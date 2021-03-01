@@ -192,7 +192,7 @@
             // A simple way to check for HTML strings
             // Strict HTML recognition (must start with <)
             // Extracted from jQuery v1.11 source
-            _.htmlExpr = /^(?:\s*(<[\w\W]+>)[^>]*)$/;
+            _Expr = /^(?:\s*(<[\w\W]+>)[^>]*)$/;
 
             _.init();
 
@@ -432,11 +432,11 @@
             _.$prevArrow = $(_.options.prevArrow);
             _.$nextArrow = $(_.options.nextArrow);
 
-            if (_.htmlExpr.test(_.options.prevArrow)) {
+            if (_Expr.test(_.options.prevArrow)) {
                 _.$prevArrow.appendTo(_.options.appendArrows);
             }
 
-            if (_.htmlExpr.test(_.options.nextArrow)) {
+            if (_Expr.test(_.options.nextArrow)) {
                 _.$nextArrow.appendTo(_.options.appendArrows);
             }
 
@@ -550,7 +550,7 @@
                 }
                 newSlides.appendChild(slide);
             };
-            _.$slider.html(newSlides);
+            _.$slider(newSlides);
             _.$slider.children().children().children()
                 .width((100 / _.options.slidesPerRow) + "%")
                 .css({'display': 'inline-block'});
@@ -755,7 +755,7 @@
         if(_.options.rows > 1) {
             originalSlides = _.$slides.children().children();
             originalSlides.removeAttr('style');
-            _.$slider.html(originalSlides);
+            _.$slider(originalSlides);
         }
 
     };
@@ -807,7 +807,7 @@
                     width: ''
                 });
 
-            _.$slider.html(_.$slides);
+            _.$slider(_.$slides);
         }
 
         _.cleanUpRows();
