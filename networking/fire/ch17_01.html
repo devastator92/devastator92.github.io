@@ -1,0 +1,1626 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:56 GMT -->
+<head><title>File Transfer, File Sharing, and Printing (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch17_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 17. File Transfer, File Sharing, and Printing</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch17-8531">File Transfer Protocol (FTP)</a><br />
+<a href="ch17_02.html">Trivial File Transfer Protocol (TFTP)</a><br />
+<a href="ch17_03.html">Network File System (NFS)</a><br />
+<a href="ch17_04.html">File Sharing for Microsoft Networks </a><br />
+<a href="ch17_05.html">Summary of Recommendations for File Sharing </a><br />
+<a href="ch17_06.html">Printing Protocols</a><br />
+<a href="ch17_07.html">Related Protocols</a><br /></p><p></div>
+
+
+
+
+
+
+
+Although files can be sent from one computer to another via
+electronic mail, email tends to be an inefficient way of transferring
+data, best suited for relatively small documents. Other protocols are
+better for moving large files around. These protocols come in two
+kinds: protocols designed for file transfer, and protocols designed
+for file sharing. In file transfer, a user copies a file to or from a
+server, so that one file is on the server and another copy of the
+file is on the client. In file sharing, the file remains on the
+server and is modified by the client, so that only one copy of the
+file exists. The file sharing model is particularly useful in
+situations where multiple people need to work on a file.</p><p>
+
+
+
+
+
+When using mobile computers, it is useful to have some sort of hybrid
+between these two options; a mobile computer may not be able to
+contact a file server to use a file that's located on the
+server, so local copies are desirable, but the mobile is unlikely to
+be reliably backed up and accessible to other people, so server-based
+files are desirable. Although there are various solutions to this
+situation, all of them involve using existing protocols designed for
+file transfer or for file sharing. The most common versions are
+programs like Microsoft's Briefcase, which use file sharing to
+synchronize files between a mobile computer and a server.</p><p>
+
+
+
+
+
+<a name="INDEX-1618" /></a><a name="INDEX-1619" /></a>FTP is the de
+facto standard for file transfer on the Internet. In addition, some
+specialized protocols are used for applications where FTP is not
+suitable. TFTP is used by dedicated devices to transfer configuration
+files.</p><p>
+
+
+
+
+
+NFS is the de facto standard for file sharing under Unix, although
+AFS and DCE DFS are both used at some sites. CIFS/SMB and NetWare are
+used for file sharing under Microsoft network operating systems.
+AppleShare is the file sharing protocol for Apple Macintoshes. There
+are a wide variety of ways to mix and match these protocols (for
+instance, Unix machines can run SMB and NetWare, Microsoft and Apple
+machines can run NFS, and Microsoft servers can translate NetWare and
+AppleShare into SMB).</p><p>
+
+
+
+
+
+Printing is effectively a special case of file transfer, in which
+files are transferred to the printer. Not only does printing have
+most of the same security properties as file transfer, it is actually
+implemented as a special type of file transfer on many platforms, so
+we have included it here.</p><p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch17-8531" /></a>
+<h2 class="sect1">17.1. File Transfer Protocol (FTP)</h2>
+
+
+
+
+
+<a name="INDEX-1620" /></a>FTP is used to transfer
+files from one machine to another. You can use FTP to transfer any
+type of file, including executable binaries, graphics images, ASCII
+text, PostScript, sound and video files, and more. The data provided
+by an FTP server is organized hierarchically, and the contents can be
+navigated interactively using Unix-like commands. There are two types
+of FTP access: user or authenticated FTP and anonymous FTP.
+<em class="emphasis">User FTP</em> requires an account on the server (in
+general, it is for users who already have accounts on the machine and
+lets them access any files they could access if they were logged in).
+<em class="emphasis">Anonymous FTP</em> is for people who don't have
+an account and is used to provide access to specific files to the
+world at large.</p><p>
+
+
+
+
+
+Anonymous FTP is by far the most common use of FTP on the Internet.
+Anonymous FTP servers are the standard mechanism for distributing
+source code, compiled programs, information, and other files that
+sites wish to make available to the Internet at large. If a site
+provides an anonymous FTP server, anyone on the Internet can initiate
+an FTP connection to the site, tell the FTP server that their login
+name is "anonymous", and access whatever files the
+server's owners have chosen to make available in a restricted
+area. This process is done automatically by most web browsers when
+they encounter a URL that begins "ftp:", so many people
+use FTP without being aware that they are doing so.</p><p>
+
+
+
+
+
+<a name="ch17-8558" /></a><div class="sect2">
+<h3 class="sect2">17.1.1. Packet Filtering Characteristics of FTP</h3>
+
+
+
+
+
+FTP uses two separate TCP connections: one to carry commands and
+results between the client and the server (commonly called the
+<em class="emphasis">command channel</em> ), and the other to carry any
+actual files and directory listings transferred (the <em class="emphasis">data
+channel</em> ). The command channel uses port 21 on the server
+end and a port above 1023 on the client. FTP has two different ways
+to set up the data channel, called <em class="emphasis">normal mode</em>
+and <em class="emphasis">passive mode</em>. (Passive mode is also
+sometimes written as "PASV mode", after the command used
+to set it up.) In normal mode, the server uses port 20 for the data
+channel, while in passive mode, it uses a port above 1023. The client
+always uses a port above 1023 for the data channel.</p><p>
+
+
+
+
+
+To start an FTP session in normal mode, a client first allocates two
+TCP ports for itself, each of them with a port number above 1024. It
+uses the first to open the command channel connection to the server
+and then issues FTP's PORT command to tell the server the
+number of the second port, which the client wants to use for the data
+channel. The server then opens the data channel connection. This data
+channel connection is backwards from most protocols, which open
+connections from the client to the server. This backwards open
+complicates things for sites that are attempting to do
+start-of-connection packet filtering to ensure that all TCP
+connections are initiated from the inside, because external FTP
+servers will attempt to initiate data connections to internal
+clients, in response to command connections opened from those
+internal clients. Furthermore, these connections will be going to
+ports known to be in an unsafe range. <a href="ch17_01.html#ch17-38821">Figure 17-1</a>
+shows this kind of FTP connection.</p><p>
+
+
+
+
+
+<a name="ch17-38821" /></a><div class="figure"><img height="328" alt="Figure 17-1" src="figs/fire2.1701.gif" width="461" /></div><h4 class="objtitle">Figure 17-1. A normal-mode FTP connection</h4>
+
+<a name="INDEX-1621" /></a><a name="INDEX-1622" /></a>To start a connection in passive mode, an
+FTP client allocates two TCP ports for its own use and uses the first
+port to contact the FTP server, just as when using normal mode.
+However, instead of issuing the PORT command to tell the server the
+client's second port, the client issues the PASV command. This
+causes the server to allocate a second port of its own for the data
+channel (for architectural reasons, servers use random ports above
+1023 for this, not port 20 as in normal mode; you couldn't have
+two servers on the same machine simultaneously listening for incoming
+PASV-mode data connections on port 20) and tell the client the number
+of that port. The client then opens the data connection from its port
+to the data port the server has just told it about. <a href="ch17_01.html#ch17-20632">Figure 17-2</a> shows a passive-mode FTP connection.</p><p>
+
+
+
+
+
+<a name="ch17-20632" /></a><div class="figure"><img height="375" alt="Figure 17-2" src="figs/fire2.1702.gif" width="456" /></div><h4 class="objtitle">Figure 17-2. A passive-mode FTP connection</h4>
+
+Passive mode is useful because it allows you to avoid
+start-of-connection filtering problems. In passive mode, all
+connections will be opened from the inside, by the client.</p><p>
+
+
+
+
+
+ost FTP servers in widespread use support passive mode, but not all
+FTP clients do. If a given client does support passive mode, it will
+usually be mentioned as a feature in the documentation or
+description. Some clients support both normal and passive modes and
+provide the user some way to specify which mode to use. If
+you're having trouble finding
+passive-mode<a name="INDEX-1623" /></a><a name="INDEX-1624" /></a> clients, it's useful to know
+that the built-in FTP clients in most web browsers (Netscape
+Navigator, for example) use passive mode. Chances are, your users
+will want to have these browsers anyway for web access, and you can
+show them how to use the browsers as FTP clients as well.</p><p>
+
+
+
+
+
+Different FTP servers have different strengths and weaknesses. You
+may find that combinations of servers and clients that work well with
+normal-mode transfers hang periodically when you do passive-mode
+transfers, or vice versa. You may also find some FTP servers that
+have difficulty with web browsers as FTP clients, even when they
+support other clients in passive mode.</p><p>
+
+
+
+
+
+If your FTP client (or one of the FTP servers you wish to communicate
+with) does not support passive mode, and you still want to allow FTP
+via packet filtering (rather than via proxy), you'll have to
+put a special-case exception in your packet filtering rules to allow
+the server to open the data channel back in to the client. If you do
+so, you will still be vulnerable to attackers launching a connection
+from port 20 on the attacker's end (nominally the FTP data
+channel, but you have no way to guarantee that on a machine you
+don't control) to a port above 1023 on your end (such as an X
+server, for example). Therefore, you should restrict this
+special-case exception as much as possible -- for example, by
+tying it to the address of the particular client or server that
+doesn't support passive mode. (Even an exception for a single
+server makes you vulnerable to forged connections from that
+server.)<a name="INDEX-1625" /></a><a name="INDEX-1626" /></a></p><p>
+
+
+
+
+
+<a name="INDEX-1627" /></a>Most dynamic packet filtering
+implementations monitor the commands sent over the FTP command
+channel and notice the PORT command the client sends to the server.
+This command tells the server on which port the client is listening
+for the server to open the data channel. These implementations also
+put in place a temporary (time-limited) exception in the packet
+filtering rules to allow the server to open the data channel back to
+the client.</p><p>
+
+
+
+
+
+<a name="ch17-2-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+21</p><p></td>
+<td>
+<a href="#FOOTNOTE-69">[69]</a></p><p>
+</td>
+<td>
+Incoming FTP request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+21</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response to incoming request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+20</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-69">[69]</a></td>
+<td>
+Data channel creation for incoming FTP request, normal mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+20</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Data channel responses for incoming FTP request, normal mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-69">[69]</a></td>
+<td>
+Data channel creation for incoming FTP request, passive mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Data channel responses for incoming FTP request, passive mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+21</p><p></td>
+<td><a href="#FOOTNOTE-69">[69]</a></td>
+<td>
+Outgoing FTP request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+21</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response to outgoing request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+20</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-69">[69]</a></td>
+<td>
+Data channel creation for outgoing FTP request, normal mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+20</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Data channel responses for outgoing FTP request, normal mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-69">[69]</a></td>
+<td>
+Data channel creation for outgoing FTP request, passive mode</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Data channel responses for outgoing FTP request, passive mode</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-69" /></a>[69]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-8900" /></a><div class="sect2">
+<h3 class="sect2">17.1.2. Proxying Characteristics of FTP</h3>
+
+
+
+
+
+Because of the problems with passive mode, and because of
+complications introduced in name service (the "double-reverse
+lookups" discussed in <a href="ch20_01.html">Chapter 20, "Naming and Directory Services"</a>), proxying
+is a particularly attractive solution for outbound FTP. Using a
+normal-mode proxied client allows you to talk reliably to external
+servers without having to allow incoming TCP connections for the data
+channel to any host except the bastion host doing the proxying. For
+this reason, you may choose to proxy FTP even if you allow most other
+protocols directly through the firewall via packet filtering. Both
+modified-client and modified-procedure proxies are available for FTP.</p><p>
+
+
+
+
+
+The SOCKS package includes an FTP client for Unix that has been
+modified to use SOCKS. Because of the multiple simultaneous TCP
+connections involved in FTP, modifying other FTP clients yourself
+requires some work (more than modifying clients for straightforward
+single-connection protocols like SMTP and POP).</p><p>
+
+
+
+
+
+<a name="INDEX-1628" /></a>TIS
+FWTK provides a proxy FTP server that operates with modified clients
+or modified user procedures. It provides additional logging,
+operation denial, and user authentication features, giving you finer
+control than you can achieve with packet filters or SOCKS proxying.</p><p>
+
+
+
+
+
+If you want to use modified clients with the TIS FWTK FTP proxy
+server, you will need to do all of the modification yourself; the
+proxy server does not provide a modified client or even a client
+library. Using modified clients with the TIS FWTK FTP proxy server
+will also prevent you from running a standard FTP server on the
+machine you're using as the proxy server. Some versions of FWTK
+have had an FTP server that could act as a proxy server and a regular
+FTP server, but there have been some problems with it, and it's
+not clear that it will continue to be included with newer releases of
+the toolkit.</p><p>
+
+
+
+
+
+Some FTP clients are not sufficiently flexible to be used with
+modified user procedures involving the TIS FWTK FTP proxy server. The
+custom procedures users have to follow involve opening an FTP
+connection to the machine where the proxy server is running and then
+logging into the FTP proxy server as
+<em class="emphasis">anonymous@host.some.net</em>, specifying the name of
+the host they really want to connect to as part of the login. Some
+FTP clients have "anonymous" simply hardcoded in or limit
+the length of the login field to something too short to contain
+"anonymous@" plus a reasonably long hostname.</p><p>
+
+
+
+
+
+Any commercial proxying packages will almost certainly support
+outbound FTP proxying because FTP is such a commonly used protocol on
+the Internet.</p><p>
+
+
+
+
+
+any sites use both proxy and packet filtering solutions for FTP. You
+can sometimes reduce the number of modified clients you need by using
+proxying to support normal-mode connections and packet filtering to
+support passive-mode connections. You can also use a combined
+solution for added security by using a proxy FTP server that uses
+passive mode to make external connections, regardless of the mode it
+uses to talk to the internal hosts; this converts all connections
+that cross the firewall to passive mode and allows you to tighten the
+packet filters that protect the host doing the proxying. On the other
+hand, it will prevent you from using servers that don't support
+passive mode.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">17.1.3. Network Address Translation Characteristics of FTP</h3>
+
+
+
+
+
+FTP uses embedded IP addresses to set up the data connection and will
+not work with network address translation unless the translator
+modifies the contents of packets. However, almost all network address
+translation systems are FTP-aware and will be able to make this
+change.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-8954" /></a><div class="sect2">
+<h3 class="sect2">17.1.4. Providing Anonymous FTP Service</h3>
+
+
+
+
+
+<a name="INDEX-1629" /></a>
+<a name="INDEX-1630" /></a>With anonymous FTP, a user logs in to the
+FTP server as "anonymous". The user is then asked for a
+password and is expected to enter his or her full email address in
+response. At most sites, this request is not enforced, however, and
+users can enter whatever they want, as long as it looks like an email
+address; even if the information is entered, it's usually just
+logged, not verified in any way beyond a superficial plausibility
+check (i.e., does it contain an "@" sign?). Many standard
+FTP servers, like the ones shipped with most versions of Unix,
+don't even log the information.</p><p>
+
+
+
+
+
+There are three main ways you can limit the risks of providing
+anonymous FTP service:</p><p>
+
+
+
+
+
+<ul><li><a name="INDEX-1631" /></a>Limiting access to only the information
+you want to make public</p><p></li><li>Preventing people from using your FTP server to distribute their
+information</p><p></li><li>Preventing people from using your FTP server to attack other machines<p></p></li></ul>
+<a name="ch17-4-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">17.1.4.1. Limiting access to information</h3>
+
+
+
+
+
+In setting up anonymous FTP, one precaution you can take is to limit
+what other information is available on the machine that's
+providing anonymous FTP service. In this way, even if attackers get
+"outside" the anonymous FTP area on the machine, nothing
+of interest to them is elsewhere on the machine (or reachable from
+the machine via NFS or some other mechanism).</p><p>
+
+
+
+
+
+<a name="INDEX-1632" /></a>Most Unix
+FTP servers perform a <em class="emphasis">chroot</em> to the anonymous
+FTP area before the FTP server starts processing commands from an
+anonymous user. Although Windows NT doesn't have a
+<em class="emphasis">chroot</em> mechanism, Windows NT FTP servers also
+provide a "virtual root", which is supposed to limit
+access given to anonymous users. To support both anonymous and user
+FTP, however, FTP servers need access to all files. This means that
+<em class="emphasis">chroot</em>, which is normally regarded as extremely
+safe, doesn't guarantee as much for an FTP server because the
+server is not always running in the <em class="emphasis">chroot</em>ed
+environment. On Windows NT, the restrictions are provided entirely by
+the FTP server (rather than the operating system), which is an even
+weaker guarantee (and indeed, a number of Windows NT FTP servers have
+had problems with people using pathnames that include
+".." to escape the restricted area).</p><p>
+
+
+
+
+
+<a name="INDEX-1633" /></a>To deal with this problem under
+Unix, you can modify <em class="emphasis">inetd</em> 's
+configuration so that instead of starting the FTP server directly, it
+<em class="emphasis">chroot</em>s (using something like the
+<em class="emphasis">chrootuid</em> program described in <a href="appb_01.html">Appendix B, "Tools"</a>) and then starts the FTP server. Normally, FTP
+runs with limited access only for anonymous users, and nonanonymous
+users have their normal access permissions. Doing the
+<em class="emphasis">chroot</em> before starting up the FTP server means
+that the nonanonymous users will also be limited; if you don't
+have any nonanonymous users of your FTP server (and you probably
+shouldn't), this is irrelevant.</p><p>
+
+
+
+
+
+Under Windows NT, you cannot get the operating system to enforce this
+sort of restriction. You should be sure that all filesystems on your
+FTP server are NTFS and use NTFS filesystem permissions to ensure
+that the account that is used for anonymous access does not have
+access to files that it should not be able to read. On the Microsoft
+FTP server that's part of the Internet Information Service and
+comes with Windows NT Server; that account is named
+IUSR_<em class="emphasis">computername</em>, and it is normally made part
+of the Guests group, which by default has almost universal read
+permissions. You should explicitly give Guests "No
+Access" to everything outside the anonymous FTP directories.</p><p>
+
+
+
+
+
+The details of setting up an anonymous FTP system vary depending on
+the operating system and the particular FTP daemon code in use. Start
+with the instructions (if any) in the manual pages for your FTP
+daemon; this should get you through most of the vendor-specific
+steps. Then, once you've performed all the steps there, if you
+are running Unix, obtain and follow CERT-CC Advisory 93:10 (for
+information on obtaining CERT-CC advisories, see <a href="appa_01.html">Appendix A, "Resources"</a>), which addresses setting up anonymous FTP
+servers to close the holes left by most of the vendor
+instructions.<a href="#FOOTNOTE-70">[70]</a> (There doesn't seem to be an equivalent source of
+information for Windows NT FTP servers.)</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-70" /></a>[70]Many vendors ship instructions
+containing critical problems, ranging from security holes to missing
+steps that disable parts of FTP's functionality.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+Unfortunately, one of the most common ways that anonymous users get
+access to files they shouldn't be able to see is that an
+internal user innocently puts the files up for anonymous FTP, on the
+assumption that this is somehow safe. Usually, the internal user is
+relying on security through obscurity, assuming that nobody will
+notice the files. This does not work well. People do notice,
+especially if the names of the new files are meaningful. At popular
+FTP sites, curious people poke around randomly, and they notice new
+files almost immediately and may transfer them out of pure curiosity.
+On less-visited FTP sites, files may remain unnoticed until some
+service indexes them. Unless you have explicitly arranged to have
+your FTP site skipped, you should assume that it is being indexed.</p><p>
+
+
+
+
+
+It's best to avoid putting files up for anonymous FTP if you
+don't want the entire world to read them. Use other methods of
+file transfer if possible. If not, you may want to use a modified FTP
+server, like the <em class="emphasis">wuarchive</em> server, which allows
+semianonymous access that requires an anonymous user to provide an
+additional password to get access to certain directories. (No such
+server appears to exist for Windows NT.) You can also put up files in
+directories that allow people to read the files without being able to
+do a directory listing; under Unix, you give execute permission but
+not read permission on the directory, while under Windows NT, you
+give read permission but not list permission. Doing so will let
+people who know the names transfer the files, but won't let
+people look to see what files exist.</p><p>
+
+
+
+
+
+Whatever method you choose, be sure that everybody at your site who
+can put files in the anonymous FTP directories knows not to put
+confidential files where they're world-readable. An easy way to
+do this is to prevent your internal users from writing to the
+anonymous FTP directories and to require them to ask a system
+administrator to make a file available.<a name="INDEX-1634" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-5-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">17.1.4.2. Preventing people from using your server to distribute their data</h3>
+
+
+
+
+
+<a name="INDEX-1635" /></a>If you have an anonymous FTP server, you
+may want to use it to get data as well as to distribute data. For
+example, you might want to let customers upload crash dump files
+(which are too big to conveniently send through email) so you can do
+a crash analysis on them, or you might want to let people give you
+software they've written. One way to do this is to provide a
+writable area in your anonymous FTP server.</p><p>
+
+
+
+
+
+Writable areas can be very useful, but they have a dark side. Such
+writable directories <em class="emphasis">will</em> (notice that we
+didn't say <em class="emphasis">may</em>) be found and used by
+"the underground" on the Internet as storage space and
+distribution areas for illicit material; this generally means pirated
+software packages or music and pornographic image files.</p><p>
+
+
+
+
+
+The folks who do this can be amazingly well organized and hard to
+track down. They have their own communication mechanisms for telling
+each other about new sites  --  places they've found to
+store their stuff  --  without revealing who they are. When they
+find a new site, they typically create a hidden subdirectory in which
+to store their files and images. They give the subdirectory an
+innocuous name such as ".. " (that's "dot dot
+space space"). When casually looking around an anonymous FTP
+area, you probably won't notice a name like this. It's
+particularly easy to miss on Unix systems because file and directory
+names beginning with "." are ignored by the
+Unix <em class="emphasis">ls</em> command, unless you give the command a
+special argument or run it as root.</p><p>
+
+
+
+
+
+On some sites in which intruders play this game, you can see a barter
+economy in operation. Someone leaves a note saying they're
+seeking a certain package or file and listing what they have to offer
+in exchange. A short time later, someone else comes along, uploads
+the requested files, and leaves another note telling the original
+poster what they want in return.</p><p>
+
+
+
+
+
+What's wrong with this misuse of your anonymous FTP areas?
+There are several problems:</p><p>
+
+
+
+
+
+<ul><li>It consumes your resources, such as disk space and network bandwidth
+(particularly on your Internet connection), and it interferes with
+the legitimate use of those resources: it's a denial of service
+attack.</p><p></li><li>It potentially exposes your site to legal action for assisting (even
+unwittingly) in copyright violations, software piracy, or perhaps
+sexual harassment, or even sexual exploitation of minors. Even if
+such actions are unlikely to succeed, your attorneys will probably
+tell you that they'd rather avoid the issue and not have to
+fight the battle in the first place.</p><p></li><li>Even if no legal actions are undertaken, such an incident could
+generate significant negative publicity and embarrassment for your
+site or organization. Once your name has been linked to software
+piracy or child pornography in any way, you are in bad trouble
+regardless of how innocent your involvement was.</p><p></li></ul>
+How can you protect your anonymous FTP areas from such misuse? The
+first question to ask yourself is this: do you really need to provide
+writable space in your anonymous FTP area? There are often other
+acceptable ways (electronic mail, for example) for folks to send
+files to you. If you decide that you must provide writable space in
+your anonymous FTP area, you can limit your vulnerability in a number
+of ways, as we describe in the following sections.<a name="INDEX-1636" /></a> <a name="INDEX-1637" /></a></p><p>
+
+
+
+
+
+<a name="ch17-9128" /></a><div class="sect4">
+<h4 class="sect4">17.1.4.2.1. Making your incoming directory write-only</h4>
+
+
+
+
+
+<a name="INDEX-1638" /></a>The most obvious approach is to make
+your "incoming" directory write-only. Under Unix, this is
+directory permissions 773 or 733  --  that is,
+"rwxrwx-wx" or "rwx-wx-wx". Make sure that
+the directory is owned by some user other than "ftp" (or
+whatever your anonymous FTP server runs as when doing anonymous FTP).
+If the mode is 773 instead of 733, then also make sure that the group
+of the directory is something other than the default group of the
+"ftp" login. Under Windows NT, set the directory so that
+the user used for anonymous FTP has Add permission on the directory
+and Write permission on files created in the directory. This shows up
+in the Permissions dialog as "(WX)(W)" and can be done by
+giving the Add permission and then going to Special File Permissions
+and giving Write permission.</p><p>
+
+
+
+
+
+The problem with this approach under Unix is that all you're
+doing is keeping people from being able to see what's in the
+top-level directory. They can still see what's in
+subdirectories, and they can still access files and directories they
+create in the top-level directory if they communicate exact filenames
+among themselves (and they can, via their mailing lists and other
+communications channels).</p><p>
+
+
+
+
+
+Under Windows NT, since you can specify the permissions that files
+are created with, you do not have this problem. On the other hand,
+the filesystem will allow the creator to change those permissions;
+you are relying on there being no way for an anonymous FTP user to
+take advantage of it. Microsoft's FTP server does not allow
+users to change permissions, so there is no automatic problem.
+However, if the anonymous user has any further access (for instance,
+a bug allows them to cause the FTP server to execute arbitrary code,
+even with the anonymous user's normal user permissions), it may
+be possible to make files readable.</p><p>
+</div>
+
+
+
+
+
+<a name="ch17-6-fm2xml" /></a><div class="sect4">
+<h4 class="sect4">17.1.4.2.2. Making anonymous read and anonymous write exclusive</h4>
+
+
+
+
+
+One way to keep people from using your server as a distribution point
+is to prohibit the user "anonymous" from reading any file
+that was created by the user "anonymous", regardless of
+the filesystem permissions on the file. This won't interfere
+with normal operation of the server; users can still read files you
+are trying to distribute and transfer files to you, but they
+can't use you as a third-party distribution service. This
+feature is unfortunately not in most FTP implementations although the
+code to implement it in a BSD-derived FTP daemon is only a few lines
+long.</p><p>
+</div>
+
+
+
+
+
+<a name="ch17-9139" /></a><div class="sect4">
+<h4 class="sect4">17.1.4.2.3. Disabling the creation of directories and certain files</h4>
+
+
+
+
+
+<a name="INDEX-1639" /></a>Another approach is to disable the creation
+of directories and files with funny names (for example, files that
+begin with ".") in your anonymous FTP server. Depending
+on your server, you may be able to do this with a configuration file
+(for example, the <em class="emphasis">wuarchive</em> server lets you
+restrict anonymous users from deleting, overwriting, or creating
+certain types of files), or you may have to modify the server source
+code. (This is a nontrivial modification, which requires a reasonably
+competent C programmer.) Microsoft's FTP server doesn't
+provide this disable capability.</p><p>
+
+
+
+
+
+This approach doesn't keep people from uploading stuff to the
+writable directory you provide; it simply makes it more difficult for
+them to hide that stuff so that it escapes your notice. If you do
+this, you will still need to look at the writable area every day (and
+look at the contents of files, not just the names) to be sure
+everything is something that belongs there.</p><p>
+</div>
+
+
+
+
+
+<a name="ch17-9147" /></a><div class="sect4">
+<h4 class="sect4">17.1.4.2.4. Uploading by prearrangement</h4>
+
+
+
+
+
+<a name="INDEX-1640" /></a><a name="INDEX-1641" /></a>Another approach is used
+frequently by sites that want people to be able to upload files but
+only by prearrangement. These sites take a page from the
+underground's own book by creating hidden writable
+subdirectories that you can access only if you know they're
+there. The attackers can't see them; they're unaware that
+there's a "there" there for their wares.</p><p>
+
+
+
+
+
+Here's what you do:</p><p>
+
+
+
+
+
+<ol><li>Make an "incoming" directory.</p><p></li><li>Make a subdirectory there with a "secret" name, chosen in
+much the same way you'd choose a password  --  that is,
+something unguessable.</p><p></li><li>Make the subdirectory with the secret name be writable.<p></p></li><li>Make the parent directory (the incoming directory) mode execute-only
+(under Unix, mode 111  --  that is, - -x- -x- -x; under Windows NT
+the anonymous FTP user should have only the Execute permission on the
+directory and no permission on files in it, which is represented as
+"(X)(None)").</p><p></li></ol>
+Users can now upload files to the writable directory only if they
+know (presumably because you've told them) its secret,
+password-like name. You can create as many of these secret
+subdirectories as necessary, and you can change or delete them as
+often as necessary. If your site creates a top-level index of your
+FTP area (such as a file containing the output of "ls -lr
+~ftp"), you need to make sure that the hidden directories
+don't appear in the index. The easiest way to do that is to run
+the indexing command as the "ftp" user, so that it has
+the same permissions that someone using anonymous FTP would have.</p><p>
+
+
+
+
+
+Beware that some FTP clients with graphical user interfaces will only
+let a user access a directory that the FTP client can see; they
+don't provide a way for the user to jump blindly to a directory
+that doesn't appear in a directory listing. Such clients
+won't work with this scheme because, by design, the client
+can't see the names of the subdirectories containing the actual
+data. This is not usually a problem for people coming in from Unix
+machines, and there are publicly available clients for most platforms
+that do not have this problem, so you may be able to work around this
+limitation.</p><p>
+</div>
+
+
+
+
+
+<a name="ch17-9177" /></a><div class="sect4">
+<h4 class="sect4">17.1.4.2.5. Removing the files</h4>
+
+
+
+
+
+<a name="INDEX-1642" /></a> <a name="INDEX-1643" /></a><a name="INDEX-1644" /></a>You might take one
+other approach on Unix, particularly if you find that your anonymous
+FTP area is already being abused and you're curious to see what
+people are uploading there. Basically, you run a program once a
+minute as a <em class="emphasis">cron</em> job that moves files from the
+writable incoming directory to another directory outside the
+anonymous FTP area. This will ensure that the intruders won't
+be able to see what's been uploaded. You may need to rename
+files when you move them to avoid overwriting files with the same
+name. Because the files aren't there to look at, it's
+easy for people to unintentionally create name conflicts
+(particularly if they're sending you crash dumps, which
+probably all start out having the same name).</p><p>
+
+
+
+
+
+ake sure that the new directory is on the same filesystem, so the
+operating system doesn't have to copy the data. Because of the
+way that the Unix filesystem works, this approach works even if the
+file is still being written when the "move" takes place,
+as long as the directory you're moving it to is on the same
+filesystem as the original directory ("moving" a file in
+such a case doesn't actually move the data; it merely renames
+the file). You should also be cautious about how you handle the
+original filename. People can create files with names that contain
+space, newlines, and other interesting characters that wreak havoc
+with carelessly written shell scripts.</p><p>
+
+
+
+
+
+This approach doesn't avoid denial of service attacks; people
+can still fill up your disk space. In fact, they may retry uploads
+multiple times (because the files keep mysteriously disappearing) and
+unintentionally fill up your disks.</p><p>
+
+
+
+
+
+This approach doesn't work as well on Windows NT because the
+FTP server opens files in a mode that does not allow any other
+process to access them. It's therefore impossible to move files
+while they are being written. On the other hand, people can't
+read them while they're being written, either, so you
+don't lose much by moving only files that are complete.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-7-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">17.1.4.3. Preventing people from using your server to attack other machines</h3>
+
+
+
+
+
+<a name="INDEX-1645" /></a> <a name="INDEX-1646" /></a>As we discussed earlier, a normal-mode
+FTP connection involves having the server open a connection to the
+client. In order to do that, it uses information provided by the
+client (an IP address and port number). A specially modified FTP
+client can send the server any IP address and port number it likes,
+and the FTP server will attempt to connect to that address and port
+number, and return information to the client about whether or not the
+attempt works. This allows clients to use the FTP server as a sort of
+port scanner.</p><p>
+
+
+
+
+
+icrosoft's FTP server by default requires the IP address to be
+the same as the source address on the data channel and allows the
+client to specify only the standard FTP data port, or a port number
+above 1023. Few Unix servers provide this kind of functionality. If
+you run a server that does not implement limits, you should be sure
+that packet filters prevent the machine from acting as a useful port
+scanner. It should not be able to create arbitrary connections to
+other machines.</p><p>
+
+
+
+
+
+In some cases, intelligent packet filters are also vulnerable to this
+kind of attack. If an attacker connects to an FTP server and issues
+the Port command, the packet filter will usually open a hole for the
+requested connection. This hole will exist regardless of whether or
+not the FTP server actually obeys the command. <a name="INDEX-1647" /></a> <a name="INDEX-1648" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-9023" /></a><div class="sect3">
+<h3 class="sect3">17.1.4.4. Using the wuarchive FTP daemon</h3>
+
+
+
+
+
+<a name="INDEX-1649" /></a><a name="INDEX-1650" /></a><a name="INDEX-1651" /></a><a name="INDEX-1652" /></a>Many
+Internet sites  --  both major and minor  --  that provide
+anonymous FTP run the <em class="emphasis">wuarchive</em> version of the
+Unix FTP server, developed at Washington University (the
+"wu" in the name) in St. Louis, Missouri. This server
+provides a number of features that are especially useful for
+anonymous FTP servers. These include the following features and many
+others:</p><p>
+
+
+
+
+
+<ul><li>Better and more complete logging. It can log uploads, downloads, or
+every command sent to it; it can also keep track of the number of
+accesses by user classes (e.g., by anonymous users).</p><p></li><li>Per-directory message files; these are shown to a user who visits
+that directory to provide relevant information about the
+directory's contents (for example, "This version is now
+obsolete").</p><p></li><li>The ability to define classes of users; based on the account they log
+in to the server with, and/or the host from which they access, you
+can determine what files they have access to and when they can log
+in.</p><p></li><li>Restrictions on certain classes of users. For example,
+<em class="emphasis">wuarchive</em> can limit the number of simultaneous
+anonymous users who are accessing the server; the limit can vary by
+time of day and day of the week. By using these restrictions, you
+control the load generated by the FTP server.</p><p></li><li>The ability to compress, tar, and otherwise manipulate files
+automatically as they are transferred.</p><p></li><li>Nonanonymous <em class="emphasis">chroot</em>ed access, for users who need
+only limited access to your machines. This allows you to give a
+specific account access to files that are not accessible to
+"anonymous" without giving the account the ability to
+look around at everything on your disks.</p><p></li></ul>
+For information about obtaining the <em class="emphasis">wuarchive</em>
+FTP daemon, see <a href="appb_01.html">Appendix B, "Tools"</a>. Make sure that you are
+installing the genuine, most recent version. This program has in the
+past been distributed by attackers with added trap doors, and older
+versions may have security problems that have since been fixed.</p><p>
+
+
+
+
+
+Be aware that one cost of the additional power and complexity offered
+by <em class="emphasis">wuarchive</em> is a bigger potential for security
+problems. The bigger and more complex a program is, the more likely
+it is to contain bugs. If the program is security-critical (as the
+FTP server is), many of those bugs are likely to have security
+impacts. Some features of the <em class="emphasis">wuarchive</em> server
+may also interact badly with some clients (in particular, some poorly
+implemented clients do not deal well with the displayed messages and
+hang). Workarounds are available, but if a significant percentage of
+your users has these clients, you may want to avoid
+<em class="emphasis">wuarchive</em>.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-9093" /></a><div class="sect2">
+<h3 class="sect2">17.1.5. Summary of Recommendations for FTP</h3>
+
+
+
+
+
+<ul><li>If you have FTP clients that properly support passive mode, then
+allow internal hosts to contact external FTP servers via packet
+filtering. This is safe only if you can filter on the TCP ACK bit, so
+that you can allow only outgoing TCP connections from ports above
+1023 to ports above 1023.</p><p></li><li>If you have FTP clients that don't support passive mode, then
+use an FTP proxy server such as the one in the TIS Internet Firewall
+Toolkit.</p><p></li><li>Encourage users to use web browsers as FTP clients in order to get
+up-to-date FTP features and proxying support without having to
+distribute additional FTP clients.</p><p></li><li>Consider providing FTP access via both packet filtering and proxies,
+supporting passive mode via packet filtering and normal mode via
+proxies.</p><p></li><li>If you want to allow incoming FTP, use packet filters to allow
+incoming FTP only to your bastion host.</p><p></li><li>If you allow incoming FTP (anonymous or user), use an up-to-date FTP
+server.</p><p></li><li>If you allow anonymous FTP users to write files, protect the writable
+area so it can't be used to transfer files between third
+parties.</p><p></li><li>Be careful about who within your organization can put up files for
+anonymous FTP, and make sure they understand what they're
+doing.<a name="INDEX-1653" /></a></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.9. Network News Transfer Protocol </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17.2. Trivial File Transfer Protocol </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:00 GMT -->
+</html>

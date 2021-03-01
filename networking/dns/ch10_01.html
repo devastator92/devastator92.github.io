@@ -1,0 +1,337 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:26 GMT -->
+<head><title>Advanced Features (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 10. Advanced Features</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-10-SECT-1">Address Match Lists and ACLs</a><br />
+<a href="ch10_02.html">DNS Dynamic Update</a><br />
+<a href="ch10_03.html">DNS NOTIFY (Zone Change Notification)</a><br />
+<a href="ch10_04.html">Incremental Zone Transfer (IXFR)</a><br />
+<a href="ch10_05.html">Forwarding</a><br />
+<a href="ch10_06.html">Views</a><br />
+<a href="ch10_07.html">Round Robin Load Distribution</a><br />
+<a href="ch10_08.html">Name Server Address Sorting</a><br />
+<a href="ch10_09.html">Preferring Name Servers on Certain Networks</a><br />
+<a href="ch10_10.html">A Nonrecursive Name Server</a><br />
+<a href="ch10_11.html">Avoiding a Bogus Name Server</a><br />
+<a href="ch10_12.html">System Tuning</a><br />
+<a href="ch10_13.html">Compatibility</a><br />
+<a href="ch10_14.html">The ABCs of IPv6 Addressing</a><br />
+<a href="ch10_15.html">Addresses and Ports</a><br />
+<a href="ch10_16.html">IPv6 Forward and Reverse Mapping</a><br /><p></p></div>
+
+
+<em>"What's the use of their having names," the Gnat
+said, "if they won't answer to them?"</em></p><p>
+
+
+<a name="INDEX-1518" /></a>The latest BIND name servers, Versions
+8.2.3 and 9.1.0, have <em class="emphasis">lots</em> of new features. Some
+of the most prominent introductions are support for dynamic updates,
+asynchronous zone change notification (called "NOTIFY"
+for short), and incremental zone transfer. Of the rest, the most
+important are related to security: they let you tell your name server
+whom to answer queries from, whom to offer zone transfers to, and
+whom to permit dynamic updates from. Many of the security features
+aren't necessary inside a corporate network, but the other
+mechanisms will help out the administrators of any name servers.</p><p>
+
+
+In this chapter, we'll cover these features and suggest how
+they might come in handy in your DNS infrastructure. (We do save some
+of the hardcore firewall material 'til the next chapter,
+though.)</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-10-SECT-1" /></a>
+<h2 class="sect1">10.1. Address Match Lists and ACLs</h2>
+
+
+<a name="INDEX-1519" /></a>Before we introduce the new features,
+however, we'd better cover address match lists. BIND 8 and 9
+use address match lists for nearly every security feature and for
+some features that aren't security-related at all.</p><p>
+
+
+An address match list is a list (what else?) of terms that specifies
+one or more IP addresses. The elements in the list can be individual
+IP addresses, IP prefixes, or a named address match list (more on
+those shortly).<a href="#FOOTNOTE-70">[70]</a> An IP
+prefix has the format:<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-70" /></a>[70]And if you're running BIND 9,
+address match lists can include IPv6 addresses and IPv6 prefixes.
+These are described later in the chapter.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">network in dotted-octet format/bits in netmask</pre></blockquote>
+
+
+For example, the network 15.0.0.0 with the network mask 255.0.0.0
+(eight contiguous ones) would be written 15/8. Traditionally, this
+would have been thought of as the "class A" network 15.
+The network consisting of IP addresses 192.168.1.192 through
+192.168.1.255, on the other hand, would be written 192.168.1.192/26
+(network 192.168.1.192 with the netmask 255.255.255.192, which has 26
+contiguous ones). Here's an address match list comprising those
+two networks:</p><p>
+
+
+<blockquote><pre class="code">15/8; 192.168.1.192/26;</pre></blockquote>
+
+
+A named address match list is just that: an address match list with a
+name. To be used within another address match list, a named address
+match list must have been previously defined in <em class="emphasis">named.conf
+</em>with an <a name="INDEX-1520" /></a><em class="emphasis">acl</em> statement.
+The <em class="emphasis">acl</em> statement has a simple syntax:</p><p>
+
+
+<blockquote><pre class="code">acl name { address_match_list; };</pre></blockquote>
+
+
+This just makes the name equivalent to that address match list from
+now on. Although the name of the statement, <em class="emphasis">acl</em>,
+suggests "<a name="INDEX-1521" /></a>
+<a name="INDEX-1522" /></a>access control list," you can use the
+named address match list anywhere an address match list is accepted,
+including some places that don't have anything to do with
+access control.</p><p>
+
+
+Any time you're going to use one or more of the same terms in a
+few access control lists, it's a good idea to use an
+<em class="emphasis">acl</em> statement to associate them with a name. You
+can then refer to the name in the address match list. For example,
+let's call 15/8 what it is: "HP-NET." And
+we'll call 192.168.1.192/26 "internal":</p><p>
+
+
+<blockquote><pre class="code">acl "HP-NET" { 15/8; };
+
+acl "internal" { 192.168.1.192/26; };</pre></blockquote>
+
+
+Now we can refer to these address match lists by name in other
+address match lists. This not only cuts down on typing, but it makes
+the resulting <em class="emphasis">named.conf</em> file more readable.</p><p>
+
+
+We prudently enclosed the names of our ACLs in quotes to avoid
+<a name="INDEX-1523" /></a>collisions with words BIND reserves for
+its own use. If you're sure your ACL names don't conflict
+with reserved words, you don't need the quotes.</p><p>
+
+
+There are four predefined named address match lists:</p><p>
+
+
+<dl>
+<dt><i>none</i></dt>
+<dd><a name="INDEX-1524" /></a>No IP addresses<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>any</i></dt>
+<dd><a name="INDEX-1525" /></a>All IP addresses<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>localhost</i></dt>
+<dd><a name="INDEX-1526" /></a>Any of the IP addresses of the local host
+(i.e., the one running the name server)<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>localnets</i></dt>
+<dd><a name="INDEX-1527" /></a>Any of the networks the local host has a
+network interface on (found by using each network interface's
+IP address and using the netmask to mask off the host bits in the
+address)<a name="INDEX-1528" /></a><p></p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.8. The Life of a Parent</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.2. DNS Dynamic Update</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:30 GMT -->
+</html>

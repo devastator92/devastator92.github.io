@@ -1,0 +1,142 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+<head><title>The Minimal Routing Table  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">7.2. The Minimal Routing Table </h2>
+
+<p>Let's look at the <a name="INDEX-1382" />contents of the routing table constructed
+when <tt class="literal">ifconfig</tt> is used to configure the network
+interfaces on a Solaris 8 system:
+</p>
+<blockquote><pre class="code"><b class="emphasis-bold">% netstat -rn</b> 
+Routing Table: IPv4
+  Destination           Gateway           Flags  Ref   Use   Interface
+-------------------- -------------------- ----- ----- ------ ---------
+172.16.12.0          172.16.12.15          U        1      8  dnet0
+224.0.0.0            172.16.12.15          U        1      0  dnet0
+127.0.0.1            127.0.0.1             UH      20   3577  lo0</pre></blockquote>
+
+<p>The first entry is the route to network 172.16.12.0 through interface
+dnet0. Address 172.16.12.15 is not a remote gateway address; it is
+the address assigned to the dnet0 interface on this host. The other
+two entries do not define routes to real physical networks; both are
+special software conventions. 224.0.0.0 is the multicast address.
+This entry tells Solaris to send multicast addresses to interface
+172.16.12.15 for delivery. The last entry is the loopback route to
+<em class="emphasis">localhost</em> created when lo0 was configured.
+</p>
+
+<p>Look at the <a name="INDEX-1383" />Flags
+field for these entries. All entries have the U (up) flag set,
+indicating that they are ready to be used, but no entry has the G
+(gateway) flag set. The G flag indicates that an external gateway is
+used. The G flag is not set because all of these routes are direct
+routes through local interfaces, not through external gateways.
+</p>
+
+<p>The <a name="INDEX-1384" />loopback route also has the H (host)
+flag set. This indicates that only one host can be reached through
+this route. The meaning of this flag becomes clear when you look at
+the <a name="INDEX-1385" />Destination field for the loopback
+entry. It shows that the destination is a host address, not a network
+address. The loopback network address is 127.0.0.0. The destination
+address shown (127.0.0.1) is the address of
+<em class="emphasis">localhost</em>, an individual host. Some systems use
+a route to the loopback network and others use a route to the
+localhost, but all systems have some route for the loopback interface
+in the routing table.
+</p>
+
+<p>Although this routing table has a host-specific route, most routes
+lead to networks. One reason network routes are used is to reduce the
+size of the routing table. An organization may have only one network
+but hundreds of hosts. The Internet has thousands of networks but
+millions of hosts. A routing table with a route for every host would
+be unmanageable.
+</p>
+
+<p>Our sample table contains only one route to a physical network,
+172.16.12.0. Therefore, this system can communicate only with hosts
+located on that network. The limited capability of this routing table
+is easily verified with the
+<tt class="literal">ping</tt><a name="INDEX-1386" /> <a name="INDEX-1387" />
+command. <tt class="literal">ping</tt> uses the ICMP Echo Message to force
+a remote host to echo a packet back to the local host. If packets can
+travel to and from a remote host, it indicates that the two hosts can
+successfully communicate.
+</p>
+
+<p>To check the routing table on this system, first
+<tt class="literal">ping</tt> another host on the local network:
+</p>
+<blockquote><pre class="code"><b class="emphasis-bold">% ping -s crab</b> 
+PING crab.wrotethebook.com: 56 data bytes 
+64 bytes from crab.wrotethebook.com (172.16.12.1): icmp_seq=0. time=11. ms 
+64 bytes from crab.wrotethebook.com (172.16.12.1): icmp_seq=1. time=10. ms 
+^C 
+----crab.wrotethebook.com PING Statistics---- 
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip (ms)  min/avg/max = 10/10/11</pre></blockquote>
+
+<p><tt class="literal">ping</tt> displays a line of output for each ICMP
+ECHO_RESPONSE received.<a href="#FOOTNOTE-68">[68]</a> When
+<tt class="literal">ping</tt> is interrupted, it displays some summary
+statistics. All of this indicates successful communication with
+<em class="emphasis">crab</em>. But if we check a host that is not on
+network 172.16.12.0, say a host at O'Reilly, the results are
+different.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-68" /><p>[68]Sun's
+<tt class="literal">ping</tt> would display only the message
+"<em class="emphasis">crab</em> is alive" if the
+<tt class="literal">-s</tt> option was not used. Most
+<tt class="literal">ping</tt> implementations do not require the
+<tt class="literal">-s</tt> option.</p> </blockquote>
+<blockquote><pre class="code"><b class="emphasis-bold"> % ping 207.25.98.2</b>
+sendto: Network is unreachable</pre></blockquote>
+
+<p>Here the message "sendto: Network is unreachable"
+indicates that this host does not know how to send data to the
+network that host 207.25.98.2 is on. There are only three routes in
+this system's routing table, and none is a route to
+207.25.98.0. 
+</p>
+
+<p>Even other subnets on <em class="emphasis">books-net</em> cannot be
+reached using this routing table. To demonstrate this,
+<tt class="literal">ping</tt> a host on another subnet. For example:
+</p>
+<blockquote><pre class="code"><b class="emphasis-bold">% ping 172.16.1.2</b>
+sendto: Network is unreachable</pre></blockquote>
+
+<p>These <tt class="literal">ping</tt> tests show that the minimal routing
+table created when the network interfaces were configured allows
+communication only with other hosts on the local network. If your
+network does not require access to any other TCP/IP networks, this
+may be all you need. However, if it does require access to other
+networks, you must add more routes to the routing <a name="INDEX-1388" />table.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7. Configuring Routing </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.3. Building a Static Routing Table </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:27 GMT -->
+</html>

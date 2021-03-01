@@ -1,0 +1,192 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Managing client swap space (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.4. Managing client swap space</h2>
+
+Once a client is running, it may need <a name="INDEX-1305" />
+<a name="INDEX-1306" />more swap space.
+Generally, allocating swap space equal to the physical memory on the
+client is a good start. Power users, or those who open many windows,
+run many processes in the background, or execute large
+compute-intensive jobs, may need to have their initial swap
+allocation increased.
+</p>
+
+You can increase the swap space on a diskless client, without
+shutting down the client, provided you have sufficient space on the
+server to hold both the client's old swap file, the
+server's new swap file, and a temporary swap file equal in size
+to the old swap file. Here is the procedure:
+</p>
+
+<ol><li>
+Create a temporary swap file <a name="INDEX-1307" />
+<a name="INDEX-1308" />on the boot server, <a name="INDEX-1309" />using <em class="emphasis">mkfile</em>
+:
+</p>
+
+<blockquote><pre class="code">wahoo# <tt class="userinput"><b>cd /export/swap</b></tt> 
+wahoo# <tt class="userinput"><b>mkfile 64M honeymoon.tmp</b></tt> wahoo# <tt class="userinput"><b>ls -l honeymoon.tmp</b></tt> 
+-rw------T  1 root root    67108864 Jan  9 00:38 honeymoon.tmp
+wahoo# <tt class="userinput"><b>share -o root=honeymoon /export/swap/honeymoon.tmp</b></tt></pre></blockquote>
+
+
+
+Make sure you do not use the <em class="emphasis">-n</em> option to
+<em class="emphasis">mkfile</em>, since this causes the swap file to be
+incompletely allocated. If the client tries to find a swap block that
+should have been pre-allocated by <em class="emphasis">mkfile</em>, but
+doesn't exist, the client <a name="INDEX-1310" />usually panics and reboots.
+</p>
+</li>
+
+<li>
+On the client, mount the temporary swap file:</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>mkdir /tmp/swap.tmp</b></tt>
+honeymoon# <tt class="userinput"><b>mount wahoo:/export/swap/honeymoon.tmp /tmp/swap.tmp</b></tt>
+honeymoon# <tt class="userinput"><b>swap -a /tmp/swap.tmp</b></tt></pre></blockquote>
+
+
+What is interesting about this is that a regular file, and not a
+directory, is exported, and yet it is mounted on top of a directory
+mount point. <a name="INDEX-1311" /> <a name="INDEX-1312" />Even more interesting is what happens
+when you do an <em class="emphasis">ls -l</em> on it:
+</p>
+
+<blockquote><pre class="code">honeymoon# ls -l <tt class="userinput"><b>/tmp/swap.tmp</b></tt>
+-rw------T  1 root root    67108864 Jan  9 00:38
+swap.tmp</pre></blockquote>
+
+
+The <em class="emphasis">/tmp/swap.tmp</em> directory point has become a
+regular file after the mount.
+</p>
+</li>
+
+<li>
+On the client, add the new swap file to the swap system:</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>swap -a /tmp/swap.tmp</b></tt></pre></blockquote>
+</li>
+
+<li>
+Now remove the old swap file from the swap system:</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>swap -d /dev/swap</b></tt></pre></blockquote>
+</li>
+
+<li>
+Unmount the old swap file:</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>umount /dev/swap</b></tt></pre></blockquote>
+</li>
+
+At this point the diskless client is swapping to
+wahoo:/export/swap/honeymoon.tmp. It is now safe to construct a
+bigger wahoo:/export/swap/honeymoon.
+</p>
+
+
+<li>
+Remove the old swap file from the server and create a bigger one to
+replace it:
+</p>
+
+<blockquote><pre class="code">wahoo# <tt class="userinput"><b>cd /export/swap</b></tt>
+wahoo# <tt class="userinput"><b>unshare /export/swap/honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>rm /export/swap/honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>mkfile 256M honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>share -o root=honeymoon /export/swap/honeymoon</b></tt></pre></blockquote>
+</li>
+
+<li>
+On the client, remount the expanded swap file, add it to the swap
+system, remove the temporary swap file from the swap system, unmount
+the temporary swap file, and remove its mount point:
+</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>mount wahoo:/export/swap/honeymoon /dev/swap</b></tt>
+honeymoon# <tt class="userinput"><b>swap -a /dev/swap</b></tt>
+honeymoon# <tt class="userinput"><b>swap -d /tmp/swap.tmp</b></tt>
+honeymoon# <tt class="userinput"><b>umount /tmp/swap.tmp</b></tt>
+honeymoon# <tt class="userinput"><b>rmdir</b></tt> <tt class="userinput"><b>/tmp/swap.tmp</b></tt></pre></blockquote>
+</li>
+
+<li>
+Remove the temporary swap file from the server:</p>
+
+<blockquote><pre class="code">wahoo# <tt class="userinput"><b>unshare/export/swap/honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>rm /export/swap/honeymoon</b></tt></pre></blockquote>
+</li></ol>
+
+Of course, that is a lot of steps. If you don't mind rebooting
+the client, it is far simpler to do:
+</p>
+
+<blockquote><pre class="code">Shutdown client honeymoon
+wahoo# <tt class="userinput"><b>cd /export/swap</b></tt>
+wahoo# <tt class="userinput"><b>rm honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>mkfile 256M honeymoon</b></tt>
+wahoo# <tt class="userinput"><b>shareall</b></tt>
+Boot client honeymoon</pre></blockquote>
+
+Note that the last bit in the world permission field of a swap file
+is <em class="emphasis">T</em>, indicating that "sticky-bit"
+access is <a name="INDEX-1313" />
+<a name="INDEX-1314" />set even though the file has no execute
+permissions. The <em class="emphasis">mkfile</em> utility sets these
+permissions by default. Enabling the sticky bit on a non-executable
+file has two effects:
+</p>
+
+<ul><li>
+The virtual memory system does not perform read-ahead of this
+file's data blocks.
+</p>
+</li><li>
+The filesystem code does not write out inode information or indirect
+blocks each time the file is modified.
+</p>
+</li></ul>
+Unlike regular files, no read-ahead should be done for swap files.
+The virtual memory management system brings in exactly those pages it
+needs to satisfy page fault conditions, and performing read-ahead for
+swap files only consumes disk bandwidth on the server.
+</p>
+
+Eliminating the write operations needed to maintain inode and
+indirect block information does not present a problem because the
+diskless client cannot extend its swap filesystem. Only the file
+modification time field in the inode will change, so this approach
+trades off an incorrect modification time (on the swap file) for
+fewer <a name="INDEX-1315" />
+<a name="INDEX-1316" />write
+operations.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.3. Diskless client boot process</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.5. Changing a client's name</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

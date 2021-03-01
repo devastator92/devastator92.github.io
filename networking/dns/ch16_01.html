@@ -1,0 +1,450 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:38 GMT -->
+<head><title>Miscellaneous (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch16_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 16. Miscellaneous</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-16-SECT-1">Using CNAME Records</a><br />
+<a href="ch16_02.html">Wildcards</a><br />
+<a href="ch16_03.html">A Limitation of MX Records</a><br />
+<a href="ch16_04.html">Dialup Connections</a><br />
+<a href="ch16_05.html">Network Names and Numbers</a><br />
+<a href="ch16_06.html">Additional Resource Records</a><br />
+<a href="ch16_07.html">DNS and WINS</a><br />
+<a href="ch16_08.html">DNS and Windows 2000</a><br /><p></p></div>
+
+
+<em>"The time has come," the Walrus said, "To talk of
+many things: Of shoes  -- and ships  -- and
+sealing-wax -- Of cabbages  -- and kings  -- And why the sea
+is boiling hot -- And whether pigs have wings."</em></p><p>
+
+It's time we tied up loose ends. We've already covered
+the mainstream of DNS and BIND, but there's a handful of
+interesting niches we haven't explored. Some of these may
+actually be useful to you, like instructions on how to accommodate
+Windows 2000 with BIND; others may just be interesting. We
+can't in good conscience send you out into the world without
+completing your education!</em></p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-16-SECT-1" /></a>
+<h2 class="sect1">16.1. Using CNAME Records</h2>
+
+
+<a name="INDEX-2363" /></a> <a name="INDEX-2364" /></a>We
+<a name="INDEX-2365" /></a>talked <a name="INDEX-2366" /></a>about CNAME resource
+records in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>. We didn't tell you
+everything about CNAME records, though; we saved that for this
+chapter. When you set up your first name servers, you didn't
+care about the subtle nuances of the magical CNAME record. Maybe you
+didn't realize that there was more than we explained; maybe you
+didn't care. Some of this trivia is interesting, some is
+arcane. We'll let you decide which is which.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">16.1.1. CNAMEs Attached to Interior Nodes</h3>
+
+
+<a name="INDEX-2367" /></a>If you've ever renamed your zone
+because of a company reorganization, you may have considered creating
+a single CNAME record that pointed from the zone's old domain
+name to its new domain name. For instance, if the <em class="emphasis">fx.movie.edu</em> zone were renamed
+<em class="emphasis">magic.movie.edu</em>, we'd
+be tempted to create a single CNAME record to map all the old domain
+names to the new names:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu.  IN  CNAME  magic.movie.edu.</pre></blockquote>
+
+
+With this in place, you'd expect a lookup of <em class="emphasis">empire.fx.movie.edu</em> to result in a
+lookup of <em class="emphasis">empire.magic.movie.edu</em>. Unfortunately,
+this doesn't work -- you <em class="emphasis">can't
+</em>have a CNAME record attached to an interior node like
+<em class="emphasis">fx.movie.edu</em> if it owns
+other records. Remember that <em class="emphasis">fx.movie.edu</em> has an SOA record and NS
+records, so attaching a CNAME record to it violates the rule that a
+domain name be either an alias or a canonical name, not both.</p><p>
+
+
+If you're running BIND 9, though, you can use the
+brand-spanking-new <a name="INDEX-2368" /></a>DNAME record (introduced in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>) to create an alias from your zone's old
+domain name to its new one:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu.  IN  DNAME  magic.movie.edu.</pre></blockquote>
+
+
+The DNAME record can coexist with other record types at <em class="emphasis">fx.movie.edu</em> -- like the SOA record
+and NS records that are undoubtedly there -- but you
+<em class="emphasis">can't</em> have any other domain names that end
+in <em class="emphasis">fx.movie.edu</em>. It'll
+"synthesize" CNAME records from domain names in
+<em class="emphasis">fx.movie.edu</em> to like domain
+names in <em class="emphasis">magic.movie.edu</em>
+when the names in <em class="emphasis">fx.movie.edu</em> are looked up.</p><p>
+
+
+If you don't have BIND 9, you'll have to create aliases
+the old-fashioned way -- a CNAME record for each individual domain
+name within the zone:</p><p>
+
+
+<blockquote><pre class="code">empire.fx.movie.edu.       IN  CNAME  empire.magic.movie.edu.
+bladerunner.fx.movie.edu.  IN  CNAME  bladerunner.magic.movie.edu.</pre></blockquote>
+
+
+If the subdomain isn't delegated, and consequently
+doesn't have an SOA record and NS records attached, you can
+also create an alias for <em class="emphasis">fx.movie.edu</em>. However, this will apply
+only to the domain name <em class="emphasis">fx.movie.edu</em> and not to other domain
+names in the <em class="emphasis">fx.movie.edu</em>
+zone.</p><p>
+
+
+Hopefully, the tool you use to manage your zone data files will
+handle creating CNAME records for you. (<em class="filename">h2n</em>,
+which was introduced in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, does just
+that.)</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">16.1.2. CNAMEs Pointing to CNAMEs</h3>
+
+
+<a name="INDEX-2369" /></a><a name="INDEX-2370" /></a>You may
+have wondered whether it was possible to have an alias (CNAME record)
+pointing to another alias. This might be useful in situations where
+an alias points from a domain name outside your zone to a domain name
+inside your zone. You may not have any control over the alias outside
+your zone. What if you want to change the domain name it points to?
+Can you simply add another CNAME record?</p><p>
+
+
+The answer is yes: you can chain together CNAME records. The BIND
+implementation supports it, and the RFCs don't expressly forbid
+it. But while you <em class="emphasis">can</em> chain CNAME records, is it
+a wise thing to do? The RFCs recommend against it because of the
+possibility of creating a CNAME loop and because it slows resolution.
+You may be able to do it in a pinch, but you probably won't
+find much sympathy on the Net if something breaks. And all bets are
+off if a new (non-BIND-based) name server implementation
+emerges.<a href="#FOOTNOTE-105">[105]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-105" /></a>[105]And one has (the Microsoft DNS Server,
+shipped with Windows NT and Windows 2000). It also permits CNAMEs
+that point to CNAMEs, though.</p><p>
+
+</blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">16.1.3. CNAMEs in the Resource Record Data</h3>
+
+
+<a name="INDEX-2371" /></a>For any other record besides a CNAME
+record, you must have the canonical domain name in the resource
+record data. Applications and name servers won't operate
+correctly otherwise. As we mentioned back in <a href="ch05_01.html">Chapter 5, "DNS and Electronic Mail"</a>, for example, <em class="filename">sendmail</em>
+only recognizes the canonical name of the local host on the right
+side of an MX record. If <em class="filename">sendmail</em> doesn't
+recognize the local host's name, it won't strip the right
+MX records out when paring down the MX list, and may deliver mail to
+itself or to less-preferred hosts, causing mail to loop.</p><p>
+
+
+BIND 8 name servers log messages like these when they encounter
+aliases on the right side of a record:</p><p>
+
+
+<blockquote><pre class="code">Sep 27 07:43:48 terminator named[22139]: "digidesign.com IN NS" points to a CNAME (ns1.digidesign.com)
+Sep 27 07:43:49 terminator named[22139]: "moreland.k12.ca.us IN MX" points to a CNAME (mail.moreland.k12.ca.us)</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">16.1.4. Multiple CNAME Records</h3>
+
+
+<a name="INDEX-2372" /></a>
+<a name="INDEX-2373" /></a>One
+pathological configuration that honestly hadn't occurred to
+us -- and many pathological configurations
+<em class="emphasis">have</em> occurred to us -- is multiple CNAME
+records attached to the same domain name. Some administrators use
+this with <a name="INDEX-2374" /></a>round robin to rotate between RRsets. For
+example, the records:</p><p>
+
+
+<blockquote><pre class="code">fullmonty  IN  CNAME  fullmonty1
+fullmonty  IN  CNAME  fullmonty2
+fullmonty  IN  CNAME  fullmonty3</pre></blockquote>
+
+
+could be used to return all the addresses attached to <em class="emphasis">fullmonty1</em>, then all the addresses of
+<em class="emphasis">fullmonty2</em>, then all the
+addresses of <em class="emphasis">fullmonty3</em> on a
+name server that didn't recognize this as the abomination it
+is. (It violates the "CNAME and other data" rule, for
+one.)</p><p>
+
+
+BIND 4 doesn't recognize this as a misconfiguration; BIND 8 and
+9.1.0 and later do. BIND 8 lets you permit it if you want to with:</p><p>
+
+
+<blockquote><pre class="code">options {
+                multiple-cnames yes;
+};</pre></blockquote>
+
+
+In BIND 9, there's no option to allow it. The default,
+naturally, is to disallow it.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-1.5" /></a><div class="sect2">
+<h3 class="sect2">16.1.5. Looking Up CNAMEs</h3>
+
+
+<a name="INDEX-2375" /></a>
+<a name="INDEX-2376" /></a>At times you may want to look up a CNAME
+record itself, not data for the canonical name. With
+<em class="filename">nslookup</em> or <em class="filename">dig</em>, this is
+easy to do. You can either set the query type to
+<em class="emphasis">cname</em>, or set the query type to
+<em class="emphasis">any</em> and then look up the name:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  wormhole
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>set query=cname</b></tt>
+&gt; <tt class="userinput"><b>bigt</b></tt>
+Server:  wormhole
+Address:  0.0.0.0
+
+bigt.movie.edu  canonical name = terminator.movie.edu
+&gt; <tt class="userinput"><b>set query=any</b></tt>
+&gt; <tt class="userinput"><b>bigt</b></tt>
+Server:  wormhole
+Address:  0.0.0.0
+
+bigt.movie.edu  canonical name = terminator.movie.edu
+&gt; <tt class="userinput"><b>exit</b></tt>
+
+<tt class="userinput"><b>% dig bigt.movie.edu cname</b></tt>
+; &lt;&lt;&gt;&gt; DiG 8.3 &lt;&lt;&gt;&gt; bigt.movie.edu cname 
+;; res options: init recurs defnam dnsrch
+;; got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 4
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 3, ADDITIONAL: 4
+;; QUERY SECTION:
+;;      bigt.movie.edu, type = CNAME, class = IN
+
+;; ANSWER SECTION:
+bigt.movie.edu.         1D IN CNAME     terminator.movie.edu.</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-1.6" /></a><div class="sect2">
+<h3 class="sect2">16.1.6. Finding Out a Host's Aliases</h3>
+
+
+<a name="INDEX-2377" /></a><a name="INDEX-2378" /></a>One thing you can't easily do
+with DNS is find out a host's aliases. With the host table,
+it's easy to find both the canonical name of a host and any
+aliases: no matter which you look up; they're all there,
+together, on the same line:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>grep terminator /etc/hosts</b></tt>
+192.249.249.3  terminator.movie.edu terminator bigt</pre></blockquote>
+
+
+With DNS, however, if you look up the canonical name, all you get is
+the canonical name. There's no easy way for the name server or
+the application to know whether aliases exist for that canonical
+name:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  wormhole
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>terminator</b></tt>
+Server:  wormhole
+Address:  0.0.0.0
+
+Name:    terminator.movie.edu
+Address:  192.249.249.3</pre></blockquote>
+
+
+If you use <em class="filename">nslookup</em> or <em class="filename">dig
+</em>to look up an alias, you'll see that alias and the
+canonical name. <em class="filename">nslookup </em>and
+<em class="filename">dig</em> report both the alias and the canonical name
+in the message. But you won't see any other aliases that might
+point to that canonical name:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  wormhole
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>bigt</b></tt>
+Server:  wormhole
+Address:  0.0.0.0
+
+Name:    terminator.movie.edu
+Address:  192.249.249.3
+Aliases:  bigt.movie.edu
+
+&gt; <tt class="userinput"><b>exit</b></tt>
+<tt class="userinput"><b>% dig bigt.movie.edu</b></tt>
+; &lt;&lt;&gt;&gt; DiG 8.3 &lt;&lt;&gt;&gt; bigt.movie.edu 
+;; res options: init recurs defnam dnsrch
+;; got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 4
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 3, ADDITIONAL: 4
+;; QUERY SECTION:
+;;      bigt.movie.edu, type = A, class = IN
+
+;; ANSWER SECTION:
+bigt.movie.edu.         1D IN CNAME     terminator.movie.edu.
+terminator.movie.edu.   1D IN A         192.249.249.3</pre></blockquote>
+
+
+About the only way to find out all the CNAMEs for a host is to
+transfer the whole zone and pick out the CNAME records in which that
+host is the canonical name:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  wormhole
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>ls -t cname movie.edu</b></tt>
+ [wormhole.movie.edu]
+$ORIGIN movie.edu.
+bigt                    1D IN CNAME     terminator
+wh                      1D IN CNAME     wormhole
+dh                      1D IN CNAME     diehard
+&gt;</pre></blockquote>
+
+
+Even this method shows you the aliases only within that
+zone -- there could be aliases in a different zone, pointing to
+canonical names in this zone.<a name="INDEX-2379" /></a> <a name="INDEX-2380" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">15.3. Perl Programming with Net::DNS</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16.2. Wildcards</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:40 GMT -->
+</html>

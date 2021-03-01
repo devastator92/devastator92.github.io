@@ -1,0 +1,2363 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch23_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:11 GMT -->
+<head><title>Databases and Games (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch23_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 23. Databases and Games</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch23-57321">Databases</a><br />
+<a href="ch23_02.html">Games</a><br /></p><p></div>
+
+
+
+
+
+
+
+This chapter discusses two categories of protocols that didn't
+fit in other chapters -- the protocols used to talk to databases
+and the protocols used to play games remotely.</p><p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch23-57321" /></a>
+<h2 class="sect1">23.1. Databases</h2>
+
+
+
+
+
+At most sites, much of the site's most security-critical
+information is stored in databases. At companies, they store
+inventory and ordering data; at universities, they store student
+information, including grades; at research institutes, they store
+personnel information and (usually on different machines) research
+data. Originally, these databases were protected mostly by
+restricting access to them, but that's no longer practical.
+People have become accustomed to mobile, distributed computing, where
+they can make instant updates to their own information, and that
+requires giving them the ability to reach databases. In addition,
+databases are being used for more and more purposes, as a way of
+storing and sharing information.</p><p>
+
+
+
+
+
+This means that network access to databases is now critical,
+particularly for electronic commerce applications where database
+servers and web servers need to exchange data. We have discussed
+issues about locating database servers and web servers in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>. Here, we will discuss the protocols used to
+provide network access and their security implications.</p><p>
+
+
+
+
+
+<a name="ch23-2-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.1. Locating Database Servers</h3>
+
+
+
+
+
+<a name="INDEX-2133" /></a> <a name="INDEX-2134" /></a> <a name="INDEX-2135" /></a>Most database protocols are deeply
+insecure and difficult to pass through a firewall. Nonetheless, you
+are likely to want to let an externally available web server talk to
+your database servers in order to provide data to your customers (for
+instance, to enable web-based order tracking). There are
+fundamentally four options:</p><p>
+
+
+
+
+
+<ul><li>Put the web server and the database on the same perimeter network
+(possibly even on the same machine). No database traffic will have to
+pass through the firewall in normal operation. (You will still need
+to figure out how to load the data onto the perimeter database and
+restrict access to the database.)</p><p></li><li>Put the web server and the database both on the internal network. No
+database traffic will have to pass through the firewall; on the other
+hand, HTTP requests will. You are relying on the security of the web
+server.</p><p></li><li>Put the web server on the perimeter network and the database server
+on the internal network, and use the database's native protocol
+to connect them. You are relying on your ability to configure the
+firewall and the database appropriately to secure the protocol; you
+must let database traffic through.</p><p></li><li>Put the web server on the perimeter network and the database server
+on the internal network, and use a custom-written protocol to connect
+them. You are relying on your ability to construct a secure protocol
+that enables the transactions you need.</p><p></li></ul>
+All of these approaches can be successful; putting the database on
+the perimeter network provides the most protection for your internal
+network, and putting the web server on the internal network provides
+the least. Using a custom protocol to connect a web server on the
+perimeter to a database server that's internal provides the
+best balance between protecting the internal network and protecting
+the data, but it's the hardest solution to maintain.</p><p>
+
+
+
+
+
+<a name="ch23-3-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.1.1. Putting both the web server and the database on the perimeter network</h3>
+
+
+
+
+
+<a name="INDEX-2136" /></a>If you choose to
+put both the web server and the database on the perimeter network, as
+shown in <a href="ch23_01.html#ch23-92298">Figure 23-1</a>, you have two primary concerns.
+First, you need to be sure that the database contains only data that
+you are actually willing to have accessed from the Internet. You do
+not get any significant security benefit from putting the database on
+the perimeter network if it contains all the private data people
+could get by breaking into the internal network! Second, in most
+cases you are still going to need to move and synchronize data
+between the external database and the internal database, and you will
+need to develop a secure means of doing it. It will be complicated by
+the first problem (it's unlikely that the external database
+will be a simple, straightforward copy of the internal database). In
+general, it's possible to do this copy with a scheduled job
+that exports data from the two servers, transfers it across the
+firewall using a secured remote copy mechanism, sanity-checks it, and
+imports the appropriate data onto each server.</p><p>
+
+
+
+
+
+<a name="ch23-92298" /></a><div class="figure"><img height="357" alt="Figure 23-1" src="figs/fire2.2301.gif" width="475" /></div><h4 class="objtitle">Figure 23-1. A web server using a database server on a perimeter network</h4>
+
+Using a scheduled job to export data provides high performance
+between the web server and the database. However, it is not
+appropriate if data is going to need to move frequently between the
+internal and the external database server; that transfer can be quite
+slow. It also complicates the procedures for internal users who need
+to see the external data (for instance, support people answering
+customer calls about the web site). This method might be appropriate
+for a web-based catalog listing but is less appropriate for
+e-commerce applications where orders are going to need to be moved
+briskly to the internal databases, and order status will need to be
+frequently updated in the other direction.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-4-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.1.2. Putting both the web server and the database on the internal network</h3>
+
+
+
+
+
+<a name="INDEX-2137" /></a>If you choose to
+put the web server and the database both on the internal network, as
+shown in <a href="ch23_01.html#ch23-16863">Figure 23-2</a>, you are allowing external
+traffic to go to the internal network. This is a highly risky
+configuration, and we do not recommend it. However, if you are
+extremely confident about the security of the web server you are
+using, it may be more secure to pass HTTP through the firewall than
+to try to pass any of the database communication protocols. In this
+situation, consider passing connections through a proxy that can
+verify the HTTP; this will be more secure than using straightforward
+packet filtering.</p><p>
+
+
+
+
+
+<a name="ch23-16863" /></a><div class="figure"><img height="321" alt="Figure 23-2" src="figs/fire2.2302.gif" width="475" /></div><h4 class="objtitle">Figure 23-2. A web server and a database server on an internal network</h4>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-5-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.1.3. Using the database's protocols to connect to a perimeter web server</h3>
+
+
+
+
+
+<a name="INDEX-2138" /></a>Putting the web server on the perimeter
+network and then using normal database remote access methods to
+connect to an internal database, as shown in <a href="ch23_01.html#ch23-34957">Figure 23-3</a>, is the most straightforward method of
+providing web access to the database. In this situation, the web
+server effectively proxies the request to the database server, so
+external commands do not arrive directly on the internal network.
+However, you are still vulnerable to any security problems in the
+remote access provided by the vendors, and you still need to get the
+database requests across to the internal network without opening up
+other vulnerabilities. Depending on the database and the firewall you
+are using, this can be quite difficult.</p><p>
+
+
+
+
+
+<a name="ch23-34957" /></a><div class="figure"><img height="357" alt="Figure 23-3" src="figs/fire2.2303.gif" width="418" /></div><h4 class="objtitle">Figure 23-3. A web server on a perimeter network using a database server on an internal network</h4>
+
+Your internal database will also be vulnerable if the perimeter
+network is compromised. If any machine is compromised, it may be
+vulnerable to sniffing attacks; if the web server is compromised, an
+intruder will have the full power of the remote database access
+mechanism available (note that any required passwords are likely to
+be stored on the web server and used automatically).</p><p>
+
+
+
+
+
+You can reduce this vulnerability by carefully configuring the access
+that the web server has. You should use all of the access controls
+that your database server provides to make certain that the web
+server can do only things that it's supposed to be able to do.
+Don't use a generic database account that has many permissions.
+Instead, set up the web server to use a specific database account
+that can access only necessary data. If at all possible, set it up to
+use stored procedures so that it does not have access to the
+arbitrary database commands but can only do predefined operations
+that are stored as part of the database.</p><p>
+
+
+
+
+
+The amount of additional security you can get this way depends a
+great deal on what the web site is supposed to do. If web users are
+only able to read data, you may be able to get pretty good protection
+from the database security. On the other hand, if the web site allows
+people to order things, cancel their orders, or otherwise modify
+data, an attacker who compromises the web server is going to be able
+to really make you suffer, no matter what the database security is
+like.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-6-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.1.4. Using a custom protocol to connect to a perimeter web server</h3>
+
+
+
+
+
+Using a locally designed custom method to connect a perimeter web
+server to an internal database leaves the architecture the same as
+the one shown in <a href="ch23_01.html#ch23-34957">Figure 23-3</a>; it just changes the
+protocols used to connect the web server to the database. This
+configuration provides real-time access to the internal data, while
+giving you complete control over both the protocol and port numbers
+and the capabilities accessible by the web server. For instance, if
+the web server needs to read only data, your program can support only
+data read queries; even if the web server is compromised, the
+intruder will not be able to write data into the database. Note that
+if you add security features such as strong authentication and
+encryption, your solution may be slower than using the vendor
+mechanisms.</p><p>
+
+
+
+
+
+We recommend building your protocol on top of an existing
+message-passing mechanism, but only if it provides the necessary
+access controls. It may be tempting to use HTTP, but we recommend
+against it for a number of reasons. First of all, HTTP is
+connectionless, which makes it difficult to build something that is
+transaction based and robust. Second, it means that you will have to
+run CGI or an equivalent on an internal HTTP server. This then makes
+it equivalent to an architecture we recommend
+against.<a name="INDEX-2139" /></a></p><p>
+
+
+
+
+
+<a name="INDEX-2140" /></a>Building
+a custom protocol is not always practical. It assumes that you have
+local programming talent sufficient to write a small but secure
+client/server application. Creating a secure client/server
+application is not easy, so implementing the communications yourself
+may simply introduce different security problems from those you would
+have been exposed to if you'd used the database vendor's
+communication package. Implementing it yourself also has long-term
+maintenance ramifications. Nevertheless, on balance this method has
+significant advantages.<a name="INDEX-2141" /></a> <a name="INDEX-2142" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch23-7-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.2. Open Database Connectivity (ODBC) and Java Database Connectivity (JDBC)</h3>
+
+
+
+
+
+<a name="INDEX-2143" /></a> <a name="INDEX-2144" /></a>Open Database
+Connectivity (ODBC) is a Microsoft-developed applications programming
+interface (API) that allows applications developers to write software
+that connects to a variety of database servers. ODBC is not a
+protocol at the network level. Instead, it's a set of libraries
+that may use other network-level protocols. A program that uses the
+ODBC API will eventually end up talking to the database server
+through whatever that server's native communication protocol
+is. Therefore, knowing that an application uses ODBC tells you
+nothing useful about what network transactions it will make; you need
+to know what database driver ODBC is calling, which is determined by
+what type of database is running on the database server.</p><p>
+
+
+
+
+
+There is a great deal of confusion about ODBC. If you are on a
+machine that uses ODBC and you are trying to configure the machine to
+talk to a database across a network, you will usually go through the
+process of configuring something called an ODBC<em class="emphasis">
+driver</em>. This causes many people to believe that the driver
+is actually part of ODBC and that ODBC controls what options are in
+it, which is not the case. The ODBC driver is specific to the
+database you are talking to, not to ODBC; it is the driver that makes
+ODBC talk to your database, and it is provided by the database
+vendor. ODBC itself does not control the network communications and
+has no firewall characteristics. ODBC applications do not have to use
+the network at all; ODBC may be used to talk to a database running
+locally on the same machine.</p><p>
+
+
+
+
+
+<a name="INDEX-2145" /></a> <a name="INDEX-2146" /></a>JDBC<img align="absmiddle" src="figs/U2122.gif" /> is simply the
+Java analog to ODBC, a Java API that will connect to any of a variety
+of vendor database drivers. Because JDBC is based on Java, which is
+designed to be dynamically loaded, it allows clients to dynamically
+load the needed drivers, while in ODBC, they have to be explicitly
+installed. As usual, this increases convenience at the cost of
+security.</p><p>
+
+
+
+
+
+If you are asked to allow ODBC or JDBC through a firewall, you should
+ask what database is being used and research the network
+characteristics of that particular database. ODBC and JDBC by
+themselves will not change those characteristics. (Occasionally,
+databases that offer multiple connection options may not offer ODBC
+or JDBC drivers for all the options. Again, this is determined by the
+database developer and is not inherent to ODBC or JDBC.) If you have
+no further information to work from, assume that people who ask for
+ODBC really want to use Microsoft SQL Server, since it is the
+database most closely associated with platforms that run
+ODBC.<a name="INDEX-2147" /></a>
+<a name="INDEX-2148" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch23-8-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.3. Oracle SQL*Net and Net8 </h3>
+
+
+
+
+
+<a name="INDEX-2149" /></a>
+<a name="INDEX-2150" /></a>
+<a name="INDEX-2151" /></a>
+<a name="INDEX-2152" /></a>SQL*Net is Oracle's SQL network
+interface for Oracle7, and Net8 is its successor for Oracle8. Both
+SQL*Net and Net8 perform complex network manipulations; depending on
+server and client configurations, connections may use unpredictable
+port numbers or may be restarted or initiated from the server to the
+client. This makes most SQL*Net and Net8 implementations extremely
+difficult to pass through a firewall that is not specially aware of
+Oracle.</p><p>
+
+
+
+
+
+SQL*Net and Net8 are both based on Oracle's Transparent Network
+Substrate (TNS) and will attempt to speak to a server known as a
+<em class="emphasis">TNS listener</em>. Oracle's network situation
+is further complicated by the fact that it provides its own naming
+service, Oracle Names, which has its own server. Some proxying
+services are provided by Oracle Connection Manager in Oracle8 and the
+Oracle Multiprotocol Interchange server in Oracle7.</p><p>
+
+
+
+
+
+<a name="ch23-9-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.3.1. Security implications of SQL*Net and Net8</h3>
+
+
+
+
+
+<a name="INDEX-2153" /></a> <a name="INDEX-2154" /></a>Both the TNS listener
+and Oracle Names will accept commands on the same port they normally
+provide service over. You can password-protect commands that are
+considered dangerous (for instance "start" and
+"stop") but not commands Oracle considers safe (for
+instance, "status" or "show" to show variable
+settings). By default, there is no password protection. Even when
+password protection is on, passwords may be stored unprotected in
+server or client configuration files. In addition, there have been
+reports that at least the Oracle8 TNS listener is quite vulnerable to
+denial of service attacks from unexpected commands, which may cause
+it to consume large amounts of CPU resources.</p><p>
+
+
+
+
+
+Encryption is actually handled by TNS, but Oracle doesn't
+provide TNS versioning information. In the TNS version built into
+SQL*Net v1, nothing is encrypted, not even user authentication.
+Passwords are sent across the network not only reusable but
+unprotected and in the clear. As of SQL*Net v2, user authentication
+and TNS listener control passwords are protected but reusable when
+passed across the network. As of Net8/Oracle8, Oracle Names uses a
+protected control password as well.</p><p>
+
+
+
+
+
+The Oracle Advanced Networking Option (ANO) provides data stream
+encryption (via 40-bit RC4 or DES internationally, 56-bit RC4 or DES
+or 128-bit RC4 within the United States) and MD5 message digests. It
+also provides support for nonreusable passwords. Oracle also has a
+separate Security Server product that is used to provide an API for
+explicit data signing and signature verification at the application
+level --  a normal Oracle application cannot control whether or
+not the client and server are using Advanced Networking's
+encryption features. An Oracle server, however, may choose to require
+encryption and/or checksumming on all connections.</p><p>
+
+
+
+
+
+Oracle has had many security problems with their server
+installations. Most of these problems have involved ways to turn
+access to the server machine into root access or Oracle administrator
+access, using Oracle tools. However, some problems (like the denial
+of service problems previously mentioned) were exploitable from the
+network. <a name="INDEX-2155" /></a> <a name="INDEX-2156" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-10-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.3.2. Packet filtering characteristics of SQL*Net and Net8</h3>
+
+
+
+
+
+Oracle uses entirely TCP ports over 1024.<a href="#FOOTNOTE-165">[165]</a> These ports
+can be configured, and there are multiple defaults depending on the
+version of Oracle you are running. In what appears to be the most
+common default configuration, the TNS listener is at 1521, the Oracle
+ultiprotocol Interchange listener is at 1526, Oracle Names is at
+1575, and Oracle Connection Manager is at 1600. Client-to-server
+connections will normally start out going to 1521 or 1600 but may not
+remain there. It is not at all uncommon for hosts to run multiple TNS
+listeners at different ports, and Oracle's own documentation
+also shows alternate defaults (for instance, Oracle Names is often
+shown at 1521 and the TNS listener at 1526). You will need to know
+the details of your configuration.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-165" /></a>[165]People are
+often confused by the IANA registrations for ports 66 and 140, which
+have "sql" and "net" in their names but are
+not used by Oracle. They are historical curiosities left over from
+previous theories about networked SQL.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="ch23-11-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1575<a href="#FOOTNOTE-166">[166]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-167">[167]</a></p><p>
+</td>
+<td>
+Name lookup, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1575<a href="#FOOTNOTE-166">[166]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Name response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1600<a href="#FOOTNOTE-168">[168]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-167">[167]</a></p><p></td>
+<td>
+Request, external client to internal server (using Connection Manager)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1600<a href="#FOOTNOTE-168">[168]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using Connection
+anager)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1521<a href="#FOOTNOTE-169">[169]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-167">[167]</a></p><p></td>
+<td>
+Request, external client to internal server (using TNS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1521<a href="#FOOTNOTE-169">[169]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using TNS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1526<a href="#FOOTNOTE-170">[170]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-167">[167]</a></p><p></td>
+<td>
+Request, external client to internal server (using Multiprotocol
+Interchange)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1526<a href="#FOOTNOTE-170">[170]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using Multiprotocol
+Interchange)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023<a href="#FOOTNOTE-171">[171]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-167">[167]</a></p><p></td>
+<td>
+Redirected request, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023<a href="#FOOTNOTE-171">[171]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response to redirected request, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1575<a href="#FOOTNOTE-166">[166]</a></p><p></td>
+<td><a href="#FOOTNOTE-167">[167]</a></td>
+<td>
+Name lookup, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1575<a href="#FOOTNOTE-166">[166]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Name response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1600<a href="#FOOTNOTE-168">[168]</a></p><p></td>
+<td><a href="#FOOTNOTE-167">[167]</a></td>
+<td>
+Request, internal client to external server (using Connection Manager)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1600<a href="#FOOTNOTE-168">[168]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using Connection
+anager)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1521<a href="#FOOTNOTE-169">[169]</a></p><p></td>
+<td><a href="#FOOTNOTE-167">[167]</a></td>
+<td>
+Request, internal client to external server (using TNS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1521<a href="#FOOTNOTE-169">[169]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using TNS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1526<a href="#FOOTNOTE-170">[170]</a></p><p></td>
+<td><a href="#FOOTNOTE-167">[167]</a></td>
+<td>
+Request, internal client to external server (using Multiprotocol
+Interchange)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1526<a href="#FOOTNOTE-170">[170]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using Multiprotocol
+Interchange)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023<a href="#FOOTNOTE-171">[171]</a></p><p></td>
+<td><a href="#FOOTNOTE-167">[167]</a></td>
+<td>
+Redirected request, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023<a href="#FOOTNOTE-171">[171]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response to redirected request, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-166" /></a>[166]1575 is a popular default, but this may be set
+to any port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-167" /></a>[167]ACK will not be set on the first packet
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-168" /></a>[168]1600 is a popular default, but this may be set
+to any port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-169" /></a>[169]1521 is a popular default, but this may be set
+to any port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-170" /></a>[170]1526 is a popular default, but this may be set
+to any port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-171" /></a>[171]This port is dynamically assigned by the
+server.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-12-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.3.3. Proxying characteristics of SQL*Net and Net8</h3>
+
+
+
+
+
+Oracle has proxy code for SQL*Net, but the company has chosen to make
+it available to firewall manufacturers, and in binary format for
+limited operating systems. Therefore, although several commercial
+firewalls provide proxying support for SQL*Net, it may not be
+available on all platforms even within a given manufacturer's
+product line. Also, while the proxy code does know about
+SQL*Net's port number negotiation, there is no way of knowing
+how much protocol enforcement it does, and given Oracle's
+history of being naive about security, it is reasonable to assume
+that it does not do much.</p><p>
+
+
+
+
+
+Oracle provides a product called Oracle Connection Manager that will
+provide proxying, among other things, for SQL*Net and Net8 clients.
+Oracle Connection Manager provides extremely limited control over
+what clients can connect; you can accept or deny based on the
+following:</p><p>
+
+
+
+
+
+<ul><li>Source host or IP address</p><p></li><li>Source port<p></p></li><li><p>Destination host or IP address</p></li><li><p>Destination port</p></li><li><p>Destination database name</p></li></ul>
+Wildcards are allowed, but they must be for entire components of a
+name or IP address; for instance, you can permit all hosts in
+<em class="emphasis">somedomain.example</em> or all hosts
+in 192.10, but not all hosts that begin with "ora" in <em class="emphasis">somedomain.example</em> or all hosts in 192.10.47.128/28.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-13-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.3.4. Network address translation characteristics of SQL*Net and Net8</h3>
+
+
+
+
+
+SQL*Net and Net8 both use embedded IP address and port number
+information and may start up connections from the server to the
+client. They will not work through a network address translation
+system unless it has special facilities for dealing with them. Since
+Oracle doesn't release protocol details, this means that
+network address translation for SQL*Net and Net8, like proxying, will
+have to be provided by Oracle. As of this writing, Oracle has not
+provided such a module.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-14-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.3.5. Summary of recommendations for SQL*Net and Net8</h3>
+
+
+
+
+
+<ul><li>If at all possible, avoid running SQL*Net or Net8 across your
+firewall. If you must run it, use a proxy server that supports it
+(either Oracle Connection Manager or one of the commercial firewall
+products that has Oracle's proxying code).<a name="INDEX-2157" /></a> <a name="INDEX-2158" /></a> <a name="INDEX-2159" /></a> <a name="INDEX-2160" /></a></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch23-15-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.4. Tabular Data Stream (TDS)</h3>
+
+
+
+
+
+<a name="INDEX-2161" /></a> <a name="INDEX-2162" /></a>TDS is a database protocol used by both
+Sybase and Microsoft SQL Server, among other products, for network
+communications. It is a proprietary protocol, owned by Sybase. Sybase
+offers relatively liberal access to the protocol specification, but
+their license specifically forbids distribution of information about
+the protocol specification, so the only people who really know how
+the protocol works aren't allowed to say.</p><p>
+
+
+
+
+
+TDS is a straightforward TCP-based protocol, in which the client
+starts up a single connection to the server. No fixed port is used by
+TDS, and different implementations default to using different port
+numbers. In its simplest form, TDS transmits all data, including
+usernames and passwords, unprotected and in the clear. However, some
+TDS implementations use encryption to protect all or part of the
+data. All in all, knowing that a product uses TDS tells you
+relatively little about its security and firewalling implications,
+although the information does tend to suggest that it will be
+relatively straightforward to pass through a firewall (it does not
+tell you whether or not that would be a good idea, since TDS may be
+cleartext or encrypted).<a name="INDEX-2163" /></a> <a name="INDEX-2164" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch23-16-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.5. Sybase</h3>
+
+
+
+
+
+<a name="INDEX-2165" /></a>Sybase
+takes an open approach to network communications. It supports
+multiple different protocols, including TDS, IIOP, and HTTP. Security
+can be provided by running IIOPS or HTTPS. (TDS is discussed in the
+previous section; IIOP is related to CORBA and is discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>; HTTP is discussed in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>.)</p><p>
+
+
+
+
+
+<a name="ch23-17-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.5.1. Packet filtering characteristics of Sybase</h3>
+
+
+
+
+
+Sybase can use TDS, HTTP, HTTPS, IIOP, or IIOPS for network
+communications. All of these by default use TCP connections from the
+client to the server with both ends at a port above 1023. The port
+that the server will use is defined when the database server is
+configured and can be set to any unused port. Sybase defaults to
+using 7878 for TDS, 8080 for HTTP, 8081 and 8082 for HTTPS, 9000 for
+IIOP, and 9001 and 9002 for IIOPS. If the server has the necessary
+privileges and no other web server is already using them, HTTP and
+HTTPS may be moved to their normal reserved ports (80 and 443,
+respectively). HTTP and HTTPS are discussed in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>; IIOP and IIOPS are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+<a name="ch23-18-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+7878<a href="#FOOTNOTE-172">[172]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-173">[173]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Request, external client to internal server (using TDS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+7878<a href="#FOOTNOTE-172">[172]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using TDS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+8080<a href="#FOOTNOTE-174">[174]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, external client to internal server (using HTTP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8080<a href="#FOOTNOTE-174">[174]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using HTTP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+8001, 8002<a href="#FOOTNOTE-175">[175]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, external client to internal server (using HTTPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8001, 8002<a href="#FOOTNOTE-175">[175]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using HTTPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+9000<a href="#FOOTNOTE-176">[176]</a></p><p>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, external client to internal server (using IIOP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+9000<a href="#FOOTNOTE-176">[176]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using IIOP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+9001, 9002<a href="#FOOTNOTE-177">[177]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, external client to internal server (using IIOPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+9001, 9002<a href="#FOOTNOTE-177">[177]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client (using IIOPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+7878<a href="#FOOTNOTE-172">[172]</a></p><p></td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, internal client to external server (using TDS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+7878<a href="#FOOTNOTE-172">[172]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using TDS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+8080<a href="#FOOTNOTE-174">[174]</a></p><p></td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, internal client to external server (using HTTP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8080<a href="#FOOTNOTE-174">[174]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using HTTP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+8001, 8002<a href="#FOOTNOTE-175">[175]</a></p><p></td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, internal client to external server (using HTTPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8001, 8002<a href="#FOOTNOTE-175">[175]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using HTTPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+9000<a href="#FOOTNOTE-176">[176]</a></p><p></td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, internal client to external server (using IIOP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+9000<a href="#FOOTNOTE-176">[176]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using IIOP)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+9001, 9002<a href="#FOOTNOTE-177">[177]</a></p><p></td>
+<td><a href="#FOOTNOTE-173">[173]</a></td>
+<td>
+Request, internal client to external server (using IIOPS)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+9001, 9002<a href="#FOOTNOTE-177">[177]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client (using IIOPS)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-172" /></a>[172]7878 is the default, but this may be set to any
+port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-173" /></a>[173]ACK will not be set on the first packet
+(establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-174" /></a>[174]8080 is the default, but this may be set to any
+port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-175" /></a>[175]8001 and 8002 are the defaults, but this
+may be set to any port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-176" /></a>[176]9000 is the default, but this may be set to any
+port number.</p><p></blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-177" /></a>[177]9001 and 9002 are the defaults, but this
+may be set to any port number.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-19-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.5.2. Proxying characteristics of Sybase</h3>
+
+
+
+
+
+HTTP proxies are widespread and can be used with Sybase's HTTP
+support. In addition, a number of firewall vendors provide TDS
+proxies. Note that none of these proxies will significantly increase
+security, so you should carefully protect your databases.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-20-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.5.3. Network address translation characteristics of Sybase</h3>
+
+
+
+
+
+Both TDS and HTTP run without problems through network address
+translation systems, so you should have no difficulty configuring
+your server to work with a network address translation system.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-21-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.5.4. Summary of recommendations for Sybase</h3>
+
+
+
+
+
+<ul><li>If possible, avoid running Sybase through a firewall. If you need to
+support Sybase through a firewall, consider using IIOPS or
+HTTPS.<a name="INDEX-2166" /></a></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch23-22-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">23.1.6. Microsoft SQL Server</h3>
+
+
+
+
+
+<a name="INDEX-2167" /></a> <a name="INDEX-2168" /></a>Microsoft's SQL Server, like
+Sybase, can use TDS for communications (it refers to this as the
+TCP/IP network library). On TCP/IP networks, it also supports the use
+of Microsoft RPC either directly (via the Multiprotocol network
+library) or over SMB (via the Named Pipes network library). See <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>, for more information about RPC and SMB.</p><p>
+
+
+
+
+
+icrosoft SQL offers multiple options for user authentication. If you
+set it to use SQL authentication over TDS, it passes authentication
+data over the network in cleartext. If you set it to use Windows NT
+authentication over TDS, the username and password data is obscured.
+(It is not clear what this is, but it appears to be reversible
+encryption rather than challenge-response.) SQL authentication over
+TDS does not protect username and password data and should never be
+used in an insecure environment.</p><p>
+
+
+
+
+
+You should be careful about what accounts you use for SQL access.
+They should have the minimum necessary permissions on the SQL
+database and under Windows NT. They should not be accounts that are
+used for logins or file sharing under Windows NT.</p><p>
+
+
+
+
+
+Note that if a client attempts to use SQL authentication across an
+insecure network, and the server is set up to use Windows NT
+authentication, the authentication will fail, but the account will
+still be compromised. The client will send the cleartext username and
+password, which can be intercepted, and there is no way for the
+server to prevent it.</p><p>
+
+
+
+
+
+Some versions of Microsoft SQL Server support database replication
+only over SMB; more recent versions will allow database replication
+over TDS, but it is less efficient.</p><p>
+
+
+
+
+
+<a name="ch23-23-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.6.1. Packet filtering characteristics of Microsoft SQL Server</h3>
+
+
+
+
+
+icrosoft SQL Server normally uses TCP port 1433 for TDS but can be
+configured to use any port. Packet filtering characteristics of SMB
+named pipes and Microsoft RPC are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+<a name="ch23-24-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1433<a href="#FOOTNOTE-178">[178]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+<a href="#FOOTNOTE-179">[179]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Request, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1433<a href="#FOOTNOTE-178">[178]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1433<a href="#FOOTNOTE-178">[178]</a></p><p></td>
+<td><a href="#FOOTNOTE-179">[179]</a></td>
+<td>
+Request, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1433<a href="#FOOTNOTE-178">[178]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-178" /></a>[178]1433 is the default, but this may be set to any
+port number.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-179" /></a>[179]ACK will not be set on the first packet
+(establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-25-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.6.2. Proxying characteristics of Microsoft SQL Server</h3>
+
+
+
+
+
+TDS is easy to proxy with generic proxies. You should ensure that
+clients are using Windows NT domain authentication, not SQL
+authentication, in order to avoid disclosing username and password
+information. Proxying characteristics of SMB and Microsoft RPC are
+discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-26-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.6.3. Network address translation and Microsoft SQL Server</h3>
+
+
+
+
+
+TDS works transparently with network address translation, so there
+should be no problem configuring Microsoft SQL Server to run through
+a network address translation system. Network address translation
+characteristics of SMB and Microsoft RPC are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch23-27-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">23.1.6.4. Summary of recommendations for Microsoft SQL Server</h3>
+
+
+
+
+
+<ul><li>Avoid passing Microsoft SQL Server through a firewall if possible.</p><p></li><li>If you need to use Microsoft SQL Server through a firewall, use TDS
+but use Windows NT authentication instead of SQL authentication in
+order to ensure that username and password information is
+protected.<a name="INDEX-2169" /></a></p><p></li></ul>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch23_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">22.7. Mostly Harmless Protocols</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">23.2. Games</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch23_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:13 GMT -->
+</html>

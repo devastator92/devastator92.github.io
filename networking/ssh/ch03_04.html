@@ -1,0 +1,1480 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:00 GMT -->
+<head><title>Inside SSH-1 (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.4. Inside SSH-1</h2>
+
+
+
+<a name="INDEX-293" /><a name="INDEX-294" />Now
+that we've seen the major features and components of SSH,
+let's delve into the details of the SSH-1 protocol. SSH-2 is
+covered separately. [<a href="ch03_05.html#ch03-10732">Section 3.5, "Inside SSH-2"</a>] The architecture of
+SSH-1 is summarized in <a href="ch03_04.html#ch03-57293">Figure 3-2</a>. We will cover:</p>
+
+
+
+<ul><li>How the secure session is established</p></li><li>Authentication by password, public key, or trusted host</p></li><li>Integrity checking</p></li><li><p>Data compression</p></li></ul>
+<a name="ch03-57293" /><div class="figure"><img height="405" alt="Figure 3-2" src="figs/ssh_0302.gif" width="481" /></div><h4 class="objtitle">Figure 3-2. SSH-1 architecture</h4>
+
+<a name="ch03-62629" /><div class="sect2">
+<h3 class="sect2">3.4.1. Establishing the Secure Connection</h3>
+
+
+
+<a name="INDEX-295" />Before meaningful interaction can
+take place, the SSH client and server must establish a secure
+connection. This lets them share keys, passwords, and ultimately,
+whatever data they transmit to each other.</p>
+
+
+
+We will now explain how the SSH-1 protocol guarantees security of a
+network connection. Through a multistep process, starting from
+scratch, the SSH-1 client and server agree on an encryption algorithm
+and generate and share a secret session key, establishing a secure
+connection:</p>
+
+
+
+<ol><li>The client contacts the
+server.</p></li><li>The client and server
+disclose the SSH protocol versions they support.</p></li><li>The client and server switch to a packet-based protocol.</p></li><li>The server identifies itself to the client and provides session
+parameters.</p></li><li>The client sends the server a secret (session) key.</p></li><li>Both sides turn on encryption and complete server authentication.</p></li><li>The secure connection is established.</p></li></ol>
+Now the client and server can communicate by encrypted messages.
+Let's examine each step in detail; the complete process is
+summarized in <a href="ch03_04.html#ch03-13439">Figure 3-3</a>.</p>
+
+
+
+<a name="ch03-13439" /><div class="figure"><img height="509" alt="Figure 3-3" src="figs/ssh_0303.gif" width="478" /></div><h4 class="objtitle">Figure 3-3. SSH-1 protocol exchange</h4>
+
+<ol><li><em class="emphasis">The client contacts the server.</em></p>
+
+
+
+This is done without fanfare, simply by sending a connection request
+to the server's TCP port, which is port 22 by convention.</p></li><li><em class="emphasis">The client and server disclose the SSH protocol versions
+they support.</em></p>
+
+
+
+These protocols are represented as ASCII
+<a name="INDEX-296" /><a name="INDEX-297" />strings, such as
+"SSH-1.5-1.2.27", which means SSH protocol Version 1.5 as
+implemented by SSH1 Version 1.2.27. You can see this string by
+connecting to an SSH server port with a Telnet client:</p>
+<blockquote><pre class="code">$ telnet server 22
+Trying 192.168.10.1
+Connected to server (192.168.10.1).
+Escape character is '^]'.
+SSH-1.5-1.2.27</pre></blockquote>
+
+The implementation version (1.2.27) is just a comment and is optional
+in the string. But, some implementations examine the comment to
+recognize particular software versions and work around known bugs or
+incompatibilities.<a href="#FOOTNOTE-19">[19]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-19" />[19]Some system administrators remove
+the comment, preferring not to announce their software package and
+version to the world, which provides clues to an attacker.</p>
+
+
+</blockquote>
+
+
+
+If the client and server decide their versions are compatible, the
+connection process continues; otherwise either party may decide to
+terminate the connection. For instance, if an SSH-1-only client
+encounters an SSH-2-only server, the client disconnects and prints an
+error message. Other actions are possible: for example, the
+SSH-2-only server can invoke an SSH-1 server to handle the
+connection.</p></li>
+
+
+<li><em class="emphasis">The client and server switch to a packet-based
+protocol.</em></p>
+
+
+
+Once the protocol version exchange is complete, both sides switch to
+a packet-based protocol over the underlying TCP connection. Each
+<a name="INDEX-298" />packet
+consists of a 32-bit length field, 1- 8 bytes of random padding to
+foil known-plaintext attacks, a one-byte packet type code, the packet
+payload data, and a four-byte integrity check field.</p></li>
+
+<li><em class="emphasis">The server identifies itself to the client and provides
+session parameters.</em></p>
+
+
+
+The server sends the following information to the client (all still
+unencrypted):</p>
+<ul><li>Its host key, used to prove the server host identity later.</p></li><li>Its server key, which helps establish the secure connection.</p></li><li>A sequence of eight random bytes, called <em class="emphasis">check
+bytes.</em><a name="INDEX-299" /><a name="INDEX-300" /> The client must include these check bytes
+in its next response, or the server rejects the response. This
+measure protects against some IP spoofing attacks.</p></li><li>Lists of encryption, compression, and authentication methods that the
+server supports.</p></li></ul>
+
+At this point, both sides also compute a common 128-bit
+<em class="emphasis">session identifier,</em><a name="INDEX-301" /> which is used in some subsequent
+protocol operations to uniquely identify this SSH session. This is an
+MD5 hash of the host key, server key, and check bytes taken together.</p>
+
+
+
+When the client receives the host key, it asks the question:
+"Have I spoken with this server before, and if so, what was its
+host key then?" To answer this question, the client consults
+its known hosts database. If the newly arrived host key matches a
+previous one in the database, all is well. However, there are two
+other possibilities: the server might not appear in the known hosts
+database, or it might be present but with a different host key. In
+each of these cases, the client elects to trust the newly arrived key
+or to reject it. [<a href="ch07_04.html#ch07-39605">Section 7.4.3.1, "Strict host key checking"</a>] Human guidance may be
+needed: for example, the client's user can be prompted to
+accept or reject the key.</p>
+
+
+
+If the client rejects the host key, the connection ends. Let's
+assume the host key is acceptable and continue.</p></li>
+
+
+<li><em class="emphasis">The client sends the server a secret (session)
+key.</em><a name="INDEX-302" /></p>
+
+
+
+Now the client randomly generates a new key for a
+<a name="INDEX-303" />bulk cipher [<a href="ch03_02.html#ch03-92389">Section 3.2.2, "Public- and Secret-Key Cryptography"</a>]
+that both client and server support; this is called the session key.
+Its purpose is to encrypt and decrypt messages sent between the
+client and the server. All that's needed is to give this
+session key to the server, and both sides can turn on encryption and
+begin communicating securely.</p>
+
+
+
+Of course, the client can't simply send the session key to the
+server. Encryption isn't operating yet, and if a third party
+intercepts this key, it can decrypt the client's and
+server's messages. Goodbye security! So the client must send
+the session key securely. This is done by encrypting it twice: once
+with the server's public host key and once with the server key.
+This step ensures that only the server can read it. After the session
+key is <a name="INDEX-304" />double-encrypted,
+the client sends it to the server, along with the check bytes and a
+choice of algorithms (picked from the server's list of
+supported algorithms sent in Step 4.</p></li><li><em class="emphasis">Both sides turn on encryption and complete server
+authentication.</em><a name="INDEX-305" /><a name="INDEX-306" /></p>
+
+
+
+After sending the session key, both sides begin encrypting the
+session data with the key and the selected bulk cipher. Before
+sending anything further, though, the client waits for a confirmation
+message from the server, which (like all subsequent data) must be
+encrypted with the session key. This final step provides the server
+authentication: only the intended server can have decrypted the
+session key, since it was encrypted with the host key verified
+earlier against the known hosts list.</p>
+
+
+
+Without the session key, an impostor server can't decrypt the
+subsequent protocol traffic or produce valid traffic in return, and
+the client will notice and terminate the connection.</p>
+
+
+
+Note that server authentication is implicit; there's no
+explicit exchange to verify the server host key. Therefore it's
+important for the client to wait for a valid server response using
+the new session key before sending anything further, in order to
+verify the server's identity before proceeding. The SSH-1
+protocol isn't specific about this point, but SSH-2 requires it
+when server authentication is implicit in the session key exchange.</p>
+
+
+
+Encrypting the session key a second time with the server key provides
+a property called <a name="INDEX-307" /><em class="emphasis">perfect forward
+secrecy</em>. This means there are no persistent keys lying
+around whose disclosure can jeopardize the secrecy of past or future
+SSH sessions. If the server host key alone is used to protect the
+session key, then disclosure of the host private key compromises
+future communications and allows decryption of old, recorded
+sessions. Using the server key in tandem for this purpose removes
+this weakness, as it is temporary, never explicitly stored on disk,
+and replaced periodically (by default, once an hour). Having stolen
+the server private key, an interloper must still perform an active
+man-in-the-middle or server spoofing attack to compromise a session.</p></li><li><em class="emphasis">The secure connection is established.</em> </p>
+
+
+
+Since both the client and server now know the session key, and nobody
+else does, they can send each other encrypted messages (using the
+bulk cipher they agreed on) only they can decrypt. Also, the client
+has completed server authentication. We're ready to begin
+client authentication<a name="INDEX-308" />.</p></li></ol>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-83508" /><div class="sect2">
+<h3 class="sect2">3.4.2. Client Authentication</h3>
+
+
+
+Once the secure connection is established, the
+<a name="INDEX-309" /><a name="INDEX-310" />client attempts to authenticate
+itself to the server. The client may try any
+<a name="INDEX-311" /><a name="INDEX-312" /><a name="INDEX-313" />authentication methods at its disposal
+until one succeeds, or all have failed. For example, the six
+authentication methods defined by the SSH-1.5 protocol, in the order
+attempted by the
+<a name="INDEX-314" />SSH1
+implementation, are:</p>
+
+
+
+<ol><li>Kerberos<a href="#FOOTNOTE-20">[20]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-20" />[20]This method isn't available by
+default; it must be requested at compile time.</p>
+
+
+</blockquote></li>
+
+<li>Rhosts</p></li>
+
+<li>RhostsRSA</p></li>
+
+<li>Public-key</p></li>
+
+<li>TIS<a href="#FOOTNOTE-20">[20]</a></p></li>
+
+<li>Password (flavors: host login password, Kerberos<em class="emphasis">,
+</em>SecurID, S/Key, etc.)</p></li></ol>
+F-Secure SSH Client for Windows (see <a href="ch16_01.html">Chapter 16, "F-Secure SSH Client (Windows, Macintosh)"</a>)
+tries these in order:</p>
+
+
+
+<ol><li>Public-key</p></li><li>Password</p></li></ol>
+Knowing the order for your client is a good idea. It helps to
+diagnose problems when authentication fails or acts unexpectedly.</p>
+
+
+
+<a name="ch03-24952" /><div class="sect3">
+<h3 class="sect3">3.4.2.1. Password authentication </h3>
+
+
+
+During <a name="INDEX-315" />password
+authentication, the user supplies a password to the SSH client, which
+the client transmits securely to the server over the encrypted
+connection. The server then checks that the given password is
+acceptable for the target account, and allows the connection if so.
+In the simplest case, the SSH server checks this through the native
+password-authentication mechanism of the host operating system.</p>
+
+
+
+Password authentication is quite convenient because it requires no
+additional setup for the user. You don't need to generate a
+key, create a <em class="filename">~/.ssh</em> directory on the server
+machine, or edit any configuration files. This is particularly
+convenient for first-time SSH users and for users who travel a lot
+and don't carry their private keys. You might not want to use
+your private keys on other machines, or there may be no way to get
+them onto the machine in question. If you frequently travel, you
+should consider setting up SSH to use one-time passwords if your
+implementation supports them, improving the security of the password
+scheme. [<a href="ch03_04.html#ch03-30873">Section 3.4.2.5, "One-time passwords"</a>]</p>
+
+
+
+On the other hand, password authentication is inconvenient because
+you have to type a password every time you connect. Also, password
+authentication is less secure than public-key because the sensitive
+password is transmitted off the client host. It is protected from
+snooping while on the network but is vulnerable to capture once it
+arrives at the server if that machine has been compromised. This is
+in contrast with public-key authentication, as even a compromised
+server can't learn your private key through the protocol.
+Therefore, before choosing password authentication, you should weigh
+the trustworthiness of the client and the server, as you will be
+revealing to them the key to your electronic kingdom.</p>
+
+
+
+Password authentication is simple in concept, but different Unix
+variants store and verify passwords in different ways, leading to
+some complexities. OpenSSH uses PAM for password authentication by
+default, which must be carefully configured. [<a href="ch04_03.html#ch04-31753">Section 4.3, "OpenSSH"</a>] Most Unix systems encrypt passwords with DES
+(via the <tt class="function">crypt( )</tt> library routine), but recently
+some systems have started using the MD5 hash algorithm, leading to
+configuration issues. [<a href="ch04_03.html#ch04-31753">Section 4.3, "OpenSSH"</a>] The behavior of
+password authentication also changes if Kerberos [<a href="ch05_05.html#ch05-86440">Section 5.5.1.7, "Kerberos authentication"</a>] or SecurID support [<a href="ch05_05.html#ch05-29482">Section 5.5.1.9, "SecurID authentication"</a>] is enabled in the SSH server.</p>
+</div>
+
+
+
+
+
+<a name="ch03-49086" /><div class="sect3">
+<h3 class="sect3">3.4.2.2. Public-key authentication</h3>
+
+
+
+<a name="INDEX-316" />Public-key
+authentication uses public-key cryptography to verify the
+client's identity. To access an account on an SSH server
+machine, the client proves that it possesses a secret: specifically,
+the private counterpart of an authorized public key. A key is
+"authorized" if its public component is contained in the
+account's authorization file (e.g.,
+<em class="filename">~/.ssh/authorized_keys</em>). The sequence of actions
+is:</p>
+
+
+
+<ol><li>The client sends the server a request for public-key authentication
+with a particular key. The request contains the key's modulus
+as an identifier.<a href="#FOOTNOTE-21">[21]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-21" />[21]An RSA key consists of two parts:
+the <em class="emphasis">exponent</em> and the <em class="emphasis">modulus.
+</em>The modulus is the long number in the public key
+<em class="filename">(.pub</em>) file.</p>
+
+
+</blockquote>
+
+
+
+The key is implicitly RSA; the SSH-1 protocol specifies the RSA
+algorithm particularly and exclusively for public-key operations.</p></li><li>The server reads the target account's authorization file, and
+looks for an entry with the matching key. If there is no matching
+entry, this authentication request fails.</p></li><li>If there is a matching entry, the server retrieves the key and notes
+any restrictions on its use. The server can then reject the request
+immediately on the basis of a restriction, for example, if the key
+shouldn't be used from the client host. Otherwise, the process
+continues.</p></li><li>The server generates a random 256-bit string as a challenge, encrypts
+it with the client's public key, and sends this to the client.</p></li><li>The client receives the challenge and decrypts it with the
+corresponding private key. It then combines the challenge with the
+session identifier, hashes the result with MD5, and returns the hash
+value to the server as its response to the challenge. The session
+identifier is mixed in to bind the authenticator to the current
+session, protecting against replay attacks taking advantage of weak
+or compromised random-number generation in creating the challenge.</p>
+
+
+
+The hashing operation is there to prevent misuse of the
+client's private key via the protocol, including a
+<a name="INDEX-317" />chosen-plaintext attack.<a href="#FOOTNOTE-22">[22]</a> If the client simply returns the decrypted challenge
+instead, a corrupt server can present any data encrypted with the
+client's public key, and the unsuspecting client dutifully
+decrypts and returns it. It might be the data-encryption key for an
+enciphered email message the attacker intercepted. Also, remember
+that with RSA, "decrypting" some data with the private
+key is actually the same operation as "signing" it. So
+the server can supply chosen, <em class="emphasis">unencrypted</em> data
+to the client as a "challenge," to be signed with the
+client's private key -- perhaps a document saying,
+"OWAH TAGU SIAM" or something even more nefarious.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-22" />[22]In a <em class="emphasis">chosen-plaintext</em> attack, the
+cryptanalyst is allowed to examine plaintext/ciphertext pairs of her
+choosing, encrypted with the key she's trying to break. The RSA
+algorithm is particularly vulnerable to chosen-plaintext attacks, so
+it's important for a protocol using RSA to avoid them.</p>
+
+
+</blockquote></li><li>The server computes the same MD5 hash of the challenge and session
+ID; if the client's reply matches, the authentication succeeds.</p></li></ol>
+The public-key method is the most secure authentication option
+available in SSH, generally speaking. First of all, the client needs
+two secrets to authenticate: the private key, and the passphrase to
+decrypt it. Stealing either one alone doesn't compromise the
+target account (assuming a strong passphrase). The private key is
+infeasible to guess and never leaves the client host, making it more
+difficult to steal than a password. A strong passphrase is difficult
+to guess by brute force, and if necessary, you can change your
+passphrase without changing the associated key. Also, public-key
+authentication doesn't trust any information supplied by the
+client host; proof of possession of the private key is the sole
+criterion. This is in contrast to
+<a name="INDEX-318" />RhostsRSA authentication,
+in which the server delegates partial responsibility for the
+authentication process to the client host: having verified the client
+host's identity and privilege of the client running on it, it
+trusts the client software not to lie about the user's
+identity. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] If someone can impersonate a
+client host, he can impersonate any user on that host without
+actually having to steal anything from the user. This can't
+happen with public-key authentication.<a href="#FOOTNOTE-23">[23]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-23" />[23]Don't
+confuse <em class="emphasis">impersonating</em> the client host with
+<em class="emphasis">compromising</em> it, however. If you actually break
+into the client host and compromise its security, all bets are off;
+you can then steal the keys, passwords, etc., of any users on that
+host. SSH doesn't protect against host compromise.</p>
+
+
+</blockquote>
+
+
+
+Public-key authentication is also the most flexible method in SSH for
+its additional control over authorization. You may tag each public
+key with restrictions to be applied after authentication succeeds:
+which client hosts may connect, what commands may be run, and so on.
+[<a href="ch08_02.html#ch08-13075">Section 8.2, "Public Key-Based Configuration "</a>] This isn't an intrinsic advantage
+of the public-key method, of course, but rather an implementation
+detail of SSH, albeit an important one.<a href="#FOOTNOTE-24">[24]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-24" />[24]We wish this
+were done differently. Rather than entangling the authentication and
+authorization functions in this way, SSH should be able to apply any
+restriction to any connection, regardless of the authentication
+method. However, no implementation of SSH, to our knowledge, keeps
+authentication and authorization truly orthogonal.</p>
+
+
+</blockquote>
+
+
+
+On the down side, <a name="INDEX-319" />public-key authentication is more
+cumbersome than the other methods. It requires users to generate and
+maintain their keys and authorization files, with all the attendant
+possibilities for error: syntax errors in
+<em class="filename">authorized_keys</em> entries, incorrect permissions
+on SSH directories or files, lost private key files requiring new
+keys and updates to all target accounts, etc. SSH doesn't
+provide any management infrastructure for distributing and
+maintaining keys on a large scale. You can combine SSH with the
+Kerberos authentication system, which does provide such management,
+to obtain the advantages of both. [<a href="ch11_04.html#ch11-75655">Section 11.4, "Kerberos and SSH"</a>]</p>
+
+
+
+<a name="ch03-8-fm2xml" /><blockquote><b>WARNING: </b>
+One technical limitation regarding public-key authentication arises
+in connection with the RSAref encryption library. [<a href="ch03_09.html#ch03-23558">Section 3.9.1.1, "Rivest-Shamir-Adleman (RSA)"</a>] RSAref supports key lengths only up to 1024
+bits, whereas the SSH internal RSA software supports longer keys. If
+you try to use a longer key with SSH/RSAref, you get an error. This
+can happen with either user or host keys, perhaps preexisting ones if
+you've recently switched to RSAref, or keys transferred from
+systems running the non-RSAref version of SSH. In all these cases,
+you have to replace the keys with shorter ones.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch03-19795" /><div class="sect3">
+<h3 class="sect3">3.4.2.3. Trusted-host authentication (Rhosts and RhostsRSA)</h3>
+
+
+
+<a name="INDEX-320" /><a name="INDEX-321" /><a name="INDEX-322" /><a name="INDEX-323" />Password and public-key
+authentication require the client to prove its identity by knowledge
+of a secret: a password or a private key particular to the target
+account on the server. In particular, the client's
+location -- the computer on which it is running -- isn't
+relevant to authentication.</p>
+
+
+
+Trusted-host authentication is different.<a href="#FOOTNOTE-25">[25]</a> Rather than making you prove your identity
+to every host that you visit, trusted-host authentication establishes
+trust relationships between machines. If you are logged in as user
+andrew on machine A, and you connect by SSH to account bob on machine
+B using trusted-host authentication, the SSH server on machine B
+doesn't check your identity directly. Instead, it checks the
+identity of host A, making sure that A is a trusted host. It further
+checks that the connection is coming from a trusted program on A, one
+installed by the system administrator that won't lie about
+andrew's identity. If the connection passes these two tests,
+the server takes A's word you have been authenticated as andrew
+and proceeds to make an authorization check that<em class="email">
+</em>andrew@A is allowed to access the account bob@B.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-25" />[25]The term
+"trusted-host" is our own; it refers to the Rhosts, SSH-1
+RhostsRSA, and SSH-2 hostbased authentication methods as a related
+group.</p>
+
+
+</blockquote>
+
+
+
+Let's follow this authentication process step by step:</p>
+
+
+
+<ol><li>The SSH client requests a connection from the SSH server.</p></li><li>The SSH server uses its local naming service to look up a hostname
+for the source address of the client network connection.</p></li><li>The SSH server consults authorization rules in several local files,
+indicating whether particular hosts are trusted or not. If the server
+finds a match for the hostname, authentication continues; otherwise
+it fails.</p></li><li>The server verifies that the remote program is a trusted one by
+following the old Unix convention of <em class="emphasis">privileged
+ports.</em><a name="INDEX-324" /> Unix-based TCP and UDP stacks reserve the
+ports numbered 1 through 1023 as privileged, allowing only processes
+running as root to listen on them or use them on the local side of a
+connection. The server simply checks that the source port of the
+connection is in the privileged range. Assuming the client host is
+secure, only its superuser can arrange for a program to originate
+such a connection, so the server believes it is talking to a trusted
+program.</p></li><li>If all goes well, authentication succeeds.</p></li></ol>
+This process has been practiced for years by the Berkeley
+<a name="INDEX-325" />r-commands:
+<tt class="command">rsh</tt>, <tt class="command">rlogin</tt>,
+<tt class="command">rcp</tt>, <tt class="command">rexec</tt>, etc. Unfortunately,
+it is a notoriously weak authentication method within modern
+networks. IP addresses can be spoofed, naming services can be
+subverted, and privileged ports aren't so privileged in a world
+of desktop PCs whose end users commonly have superuser
+(administrator) privileges. Indeed, some desktop operating systems
+lack the concept of a user (such as MacOS), while others don't
+implement the privileged-port convention (Windows), so any user may
+access any free port.</p>
+
+
+
+Nevertheless, trusted-host authentication has advantages. For one, it
+is simple: you don't have to type passwords or passphrases, or
+generate, distribute, and maintain keys. It also provides ease of
+automation. Unattended processes such as <em class="emphasis">cron</em>
+jobs may have difficulty using SSH if they need a key, passphrase, or
+password coded into a script, placed in a protected file, or stored
+in memory. This isn't only a potential security risk but also a
+maintenance nightmare. If the authenticator ever changes, you must
+hunt down and change these hard coded copies, a situation just
+begging for things to break mysteriously later on. Trusted-host
+authentication gets around this problem neatly.</p>
+
+
+
+Since trusted-host authentication is a useful idea, SSH1 supports it
+in two ways. <em class="emphasis">Rhosts
+authentication</em><a name="INDEX-326" />
+simply behaves as described in Steps 1-5, just like the
+Berkeley r-commands. This method is disabled by default, since it is
+quite insecure, though it's still an improvement over
+<tt class="command">rsh</tt> since it provides server host authentication,
+encryption, and integrity. More importantly, though, SSH1 provides a
+more secure version of the trusted-host method, called
+<em class="emphasis">RhostsRSA
+authentication,</em><a name="INDEX-327" />
+which improves Steps 2 and 4 using the client's host key.</p>
+
+
+
+Step 2 is improved by a stronger check on
+the identity of the client host. Instead of relying on the source IP
+address and a naming service such as DNS, SSH uses public-key
+cryptography. Recall that each host on which SSH is installed has an
+asymmetric "host key" identifying it. The host key
+authenticates the server to the client while establishing the secure
+connection. In RhostsRSA authentication, the client's host key
+authenticates the client host to the server. The client host provides
+its name and public key, and then must prove it holds the
+corresponding private key via a challenge-response exchange. The
+server maintains a list of known hosts and their public keys to
+determine the client's status as a known, trusted host.</p>
+
+
+
+Step 4, checking that the server is
+talking to a trusted program, is improved again through use of the
+client's host key. The private key is kept protected so only a
+program with special privileges (e.g., setuid root) can read it.
+Therefore, if the client can access its local host key at
+all -- which it must do to complete authentication in Step
+2 -- the client must have those special privileges. Therefore the
+client was installed by the administrator of the trusted host and can
+be trusted. SSH1 retains the privileged-port check, which can't
+be turned off.<a href="#FOOTNOTE-26">[26]</a> SSH2 does away with this check entirely
+since it doesn't add anything.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-26" />[26]SSH1 has a
+<tt class="literal">UsePrivilegedPort</tt> configuration keyword, but it
+tells the client not to use a privileged port in
+its source socket, which renders the session unusable for rhosts or
+RhostsRSA authentication. The purpose of this feature is to get
+around firewalls that might block connections coming from privileged
+ports and requires that some other authentication method be
+used.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch03-70368" /><div class="sect4">
+<h4 class="sect4">3.4.2.3.1. Trusted-host access files</h4>
+
+
+
+Two pairs of files on the SSH server machine provide access control
+for trusted-host authentication, in both its weak and strong forms:</p>
+
+
+
+<ul><li><em class="filename">
+/etc/hosts.equiv</em><a name="INDEX-328" />
+and<em class="filename">
+~/.rhosts</em><a name="INDEX-329" /></p></li><li><em class="filename">
+/etc/shosts.equiv</em><a name="INDEX-330" /> and<em class="filename">
+~/.shosts</em><a name="INDEX-331" /></p></li></ul>
+The files in <em class="filename">/etc</em> have machine-global scope,
+while those in the target account's home directory are specific
+to that account. The <em class="filename">hosts.equiv</em> and
+<em class="filename">shosts.equiv</em> files have the same syntax, as do
+the <em class="filename">.rhosts</em> and <em class="filename">.shosts</em>
+files, and by default they are all checked.</p>
+
+
+
+<a name="ch03-9-fm2xml" /><blockquote><b>WARNING: </b>
+If any of the four access files allows access for a particular
+connection, it's allowed, even if another of the files forbids
+it.</p>
+
+
+</blockquote>
+
+The <em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">~/.rhosts</em> files originated with the insecure
+r-commands. For backward compatibility, SSH can also use these files
+for making its trusted-host authentication decisions. If using both
+the r-commands and SSH, however, you might not want the two systems
+to have the same configuration. Also, because of their poor security,
+it's common to disable the r-commands, by turning off the
+servers in your <em class="filename">inetd.conf</em> files and/or removing
+the software. In that case, you may not want to have any traditional
+control files lying around, as a defensive measure in case an
+attacker managed to get one of these services turned on again.</p>
+
+
+
+To separate itself from the r-commands, SSH reads two additional
+files, <em class="filename">/etc/shosts.equiv</em> and
+<em class="filename">~/.shosts</em>, which have the same syntax and
+meaning as <em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">~/.rhosts,</em> but are specific to SSH. If you use
+only the SSH-specific files, you can have SSH trusted-host
+authentication without leaving any files the r-commands would look
+at.<a href="#FOOTNOTE-27">[27]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-27" />[27]Unfortunately, you can't configure the
+server to look at one set but not the other. If it looks at
+<em class="filename">~/.shosts</em>, then it also considers
+<em class="filename">~/.rhosts</em>, and both global files are always
+considered.</p>
+
+
+</blockquote>
+
+
+
+All four files have the same syntax, and SSH interprets them very
+similarly -- but not identically -- to the way the r-commands
+do. Read the following sections carefully to make sure you understand
+this behavior.</p>
+</div>
+
+
+
+<a name="ch03-10-fm2xml" /><div class="sect4">
+<h4 class="sect4">3.4.2.3.2. Control file details</h4>
+
+
+<a name="INDEX-332" /><a name="INDEX-333" /><a name="INDEX-334" /><a name="INDEX-335" />
+
+Here is the common format of all four trusted-host control files.
+Each entry is a single line, containing either one or two tokens
+separated by tabs and/or spaces. Comments begin with #, continue to
+the end of the line, and may be placed anywhere; empty and
+comment-only lines are allowed.</p>
+
+
+
+<blockquote><pre class="code"># example control file entry
+[+-][@]<em class="replaceable">hostspec</em>  [+-][@]<em class="replaceable">userspec</em>  # <em class="replaceable">comment</em></pre></blockquote>
+
+
+
+The two tokens indicate host(s) and user(s), respectively; the
+<em class="emphasis">userspec</em> may be omitted. If the at-sign (@) is
+present, then the token is interpreted as a netgroup (see <a href="ch03_04.html#ch03-81473">the sidebar "Netgroups"</a>), looked up using the
+<tt class="function">innetgr( )</tt> library call, and the resulting list
+of user or hostnames is substituted. Otherwise, the token is
+interpreted as a single host or username. Hostnames must be canonical
+as reported by <tt class="function">gethostbyaddr( )</tt> on the server
+host; other names won't work.</p>
+
+
+
+<a name="INDEX-336" /><a name="INDEX-337" /><a name="INDEX-338" /><a name="INDEX-339" />
+<a name="ch03-81473" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Netgroups</h4>
+
+
+
+A netgroup defines a list of (<em class="emphasis">host</em>,
+<em class="emphasis">user</em>, <em class="emphasis">domain</em>) triples.
+Netgroups are used to define lists of users, machines, or accounts,
+usually for access-control purposes; for instance, one can usually
+use a netgroup to specify what hosts are allowed to mount an NFS
+filesystem (e.g., in the Solaris <em class="emphasis">share</em> command
+or BSD <em class="emphasis">exportfs</em>).</p>
+
+
+
+Different flavors of Unix vary in how they implement netgroups,
+though you must always be the system administrator to define a
+netgroup. Possible sources for netgroup definitions include:</p>
+
+
+
+<ul><li>A plain file, e.g.,  <em class="filename">/etc/netgroup</em></p></li>
+<li>A database file in various formats, e.g.,
+<em class="filename">/etc/netgroup.db</em></p></li>
+
+<li>An information service, such as Sun's YP/NIS</p></li></ul>
+On many modern Unix flavors, the source of netgroup information is
+configurable with the Network Service Switch facility; see the file
+<em class="filename">/etc/nsswitch.conf</em>. Be aware that in some
+versions of SunOS and Solaris, netgroups may be defined only in NIS;
+it doesn't complain if you specify "files" as the
+source in <em class="filename">nsswitch.conf</em>, but it doesn't
+work either. Recent Linux systems support
+<em class="filename">/etc/netgroup</em>, though C libraries before
+<em class="filename">glibc</em> 2.1 support netgroups only over NIS.</p>
+
+
+
+Some typical netgroup definitions might look like this:</p>
+
+
+
+<blockquote><pre class="code"># defines a group consisting of two hosts: hostnames
+"print1" and
+# "print2", in the (probably NIS) domains one.foo.org and two.foo.com.
+print-servers        (print1,,one.foo.com) (print2,,two.foo.com)
+# a list of three login servers
+login-servers        (login1,,foo.com) (login2,,foo.com) (login1,,foo.com)
+# Use two existing netgroups to define a list of all hosts, throwing in
+# another.foo.com as well.
+all-hosts            print-servers login-servers (another,,foo.com)
+# A list of users for some access-control purpose.  Mary is allowed from
+# anywhere in the foo.com domain, but Peter only from one host.  Alice
+# is allowed from anywhere at all.
+allowed-users         (,mary,foo.com) (login1,peter,foo.com) (,alice,)</pre></blockquote>
+
+
+
+When deciding membership in a netgroup, the thing being matched is
+always construed as an appropriate triple. A triple (<em class="emphasis">x, y,
+z</em>) matches a netgroup <em class="emphasis">N</em> if there
+exists a triple (<em class="emphasis">a, b, c</em>) in
+<em class="emphasis">N</em> which matches (<em class="emphasis">x, y, z</em>).
+In turn, you define that these two triples match if and only if the
+following conditions are met:</p>
+
+<em class="emphasis">x=a</em> <b class="emphasis-bold">or</b>
+<em class="emphasis">x</em> is null <b class="emphasis-bold">or</b>
+<em class="emphasis">a</em> is null</p>
+
+<b class="emphasis-bold">and:</b></p>
+
+<em class="emphasis">y=b</em> <b class="emphasis-bold">or</b>
+<em class="emphasis">y</em> is null <b class="emphasis-bold">or</b>
+<em class="emphasis">b</em> is null</p>
+
+<b class="emphasis-bold">and:</b></p>
+
+<em class="emphasis">z=c</em> <b class="emphasis-bold">or</b>
+<em class="emphasis">z</em> is null <b class="emphasis-bold">or</b>
+<em class="emphasis">c</em> is null</p>
+
+This means that a null field in a triple acts as wildcard. By
+"null," we mean missing; that is, in the triple (, <em class="emphasis">user,
+domain</em>), the host part is null. This isn't the same as the
+empty string: ("", <em class="emphasis">user, domain</em>). In this triple,
+the host part isn't null. It is the empty string, and the triple can
+match only another whose host part is also the empty string.</p>
+
+When SSH matches a username <em class="emphasis">U</em> againsta
+netgroup, it matches the triple (, <em class="emphasis">U</em>,);
+similarly, when matching a hostname <em class="emphasis">H</em>, it matches
+(<em class="emphasis">H, ,</em>). You might expect it to use (<em class="emphasis">,
+U, D</em>) and (<em class="emphasis">H, , D</em>) where
+<em class="emphasis">D</em> is
+the host's domain, but it doesn't.</p>
+
+</td></tr></table><p></blockquote>
+
+If either or both tokens are preceded by a minus sign (-), the whole
+entry is considered negated. It doesn't matter which token has
+the minus sign; the effect is the same. Let's see some examples
+before explaining the full rules.</p>
+
+
+
+The following <em class="emphasis">hostspec</em> allows anyone from
+<em class="emphasis">fred.flintstone.gov</em> to log
+in if the remote and local usernames are the same:</p>
+
+
+
+<blockquote><pre class="code"># /etc/shosts.equiv
+fred.flintstone.gov</pre></blockquote>
+
+
+
+The following <em class="emphasis">hostspec</em>s allow anyone from any
+host in the netgroup "trusted-hosts" to log in, if the
+remote and local usernames are the same, but not from <em class="emphasis">evil.empire.org</em>, even if it is in the
+trusted-hosts netgroup.</p>
+
+
+
+<blockquote><pre class="code"># /etc/shosts.equiv
+-evil.empire.org
+@trusted-hosts</pre></blockquote>
+
+
+
+This next entry (<em class="emphasis">hostspec</em> and
+<em class="emphasis">userspec</em>) allows
+<em class="emphasis">mark@way.too.trusted</em> to log into any local account!
+Even if a user has <tt class="command">-way.too.trusted mark</tt> in
+<em class="filename">~/.shosts</em>, it won't prevent access since
+the global file is consulted first. You probably never want to do
+this.</p>
+
+
+
+<blockquote><pre class="code"># /etc/shosts.equiv
+way.too.trusted mark</pre></blockquote>
+
+
+
+On the other hand, the following entries allow anyone from
+<em class="emphasis">sister.host.org</em> to connect
+under the same account name, except mark, who can't access any
+local account. Remember, however, that a target account can override
+this restriction by placing <tt class="literal">sister.host.org mark</tt>
+in <em class="filename">~/.shosts</em>. Note also, as shown earlier, that
+the negated line must come first; in the other order, it's
+ineffective.</p>
+
+
+
+<blockquote><pre class="code"># /etc/shosts.equiv
+sister.host.org -mark
+sister.host.org</pre></blockquote>
+
+
+
+This next <em class="emphasis">hostspec</em> allows user wilma on
+<em class="emphasis">fred.flintstone.gov</em> to log
+into the local wilma account:</p>
+
+
+
+<blockquote><pre class="code"># ~wilma/.shosts
+fred.flintstone.gov</pre></blockquote>
+
+
+
+This entry allows user fred on <em class="emphasis">fred.flintstone.gov</em> to log into the
+local wilma account, but no one else -- not even
+<em class="emphasis">wilma@fred.flintstone.gov</em>:</p>
+
+
+
+<blockquote><pre class="code"># ~wilma/.shosts
+fred.flintstone.gov fred</pre></blockquote>
+
+
+
+These entries allow both fred and wilma on <em class="emphasis">fred.flintstone.gov</em> to log into the
+local wilma account:</p>
+
+
+
+<blockquote><pre class="code"># ~wilma/.shosts
+fred.flintstone.gov fred
+fred.flintstone.gov</pre></blockquote>
+
+
+
+Now that we've covered some examples, let's discuss the
+precise rules. Suppose the client username is C, and the target
+account of the SSH command is T. Then:</p>
+
+
+
+<ol><li>A <em class="emphasis">hostspec</em> entry with no
+<em class="emphasis">userspec</em> permits access from all
+<em class="emphasis">hostspec</em> hosts when T = C.</p></li><li>In a per-account file (<em class="filename">~/.rhosts</em> or
+<em class="filename">~/.shosts</em>), a <em class="emphasis">hostspec
+userspec</em> entry permits access to the containing account
+from <em class="emphasis">hostspec</em> hosts when C is any one of the
+<em class="emphasis">userspec</em> usernames.</p></li><li>In a global file (<em class="filename">/etc/hosts.equiv</em> or
+<em class="filename">/etc/shosts.equiv</em>), a <em class="emphasis">hostspec
+userspec</em> entry permits access to any local target account
+from any <em class="emphasis">hostspec</em> host, when C is any one of the
+<em class="emphasis">userspec</em> usernames.</p></li><li>For negated entries, replace "permits" with
+"denies" in the preceding rules.</p></li></ol>
+Note Rule #3 carefully. You never, ever
+want to open your machine to such a security hole. The only
+reasonable use for such a rule is if it is negated, thus disallowing
+access to any local account for a particular remote account. We
+present some examples shortly.</p>
+
+
+
+The files are checked in the following order (a missing file is
+simply skipped, with no effect on the authorization decision):</p>
+
+
+
+<ol><li><em class="filename">/etc/hosts.equiv</em></p></li><li><em class="filename">/etc/shosts.equiv</em></p></li><li><em class="filename">~/.shosts</em></p></li><li><p><em class="filename">~/.rhosts</em></p></li></ol>
+SSH makes a special exception when the target user is root: it
+doesn't check the global files. Access to the root account can
+be granted only via the root account's
+<em class="filename">/.rhosts</em> and <em class="filename">/.shosts</em>
+files. If you block the use of those files with the
+<tt class="literal">IgnoreRootRhosts</tt> server directive, this
+effectively prevents access to the root account via trusted-host
+authentication.</p>
+
+
+
+When checking these files, there are two rules to keep in mind. The
+first rule is: the first accepting line wins. That is, if you have
+two netgroups:</p>
+
+
+
+<blockquote><pre class="code">set     (one,,) (two,,) (three,,)
+subset  (one,,) (two,,)</pre></blockquote>
+
+
+
+the following <em class="filename">/etc/shosts.equiv</em> file permits
+access only from host three:</p>
+
+
+
+<blockquote><pre class="code">-@subset
+@set</pre></blockquote>
+
+
+
+But this next one allows access from all three:</p>
+
+
+
+<blockquote><pre class="code">@set
+-@subset</pre></blockquote>
+
+
+
+The second line has no effect, because all its hosts have already
+been accepted by a previous line.</p>
+
+
+
+The second rule is: if any file accepts the connection, it's
+allowed. That is, if <em class="filename">/etc/shosts.equiv</em> forbids a
+connection but the target user's <em class="filename">~/.shosts</em>
+file accepts it, then it is accepted. Therefore the sysadmin
+can't rely on the global file to block connections. Similarly,
+if your per-account file forbids a connection, it can be overridden
+by a global file that accepts it. Keep these facts carefully in mind
+when using trusted-host authentication.<a href="#FOOTNOTE-28">[28]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-28" />[28]By setting
+the server's <tt class="literal">IgnoreRhosts</tt> keyword to
+<tt class="literal">yes</tt>, you can cause the server to ignore the
+per-account files completely and consult the global files exclusively
+instead. [<a href="ch05_05.html#ch05-20102">Section 5.5.1.3, "Rhosts authentication"</a>]</p>
+
+
+</blockquote>
+</div>
+
+
+
+<a name="ch03-11-fm2xml" /><div class="sect4">
+<a name="INDEX-340" /><h4 class="sect4">3.4.2.3.3. Netgroups as wildcards</h4>
+
+
+
+You may have noticed the rule syntax has no wildcards; this omission
+is deliberate. The r-commands recognize bare + and - characters as
+positive and negative wildcards, respectively, and a number of
+attacks are based on surreptitiously adding a "+" to
+someone's <em class="filename">.rhosts</em> file, immediately
+allowing anyone to <tt class="command">rlogin</tt> as that user. So SSH
+deliberately ignores these wildcards. You'll see messages to
+that effect in the server's debugging output if it encounters
+such a wildcard:</p>
+
+
+
+<blockquote><pre class="code">Remote: Ignoring wild host/user names in /etc/shosts.equiv</pre></blockquote>
+
+
+
+However, there's still a way to get the effect of a wildcard:
+using the wildcards available in netgroups. An empty netgroup:</p>
+
+
+
+<blockquote><pre class="code">empty  # nothing here</pre></blockquote>
+
+
+
+matches nothing at all. However, this netgroup:</p>
+
+
+
+<blockquote><pre class="code">wild  (,,)</pre></blockquote>
+
+
+
+matches everything. In fact, a netgroup containing (,,) anywhere
+matches everything, regardless of what else is in the netgroup. So
+this entry:</p>
+
+
+
+<blockquote><pre class="code"># ~/.shosts
+@wild</pre></blockquote>
+
+
+
+allows access from any host at all,<a href="#FOOTNOTE-29">[29]</a> as long as the remote and local usernames match. This
+one:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-29" />[29]If strong
+trusted-host authentication is in use, this means any host verified
+by public key against the server's known hosts database.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># ~/.shosts
+way.too.trusted @wild</pre></blockquote>
+
+
+
+allows any user on <em class="emphasis">way.too.trusted</em> to log into this
+account, while this entry:</p>
+
+
+
+<blockquote><pre class="code"># ~/.shosts 
+@wild @wild</pre></blockquote>
+
+
+
+allows any user access from anywhere.</p>
+
+
+
+Given this wildcard behavior, it's important to pay careful
+attention to netgroup definitions. It's easier to create a
+wildcard netgroup than you might think. Including the null triple
+(,,) is the obvious approach. However, remember that the order of
+elements in a netgroup triple is
+(<em class="emphasis">host,user,domain</em>). Suppose you define a group
+"oops" like this:</p>
+
+
+
+<blockquote><pre class="code">oops        (fred,,) (wilma,,) (barney,,)</pre></blockquote>
+
+
+
+You intend for this to be a group of usernames, but you've
+placed the usernames in the host slots, and the username fields are
+left null. If you use this group as the userspec of a rule, it will
+act as a wildcard. Thus this entry:</p>
+
+
+
+<blockquote><pre class="code"># ~/.shosts 
+home.flintstones.gov @oops</pre></blockquote>
+
+
+
+allows anyone on <em class="emphasis">home.flintstones.gov,
+</em>not just your three friends, to log into your account.
+Beware!</p>
+</div>
+
+
+
+<a name="ch03-12-fm2xml" /><div class="sect4">
+<h4 class="sect4">3.4.2.3.4. Summary</h4>
+
+
+
+Trusted-host authentication is convenient for users and
+administrators, because it can set up automatic authentication
+between hosts based on username correspondence and inter-host trust
+relationships. This removes the burden of typing passwords or dealing
+with key management. However, it is heavily dependent on the correct
+administration and security of the hosts involved; compromising one
+trusted host can give an attacker automatic access to all accounts on
+other hosts. Also, the rules for the access control files are
+complicated, fragile, and easy to get wrong in ways that compromise
+security. In an environment more concerned with eavesdropping and
+disclosure than active attacks, it may be acceptable to deploy
+RhostsRSA (SSH-2 "hostbased") authentication for general
+user authentication. In a more security-conscious scenario, however,
+it is probably inappropriate, though it may be acceptable for limited
+use in special-purpose accounts, such as for unattended batch jobs.
+[<a href="ch11_01.html#ch11-35818">Section 11.1.3, "Trusted-Host Authentication"</a>]</p>
+
+
+
+We don't recommend the use of weak ("Rhosts")
+trusted-host authentication at all in SSH1 and OpenSSH/1. It is
+totally insecure.<a name="INDEX-341" /><a name="INDEX-342" /><a name="INDEX-343" /><a name="INDEX-344" /></p>
+</div>
+</div>
+
+
+
+
+
+<a name="ch03-60960" /><div class="sect3">
+<h3 class="sect3">3.4.2.4. Kerberos authentication</h3>
+
+
+
+SSH1 and OpenSSH provide support for
+<a name="INDEX-345" /><a name="INDEX-346" />Kerberos-based authentication;
+SSH2 doesn't yet.<a href="#FOOTNOTE-30">[30]</a> [<a href="ch11_04.html#ch11-75655">Section 11.4, "Kerberos and SSH"</a>] <a href="ch03_04.html#ch03-50323">Table 3-2</a>
+summarizes the support features in these products.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-30" />[30]At press time, experimental
+Kerberos support is being integrated into SSH2 2.3.0.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch03-50323" /><h4 class="objtitle">Table 3-2. Kerberos Authentication Support in SSH </h4><table border="1">
+
+
+
+
+
+
+
+<tr>
+<th>
+Product</p></th>
+<th>
+Kerberos Version</p></th>
+<th>
+Tickets</p></th>
+<th>
+Password Authentication</p></th>
+<th>
+AFS</p></th>
+<th>
+Forwarding</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+SSH1</p></td>
+<td>
+5</p></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+OpenSSH</p></td>
+<td>
+4</p></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+Only with AFS</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+
+The following list explains the columns:</p>
+
+
+
+<dl>
+<dt><i>Tickets</i></dt>
+<dd>Performs standard Kerberos authentication. The client obtains a
+ticket for the "host" (v5) or "rcmd" (v4)
+service on the server and sends that to the SSH server as proof of
+identity; the server validates it in the standard fashion. Both SSH1
+and OpenSSH do Kerberos mutual authentication. This isn't
+strictly necessary given that SSH has already authenticated the
+server as part of connection setup, but the extra check can't
+hurt.</p></dd>
+
+
+
+<dt><i>Password Authentication</i></dt>
+<dd>Option to perform server-side password authentication using Kerberos.
+Instead of checking the password using the operating system's
+account database, the SSH server instead attempts to obtain Kerberos
+initial credentials for the target user (a
+"ticket-granting-ticket" or TGT). If this succeeds, the
+user is authenticated. Also, the server stores the TGT for the
+session so that the user has access to it, thus removing the need for
+an explicit <tt class="command">kinit</tt>.</p></dd>
+
+
+
+<dt><i>AFS</i></dt>
+<dd>The <a name="INDEX-347" />Andrew File System (<a href="http://www.faqs.org/faqs/afs-faq/)">http://www.faqs.org/faqs/afs-faq/)</a>, or AFS,
+uses Kerberos-4 in a specialized way for its authentication. OpenSSH
+has extra support for obtaining and forwarding AFS credentials. This
+can be critical in environments using AFS for file sharing. Before it
+performs authentication, <tt class="command">sshd</tt> must read the target
+account's home directory, for instance to check
+<em class="filename">~/.shosts</em>, or
+<em class="filename">~/.ssh/authorized_keys</em>. If the home directory is
+shared via AFS, then depending on AFS permissions
+<tt class="command">sshd</tt> might not be able to read it unless it has
+valid AFS credentials for the owning user. The OpenSSH AFS code
+provides this, forwarding the source user's Kerberos-4 TGT and
+AFS ticket to the remote host for use by <tt class="command">sshd</tt>.</p></dd>
+
+
+
+<dt><i>Forwarding</i></dt>
+<dd><a name="INDEX-348" />Kerberos
+credentials are normally usable only on the machine to which they are
+issued. The Kerberos-5 protocol allows a user to forward credentials
+from one machine to another on which he has been authenticated,
+avoiding the need for repeated <tt class="command">kinit</tt> invocations.
+SSH1 supports this with the <tt class="literal">KerberosTgtPassing</tt>
+option. Kerberos-4 doesn't do ticket forwarding, so OpenSSH
+doesn't provide this feature -- unless it is using AFS,
+whose modified Kerberos-4 implementation provides a form of ticket
+forwarding.</p></dd>
+
+</dl>
+
+
+
+<a name="ch03-13-fm2xml" /><blockquote><b>TIP: </b>
+OpenSSH provides Kerberos support only when using the SSH-1 protocol.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch03-30873" /><div class="sect3">
+<h3 class="sect3">3.4.2.5. One-time passwords</h3>
+
+
+
+Password <a name="INDEX-349" /><a name="INDEX-350" />authentication is
+convenient because it can be used easily from anywhere. If you travel
+a lot and use other people's computers, passwords might be your
+best bet for SSH authentication. However, it's precisely in
+that situation that you're most concerned about someone
+stealing your password -- by monitoring keyboard activity on a
+hacked computer or by old-fashioned shoulder-surfing. One-time
+password, or OTP systems, preserve the convenience of password access
+while mitigating the risk: each login requires a different,
+unpredictable password. Here are the properties of some OTP systems:</p>
+
+
+
+<ul><li>With the free <a name="INDEX-351" />S/Key software OTP system, you carry a
+printed list of passwords or calculate the next one needed using a
+piece of software on your laptop or PDA.</p></li><li>With the
+<a name="INDEX-352" />SecurID system from RSA Security, Inc.,
+you carry a small hardware token (credit-card or key-fob size) with
+an LCD screen, which displays a passcode that changes frequently and
+is synchronized with the SecurID server, which verifies the passcode.</p></li><li>The OTP system from <a name="INDEX-353" />Trusted Information Systems,
+Inc. (TIS) is a variant called <em class="emphasis">challenge-response
+</em>: the server displays a challenge, which you type into
+your software or hardware token. The token supplies the corresponding
+response, which you supply to be authenticated.</p></li></ul>
+SSH1 supports SecurID as a variant behavior of password
+authentication, and TIS as a separate method with the
+<tt class="literal">TISAuthentication</tt> configuration keyword (as noted
+earlier, this is actually a separate authentication type in the SSH-1
+protocol). OpenSSH doesn't support TIS but instead reuses the
+TIS message types in the SSH-1 protocol to implement S/Key. This
+works because both TIS and S/Key fit the model of a
+challenge/response exchange.</p>
+
+
+
+Using these systems involves obtaining the requisite libraries and
+header files, compiling SSH with the appropriate
+<tt class="command">configure</tt> switches, enabling the right SSH
+authentication method, and setting up the system according to its
+instructions. If you are using SecurID or TIS, the requisite
+libraries and header files should have come with the software or be
+available from the vendor. S/Key is widely available on the Net,
+though it has diverged into many versions, and we don't know a
+canonical site for it. One popular implementation is found in the
+<em class="emphasis">logdaemon</em> package by Wietse Venema; see
+<a href="http://www.porcupine.org/wietse/">http://www.porcupine.org/wietse/</a>.
+The details of these external packages are mostly outside the scope
+of SSH proper, so we won't delve into them.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-14-fm2xml" /><div class="sect2">
+<h3 class="sect2">3.4.3. Integrity Checking</h3>
+
+
+
+The SSH-1 protocol uses a weak <a name="INDEX-354" />integrity
+check: a 32-bit cyclic redundancy check or CRC-32. This sort of check
+is sufficient for detecting accidental changes to data, but
+isn't effective against deliberate corruption. In fact, the
+"insertion attack" of Futoransky and Kargieman
+specifically targets this weakness in SSH-1. [<a href="ch03_10.html#ch03-50330">Section 3.10.5, "The Insertion Attack"</a>] The use of the CRC-32 integrity check is a
+serious inherent weakness in SSH-1 that helped prompt the evolution
+of SSH-2, which uses cryptographically strong integrity checking
+invulnerable to this attack.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">3.4.4. Compression</h3>
+
+
+
+The SSH-1 protocol supports <a name="INDEX-355" />compression of session data using the
+"deflate" algorithm of the GNU <tt class="command">gzip</tt>
+utility ( <a href="ftp://ftp.gnu.org/pub/gnu/gzip/">ftp://ftp.gnu.org/pub/gnu/gzip/
+</a>). Packet data bytes in each direction are compressed
+separately, each as a single large stream without regard to packet
+boundaries.</p>
+
+
+
+While not typically needed on LAN or fast WAN links, compression can
+improve speed noticeably over slower links, such as an analog modem
+line. It is especially beneficial for file transfers, X forwarding,
+and running curses-style programs in a terminal session, such as text
+editors. Also, since compression is done before encryption, using
+compression can reduce delays due to encryption. This may be
+especially effective with 3DES, which is quite slow.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.3. The Architecture of an SSH System</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.5. Inside SSH-2</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:01 GMT -->
+</html>

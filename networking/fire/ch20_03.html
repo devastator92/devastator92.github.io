@@ -1,0 +1,1345 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+<head><title>NetBIOS for TCP/IP Name Service and Windows Internet Name Service (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch20_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">20.3. NetBIOS for TCP/IP Name Service and Windows Internet Name Service</h2>
+
+
+
+
+
+<a name="INDEX-1882" />
+<a name="INDEX-1883" />NetBT name
+service is the NetBT service used to translate NetBIOS names to IP
+addresses. There are two ways to get name service under NetBT: a
+broadcast mechanism in which each machine keeps a database, and a
+unicast mechanism in which there is a designated server. In theory,
+that designated server is called a NetBT Name Server, or NBNS.
+However, Microsoft's NBNS implementation is called Windows
+Internet Name Service (WINS). It's rare to see the general term
+"NBNS" used outside of standards documentation, even for
+non-Microsoft servers, which are technically implementations of NBNS,
+not WINS.</p><p>
+
+
+
+
+
+In order to minimize the inevitable confusion, we will call
+broadcast-based NetBT name service "NetBT name service",
+and unicast-based service "WINS". This reflects common
+usage and is no more arbitrary and confusing than any other naming
+scheme.</p><p>
+
+
+
+
+
+<a name="INDEX-1884" />A NetBIOS name
+is up to 15 characters long.<a href="#FOOTNOTE-121">[121]</a> NetBIOS names are "unqualified"
+(according to Microsoft documentation) which means two things:</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-121" />[121]Technically speaking,
+all NetBIOS names are exactly 16 characters long, and Microsoft
+reserves the 16th character for administrative use. Short names are
+automatically and transparently padded to 16 characters. To the user,
+this is indistinguishable from having names up to 15 characters
+long.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<ul><li>They must be unique within a server's area of control.</p><p></li><li>They cannot contain periods.</p></li></ul>
+There is no notion of hierarchy in NetBIOS. Only one machine can be
+named "foo", and there is no way to indicate in a name
+what server is responsible for it. In order to reduce problems with
+name collisions, Microsoft provides the concept of a NetBIOS
+<em class="emphasis">scope</em>, which strongly resembles a NIS domain;
+this is a string that defines a group of machines that talk to each
+other. If you are using NetBIOS scopes, a machine's name needs
+to be unique only within the scope. By default, machines use a null
+NetBIOS scope. The NetBIOS name and scope taken together can be up to
+255 characters long (effectively limiting the scope to 240
+characters), and the NetBIOS scope can contain periods.</p><p>
+
+
+
+
+
+NetBIOS scopes are much more limiting than NIS domains. Machines that
+are in different NetBIOS scopes cannot speak any NetBIOS protocols to
+each other, including file and printer sharing. On controlled
+networks, this can actually be an advantage, as it provides a small
+security improvement; the NetBIOS scope setting effectively acts as a
+password for network access. This is a protection from accidental
+misconfiguration, not from hostile action. The NetBIOS scope is
+passed in cleartext across the network as part of the NetBIOS
+hostname, and any attacker can simply read it from valid packets (it
+is particularly simple because it is sent in broadcast packets, so no
+special ability to snoop the network is required.)</p><p>
+
+
+
+
+
+It is important to keep in mind that WINS and NetBT name service are
+merely variants on the same service. Clients that use broadcast
+resolution run their own name servers, and although they expect only
+broadcast-based queries, they will respond to unicast queries. Do not
+assume that you are safe from remote requests just because you have
+avoided running WINS; normal NetBIOS clients are still running name
+servers that will feed their own data and any other data that they
+have cached to anybody who asks them. As we will see later, even
+machines that use WINS exclusively must have servers running that
+will respond to unicast name queries in order to have full WINS
+functionality. This is one of the things that the
+"Server" service normally does on clients.</p><p>
+
+
+
+
+
+Even though these services are tightly interrelated, the same machine
+may run both servers, in which case the WINS server will get unicast
+packets and the NetBT name server will get broadcast packets (Unix
+aficionados will probably find this upsetting). This means that the
+two services will run completely independently and may have different
+data on them. A WINS server will not provide data gathered by WINS to
+a NetBT name service client, or data gathered by NetBT name service
+to a WINS client, even though the servers are running on the same
+port on the same computer. (Therefore, a machine that runs a WINS
+server but is not configured as a WINS client won't advertise
+its own services via WINS!)</p><p>
+
+
+
+
+
+<a name="ch20-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.1. Name Resolution Under Windows</h3>
+
+
+
+
+
+For historical reasons, Microsoft provides multiple methods of name
+resolution. Windows 2000 uses DNS wherever possible, but other
+icrosoft Windows machines may use numerous methods to translate a
+name to an address, depending on their configurations. They may try
+multiple methods to translate the same name, attempting various
+things until something succeeds.</p><p>
+
+
+
+
+
+<a name="INDEX-1885" />For this purpose, there are two kinds of
+names: possible NetBIOS names and non-NetBIOS names. A genuine
+NetBIOS name is one known to the NetBIOS name service, but a possible
+NetBIOS name is any name that is up to 15 characters long. (In
+theory, a name with a period in it is not a possible NetBIOS name,
+but in fact, it will be treated as one under some versions of Windows
+NT.) Names that are not possible NetBIOS names (that is, ones that
+are over 15 characters long) must be resolved via DNS. The methods
+recent Windows machines can use for possible NetBIOS names are:</p><p>
+
+
+
+
+
+<ul><li>Do a local NetBIOS broadcast and see if a machine by that name
+answers.</p><p></li><li>Check a local file named <em class="filename">lmhosts</em> or
+<em class="filename">hosts</em> for an entry with the relevant name.</p><p></li><li>Do a WINS query.</p></li><li>Do a DNS query.</p></li></ul>
+In addition, they may have the information cached and therefore not
+need to look it up at all. Windows NT 4 machines that are WINS and
+DNS clients by default try these options in the following order:</p><p>
+
+
+
+
+
+<ol><li>Look in the machine's cache of name information; this includes
+information for machines that have been looked up recently and
+information from <em class="filename">lmhosts</em> that has been marked
+#PRE, and it may include information about hosts on the local network
+that have booted recently.</p><p></li><li>Do a WINS query.</p></li><li>Check a local <em class="filename">lmhosts</em> file.</p></li><li><p>Do a NetBIOS broadcast.</p></li><li><p>Check a local <em class="filename">hosts</em> file.</p></li><li><p>Do a DNS query.</p></li></ol>
+Various configuration options will change this order (most notably,
+if DNS support is not configured, DNS and <em class="filename">hosts</em>
+will not be checked). Other operating systems prefer other orders. In
+particular, older operating systems may try broadcasting before doing
+a WINS query or may not support any method except broadcasting.</p><p>
+
+
+
+
+
+icrosoft has a complicated naming scheme for describing these
+options; a machine that does only broadcast is a b-node, one that
+only does WINS queries is a p-node ("p" for
+"point-to-point"), one that does broadcast and then WINS
+is an m-node ("m" for "mixed"), and one that
+does WINS first and then broadcast is an h-node ("h" for
+"hybrid"). This naming scheme is useful mostly for
+understanding Microsoft documentation, since knowing what kind of
+node a machine is does not tell you where in the process it consults
+DNS or <em class="filename">lmhosts</em>. However, you may wish to
+remember that "m-node" and "b-node" both mean
+a "machine that generates lots of annoying broadcast
+packets". As you can determine by careful reading of the
+definitions and the preceding steps, Windows NT machines configured
+to use WINS are normally h-nodes.</p><p>
+
+
+
+
+
+Clients may get DNS data without making DNS queries; WINS servers can
+act as gateways into DNS, and other machines may cache DNS data and
+return it in answer to NetBIOS queries. In some configurations, this
+will result in a puzzling situation where the clients cannot reach
+hosts with names over 15 characters long. Since these are not valid
+NetBIOS names, clients must speak DNS directly in order to resolve
+them.</p><p>
+
+
+
+
+
+Just to further confuse matters, Microsoft DNS servers are capable of
+acting as gateways to WINS servers, making WINS queries to try to
+resolve DNS queries. This has two advantages; it obviously simplifies
+DNS administration for sites that are already using WINS, by making
+it nearly nonexistent. More importantly, WINS supports dynamic host
+registration. When a host comes up, it tells the WINS server what its
+name and network address are. By contrast, standard DNS provides no
+way for a host to give this information to the server; the server
+must be preconfigured with the name-address mapping. (DNS and dynamic
+update are discussed earlier.) Forwarding DNS queries to WINS
+provides dynamic DNS registration without modification of DNS.</p><p>
+
+
+
+
+
+The <em class="emphasis">nbtstat</em> command will show you information
+about NetBT names on a machine. Using <em class="emphasis">nbtstat</em> to
+check NetBT naming information and <em class="emphasis">nslookup</em> to
+check DNS naming information will often help you straighten out
+questions about where information is coming from (and therefore what
+to fix in order to get things to work correctly).<a name="INDEX-1886" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-16-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.2. NetBIOS Names</h3>
+
+
+
+
+
+<a name="INDEX-1887" />
+<a name="INDEX-1888" />NetBT name service is used to resolve
+more than just hostnames. There are two basic types of NetBT names:
+unique names and group names. A unique name maps to exactly one IP
+address, while a group name may map to multiple IP addresses. Each of
+these has multiple subtypes, used for different purposes. For
+instance, one type of group name is used to indicate a multihomed
+host; another type is used to indicate an administrative group (all
+the printers, for instance); and a third type is used for showing
+domain and workgroup membership. Different types of unique names are
+used for different services. The sixteenth byte of a NetBIOS name is
+used to indicate the type, and this byte is typically shown in
+hexadecimal notation when names are displayed (you may see type 03
+displayed as "0x03", "&lt;03&gt;", or
+"03h").</p><p>
+
+
+
+
+
+If you actually look at packet traces, particularly if you are using
+a packet trace system that is not aware of NetBT, you may see NetBIOS
+names in mangled form. NetBT is based on DNS packet formats. DNS
+names are longer than NetBIOS names but can't contain the
+arbitrary hexadecimal values NetBIOS uses for type indicators. In
+order to make NetBIOS names fit into DNS name fields, NetBT applies a
+system that converts each byte of the NetBIOS name into two uppercase
+ASCII characters, which results in eye-catching, if incomprehensible,
+name strings. They are made even more noticeable by the fact that the
+mangling algorithm converts spaces, which are used for padding, into
+"CA", so that almost every name ends in
+"CACA". Many English speakers (including presumably the
+engineer who designed the algorithm) attach no special meaning to
+this string, but the repeating pattern is still very striking. For
+details of the name-mangling algorithm, see RFC 1001. If you are on a
+icrosoft machine, most packet sniffing programs will unmangle the
+names for you; if you are on a Unix machine, the Samba package
+contains name mangling and unmangling routines. See <a href="appa_01.html">Appendix A, "Resources"</a>, for information on how to get Samba.</p><p>
+
+
+
+
+
+When a computer boots, it registers multiple names of different
+types. These names are not necessarily based on the hostname of the
+machine; they are chosen according to the purpose the name will be
+used for. For instance, one of the NetBT names that machines normally
+register is a unique name for the Messenger service. This service is
+used to send messages, and if a user is logged in to the console of
+the machine, the Messenger service will be registered under the
+user's name as well as under the computer's name. This is
+designed to allow you to send messages to people by name (human
+beings rarely want to talk to computers, after all), but it means
+that NetBT name registrations will contain not only hostnames, but
+also usernames, and in many cases will let you figure out whether or
+not somebody is logged in to a machine.</p><p>
+
+
+
+
+
+A machine will also register a group name for the workgroup or domain
+it is part of. This does not make the machine a valid member of a
+domain; machines may register as parts of domains they don't
+belong to, and it will not have any security implications. For
+clients, there is no difference between the registration for a domain
+and a workgroup. Domain controllers will make some extra
+registrations; there is a group name for all of the domain
+controllers and a unique name for the primary domain controller.</p><p>
+
+
+
+
+
+In addition, machines that are running the Windows Browser server
+will register a number of special names used by this service. These
+name registrations are sometimes treated specially. See the section
+on the Windows Browser, later in this chapter, for more information
+about these names and their registration.</p><p>
+
+
+
+
+
+Group names can contain large numbers of hosts, which makes them
+expensive to maintain. As a result, WINS servers are allowed to skip
+a lot of the verification they do on hostnames when they're
+dealing with group names, and invalid group names may remain
+registered for long periods of time. <a name="INDEX-1889" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-17-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.3. NetBT Name Service Operations</h3>
+
+
+
+
+
+DNS is a simple question-and-answer system. NetBT name service,
+because it's dynamic, is nowhere near as straightforward.
+Clients and servers interact in numerous ways, in order to register
+names, refresh and release them, and look up other names. The details
+of this process are quite intricate, and despite the daunting amount
+of detail here, a number of special cases and possible interactions
+have been glossed over.</p><p>
+
+
+
+
+
+<a name="ch20-18-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.1. General principles of NetBT operations</h3>
+
+
+
+
+
+There are some generalizations about how NetBT name service works:</p><p>
+
+
+
+
+
+<ul><li>Queries may be broadcast or unicast, but responses are always unicast
+to the host that made the query.</p><p></li><li>WINS servers respond to all requests with positive or negative
+answers (in fact, if a query takes any significant amount of time to
+process, they will return an intermediate answer called a
+<em class="emphasis">wait acknowledgment</em> or WACK). NetBT name servers
+dealing with broadcast requests, however, answer only if they have
+something to say.</p><p></li><li>Clients will always repeat a query if there is no answer (even if it
+is a broadcast query to which no answer was expected).</p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.2. Name registration</h3>
+
+
+
+
+
+When a client starts up, it registers the names it wants to answer
+to, starting with a name registration request. Under NetBT name
+service, it does this by broadcasting the registration request; with
+WINS, the request is sent directly to the WINS server. In either
+case, it may turn out that some other machine already has a name the
+client wants, which will set off a procedure of name conflict
+resolution that's discussed later. A WINS server will always
+answer the request, while NetBT name servers will answer name
+registration requests only in order to dispute them. If the name is
+not already taken, the client will send out a name announcement that
+confirms that it has the name to the same place or places it sent the
+original request.</p><p>
+
+
+
+
+
+For a normally configured Windows NT machine that's trying to
+register the nonconflicting name "unique" and is
+configured with a WINS server address, the process looks like this:</p><p>
+
+
+
+
+
+<ol><li>The machine sends a name registration request for
+"unique" to the WINS server.</p><p></li><li>The WINS server updates its database and sends a positive response
+containing a time-to-live (TTL).</p><p></li><li>The machine broadcasts a name registration request for
+"unique" and gets no response.</p><p></li><li>The machine broadcasts another three name registration requests for
+"unique", just in case, and still gets no response.</p><p></li><li>The machine sends a name announcement to the broadcast address.</p></li><li>All machines that receive the broadcast cache the information
+temporarily, overwriting any previous entry they had for that name.</p><p></li></ol>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-20-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.3. Name refresh</h3>
+
+
+
+
+
+In order to keep WINS server databases free of old junk data, WINS
+servers hand out limited-time registrations. Clients need to send a
+name refresh request before the TTL given to them with the name
+registration expires. If they don't send a name refresh, the
+WINS server will eventually remove the name. This process is not
+particularly fast. Windows NT normally gives out registrations with
+six-day TTLs, so a client that goes away may still be visible in the
+database for up to six days if nobody tries to release or register
+the name.</p><p>
+
+
+
+
+
+Clients may also send out name refresh requests for reasons of their
+own (for instance, a client that changes its configuration to use
+WINS will send a name refresh request to the WINS server).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-21-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.4. Name resolution</h3>
+
+
+
+
+
+When a client wants to map a name to an IP address, it sends out a
+name query request, either by broadcast or to the WINS server. Every
+machine that has a mapping for the name will reply with that mapping.
+A WINS server will reply to the request even if it doesn't have
+the answer. Suppose "unique" wants to talk to
+"stupid", which is a misconfigured client on the local
+network that doesn't use WINS and didn't boot recently.
+The procedure will look like this:</p><p>
+
+
+
+
+
+<ol><li>"unique" checks its cache but doesn't find
+"stupid" there (if "stupid" had just booted,
+it would have worked).</p><p></li><li>"unique" sends a name query request to the WINS server.</p></li><li>The WINS server sends a negative response.</p></li><li><p>"unique" broadcasts a name query request.</p></li><li><p>All machines that know where "stupid" is, including
+"stupid" itself and every machine that's connected
+to it recently, return responses. "unique" believes the
+first answer it gets.</p><p></li></ol>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-22-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.5. Name release</h3>
+
+
+
+
+
+When a client shuts down or changes its name, it sends a name release
+request to the WINS server and/or the broadcast address to give
+notice that the name is now available. As usual, the WINS server will
+always respond, while other servers will respond only if they have
+something to say (in this case, if they reject the name release). A
+client that is trying to release its own name will consider a name
+released and continue if it receives any response to the name release
+request (positive or negative). If it gets no answer, it will try
+again before continuing.</p><p>
+
+
+
+
+
+Name release requests may also be sent by machines other than the
+client that registered the name. This is supposed to allow a machine
+to correct invalid data. A machine that receives a response from the
+server, but gets no response at that address, can send a name release
+request for the name. The WINS server will then do a name query
+request and release the name if it fails. Other servers will respond
+to name release requests only for names that they own, for which they
+will return negative responses. A client that tries to release
+somebody else's name pays attention to the contents of the
+response and does not release a name for which it gets a negative
+response.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-23-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.3.3.6. Conflict management </h3>
+
+
+
+
+
+What happens if a machine tries to register a name as a unique name,
+but it's already in use, or tries to refresh a name that some
+other host has registered? Using broadcasts, when a machine sends out
+the name registration request, the machine that already has the name
+registered will respond with a negative response. Machines that have
+conflicting cached data will not respond.</p><p>
+
+
+
+
+
+A WINS server has a somewhat more complicated task. It can't be
+sure that the existing record it has is for a machine that's
+still running -- in fact, there's a significant chance that
+the existing record is actually for the same machine, and it's
+just been moved from one network to another. Therefore, the WINS
+server will check to see if the record is correct by sending a name
+query request for the name to the address it's registered at.
+If the host is still there, it will answer, and the WINS server will
+send a negative response to the new registration.</p><p>
+
+
+
+
+
+There's an important subtlety to note here. Machines that are
+not WINS servers normally receive name query requests only via
+broadcast; unicast name queries are the business of WINS. But name
+query requests used for conflict resolution and verification of
+third-party release requests are unicast, so non-WINS servers must
+answer them. Machines that don't run name servers cannot defend
+against conflicting name registrations, even if they otherwise use
+WINS.</p><p>
+
+
+
+
+
+Conflict management is one case where groups have a special
+exemption. If a host tries to register an existing group name as a
+unique name, the WINS server is not required to check that the group
+registration is still valid; it can simply reject the attempt.
+<a name="INDEX-1890" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-24-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.4. WINS Server-Server Communication</h3>
+
+
+
+
+
+<a name="INDEX-1891" /> <a name="INDEX-1892" />As well as picking up information from
+clients as they boot, WINS servers can also exchange information with
+other WINS servers. This approach is used to provide redundancy and
+to allow name information to be propagated across large networks.</p><p>
+
+
+
+
+
+Unlike DNS servers, WINS servers have no hierarchical structure and
+do not normally forward queries from one server to another.<a href="#FOOTNOTE-122">[122]</a> WINS servers that talk
+to each other are trying to cause both servers to have identical
+databases. The replication protocol uses several tricks to try to
+distribute only updates rather than entire databases between servers,
+but there is nothing like a DNS zone that would allow them to
+subdivide the database.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-122" />[122]The protocol allows a WINS server to answer a query by
+directing the client to query another server, but this facility does
+not appear to be used in practice; in any case, there is no direct
+server-server forwarding.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+WINS server replication is a complicated topic, involving numerous
+options (for instance, WINS servers need not replicate
+symmetrically). The details are beyond the scope of this book but are
+covered in most references about Windows NT network administration
+(for instance, in Microsoft's <em class="emphasis">Windows NT Server
+Networking Guide</em>, Microsoft Press, which is part of the
+Windows NT Server Resource Kit). From a firewall point of view, the
+interesting points about WINS server replication are:</p><p>
+
+
+
+
+
+<ul><li>WINS servers speak to each other over TCP port 42.</p><p></li><li>WINS servers attempt to locate replication partners via multicast and
+will send out IGMP packets to register multicast addresses for this
+purpose. IGMP is discussed in <a href="ch22_01.html">Chapter 22, "Administrative Services"</a>.</p><p></li><li>No matter what kind of WINS replication you establish, a pair of
+replicating WINS servers will make connections in both directions
+(you cannot set up replication so that only one of the two servers
+needs to be able to initiate a connection).</p><p></li></ul>
+WINS servers may have "push" or "pull"
+partners, but in fact, data is transferred between them only when the
+receiving machine requests it. A machine that tries to
+"push" data will simply inform the other machine that new
+data is available, and the other machine will then request the data.</p><p>
+
+
+
+
+
+By default, WINS servers will send data only to machines that are
+configured as replication partners. It can be reset via the WINS
+anager or the registry. It should be left in the default mode to
+help prevent attackers from pretending to be replication partners and
+pulling the entire WINS database with all of its information about
+valid hostnames and usernames.<a name="INDEX-1893" /> <a name="INDEX-1894" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-25-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.5. The WINS Manager</h3>
+
+
+
+
+
+<a name="INDEX-1895" />It is possible
+to control and configure WINS servers on remote machines with the
+WINS manager, which uses Microsoft RPC. The security implications of
+icrosoft RPC are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-26-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.6. Security Implications of NetBT Name Service and WINS</h3>
+
+
+
+
+
+<a name="INDEX-1896" />
+<a name="INDEX-1897" />NetBT Name Service and WINS are very
+vulnerable and are much more sensitive than DNS. The information they
+provide is valuable to attackers; it's not just the hostname
+data DNS provides, which is already useful, but also information
+about what usernames are valid and whether anybody is logged in, plus
+structural information about what machines provide what services.
+This information gives all sorts of leads to further possible
+attacks.</p><p>
+
+
+
+
+
+In addition, these services modify their databases and take other
+actions based on information from clients, which vastly magnifies the
+risks. An attacker who can send packets to a WINS server can cause
+the WINS server to send packets other places, using it as an
+amplifier to spread denial of service attacks and as a gateway to get
+those attacks to networks that may not be directly vulnerable to the
+attacker. It's also easy for an attacker to contaminate NetBT
+name service and WINS databases with bad data, which is relatively
+difficult in DNS.</p><p>
+
+
+
+
+
+The protocols are more complex than DNS. The extra protocol layers
+and headers are all opportunities for implementors to introduce bugs
+that can become denial of service attacks. Some of these problems
+have already been found by accident by people implementing these
+protocols on other platforms and are fixed in recent versions; others
+are presumably lurking, waiting for malicious people to run out of
+easier targets.</p><p>
+
+
+
+
+
+Finally, DNS servers are relatively rare. Any given site has a
+handful. NetBT name servers are everywhere. Every machine that uses
+NetBT name service must also be a NetBT name server. For an attacker
+who is going after quantity, rather than quality, NetBT name service
+is a very tempting target; it has information-rich servers everywhere
+accepting queries and data from arbitrary hosts.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-27-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.7. Packet Filtering Characteristics of NetBT Name Service</h3>
+
+
+
+
+
+NetBT name service uses TCP and UDP port 137. Almost all NetBT name
+service traffic will be UDP; clients normally use TCP only if they
+issue a query via UDP and get a truncated response because the
+response is too long to fit into a single UDP packet. However,
+servers will respond to any query via TCP. Microsoft implementations
+use port 137 for queries as well as responses. Some older versions
+will return UDP responses to port 137 regardless of the port the
+query was made from. Given that most requests are UDP, and both ends
+are at port 137, it is basically impossible to allow service in a
+single direction. (Since server-initiated queries are part of
+conflict resolution, it wouldn't help much anyway.)</p><p>
+
+
+
+
+
+Clients that do not use WINS will send queries to the broadcast
+address; responses always are unicast, as are WINS queries. WINS
+servers will try to use multicast to contact replication partners and
+will therefore generate IGMP packets (see <a href="ch22_01.html">Chapter 22, "Administrative Services"</a>, for packet filtering details of IGMP). WINS
+server replication uses TCP port 42.</p><p>
+
+
+
+
+
+<a name="ch20-28-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Broadcast</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td>
+<a href="#FOOTNOTE-123">[123]</a></p><p>
+</td>
+<td>
+Incoming NetBT name service query via UDP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td><a href="#FOOTNOTE-123">[123]</a></td>
+<td>
+Incoming WINS query via UDP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>&nbsp;</td>
+<td>
+Answer to incoming UDP query, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td>
+<a href="#FOOTNOTE-124">[124]</a></p><p>
+</td>
+<td>
+Incoming query via TCP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+137</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Answer to incoming TCP query, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Broadcast</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td><a href="#FOOTNOTE-123">[123]</a></td>
+<td>
+Outgoing NetBT name service query via UDP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td><a href="#FOOTNOTE-123">[123]</a></td>
+<td>
+Outgoing WINS query via UDP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+137</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-123">[123]</a></td>
+<td>
+Answer to outgoing UDP query</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+137</p><p></td>
+<td><a href="#FOOTNOTE-124">[124]</a></td>
+<td>
+Outgoing query via TCP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+137</p><p></td>
+<td>
+137, &gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Answer to outgoing TCP query, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+42</p><p></td>
+<td><a href="#FOOTNOTE-124">[124]</a></td>
+<td>
+WINS server replication request from internal server to external
+server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+42</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+WINS server replication reply</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+42</p><p></td>
+<td><a href="#FOOTNOTE-124">[124]</a></td>
+<td>
+WINS server replication request from external server to internal
+server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+42</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+WINS server replication reply</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-123" />[123]UDP has no ACK equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-124" />[124]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-29-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.8. Proxying Characteristics of NetBT Name Service and WINS</h3>
+
+
+
+
+
+icrosoft provides something called a <em class="emphasis">WINS proxy
+service</em>, which turns broadcast NetBIOS name resolution
+requests into WINS requests, in order to allow non-WINS clients to
+use a WINS server. This is a form of proxying, although it also is
+changing the protocol in use.</p><p>
+
+
+
+
+
+It would be perfectly possible to do more traditional firewall
+proxying of WINS, but there do not appear to be any implementations
+available.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-30-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.9. Network Address Translation Characteristics of NetBT Name Service and WINS</h3>
+
+
+
+
+
+Because these protocols are attempting to maintain mappings between
+names and IP addresses, they frequently contain embedded IP
+addresses. Furthermore, these addresses are often deep in the content
+of the packet (not simply in the NetBT destination headers used by
+many other NetBT-based protocols). A network address translator would
+have to be aware of the details of the protocol in order to
+successfully translate all of the embedded addresses. In any case,
+you cannot save address space by using a network address translator
+if you run the name service through it, since all hosts will attempt
+to register their names and addresses.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.3.10. Summary of Recommendations for NetBT Name Service and WINS</h3>
+
+
+
+
+
+<ul><li>Do not allow WINS queries or server replication across your firewall.</p><p></li><li>Bastion hosts that are configured not to respond to name requests
+will be unable to defend themselves from other hosts that try to take
+over their names via NetBT. These machines should be statically
+configured into WINS servers or accessed via 16-character names that
+cannot be resolved with NetBT. See <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, for
+more information.<a name="INDEX-1898" /> <a name="INDEX-1899" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch20_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">20.2. Network Information Service </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">20.4. The Windows Browser</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+</html>

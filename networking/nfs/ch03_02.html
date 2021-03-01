@@ -1,0 +1,800 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+<head><title>Basics of NIS management (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.2. Basics of NIS management</h2>
+
+
+Now that we have laid a conceptual <a name="INDEX-353" />foundation, let's look at how
+to set the machinery in motion. Basic NIS management involves setting
+up NIS servers and enabling NIS on client hosts. Server management
+includes three tasks:</p>
+
+
+<ul><li>Installing a new NIS environment, building
+<a name="INDEX-354" />
+<a name="INDEX-355" /> <a name="INDEX-356" />both master and slave servers.</p></li><li>Starting the <em class="emphasis">ypserv</em> daemon, which enables the
+<a name="INDEX-357" />system to
+act as an NIS server.</p></li><li>Adding new slave servers when growth of <a name="INDEX-358" />
+<a name="INDEX-359" />your network
+or NIS performance requires more server bandwidth.</p></li></ul>
+Enabling NIS on a client requires two tasks:</p>
+
+
+<ul><li>Modifying the client's administrative
+<a name="INDEX-360" />
+<a name="INDEX-361" />files
+so that the client can take advantage of NIS.</p></li><li>Starting the <em class="emphasis">ypbind</em> daemon, which allows the
+client to make NIS requests.</p></li></ul>
+In this section, we'll review the procedures required to
+initialize NIS, set up slave servers, and configure NIS clients.</p>
+
+
+<a name="nfs2-CHP-3-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">3.2.1. Choosing NIS servers</h3>
+
+
+First, a few words on<a name="INDEX-362" />
+<a name="INDEX-363" />
+how to plan your network. One of the most important decisions you
+will make is which systems will be your NIS servers. Because a client
+gets almost all of its configuration information from NIS, servers
+must be highly available in measures of both uptime and request
+handling bandwidth. If an NIS server stops responding or replies too
+slowly, the client tries to find another, less-loaded server. While
+this is an argument for at least one slave server for each master
+server, it supports an equally strong case for building NIS on
+reliable hosts. An interruption in NIS service affects all NIS
+clients if no other servers are available. Even if another server is
+available, clients will suffer periodic slowdowns as they recognize
+the current server is down and hunt for a new one.</p>
+
+
+Use your judgement in defining "highly available." You
+know what machines have troublesome hardware or are likely to be
+commandeered for a trade show, and would therefore make poor NIS
+servers. Request handling bandwidth is much harder to measure,
+because it is a product of network loading, CPU utilization, and disk
+activity. In later chapters, we'll come back to choosing the
+number of NIS servers and identifying signs that you have too few
+servers.</p>
+
+
+A second imperative for NIS servers is synchronization. Clients may
+get their NIS information from any server, so all servers must have
+copies of every map file to ensure proper NIS operation. Furthermore,
+the data in each map on the slave servers must agree with that on the
+master server, so that NIS clients cannot get out-of-date or stale
+data. NIS contains several mechanisms for making changes to map files
+and distributing these changes to all NIS servers on a <a name="INDEX-364" /> <a name="INDEX-365" />regular basis.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-3-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">3.2.2. Installing the NIS master server</h3>
+
+
+We'll assume that you've already done your <a name="INDEX-366" />
+<a name="INDEX-367" />planning
+and decided that you need a single NIS domain, which will
+be<a name="INDEX-368" /> called
+<em class="emphasis">bedrock</em>.<a href="#FOOTNOTE-5">[5]</a> Before going any further, make sure you've set the
+NIS domain name on the master server<a name="INDEX-370" />
+<a name="INDEX-371" />
+using <em class="emphasis">domainname</em>. We'll install a server
+for an NIS domain named <em class="emphasis">bedrock</em>:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-5" />[5]The multiple-domain
+case is really no different than this; you just have to remember
+which systems belong to which
+domain.<a name="INDEX-369" /></p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>domainname bedrock</b></tt></pre></blockquote>
+
+
+A line like this will usually appear in the
+<em class="emphasis">/etc/rc2.d/S69inet</em> file for every host (server
+and client) in the domain. Setting the domain name if you
+aren't using NIS is harmless. Reminder: you are setting the NIS
+domain name here, not the DNS domain. See <a href="ch03_03.html#nfs2-CHP-3-SECT-3.8.1">Section 3.3.8.1, "Internet domains versus NIS domains"</a> later in this chapter.</p>
+
+
+Note that on Solaris, the domain name setting will not survive a
+server reboot unless it is stored in the
+<em class="emphasis">/etc/defaultdomain</em> file. So, you need to do:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>domainname &gt; /etc/defaultdomain</b></tt></pre></blockquote>
+
+
+After establishing the domain's name, you should
+<a name="INDEX-372" />go over
+all the system's administrative files with a fine-toothed comb:
+make sure they contain only the entries you want, no more, and no
+less. It is important for your network to start with correct map
+information. Which administrative files NIS cares about varies, but
+generally includes the information shown in <a href="ch03_02.html#nfs2-CHP-3-TABLE-1">Table 3-1</a>.</p>
+
+
+<a name="nfs2-CHP-3-TABLE-1" /><h4 class="objtitle">Table 3-1. Files managed by NIS </h4><table border="1">
+
+
+
+<tr>
+<th>
+File</p></th>
+<th>
+Contains</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+/etc/auto_*</p></td>
+<td>
+Automounter maps</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/bootparams</p></td>
+<td>
+Information about diskless nodes</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/ethers</p></td>
+<td>
+Ethernet numbers (MAC addresses)</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/group</p></td>
+<td>
+User groups</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/hosts</p></td>
+<td>
+Hostnames and IP addresses</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/inet/ipnodes</p></td>
+<td>
+Hostnames, IPv4, and IPv6 addresses</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/mail/aliases</p></td>
+<td>
+Aliases and mailing lists for the mail system</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/netgroup</p></td>
+<td>
+Netgroup definitions (used by NIS)</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/netid</p></td>
+<td>
+Netname database for RPC/dh (RPC/dh is discussed in <a href="ch12_05.html#nfs2-CHP-12-SECT-5.4">Section 12.5.4, "AUTH_DH: Diffie-Hellman authentication"</a>)</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/netmasks</p></td>
+<td>
+Network "masks"</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/networks</p></td>
+<td>
+Network addresses</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/passwd</p></td>
+<td>
+Usernames and user IDs</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/protocols</p></td>
+<td>
+Network protocol names and numbers</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/publickey</p></td>
+<td>
+Public key database for RPC/dh</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/rpc</p></td>
+<td>
+Remote procedure call program numbers</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/services</p></td>
+<td>
+Network port numbers and service names</p></td>
+</tr>
+
+<tr>
+<td>
+/etc/shadow</p></td>
+<td>
+User passwords</p></td>
+</tr>
+
+
+</table><p>
+
+
+With the exception of <em class="emphasis">netgroup</em>, these are all
+standard Solaris administrative files. Once NIS is running, it will
+replace or supplement all of these files, depending on how
+/<em class="emphasis">etc/nsswitch.conf</em> is configured.
+<em class="emphasis">/etc/netgroup</em> is an administrative file that is
+only consulted via the NIS database. Before creating it, see <a href="ch03_03.html#nfs2-CHP-3-SECT-3.2">Section 3.3.2, "Netgroups"</a> later in this chapter.</p>
+
+
+Make sure that your <em class="emphasis">/etc/passwd</em> file on the
+master server does <em class="emphasis">not</em> include the entry:</p>
+
+
+<blockquote><pre class="code">+::0:0::</pre></blockquote>
+
+
+This entry is used by NIS client hosts to indicate that they want to
+include NIS map information in their password files. On the NIS
+master server, all entries<a name="INDEX-373" /> in the
+<em class="emphasis">/etc/passwd</em> file get put into the
+<em class="emphasis">passwd</em> NIS map. If you leave this NIS
+"marker" in the master server's
+<em class="emphasis">/etc/passwd</em> file, your NIS password file map
+will contain an entry for a user named <tt class="literal">+</tt>. If you
+do leave the entry in the password file, be sure to put an asterisk
+(<tt class="literal">*</tt>) in the password field so that this
+"user" will not have a valid password:</p>
+
+
+<blockquote><pre class="code">+:*:0:0::</pre></blockquote>
+
+
+Note that this will not work under all operating systems; in
+particular you must not use an asterisk in SunOS 4.0 or later. If you
+cannot fill the password field of the NIS "marker" entry,
+make sure you remove this entry if you decide not to run NIS at some
+future point. Also, in Solaris, the plus sign entry has been
+deprecated in favor of the use of the Name Service Switch, via the
+<em class="emphasis">nsswitch.conf</em> file.</p>
+
+
+If you are using NIS to manage
+<a name="INDEX-374" /> <a name="INDEX-375" />any local files
+(company phone lists, etc.), you must also make sure that your local
+source files are up-to-date. Once you have established the
+domain's name and "purified" the master
+server's source files, you're ready to initialize a
+master server. To do so, you will use the <em class="emphasis">ypinit</em>
+utility.<a name="INDEX-376" /><a name="INDEX-377" />
+<a name="INDEX-378" />
+You will first need to ensure that <em class="emphasis">ypinit</em> gets
+its naming information from files:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>cp /etc/nsswitch.files /etc/nsswitch.conf</b></tt></pre></blockquote>
+
+
+At this point, you are quite close to creating the NIS maps via the
+<em class="emphasis">ypinit</em> utility. However, there is one security
+issue you need to be aware of. The <em class="emphasis">ypinit</em>
+utility will generate
+<a name="INDEX-379" /> <a name="INDEX-380" />maps from
+the set of files listed in <a href="ch03_02.html#nfs2-CHP-3-TABLE-1">Table 3-1</a>. One of these
+files is <em class="emphasis">/etc/shadow</em>, which<a name="INDEX-381" />
+contains a one-way hash of the password for every account name listed
+in <em class="emphasis">/etc/passwd</em>. If you look at
+<em class="emphasis">/etc/shadow</em>, you should see something like:</p>
+
+
+<blockquote><pre class="code">root:eOUqsdfpdIaiA:6445::::::
+daemon:NP:6445::::::
+bin:NP:6445::::::
+sys:NP:6445::::::
+adm:NP:6445::::::
+lp:NP:6445::::::
+uucp:NP:6445::::::
+nuucp:NP:6445::::::
+listen:*LK*:::::::
+nobody:NP:6445::::::
+noaccess:NP:6445::::::
+nobody4:NP:6445::::::
+stern:aSuxcvmyerjDM:6445::::::
+mre:96wqktpdmrkjsE:6445::::::</pre></blockquote>
+
+
+The fields are separated by <a name="INDEX-382" />colons (:). The first field is the name
+of the account or login. The second field is the one-way hash. Note
+that the "system" accounts, <a name="INDEX-383" />
+<a name="INDEX-384" />except for <em class="emphasis">root</em>,
+have a password hash of NP or *LK*. These are not valid hashes, so
+the accounts are effectively locked. The nonprivileged accounts, such
+as <em class="emphasis">stern</em> and <em class="emphasis">mre</em>, have a
+valid password hash. It is safe to put the locked accounts in the NIS
+<em class="emphasis">passwd</em> map, because the password hash is of no
+use to an attacker. It is safe to put the nonprivileged accounts in
+the map because they don't have privileges. However, it is not
+safe for <a name="INDEX-385" />
+<a name="INDEX-386" />the root account to be put into NIS.
+The reason is that if an attacker obtains the hash for root, he can
+perform an off-line brute force attack to determine the root password
+of the master NIS server. With that password, the attacker could
+render havoc on your network.</p>
+
+
+Thus, you must take steps to ensure that the
+<em class="emphasis">passwd</em> map does <a name="INDEX-387" /> <a name="INDEX-388" />not
+have a root entry. The ypinit utility will invoke the make utility on
+<em class="emphasis">/var/yp/Makefile</em>. Then
+<em class="emphasis">Makefile</em> will
+<a name="INDEX-389" />by default get the
+<em class="emphasis">passwd</em> map contents from
+<em class="emphasis">/etc/passwd</em> and
+<em class="emphasis">/etc/shadow</em>, but by setting the
+<em class="emphasis">PWDIR</em> <em class="emphasis">Makefile</em> variable to
+something else, you can ensure that <em class="emphasis">ypinit</em> will
+create the passwd map without root in it. So do the following:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>mkdir /etc/nispw</b></tt>
+newmaster# <tt class="userinput"><b>chmod 0700 /etc/nispw</b></tt>
+newmaster# <tt class="userinput"><b>grep -v '^root:' /etc/passwd &gt; /etc/nispw/passwd</b></tt>
+newmaster# <tt class="userinput"><b>grep -v '^root:' /etc/shadow &gt; /etc/nispw/shadow</b></tt>
+newmaster# <tt class="userinput"><b>vi /etc/passwd /etc/shadow  </b></tt># delete the nonprivileged entries,
+                                       # e.g., stern and mre
+newmaster# <tt class="userinput"><b>cp /var/yp/Makefile /var/yp/Makefile.save</b></tt>
+newmaster# <tt class="userinput"><b>vi /var/yp/Makefile         </b></tt># change the PWDIR variable to /etc/nispw</pre></blockquote>
+
+
+Before you create the new master server, you must decide how many
+slave servers you will have. For availability, it is a good idea to
+have at minimum one slave. Once NIS is installed, if it ever becomes
+unavailable, your network will become unusable. The first time your
+master server becomes unavailable, your
+users<a name="INDEX-390" />
+<a name="INDEX-391" /> and
+you will appreciate being able to use the network. If you need
+additional server horsepower, then set up more than one NIS slave
+server. Once you know what the names of the slaves are, make sure
+that the master's <em class="emphasis">/etc/hosts</em> file has
+entries for each slave.</p>
+
+
+To create a new master server, become <a name="INDEX-392" />
+<a name="INDEX-393" /><a name="INDEX-394" />the superuser on the host and invoke
+<em class="emphasis">ypinit</em> with the <em class="emphasis">-m</em> flag:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Edit /etc/hosts to add entries for each slave</i>
+newmaster# <tt class="userinput"><b>/usr/sbin/ypinit -m</b></tt></pre></blockquote>
+
+
+<em class="emphasis">ypinit</em> builds the domain subdirectory of
+<em class="emphasis">/var/yp</em> for the current default domain. Note
+that the <em class="emphasis">ypinit</em> utility lives in
+<em class="emphasis">/usr/sbin</em>, so you should use its full pathname
+if you don't have this directory in your search path. In this
+example, <em class="emphasis">ypinit</em> creates
+<em class="emphasis">/var/yp/bedrock</em>.</p>
+
+
+After building the domain subdirectory, <em class="emphasis">ypinit</em>
+builds a complete set of administrative maps for your system and
+places them in this directory. The first map created by
+<em class="emphasis">ypinit -m</em> is the <em class="emphasis">ypservers</em>
+map. <em class="emphasis">ypinit</em> will ask
+you<a name="INDEX-395" />
+<a name="INDEX-396" />
+for a list of hosts that will be running NIS. The hosts named in the
+<em class="emphasis">ypservers</em> map do not have to be running NIS at
+that time, but they should become NIS servers before the first
+modifications are made to NIS maps.</p>
+
+
+You must have one and only one <a name="INDEX-397" />
+<a name="INDEX-398" />master
+server per NIS domain. There is nothing in
+<em class="emphasis">ypinit</em> that checks for the existence of another
+<a name="INDEX-399" />master server, so it's
+possible to create two masters accidentally in the same domain.
+Having more than one master may lead to NIS map corruption; at best
+it confuses procedures that contact the NIS master, such as map
+transfers and NIS password file updates.</p>
+
+
+Now enable NIS in <em class="emphasis">nsswitch.conf</em> so that
+processes on your NIS master host can use NIS for all of its name
+service accesses:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>cp /etc/nsswitch.nis /etc/nsswitch.conf</b></tt></pre></blockquote>
+
+
+If you are running Solaris 8 and if you think you will ever use the
+<em class="emphasis">sec=dh</em> option with NFS, then it would be an
+excellent idea to change the entry for publickey in
+<em class="emphasis">nsswitch.conf</em> to:</p>
+
+
+<blockquote><pre class="code"><tt class="userinput"><b>publickey: nis </b></tt></pre></blockquote>
+
+
+The reason for this step is that the Solaris 8 utilities that
+manipulate <a name="INDEX-400" />the <em class="emphasis">publickey</em> map get
+confused if there are multiple database sources in the publickey
+entry of <em class="emphasis">nsswitch.conf.</em> You should do this on
+NIS slaves and NIS clients as well.</p>
+
+
+Once <em class="emphasis">ypinit</em> finishes and
+<em class="emphasis">nsswitch.conf</em> is set up to use NIS, you should
+start the NIS service manually via the <em class="emphasis">ypstart
+script</em> or by rebooting the server host. In Solaris, the
+relevant part of the boot script <em class="emphasis">/etc/rc2.d//S71rpc</em>
+normally looks like this:</p>
+
+
+<blockquote><pre class="code"># Start NIS (YP) services. The ypstart script handles both client
+# and server startup, whichever is appropriate.
+
+if [ -x /usr/lib/netsvc/yp/ypstart ]; then
+        /usr/lib/netsvc/yp/ypstart rpcstart
+fi</pre></blockquote>
+
+
+Assuming you opt to start the NIS service manually, you would do:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstart</b></tt></pre></blockquote>
+
+
+As the comment in <em class="emphasis">S71rpc</em> says, the
+<em class="emphasis">ypstart</em> script handles the case when the host is
+an NIS server or NIS client or both. Both <em class="emphasis">S71rpc</em>
+and <em class="emphasis">ypstart</em> came with the system when it was
+installed, and normally won't need modifications. The logic in
+<em class="emphasis">ypstart</em> may require modifications if a server is
+a client of one domain but serves another; this situation sometimes
+occurs when a host is on multiple networks. Issues surrounding
+multiple domains are left for the next chapter.</p>
+
+
+Test that your NIS server is <a name="INDEX-401" />
+<a name="INDEX-402" />working:</p>
+
+
+<blockquote><pre class="code">newmaster# <tt class="userinput"><b>ypcat passwd</b></tt>
+noaccess:NP:60002:60002:No Access User:/:
+nobody4:NP:65534:65534:SunOS 4.x Nobody:/:
+nobody:NP:60001:60001:Nobody:/:
+listen:*LK*:37:4:Network Admin:/usr/net/nls:
+daemon:NP:1:1::/:
+nuucp:NP:9:9:uucp Admin:/var/spool/uucppublic:/usr/lib/uucp/uucico
+uucp:NP:5:5:uucp Admin:/usr/lib/uucp:
+sys:NP:3:3::/:
+bin:NP:2:2::/usr/bin:
+adm:NP:4:4:Admin:/var/adm:
+lp:NP:71:8:Line Printer Admin:/usr/spool/lp:
+stern:aSuxcvmyerjDM:6445::::::
+mre:96wqktpdmrkjsE:6445::::::</pre></blockquote>
+
+
+You are now ready to add new <a name="INDEX-403" /> <a name="INDEX-404" />slave servers or to set up NIS clients.
+Note that NIS <em class="emphasis">must</em> be running on a master server
+before you <a name="INDEX-405" /> <a name="INDEX-406" />can proceed.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-3-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">3.2.3. Installing NIS slave servers</h3>
+
+
+As with a master server, you must <a name="INDEX-407" />
+<a name="INDEX-408" />
+<a name="INDEX-409" />establish the domain name and the
+/etc/hosts file with the IP addresses of all the slaves and the
+master:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>domainname bedrock</b></tt>
+newslave# <tt class="userinput"><b>domainname &gt; /etc/defaultdomain</b></tt>
+<i class="lineannotation">Edit /etc/hosts to add master and slaves</i></pre></blockquote>
+
+
+When you initialize a new slave server, it transfers
+<a name="INDEX-410" />
+<a name="INDEX-411" />
+<a name="INDEX-412" />the
+data from the master server's map files and builds its own
+copies of the maps. No ASCII source files are
+<a name="INDEX-413" /> <a name="INDEX-414" />
+<a name="INDEX-415" />used to build the NIS maps on a
+slave server  --  only the information already in the master
+server's maps. If the slave has information in ASCII
+configuration files that belongs in the NIS maps, make sure the
+master NIS server has a copy of this data before beginning the NIS
+installation. For example, having password file entries only on an
+NIS slave server will not add them to the NIS
+<em class="emphasis">passwd</em> map. The map source files on the master
+server must contain <em class="emphasis">all</em> map information, since
+it is the only host that constructs map files from their sources.</p>
+
+
+The slave will need to act as an NIS client in order get initial
+copies of the maps from the server. Thus you must first set up the
+slave as a client:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>/usr/sbin/ypinit -c</b></tt></pre></blockquote>
+
+
+You will be prompted for a list of NIS servers. You
+<a name="INDEX-416" />
+<a name="INDEX-417" />should
+start with the name of the local host (in this example,
+<em class="emphasis">newslave</em>), followed by the name of the master
+(in this example, <em class="emphasis">newmaster</em>), followed by the
+remaining slave servers, in order of physical proximity.</p>
+
+
+Now check to see if your slave was already acting as an NIS
+<a name="INDEX-418" />
+<a name="INDEX-419" />
+<a name="INDEX-420" />client already. If
+so, use <em class="emphasis">ypstop</em> to terminate it:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>ps -ef | grep ypbind</b></tt>
+newslave# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstop</b></tt></pre></blockquote>
+
+
+Now start <em class="emphasis">ypbind</em>:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstart</b></tt></pre></blockquote>
+
+
+Slave servers are also initialized using <em class="emphasis">ypinit</em>.
+Instead<a name="INDEX-421" /> of
+<a name="INDEX-422" />specifying the
+<em class="emphasis">-m</em> option, use <em class="emphasis">-s</em> and the
+name of the NIS master server:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>/usr/sbin/ypinit -s newmaster</b></tt></pre></blockquote>
+
+
+Now you need to start <a name="INDEX-423" />the
+<em class="emphasis">ypserv</em> daemon:</p>
+
+
+<blockquote><pre class="code">newslave# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstop</b></tt>
+newslave# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstart</b></tt></pre></blockquote>
+
+
+Finally, set up <em class="emphasis">nsswitch.conf</em> to use NIS:</p>
+
+
+<blockquote><pre class="code">newslave#<tt class="userinput"><b> cp /etc/nsswitch.nis /etc/nsswitch.conf</b></tt></pre></blockquote>
+
+
+<a name="nfs2-CHP-3-SECT-2.3.1" /><div class="sect3">
+<h3 class="sect3">3.2.3.1. Adding slave servers later</h3>
+
+
+In general, it is a good idea to initialize <a name="INDEX-424" />
+<a name="INDEX-425" />your
+NIS slave servers as soon as possible after building the master
+server, so that there are no inconsistencies between the
+<em class="emphasis">ypservers</em> map and the hosts that are really
+running NIS. Once the initial installation is complete, though, you
+can add slave servers at any time. If you add an NIS slave server
+that was not listed in the <em class="emphasis">ypservers</em> map, you
+must add its hostname to this map so that it receives NIS map
+updates.</p>
+
+
+To edit <em class="emphasis">ypservers</em>, dump out its old contents
+with <em class="emphasis">ypcat</em>, add the new slave server name, and
+rebuild the map using <em class="emphasis">makedbm</em>. This procedure
+must be done on the NIS master server:</p>
+
+
+<blockquote><pre class="code">master# <tt class="userinput"><b>ypcat -k ypservers &gt; /tmp/ypservers</b></tt> 
+<i class="lineannotation">Edit /tmp/ypservers to add new server name </i>
+master# <tt class="userinput"><b>cd /var/yp</b></tt> 
+master# <tt class="userinput"><b>cat /tmp/ypservers | makedbm - /var/yp/`domainname`/ypservers</b></tt></pre></blockquote>
+
+
+Once you've changed the master <em class="emphasis">ypservers</em>
+map on the new slave, you must follow the steps described in <a href="ch03_02.html#nfs2-CHP-3-SECT-2.3">Section 3.2.3, "Installing NIS slave servers"</a> <a name="INDEX-426" /> <a name="INDEX-427" />
+<a name="INDEX-428" /> in this <a name="INDEX-429" /> <a name="INDEX-430" />chapter.</p>
+</div>
+</div>
+
+
+
+
+<a name="nfs2-CHP-3-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">3.2.4. Enabling NIS on client hosts</h3>
+
+
+Once you have one or more NIS servers<a name="INDEX-431" />
+<a name="INDEX-432" />
+running <em class="emphasis">ypserv</em>, you can set up NIS clients that
+query them. Make sure you do not enable NIS on any clients until you
+have at least one NIS server up and running. If no servers are
+available, the host that attempts to run as an NIS client will hang.</p>
+
+
+To enable NIS on a client host, first set up
+<a name="INDEX-433" />the <em class="emphasis">nsswitch.conf</em>
+file:</p>
+
+
+<blockquote><pre class="code">newclient# <tt class="userinput"><b>cp /etc/nsswitch.nis /etc/nsswitch.conf</b></tt></pre></blockquote>
+
+
+Set up the domain name:</p>
+
+
+<blockquote><pre class="code">newclient# <tt class="userinput"><b>domainname bedrock</b></tt>
+newclient# <tt class="userinput"><b>domainname &gt; /etc/defaultdomain</b></tt></pre></blockquote>
+
+
+Run <em class="emphasis">ypinit</em>:</p>
+
+
+<blockquote><pre class="code">newclient# <tt class="userinput"><b>/usr/sbin/ypinit -c</b></tt></pre></blockquote>
+
+
+You will be prompted for a list of NIS servers. Enter the servers in
+order of proximity to the client.</p>
+
+
+Kill (if necessary) ypbind, and restart it:</p>
+
+
+<blockquote><pre class="code">newclient# <tt class="userinput"><b>ps -ef | grep ypbind</b></tt>
+newclient# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstop</b></tt>
+newclient# <tt class="userinput"><b>/usr/lib/netsvc/yp/ypstart</b></tt></pre></blockquote>
+
+
+Once NIS is running, references to the basic
+<a name="INDEX-434" />
+<a name="INDEX-435" />administrative
+files are handled in two fundamentally different ways, depending on
+how <em class="emphasis">nsswitch.conf</em> is configured:</p>
+
+
+<ul><li>The NIS database <em class="emphasis">replaces</em> some files. Local
+copies of <a name="INDEX-436" /> <a name="INDEX-437" />replaced
+files (<em class="emphasis">ethers</em>, <em class="emphasis">hosts</em>,
+<em class="emphasis">netmasks</em>,
+<em class="emphasis">netgroups</em>,<a href="#FOOTNOTE-6">[6]</a> <em class="emphasis">networks</em>,
+<em class="emphasis">protocols</em>, <em class="emphasis">rpc</em>, and
+<em class="emphasis">services</em>) are ignored as soon as the
+<em class="emphasis">ypbind</em> daemon is started (to enable NIS).</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-6" />[6]The
+<em class="emphasis">netgroups</em> file is a special case. Netgroups
+<a name="INDEX-438" />
+<a name="INDEX-439" />are only meaningful when NIS is running,
+in which case the <em class="emphasis">netgroups</em> map (rather than the
+file) is consulted. The <em class="emphasis">netgroups</em> file is
+therefore only used to build the <em class="emphasis">netgroups</em> map;
+it is never "consulted" in its own right.</p>
+
+</blockquote></li><li>Some files are <em class="emphasis">augmented</em>, or
+<em class="emphasis">appended</em> to, by NIS. Files
+<a name="INDEX-440" />
+<a name="INDEX-441" />
+<a name="INDEX-442" />that
+are appended, or augmented, by NIS are consulted before the NIS maps
+are queried. The default <em class="emphasis">/etc/nsswitch.conf</em> file
+for NIS has these appended files: <em class="emphasis">aliases</em>,
+<em class="emphasis">auto_</em>*, <em class="emphasis">group</em>,
+<em class="emphasis">passwd</em>, <em class="emphasis">services</em>, and
+<em class="emphasis">shadow</em>. These files are read first, and if an
+appropriate entry isn't found in the local file, the
+corresponding NIS map is consulted. For example, when a user logs in,
+an NIS client will first look up the user's login name in the
+local <em class="emphasis">passwd</em> file; if it does not find anything
+that matches, it will refer to the NIS <em class="emphasis">passwd</em>
+map.</p></li></ul>
+Although the replaced files aren't consulted once NIS is
+running, <a name="INDEX-443" />
+<a name="INDEX-444" />
+<a name="INDEX-445" />they
+shouldn't be deleted. In particular, the
+<em class="emphasis">/etc/hosts</em> file is used by an NIS client during
+the boot process, before it starts NIS, but is ignored as soon as NIS
+is running. The NIS client needs a "runt"
+<em class="emphasis">hosts</em> file during the boot process so that it
+can configure itself and get NIS running. Administrators usually
+truncate <em class="emphasis">hosts</em> to the absolute minimum: entries
+for the host itself and the "loopback" address. Diskless
+nodes need additional entries for the node's boot server and
+the server for the diskless node's <em class="emphasis">/usr</em>
+filesystem. Trimming the <em class="emphasis">hosts</em> file to these
+minimal entries is a good idea because, for historical reasons, many
+systems have extremely long host tables. Other files, like
+<em class="emphasis">rpc</em>, <em class="emphasis">services</em>, and
+<em class="emphasis">protocols</em>, could probably be eliminated, but
+it's safest to leave the files distributed with your system
+untouched; these will certainly have enough information to get your
+system booted safely, particularly if NIS stops running for some
+reason. However, you should make any local additions to these files
+on the master server alone. You don't need to bother keeping
+the slaves and clients up to date.</p>
+
+
+We'll take a much closer look at the files managed by NIS and
+the mechanisms used to manage appended files in <a href="ch03_03.html#nfs2-CHP-3-SECT-3">Section 3.3, "Files managed under NIS"</a>. Meanwhile, we'll assume that you
+have modified these files correctly <a name="INDEX-446" />and <a name="INDEX-447" /> <a name="INDEX-448" />proceed with NIS setup.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3. Network Information Service Operation</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.3. Files managed under NIS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+</html>

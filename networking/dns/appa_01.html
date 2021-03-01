@@ -1,0 +1,624 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/appa_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:40 GMT -->
+<head><title>DNS Message Format and Resource Records (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="appa_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Appendix A. DNS Message Format and Resource Records</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ahead-1">Master File Format</a><br />
+<a href="appa_02.html">DNS Messages</a><br />
+<a href="appa_03.html">Resource Record Data</a><br /><p></p></div>
+
+
+This appendix outlines the format of DNS messages and enumerates all
+the <a name="INDEX-2453" /></a>resource record types. The resource
+records are shown in their textual format, as you would specify them
+in a zone data file, and in their binary format, as they appear in
+DNS messages. You'll find a few resource records here that
+weren't covered in the book because they are experimental or
+obsolete.<p></p><p>
+
+
+We've included the portions of RFC 1035, written by
+Paul<a name="INDEX-2454" /></a> Mockapetris, that deal with the
+textual format of <a name="INDEX-2455" /></a>master files (what we called
+<em class="emphasis">zone data files</em> in the book) or with the DNS
+message format (for those of you who need to parse DNS packets).<p></p><p>
+
+
+    <div class="sect1"><a name="dns4-APP-A-SECT-1" /></a> 
+      <h2 class="sect1"><a name="ahead-1"></a>A.1. Master File Format</h2>
+      (From RFC 1035, pages 33-35)
+<p></p><p>
+
+
+<a name="INDEX-2456" /></a><a name="INDEX-2457" /></a>The format of these files is a
+sequence of entries. Entries are predominantly line-oriented, though
+parentheses can be used to continue a list of items across a line
+boundary, and text literals can contain CRLF within the text. Any
+combination of tabs and spaces acts as a delimiter between the
+separate items that make up an entry. The end of any line in the
+master file can end with a comment. The comment starts with a
+semicolon (;).<p></p><p>
+
+
+The following entries are defined:<p></p><p>
+
+
+<blockquote><pre class="code">blank[comment]
+
+$ORIGIN domain-name [comment]
+
+$INCLUDE file-name [domain-name] [comment]
+
+domain-namerr [comment]
+
+blankrr [comment]</pre></blockquote>
+
+
+Blank lines, with or without comments, are allowed anywhere in the
+file.<p></p><p>
+
+
+Two control entries are defined:<a name="INDEX-2458" /></a><a name="INDEX-2459" /></a> $ORIGIN and $INCLUDE. $ORIGIN is
+followed by a domain name and resets the current origin for relative
+domain names to the stated name. $INCLUDE inserts the named file into
+the current file and may optionally specify a domain name that sets
+the relative domain name origin for the included file. $INCLUDE may
+also have a comment. Note that an $INCLUDE entry never changes the
+relative origin of the parent file, regardless of changes to the
+relative origin made within the included file.<p></p><p>
+
+
+The last two forms represent RRs. If an entry for an RR begins with a
+blank, then the RR is assumed to be owned by the last stated owner.
+If an RR entry begins with a <em class="emphasis">domain-name</em>, then
+the owner name is reset.<p></p><p>
+
+
+<em class="emphasis">rr</em> contents take one of the following forms:<p></p><p>
+
+
+<blockquote><pre class="code">[TTL] [class] type RDATA
+[class] [TTL] type RDATA</pre></blockquote>
+
+
+The RR begins with optional TTL and class fields, followed by a type
+and RDATA field appropriate to the type and class. Class and type use
+the standard mnemonics; TTL is a decimal integer. Omitted class and
+TTL values default to the last explicitly stated values. Since type
+and class mnemonics are disjoint, the parse is unique.<p></p><p>
+
+
+<em class="emphasis">domain-names</em> make up a large share of the data
+in the master file. The labels in the domain name are expressed as
+character strings and separated by dots. Quoting conventions allow
+arbitrary characters to be stored in domain
+names.<a name="INDEX-2460" /></a><a name="INDEX-2461" /></a> <a name="INDEX-2462" /></a><a name="INDEX-2463" /></a>
+Domain names that end in a dot are called absolute, and are taken as
+complete. Domain names that do not end in a dot are called relative;
+the actual domain name is the concatenation of the relative part with
+an origin specified in an $ORIGIN, $INCLUDE, or argument to the
+master file-loading routine. A relative name is an error when no
+origin is available.<p></p><p>
+
+
+<em class="emphasis">character-string</em> is expressed in one of two
+ways: as a contiguous set of characters without interior spaces, or
+as a string beginning with " and ending with ". Inside a " -delimited
+string any character can occur, except for " itself, which must be
+quoted using a backslash (\).<p></p><p>
+
+
+Because these files are text files, several special encodings are
+necessary to allow arbitrary data to be loaded. In particular:<p></p><p>
+
+
+<dl>
+<dt><i>.</i></dt>
+<dd>Of the root.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>@</i></dt>
+<dd>A free-standing<a name="INDEX-2464" /></a> @
+is used to denote the current origin.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>\X</i></dt>
+<dd>Where X is any character other than a digit (0-9), \ is used to quote
+that character so that its special meaning does not apply. For
+example, \. can be used to place a dot character in a
+label.<a href="#FOOTNOTE-108">[108]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-108" /></a>[108]Not implemented by BIND 4.8.3.<p></p><p>
+
+</blockquote></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>\DDD</i></dt>
+<dd><a name="INDEX-2465" /></a>Where each D is a
+digit in the octet corresponding to the decimal number described by
+DDD. The resulting octet is assumed to be text and is not checked for
+special meaning.<a href="#FOOTNOTE-109">[109]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-109" /></a>[109]Not implemented by BIND
+4.8.3.<p></p><p>
+
+</blockquote></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>( )</i></dt>
+<dd>Parentheses are used to group data that crosses a line boundary. In
+effect, line terminations are not recognized
+within<a name="INDEX-2466" /></a>
+<a name="INDEX-2467" /></a> parentheses.<a href="#FOOTNOTE-110">[110]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-110" /></a>[110]BIND 4.8.3
+allows parentheses only on SOA and WKS resource records.<p></p><p>
+
+</blockquote></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>;</i></dt>
+<dd><a name="INDEX-2468" /></a>
+<a name="INDEX-2469" /></a>A semicolon is used to start a comment;
+the remainder of the line is ignored.<p></p></dd>
+
+</dl>
+
+
+<a name="dns4-APP-A-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">A.1.1. Character Case</h3>
+
+
+(From RFC 1035, page 9)<p></p><p>
+
+
+<a name="INDEX-2470" /></a>For all
+parts of the DNS that are part of the official protocol, all
+comparisons between character strings (e.g., labels, domain names,
+etc.) are done in a case-insensitive manner. At present, this rule is
+in force throughout the domain system without exception. However,
+future additions beyond current usage may need to use the full binary
+octet capabilities in names, so attempts to store domain names in
+7-bit ASCII or use of special bytes to terminate labels, etc., should
+be avoided.<p></p><p>
+</div>
+
+
+
+
+<a name="dns4-APP-A-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">A.1.2. Types</h3>
+
+
+<a name="INDEX-2471" /></a>Here is a complete list of resource
+record types. The textual representation is used in master files. The
+binary representation is used in DNS queries and responses. These
+resource records are described on pages 13-21 of RFC 1035.<p></p><p>
+
+
+<a name="INDEX-2472" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>A address</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 20)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class A address</pre></blockquote>Example:<p></p><blockquote><pre class="code">localhost.movie.edu.   IN A 127.0.0.1</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">Address type code: 1
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    ADDRESS                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+ADDRESS         A 32 bit Internet address.</pre></blockquote></div>
+
+<a name="INDEX-2473" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>CNAME canonical name</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 14)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class CNAME canonical-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">wh.movie.edu.  IN  CNAME  wormhole.movie.edu.</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">CNAME type code: 5
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                     CNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+CNAME           A domain-name which specifies the canonical
+                or primary name for the owner.  The owner name is
+                an alias.</pre></blockquote></div>
+
+<a name="INDEX-2474" /></a><a name="INDEX-2475" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>HINFO host information</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 14)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class HINFO cpu os</pre></blockquote>Example:<p></p><blockquote><pre class="code">grizzly.movie.edu.  IN  HINFO  VAX-11/780 UNIX</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">HINFO type code: 13
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                      CPU                      /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                       OS                      /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+CPU             A character-string which specifies the CPU type.
+OS              A character-string which specifies the
+                operating system type.</pre></blockquote></div>
+
+<a name="INDEX-2476" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MB mailbox domain name (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 14)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class MB mbox-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">al.movie.edu.  IN  MB  robocop.movie.edu.</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">MB type code: 7
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   MADNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+MADNAME         A domain-name which specifies a host which has
+                the specified mailbox.</pre></blockquote></div>
+
+<a name="INDEX-2477" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MD mail destination (obsolete)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>MD has been replaced with MX.<p></p></div>
+
+<div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MF mail forwarder (obsolete)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>MF has been replaced with MX.<p></p></div>
+
+<a name="INDEX-2478" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MG mail group member (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 16)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class MG mgroup-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">admin.movie.edu.  IN  MG  al.movie.edu.
+                  IN  MG  ed.movie.edu.
+                  IN  MG  jc.movie.edu.</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">MG type code: 8
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   MGMNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+MGMNAME         A domain-name which specifies a mailbox which
+                is a member of the mail group specified by the
+                domain name.</pre></blockquote></div>
+
+<a name="INDEX-2479" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MINFO mailbox or mail list information (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 16)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class MINFO resp-mbox error-mbox</pre></blockquote>Example:<p></p><blockquote><pre class="code">admin.movie.edu.  IN  MINFO  al.movie.edu. al.movie.edu.</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">MINFO type code: 14
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    RMAILBX                    /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    EMAILBX                    /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+RMAILBX         A domain-name which specifies a mailbox which
+                is responsible for the mailing list or mailbox.
+                If this domain name names the root, the owner of
+                the MINFO RR is responsible for itself.  Note
+                that many existing mailing lists use a mailbox
+                X-request for the RMAILBX field of mailing list
+                X, e.g., Msgroup-request for Msgroup.  This field
+                provides a more general mechanism.
+EMAILBX         A domain-name which specifies a mailbox which is
+                to receive error messages related to the mailing
+                list or mailbox specified by the owner of the
+                MINFO RR (similar to the ERRORS-TO: field which has
+                been proposed). If this domain name names the root,
+                errors should be returned to the sender of the
+                message.</pre></blockquote></div>
+
+<a name="INDEX-2480" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MR mail rename (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 17)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class MR new-mbox</pre></blockquote>Example:<p></p><blockquote><pre class="code">eddie.movie.edu.  IN  MR  eddie.bornagain.edu.</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">MR type code: 9
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   NEWNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+NEWNAME         A domain-name which specifies a mailbox which
+                is the proper rename of the specified mailbox.</pre></blockquote></div>
+
+<a name="INDEX-2481" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>MX mail exchanger</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 17)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class MX preference exchange-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">ora.com.  IN  MX  0  ora.ora.com.
+          IN  MX  10 ruby.ora.com.
+          IN  MX  10 opal.ora.com.</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">MX type code: 15
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                  PREFERENCE                   |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   EXCHANGE                    /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+PREFERENCE      A 16 bit integer which specifies the preference
+                given to this RR among others at the same owner.
+                Lower values are preferred.
+EXCHANGE        A domain-name which specifies a host willing
+                to act as a mail exchange for the owner name.</pre></blockquote></div>
+
+<a name="INDEX-2482" /></a><a name="INDEX-2483" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>NS name server</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 18)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class NS name-server-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">movie.edu.  IN   NS  terminator.movie.edu</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">NS type code: 2
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   NSDNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+NSDNAME         A domain-name which specifies a host which
+                should be authoritative for the specified
+                class and domain.</pre></blockquote></div>
+
+<a name="INDEX-2484" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>NULL null (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 17)<p></p>Binary Representation:<p></p><blockquote><pre class="code">NULL type code: 10
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                  anything                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+Anything at all may be in the RDATA field so long as it is 65535
+octets or less.</pre></blockquote>NULL is not implemented by BIND.<p></p></div>
+
+<a name="INDEX-2485" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>PTR pointer</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 18)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class PTR dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">1.249.249.192.in-addr.arpa.  IN PTR wormhole.movie.edu.</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">PTR type code: 12
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   PTRDNAME                    /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+PTRDNAME        A domain-name which points to some location in
+                the domain name space.</pre></blockquote></div>
+
+<a name="INDEX-2486" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>SOA start of authority</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, pages 19-20)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class SOA source-dname mbox (serial refresh retry expire minimum)</pre></blockquote>Example:<p></p><blockquote><pre class="code">movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                      1        ; Serial
+                      10800    ; Refresh after 3 hours
+                      3600     ; Retry after 1 hour
+                      604800   ; Expire after 1 week
+                      86400 )  ; Minimum TTL of 1 day</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">SOA type code: 6
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                     MNAME                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                     RNAME                     /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    SERIAL                     |
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    REFRESH                    |
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                     RETRY                     |
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    EXPIRE                     |
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    MINIMUM                    |
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+MNAME           The domain-name of the name server that was the
+                original or primary source of data for this zone.
+RNAME           A domain-name which specifies the mailbox of the
+                person responsible for this zone.
+SERIAL          The unsigned 32 bit version number of the original
+                copy of the zone.  Zone transfers preserve this
+                value.  This value wraps and should be compared
+                using sequence space arithmetic.
+REFRESH         A 32 bit time interval before the zone should be
+                refreshed.
+RETRY           A 32 bit time interval that should elapse before
+                a failed refresh should be retried.
+EXPIRE          A 32 bit time value that specifies the upper limit
+                on the time interval that can elapse before the
+                zone is no longer authoritative.
+MINIMUM         The unsigned 32 bit minimum TTL field that should
+                be exported with any RR from this zone.</pre></blockquote></div>
+
+<a name="INDEX-2487" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>TXT text</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 20)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class TXT txt-strings</pre></blockquote>Example:<p></p><blockquote><pre class="code">cujo.movie.edu.  IN  TXT  "Location: machine room dog house"</pre></blockquote><p>Binary Representation:</p><blockquote><pre class="code">TXT type code: 16
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   TXT-DATA                    /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+TXT-DATA        One or more character-strings.</pre></blockquote></div>
+
+<a name="INDEX-2488" /></a><a name="INDEX-2489" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>WKS well-known services</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>(From RFC 1035, page 21)<p></p>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class WKS address protocol service-list</pre></blockquote>Example:<p></p><blockquote><pre class="code">terminator.movie.edu.  IN  WKS 192.249.249.3  TCP ( telnet smtp
+                                              ftp shell domain )</pre></blockquote>Binary Representation:<p></p><a name="INDEX-2489" /></a><blockquote><pre class="code">WKS type code: 11
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                    ADDRESS                    |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |       PROTOCOL        |                       |
+    +--+--+--+--+--+--+--+--+                       |
+    |                                               |
+    /                   BIT MAP                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+ADDRESS         An 32 bit Internet address
+PROTOCOL        An 8 bit IP protocol number
+BIT MAP         A variable length bit map.  The bit map must
+                be a multiple of 8 bits long.</pre></blockquote></div>
+
+</div>
+
+
+
+
+<a name="dns4-APP-A-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">A.1.3. New Types from RFC 1183</h3>
+
+
+<a name="INDEX-2490" /></a><a name="INDEX-2491" /></a><a name="INDEX-2492" /></a><a name="INDEX-2493" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>AFSDB
+ Andrew File System Data Base (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class AFSDB subtype hostname</pre></blockquote>Example:<p></p><blockquote><pre class="code">fx.movie.edu.  IN  AFSDB  1 bladerunner.fx.movie.edu.
+               IN  AFSDB  2 bladerunner.fx.movie.edu.
+               IN  AFSDB  1 empire.fx.movie.edu.
+               IN  AFSDB  2 aliens.fx.movie.edu.</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">AFSDB type code: 18
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                   SUBTYPE                     |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                   HOSTNAME                    /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+SUBTYPE         Subtype 1 is an AFS cell database server. Subtype 2
+                is a DCE authenticated name server.
+HOSTNAME        A domain-name which specifies a host that has a
+                server for the cell named by the owner of the RR.</pre></blockquote></div>
+
+<a name="INDEX-2494" /></a><a name="INDEX-2495" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ISDN Integrated Services Digital Network address (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class ISDN ISDN-address sa</pre></blockquote>Example:<p></p><blockquote><pre class="code">delay.hp.com.    IN  ISDN  141555514539488
+hep.hp.com.      IN  ISDN  141555514539488 004</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">ISDN type code: 20
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                 ISDN ADDRESS                  /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                  SUBADDRESS                   /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+ISDN ADDRESS    A character-string which identifies the ISDN number
+                of owner and DDI (Direct Dial In) if any.
+SUBADDRESS      An optional character-string specifying the
+                subaddress.</pre></blockquote></div>
+
+<a name="INDEX-2496" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>RP Responsible Person (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class RP mbox-dname txt-dname</pre></blockquote>Example:<p></p><blockquote><pre class="code">; The current origin is fx.movie.edu
+@            IN  RP   ajs.fx.movie.edu.   ajs.fx.movie.edu.
+bladerunner  IN  RP   root.fx.movie.edu.  hotline.fx.movie.edu.
+             IN  RP   richard.fx.movie.edu.  rb.fx.movie.edu.
+ajs          IN  TXT  "Arty Segue, (415) 555-3610"
+hotline      IN  TXT  "Movie U. Network Hotline, (415) 555-4111"
+rb           IN  TXT  "Richard Boisclair, (415) 555-9612"</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">RP type code: 17
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    MAILBOX                    /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    TXTDNAME                   /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+MAILBOX         A domain-name that specifies the mailbox for
+                the responsible person.
+TXTDNAME        A domain-name for which TXT RR's exist.  A
+                subsequent query can be performed to retrieve
+                the associated TXT resource records at
+                txt-dname</pre></blockquote></div>
+
+<a name="INDEX-2497" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>RT Route Through (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class RT preference intermediate-host</pre></blockquote>Example:<p></p><blockquote><pre class="code">sh.prime.com.  IN  RT  2   Relay.Prime.COM.
+               IN  RT  10  NET.Prime.COM.</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">RT type code: 21
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                  PREFERENCE                   |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                 INTERMEDIATE                  /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+PREFERENCE      A 16 bit integer which specifies the preference
+                given to this RR among others at the same owner.
+                Lower values are preferred.
+EXCHANGE        A domain-name which specifies a host which will
+                serve as an intermediate in reaching the host
+                specified by owner.</pre></blockquote></div>
+
+<a name="INDEX-2498" /></a><a name="INDEX-2499" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>X25 X.25 address (experimental)</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class X25 PSDN-address</pre></blockquote>Example:<p></p><blockquote><pre class="code">relay.pink.com.  IN  X25   31105060845</pre></blockquote>Binary Representation:<p></p><a name="INDEX-2499" /></a><blockquote><pre class="code">X25 type code: 19
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                 PSDN ADDRESS                  /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+PSDN ADDRESS    A character-string which identifies the PSDN
+                (Public Switched Data Network) address in the
+                X.121 numbering plan associated with owner.</pre></blockquote></div>
+
+</div>
+
+
+
+
+<a name="dns4-APP-A-SECT-1.4" /></a><div class="sect2">
+<a name="INDEX-2500" /></a><h3 class="sect2">A.1.4. New Types from RFC 1664</h3>
+
+
+<a name="INDEX-2501" /></a><a name="INDEX-2502" /></a><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>PX pointer to X.400/RFC 822 mapping information</i></b></font></td><td align="right"><i /></i></td></tr></table><p><hr width="515" size="3" true align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table>Textual Representation:<p></p><blockquote><pre class="code">owner ttl class PX preference RFC822 address X.400 address</pre></blockquote>Example:<p></p><blockquote><pre class="code">ab.net2.it.  IN  PX  10   ab.net2.it.  O-ab.PRMD-net2.ADMDb.C-it.</pre></blockquote>Binary Representation:<p></p><blockquote><pre class="code">PX type code: 26
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                  PREFERENCE                   |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    MAP822                     /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    /                    MAPX400                    /
+    /                                               /
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+where:
+PREFERENCE   A 16 bit integer which specifies the preference given to
+             this RR among others at the same owner.  Lower values
+             are preferred.
+MAP822       A domain-name element containing rfc822-domain, the
+             RFC 822 part of the RFC 1327 mapping information.
+MAPX400      A domain-name element containing the value of
+             x400-in-domain-syntax derived from the X.400 part of
+             the RFC 1327 mapping information.</pre></blockquote></div>
+</div>
+
+
+
+
+<a name="dns4-APP-A-SECT-1.5" /></a><div class="sect2">
+<h3 class="sect2">A.1.5. Classes</h3>
+
+
+(From RFC 1035, page 13)<p></p><p>
+
+
+<a name="INDEX-2503" /></a><a name="INDEX-2504" /></a>CLASS fields appear in
+resource records. The following CLASS mnemonics and values are
+defined:<p></p><p>
+
+
+<dl>
+<dt><i>IN</i></dt>
+<dd>1: the Internet<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>CS</i></dt>
+<dd>2: the CSNET class (obsolete -- used only for examples in some
+obsolete RFCs)<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>CH</i></dt>
+<dd>3: the CHAOS class<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>HS</i></dt>
+<dd>4: the Hesiod<a name="INDEX-2505" /></a> class<a name="INDEX-2506" /></a><p></p></dd>
+
+</dl>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appa_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.8. DNS and Windows 2000</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">A.2. DNS Messages</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/appa_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:40 GMT -->
+</html>

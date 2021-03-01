@@ -1,0 +1,580 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:36 GMT -->
+<head><title>Printing Protocols (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch17_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">17.6. Printing Protocols</h2>
+
+
+
+
+
+<a name="INDEX-1698" />One
+specialized form of file transfer is printing, where you are sending
+files to a printer instead of to another general-purpose computer.
+Although people tend to think of printing as relatively safe, in
+fact, it involves most of the same risks as other file transfer
+protocols, and printers have most of the capabilities of other
+computing devices.</p><p>
+
+
+
+
+
+You need to realize that many modern network printing devices respond
+to protocols other than the dedicated printing protocols discussed
+here. For instance, they may have administrative interfaces that use
+Telnet or HTTP; they may auto-configure interfaces with DHCP; they
+may accept file transfers via FTP; and they will certainly respond,
+not necessarily correctly, to at least some ICMP. These extra
+protocols may introduce entirely new classes of vulnerability. For
+instance, one plotter has a network interface that not only allows
+you to telnet to the plotter, but then allows you to telnet from the
+plotter to other hosts. (Apparently, the easiest way to get an
+intelligent interface was to simply take it, lock, stock, and barrel,
+from a network hub made by the same company --  except that a
+network hub can reasonably be expected to do this sort of thing,
+while few people suspect a plotter of also having network management
+capabilities and a guest login.) You should carefully examine the
+network capabilities and protections of printing devices before
+putting them on unprotected networks.</p><p>
+
+
+
+
+
+<a name="INDEX-1699" />Because modern PostScript printers can be
+intelligent Ethernet devices with their own disks, it is
+theoretically possible for a rogue print job to turn one into a
+network sniffing device. In practice, this is a baroquely complex
+approach; attackers aren't very likely to succeed at it.
+However, more mundane denial of service attacks on printers are
+eminently possible and in fact have been known to happen.</p><p>
+
+
+
+
+
+<a name="INDEX-1700" />
+<a name="INDEX-1701" /><a name="INDEX-1702" />Some are merely annoying, such as
+simply printing page after page of garbage (or, better yet, something
+offensive to the victim or the victim's coworkers) until the
+printer runs out of paper. But a few of them are serious, and the
+nastiest of them are enabled by a security feature in PostScript.
+PostScript was designed to protect certain dangerous commands by
+requiring a password before they were executed. This password is
+stored in an EEPROM chip on the printer and is factory-set to
+"0" on every brand of PostScript printer. It's
+always the same because it <em class="emphasis">must</em> always be the
+same. Some of the commands that the PostScript designers considered
+dangerous are routinely used by standard PostScript drivers, and if
+you change the password, those drivers will no longer work. Because,
+in order to reset it, you need either the old password or a hardware
+method to override the EEPROM, a program that uses the well-known
+"0" password to reset the password to something unknown
+can make printers effectively unusable until new EEPROMs are sent
+from the factory. (Some printers will run without the EEPROM, with an
+effective password of 0.) Removing or replacing the EEPROM resets not
+only the password, but also the printer ID and the page count; if you
+have fonts licensed to the printer, they will have to be relicensed.
+Since the last wave of such attacks, licensing of fonts to individual
+printers has become uncommon, reducing the attack's popularity.
+On the other hand, there are likely to be other, equally annoying
+PostScript attacks in the future.</p><p>
+
+
+
+
+
+The intelligence and vulnerability of PostScript devices makes it
+important to protect your printers from Internet access. Make sure
+you have blocked any remote printing protocols your machines and
+printers use. You will need to check every printer type and every
+machine type separately.</p><p>
+
+
+
+
+
+<a name="ch17-16581" /><div class="sect2">
+<h3 class="sect2">17.6.1. lpr and lp</h3>
+
+
+
+
+
+<a name="INDEX-1703" />The BSD <em class="emphasis">lpr</em>
+printing system is very similar to the BSD "r" commands
+(<tt class="command">rsh</tt>, <tt class="command">rlogin</tt>,
+<tt class="command">rcp</tt>, <tt class="command">rdump</tt>) discussed in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>. Unlike the "r" commands,
+<em class="emphasis">lpr</em> authorizes hosts, not individual users, and
+it will accept jobs from hosts in
+<em class="emphasis">/etc/printers.equiv</em> as well as
+<em class="emphasis">/etc/hosts.equiv</em>.</p><p>
+
+
+
+
+
+<a name="INDEX-1704" />There have
+been a number of security problems with <em class="emphasis">lpr</em> and
+its associated printing commands. Some of these are inherent in the
+design of <em class="emphasis">lpr</em>, which provides no user
+authentication and no data protection. Most of them, however, are
+implementation problems, including buffer overflows, printers, and
+spooling systems that crash on invalid or dubious input, and ways of
+using the printer system's administrative privileges to print
+out, overwrite, or delete files that would be otherwise inaccessible.
+Several <em class="emphasis">lpr</em> problems give remote attackers the
+ability to run any command as root. You should carefully limit access
+to <em class="emphasis">lpr</em> print servers and run current versions of
+the printing system.</p><p>
+
+
+
+
+
+The System V <em class="emphasis">lp</em> printing system doesn't
+really have a remote printing component. When it does remote
+printing, it usually does it by handing the job off to a BSD
+<em class="emphasis">lpr</em> printing system, or by using the BSD
+<em class="emphasis">rsh</em> command (which is often called
+<em class="emphasis">remsh</em> on System V systems because such systems
+have another program called <em class="emphasis">rsh</em> that does
+something else entirely).</p><p>
+
+
+
+
+
+When jobs are actually printed via <em class="emphasis">lp</em> or
+<em class="emphasis">lpr</em>, they are normally run through
+printer-specific filters, which translate the user-readable data into
+a format the printer will accept. Even when the printing system
+itself is secure, the printer filter can introduce new security
+problems. If you are accepting print jobs from possibly hostile
+sources, you should be extremely careful about the printer filters
+that you run and the permissions that they have.</p><p>
+
+
+
+
+
+<a name="ch17-20-fm2xml" /><div class="sect3">
+<h3 class="sect3">17.6.1.1. LPRng</h3>
+
+
+
+
+
+A freely available printing system called LPRng (for
+"<em class="emphasis">lpr</em> next generation"), originally
+designed by Patrick Powell, addresses a number of the problems with
+<em class="emphasis">lpr</em>. It adds support for both authentication and
+encryption of printer jobs, while still providing backward
+compatibility with <em class="emphasis">lpr</em>. It uses the same ports
+as <em class="emphasis">lpr</em>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-16639" /><div class="sect3">
+<h3 class="sect3">17.6.1.2. Packet filtering characteristics of lpr</h3>
+
+
+
+
+
+<em class="emphasis">lpr</em> is TCP-based. Servers use port 515. Clients
+use random ports below 1024, just like the BSD "r"
+commands (for further information about the BSD "r"
+commands, see <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>). For historical reasons,
+some clients use ports only between 721 and 731 (this behavior is
+documented in the RFC that discusses <em class="emphasis">lpr</em>, but in
+practice few servers require it).</p><p>
+
+
+
+
+
+<a name="ch17-21-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-77">[77]</a></p><p>
+</td>
+<td>
+515</p><p></td>
+<td>
+<a href="#FOOTNOTE-78">[78]</a></p><p>
+</td>
+<td>
+Incoming <em class="emphasis">lpr</em>, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+515</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-77">[77]</a></p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming <em class="emphasis">lpr</em>, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-77">[77]</a></p><p></td>
+<td>
+515</p><p></td>
+<td><a href="#FOOTNOTE-78">[78]</a></td>
+<td>
+Outgoing <em class="emphasis">lpr</em>, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+515</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-77">[77]</a></p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing <em class="emphasis">lpr</em>, server to client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-77" />[77]May be restricted to 721-731.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-78" />[78]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-16759" /><div class="sect3">
+<h3 class="sect3">17.6.1.3. Proxying characteristics of lpr</h3>
+
+
+
+
+
+<em class="emphasis">lpr</em> is a store-and-forward protocol, capable of
+being configured to do its own proxying. You can simply run a
+standard <em class="emphasis">lpr</em> configuration on your proxy server
+and configure it to drive whatever printers you like or pass jobs to
+another server. This does not provide security improvements over
+direct <em class="emphasis">lpr</em>, but it will let it cross a
+nonrouting host.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-22-fm2xml" /><div class="sect3">
+<h3 class="sect3">17.6.1.4. Network address translation characteristics of lpr</h3>
+
+
+
+
+
+<em class="emphasis">lpr</em> does not use embedded IP addresses and will
+work with network address translation systems without problems.
+However, print jobs will normally contain information about internal
+hostnames.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch17-16769" /><div class="sect3">
+<h3 class="sect3">17.6.1.5. Packet filtering and proxying characteristics of lp</h3>
+
+
+
+
+
+<em class="emphasis">lp</em> itself provides no remote printing support.
+It handles printing across the network by using either
+<em class="emphasis">rsh</em>, which is covered in with the other 
+BSD "r" commands,
+or <em class="emphasis">lpr</em>. To determine what your printer
+configuration is using, configure a remote printer and read its
+interface file (which is usually stored in
+<em class="emphasis">/usr/spool/lp/interfaces/printername</em>). Some
+vendors also provide novel remote printing systems for use with
+<em class="emphasis">lp</em> ; consult your vendor documentation for
+information.<a name="INDEX-1705" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-23-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.6.2. Windows-based Printing</h3>
+
+
+
+
+
+<a name="INDEX-1706" />
+<a name="INDEX-1707" />
+<a name="INDEX-1708" />Windows
+operating systems use three main kinds of network-based printing
+protocols. Windows NT and Windows 95 and above are capable of using
+<em class="emphasis">lpr</em> as a network printing protocol. In addition,
+two Windows-native network printing protocols are based on SMB, a
+LanMan version (which uses specialized printing calls) and a CIFS
+version (which uses a named pipe into the spooler system and general
+transaction calls). These protocols have some special security
+implications in addition to the general issues with SMB. Most clients
+are set so that if a print server claims to have an upgraded version
+of a printer driver, the client will accept and run the new software.
+This is one of the few cases where a server can actually force a
+client to download and run arbitrary code via SMB without a
+user's consciously asking for something to be executed. While
+<em class="emphasis">lpr</em> outbound (from an internal client to an
+external print server) is relatively secure, outbound SMB printing is
+even less secure than inbound SMB printing.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-24-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.6.3. Other Printing Systems</h3>
+
+
+
+
+
+Given the deficiencies of both <em class="emphasis">lp</em> and
+<em class="emphasis">lpr</em>, many Unix vendors implement their own
+solutions to remote printing. Other platforms may support
+<em class="emphasis">lp</em>, <em class="emphasis">lpr</em>, a separate
+protocol, or some combination. Because it has its own protocol, which
+is somewhat easier to implement than <em class="emphasis">rsh</em>,
+<em class="emphasis">lpr</em> is more popular than <em class="emphasis">lp</em>
+on non-Unix systems, but many of them have their own protocols. Some
+printers are network devices in their own right, sometimes speaking
+<em class="emphasis">lp</em> or <em class="emphasis">lpr</em> directly, and
+sometimes (particularly older printers) speaking a protocol developed
+by the printer manufacturer.</p><p>
+
+
+
+
+
+For the most part, the wide variety of other network printing
+protocols that are out there share a common feature; they're no
+more secure than <em class="emphasis">lpr</em>. Most of them are not even
+as secure as <em class="emphasis">lpr</em> (if you can reach the system
+with a print request in the right protocol, it will print it).</p><p>
+
+
+
+
+
+<a name="INDEX-1709" /> <a name="INDEX-1710" /><a name="INDEX-1711" />The IETF is
+working on a protocol called the Internet Printing Protocol (IPP),
+which is designed to be used across the Internet. This protocol is
+not yet in widespread use, although it is provided with Windows 2000
+and is expected to become more popular as Windows 2000 comes into
+use. IPP is based on HTTP and may be run on the normal HTTP port or
+on port 631. IPP encryption is provided by running it over HTTPS
+instead of HTTP. Authentication may be provided either by using HTTPS
+with client certificates, or by using any HTTP authentication method.
+See <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>, for more information about HTTP and
+HTTPS.</p><p>
+
+
+
+
+
+<a name="INDEX-1712" /> <a name="INDEX-1713" />Hewlett-Packard printers also support a
+network printing interface that has become a de facto standard,
+although it barely qualifies as a protocol. The printer accepts
+printer jobs on TCP port 9100, much the same way it would over a
+serial or parallel connection. Each TCP connection is a separate job,
+and the printer simply processes the data as it receives it,
+returning any error codes. This obviously provides no encryption or
+authentication.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-16790" /><div class="sect2">
+<h3 class="sect2">17.6.4. Summary of Recommendations for Printing Protocols</h3>
+
+
+
+
+
+<ul><li>Do not permit printing protocols across your firewall.<a name="INDEX-1714" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">17.5. Summary of Recommendations for File Sharing </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17.7. Related Protocols</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:36 GMT -->
+</html>

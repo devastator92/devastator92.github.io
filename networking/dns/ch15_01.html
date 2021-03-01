@@ -1,0 +1,436 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch15_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:37 GMT -->
+<head><title>Programming with the Resolver and Name Server Library Routines (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch15_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 15. Programming with the Resolver and Name Server Library Routines</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-15-SECT-1">Shell Script Programming with nslookup</a><br />
+<a href="ch15_02.html">C Programming with the Resolver Library Routines</a><br />
+<a href="ch15_03.html">Perl Programming with Net::DNS</a><br /><p></p></div>
+
+
+<em>"I know what you're thinking about," said
+Tweedledum; "but it isn't so, nohow."</p><p>
+
+
+"Contrariwise," continued Tweedledee, "if it was
+so, it might be; and if it were so, it would be; but as it
+isn't, it ain't. That's logic."</em></p><p>
+
+
+<a name="INDEX-2273" /></a>
+<a name="INDEX-2274" /></a>I bet you think resolver programming
+is hard. Contrariwise! It isn't very hard, really. The format
+of DNS messages is quite straightforward -- you don't have
+to deal with ASN.1<a href="#FOOTNOTE-103">[103]</a> at all, as you do with SNMP. And
+you have nifty library routines to make parsing DNS messages easy.
+We've included portions of <a name="INDEX-2275" /></a>RFC 1035 in <a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a>.
+However, you might find it handy to have a copy of RFC 1035 to look
+at as we go through this chapter; at least have a copy of it nearby
+when you write your own DNS programs.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-103" /></a>[103]ASN.1 stands for Abstract Syntax
+Notation. ASN.1 is a method of encoding object types, accepted as an
+international standard by the International Organization for
+Standardization.</p><p>
+
+</blockquote>
+
+
+<div class="sect1"><a name="dns4-CHP-15-SECT-1" /></a>
+<h2 class="sect1">15.1. Shell Script Programming with nslookup</h2>
+
+
+<a name="INDEX-2276" /></a> <a name="INDEX-2277" /></a>Before you go off and write a C
+program to do your DNS chore, you should write the program as a shell
+script using <em class="filename">nslookup </em>or
+<em class="filename">dig</em>. There are good reasons to start with a
+shell script:</p><p>
+
+
+<ul><li>You can write the shell script much faster than you can write the C
+program.<p></p></li><li>If you're not comfortable with DNS, you can work out the
+details of your program's logic with a quick shell script
+prototype. When you finally write the C program, you can focus on the
+additional control you have with C rather than spending your time
+reworking the basic functionality.<p></p></li><li>You might find out that the shell script version does your task well
+enough so that you don't have to write the C program after all.
+And not only is it quicker to write shell scripts, but they're
+easier to maintain if you stick with them for the long run.<p></p></li></ul>
+If you prefer Perl over plain old shell programming, you can use Perl
+instead. At the end of this chapter, we'll show you how to use
+the Perl Net::DNS module written by Michael Fuhr.</p><p>
+
+
+<a name="dns4-CHP-15-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">15.1.1. A Typical Problem</h3>
+
+
+Before you write a program, you need a problem to solve. Let's
+suppose you want your network management system to watch over your
+primary master and slave name servers. You want it to notify you of
+several problems: a name server that isn't running (it might
+have died), a name server that is not authoritative for a zone it is
+supposed to be authoritative for (the config file or zone data file
+might have been messed up), or a name server that has fallen behind
+in updating its zone data (the primary master's serial number
+might have been decreased accidentally).</p><p>
+
+
+Each of these problems is easily detectable. If a name server is not
+running on a host, the host sends back an ICMP
+<a name="INDEX-2278" /></a><em class="emphasis">port unreachable</em>
+message. You can find this out with either a query tool or the
+resolver routines. Checking whether a name server is authoritative
+for a zone is easy: ask it for the
+zone's<a name="INDEX-2279" /></a> SOA
+record. If the answer is nonauthoritative or the name server does not
+have the SOA record, there's a problem. You'll have to
+ask for the SOA record in a<a name="INDEX-2280" /></a><a name="INDEX-2281" /></a><a name="INDEX-2282" /></a>
+<em class="emphasis">nonrecursive</em> query so that the name server
+doesn't go off and look up the SOA record from another server.
+Once you have the SOA record, you can extract the serial number.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">15.1.2. Solving This Problem with a Script</h3>
+
+
+This problem requires a program that takes the domain name of a zone
+as an argument, looks up the name servers for that zone, and then
+queries each of those name servers for the SOA record for the zone.
+The response will show whether the name server is authoritative, and
+it will show the zone's serial number. If there is no response,
+the program needs to determine if there's even a name server
+running on the host. Once you write this program, you should run it
+on each zone you want to watch over. Since this program looks up the
+name servers (by looking up the NS records for the zone), we assume
+that you have listed all your name servers in NS records in your zone
+data. If that's not the case, you will have to change this
+program to read a list of name servers from the command line.</p><p>
+
+
+Let's write the basic program as a shell script that uses
+<em class="filename">nslookup</em>. First, we figure out what the output
+of <em class="filename">nslookup</em> looks like so that we can parse it
+with Unix tools. We'll look up NS records to find out which
+name servers are supposed to be authoritative for the zone, both when
+the server is authoritative for the zone that contains the NS records
+and when it isn't:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  relay.hp.com
+Address:  15.255.152.2
+
+&gt; <tt class="userinput"><b>set type=ns</b></tt></pre></blockquote>
+
+
+Find out what the response looks like when the name server is not
+authoritative for the NS records:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  relay.hp.com
+Address:  15.255.152.2
+
+Non-authoritative answer:
+mit.edu nameserver = STRAWB.MIT.EDU
+mit.edu nameserver = W20NS.MIT.EDU
+mit.edu nameserver = BITSY.MIT.EDU
+
+Authoritative answers can be found from:
+MIT.EDU nameserver = STRAWB.MIT.EDU
+MIT.EDU nameserver = W20NS.MIT.EDU
+MIT.EDU nameserver = BITSY.MIT.EDU
+STRAWB.MIT.EDU  internet address = 18.71.0.151
+W20NS.MIT.EDU   internet address = 18.70.0.160
+BITSY.MIT.EDU   internet address = 18.72.0.3</pre></blockquote>
+
+
+Then find out what the response looks like when the name server
+<em class="emphasis">is</em> authoritative for the NS records:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>server strawb.mit.edu.</b></tt>
+Default Server:  strawb.mit.edu
+Address:  18.71.0.151
+
+&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  strawb.mit.edu
+Address:  18.71.0.151
+
+mit.edu nameserver = BITSY.MIT.EDU
+mit.edu nameserver = STRAWB.MIT.EDU
+mit.edu nameserver = W20NS.MIT.EDU
+BITSY.MIT.EDU   internet address = 18.72.0.3
+STRAWB.MIT.EDU  internet address = 18.71.0.151
+W20NS.MIT.EDU   internet address = 18.70.0.160</pre></blockquote>
+
+
+You can see from this output that we can grab the domain names of the
+name servers by looking for the lines that contain
+<em class="emphasis">nameserver</em> and saving the last field. When the
+name server wasn't authoritative for the NS records, it printed
+them twice, so we'll have to weed out duplicates.</p><p>
+
+
+Next, we look up the SOA record for the zone, both when the server is
+authoritative for the zone that contains the SOA record and when it
+isn't. We turn off<a name="INDEX-2283" /></a> <em class="emphasis">recurse</em> so the
+name server doesn't go off and query an authoritative name
+server for the SOA:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  relay.hp.com
+Address:  15.255.152.2
+
+&gt; <tt class="userinput"><b>set type=soa</b></tt>
+&gt; <tt class="userinput"><b>set norecurse</b></tt></pre></blockquote>
+
+
+Find out what the response looks like when the name server is not
+authoritative and does not have the SOA record:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  relay.hp.com
+Address:  15.255.152.2
+
+Authoritative answers can be found from:
+MIT.EDU nameserver = STRAWB.MIT.EDU
+MIT.EDU nameserver = W20NS.MIT.EDU
+MIT.EDU nameserver = BITSY.MIT.EDU
+STRAWB.MIT.EDU  internet address = 18.71.0.151
+W20NS.MIT.EDU   internet address = 18.70.0.160
+BITSY.MIT.EDU   internet address = 18.72.0.3</pre></blockquote>
+
+
+Then find out what the response looks like when the name server
+<em class="emphasis">is</em> authoritative for the zone:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>server strawb.mit.edu.</b></tt>
+Default Server:  strawb.mit.edu
+Address:  18.71.0.151
+
+&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  strawb.mit.edu
+Address:  18.71.0.151
+
+mit.edu
+        origin = BITSY.MIT.EDU
+        mail addr = NETWORK-REQUEST.BITSY.MIT.EDU
+        serial = 1995
+        refresh = 3600 (1H)
+        retry   = 900 (15M)
+        expire  = 3600000 (5w6d16h)
+        minimum ttl = 21600 (6H)</pre></blockquote>
+
+
+When the name server was not authoritative for the zone, it returned
+references to other name servers. If the name server had previously
+looked up the SOA record and cached it, the name server would have
+returned the SOA record and said that it was nonauthoritative. We
+need to check for both cases. When the name server returns the SOA
+record and it is authoritative, we can grab the serial number from
+the line that contains <em class="emphasis">serial</em>.</p><p>
+
+
+Now we need to see what <em class="filename">nslookup</em> returns when no
+name server is running on a host. We'll change servers to a
+host that does not normally run a name server and look up an SOA
+record:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  relay.hp.com
+Address:  15.255.152.2
+
+&gt; <tt class="userinput"><b>server galt.cs.purdue.edu.</b></tt>
+Default Server:  galt.cs.purdue.edu
+Address:  128.10.2.39
+
+&gt; <tt class="userinput"><b>set type=soa</b></tt>
+&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  galt.cs.purdue.edu
+Address:  128.10.2.39
+
+*** galt.cs.purdue.edu can't find mit.edu.: No response from server</pre></blockquote>
+
+
+Last, we need to see what <em class="filename">nslookup</em> returns if a
+host is not responding. We can test this by switching name servers to
+an unused IP address on our LAN:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  relay.hp.com
+Address:  15.255.152.2
+
+&gt; <tt class="userinput"><b>server 15.255.152.100</b></tt>
+Default Server:  [15.255.152.100]
+Address:  15.255.152.100
+
+&gt; <tt class="userinput"><b>set type=soa</b></tt>
+&gt; <tt class="userinput"><b>mit.edu.</b></tt>
+Server:  [15.255.152.100]
+Address:  15.255.152.100
+
+*** Request to [15.255.152.100] timed-out</pre></blockquote>
+
+
+In the last two cases, the error message was written to
+<em class="emphasis">stderr</em>.<a href="#FOOTNOTE-104">[104]</a> We can make use of that fact when writing our
+shell script. Now we are ready to compose the shell script.
+We'll call it <em class="filename">check_soa</em>:<p></p><blockquote class="footnote"><a name="FOOTNOTE-104" /></a>[104]Not all versions of <em class="emphasis">nslookup</em> print the last error message for a timeout. Be sure to check what yours prints.<p></p></blockquote>
+
+
+<blockquote><pre class="code">#!/bin/sh
+if test "$1" = ""
+then
+    echo usage: $0 zone
+    exit 1
+fi
+ZONE=$1
+#
+# Use nslookup to discover the name servers for this zone ($1).
+# Use awk to grab the name server's domain names from the nameserver lines.
+# (The names are always in the last field.)  Use sort -u to weed out
+# duplicates; we don't actually care about collation.
+#
+SERVERS=`nslookup -type=ns $ZONE |\
+                 awk '/nameserver/ {print $NF}' | sort -u`
+if test "$SERVERS" = ""
+then
+    #
+    # Didn't find any servers.  Just quit silently; nslookup will
+    # have detected this error and printed a message.  That will
+    # suffice.
+    #
+    exit 1
+fi
+#
+# Check each server's SOA serial number.  The output from
+# nslookup is saved in two temp files: nso.$$ (standard output)
+# and nse.$$ (standard error).  These files are rewritten on
+# every iteration.  Turn off defname and search since we
+# should be dealing with fully qualified domain names.
+#
+# NOTE: this loop is rather long; don't be fooled.
+#
+for i in $SERVERS
+do
+  nslookup &gt;/tmp/nso.$$ 2&gt;/tmp/nse.$$ &lt;&lt;-EOF
+    server $i
+    set nosearch
+    set nodefname
+    set norecurse
+    set q=soa
+    $ZONE
+EOF
+  #
+  # Does this response indicate that the current server ($i) is
+  # authoritative?  The server is NOT authoritative if (a) the
+  # response says so, or (b) the response tells you to find
+  # authoritative info elsewhere.
+  #
+  if egrep "Non-authoritative|Authoritative answers can be" \
+                                          /tmp/nso.$$ &gt;/dev/null
+  then
+    echo $i is not authoritative for $ZONE
+    continue
+  fi
+  #
+  # We know the server is authoritative; extract the serial number.
+  #
+  SERIAL=`cat /tmp/nso.$$ | grep serial | sed -e "s/.*= //"`
+  if test "$SERIAL" = ""
+  then
+    #
+    # We get here if SERIAL is null.  In this case, there should
+    # be an error message from nslookup; so cat the "standard
+    # error" file.
+    #
+    cat /tmp/nse.$$
+  else
+    #
+    # Report the server's domain name and its serial number.
+    #
+    echo $i has serial number $SERIAL
+  fi
+done  # end of the "for" loop
+#
+# Delete the temporary files.
+#
+rm -f /tmp/nso.$$ /tmp/nse.$$</pre></blockquote>
+
+
+Here is what the output looks like:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>check_soa mit.edu</b></tt>
+BITSY.MIT.EDU has serial number 1995
+STRAWB.MIT.EDU has serial number 1995
+W20NS.MIT.EDU has serial number 1995</pre></blockquote>
+
+
+If you are pressed for time, this short tool will solve your problem,
+and you can go on to other work. If you find that you are checking
+lots of zones and that this tool is too slow, you'll want to
+convert it to a C program. Also, if you want more control over the
+error messages -- rather than relying on
+<em class="filename">nslookup</em> for error messages -- then
+you'll have to write a C program. We'll do just that
+later in this chapter.<a name="INDEX-2284" /></a> <a name="INDEX-2285" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.7. Problem Symptoms</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15.2. C Programming with the Resolver Library Routines</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch15_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:38 GMT -->
+</html>

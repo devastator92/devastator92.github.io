@@ -1,0 +1,691 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>Disk-Space Checker (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">12.5. Disk-Space Checker</h2>
+
+<a name="INDEX-1929" /><a name="INDEX-1930" /> <a name="INDEX-1931" /><a name="INDEX-1932" />OpenView's agent has a
+<em class="emphasis">fileSystemTable</em> object that contains statistics
+about disk utilization and other filesystem parameters. At first
+glance, it looks extremely useful: you can use it to find out
+filesystem names, blocks free, etc. But it has some quirks, and
+we'll need to play a few tricks to use this table effectively.
+Walking
+<em class="emphasis">fileSystemTable.fileSystemEntry.fileSystemDir</em>
+(<em class="emphasis">.1.3.6.1.4.1.11.2.3.1.2.2.1.10</em>) lists the
+filesystems that are currently mounted:<a href="#FOOTNOTE-68">[68]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-68" />[68]We've
+truncated the leading
+<em class="emphasis">.iso.org.dod.internet.private.enterprises.hp.nm.system.general</em>
+to the <i class="command">walk</i> results for space reasons.</p>
+</blockquote>
+
+<blockquote><pre class="code">[root][nms] <tt class="userinput"><b>/opt/OV/local/bin/disk_space&gt; snmpwalk spruce \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.11.2.3.1.2.2.1.10</b></tt>
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.14680064.1 
+: DISPLAY STRING- (ascii):  /
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.14680067.1 
+: DISPLAY STRING- (ascii):  /var
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.14680068.1 
+: DISPLAY STRING- (ascii):  /export
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.14680069.1 
+: DISPLAY STRING- (ascii):  /opt
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.14680070.1 
+: DISPLAY STRING- (ascii):  /usr
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.41156608.1 
+: DISPLAY STRING- (ascii):  /proc
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.41680896.1 
+: DISPLAY STRING- (ascii):  /dev/fd
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.42991617.1 
+: DISPLAY STRING- (ascii):  /net
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.42991618.1 
+: DISPLAY STRING- (ascii):  /home
+fileSystem.fileSystemTable.fileSystemEntry.fileSystemDir.42991619.1 
+: DISPLAY STRING- (ascii):  /xfn</pre></blockquote>
+
+<a name="INDEX-1933" />Let's think about how we'd
+write a program that checks for available disk space. At first
+glance, it looks like this will be easy. But this table contains a
+number of objects that aren't filesystems in the normal sense;
+<em class="filename">/proc</em>, for example, provides access to the
+processes running on the system and doesn't represent storage.
+This raises problems if we start polling for free blocks:
+<em class="filename">/proc</em> isn't going to have any free blocks,
+and <em class="filename">/dev/fd</em>, which represents a floppy disk,
+will have free blocks only if a disk happens to be in the drive.
+You'd expect <em class="filename">/home</em> to behave like a normal
+filesystem, but on this server it's automounted, which means
+that its behavior is unpredictable; if it's not in use, it
+might not be mounted. Therefore, if we polled for free blocks using
+the
+<em class="emphasis">fileSystem.fileSystemTable.fileSystemEntry.fileSystemBavail</em>
+object, the last five instances might return 0 under normal
+conditions. So the results we'd get from polling all the
+entries in the filesystem table aren't meaningful without
+further interpretation. At a minimum, we need to figure out which
+filesystems are important to us and which aren't. This is
+probably going to require being clever about the instance numbers.
+</p>
+
+<a name="INDEX-1934" /><a name="INDEX-1935" />When I discovered this problem,
+I noticed that all the filesystems I wanted to check happened to have
+instance numbers with the same leading digits; i.e.,
+<em class="emphasis">fileSystemDir.14680064.1</em>,
+<em class="emphasis">fileSystemDir.14680067.1</em>,
+<em class="emphasis">fileSystemDir.14680068.1</em>, etc. That observation
+proved to be less useful than it seemed -- with time, I learned
+that not only do other servers have different leading instance
+numbers, but that on any server the instance numbers could change.
+Even if the instance number changes, though, the leading instance
+digits seem to stay the same for all disks or filesystems of the same
+type. For example, disk arrays might have instance numbers like
+<em class="emphasis">fileSystemDir.12312310.1</em>,
+<em class="emphasis">fileSystemDir.12312311.1</em>,
+<em class="emphasis">fileSystemDir.12312312.1</em>, and so on. Your
+internal disks might have instance numbers like
+<em class="emphasis">fileSystemDir.12388817.1</em>,
+<em class="emphasis">fileSystemDir.12388818.1</em>,
+<em class="emphasis">fileSystemDir.12388819.1</em>, and so on.
+</p>
+
+So, working with the instance numbers is possible, but
+painful -- there is still nothing static that can be easily
+polled. There's no easy way to say "Give me the
+statistics for all the local filesystems," or even "Give
+me the statistics for <em class="filename">/usr</em>." I was forced
+to write a program that would do a fair amount of instance-number
+processing, making guesses based on the behavior I observed. I had to
+use <em class="emphasis">snmpwalk</em> to figure out the instance numbers
+for the filesystems I cared about before doing anything more
+interesting. By comparing the initial digits of the instance numbers,
+I was able to figure out which filesystems were local, which were
+networked, and which were "special purpose" (like
+<em class="filename">/proc</em>). Here's the
+result:<a name="INDEX-1936" />
+</p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+# filename: polling.pl
+# options: 
+#    -min n    : send trap if less than n 1024-byte blocks free
+#    -table f  : table of servers to watch (defaults to ./default)
+#    -server s : specifies a single server to poll
+#    -inst n   : number of leading instance-number digits to compare
+#    -debug n  : debug level
+
+$|++;
+
+$SNMPWALK_LOC  = "/opt/OV/bin/snmpwalk -r 5";
+$SNMPGET_LOC   = "/opt/OV/bin/snmpget";
+$HOME_LOC      = "/opt/OV/local/bin/disk_space";
+$LOCK_FILE_LOC = "$HOME_LOC/lock_files";
+$GREP_LOC      = "/bin/grep";
+$TOUCH_LOC     = "/bin/touch";
+$PING_LOC      = "/usr/sbin/ping";       # Ping Location 
+$PING_TIMEOUT  = 7;                      # Seconds to wait for a ping 
+
+$MIB_C = ".1.3.6.1.4.1.11.2.3.1.2.2.1.6";      # fileSystemBavail 
+$MIB_BSIZE = ".1.3.6.1.4.1.11.2.3.1.2.2.1.7";  # fileSystemBsize
+$MIB_DIR = ".1.3.6.1.4.1.11.2.3.1.2.2.1.10";   # fileSystemDir
+
+while ($ARGV[0] =~ /^-/)
+{
+    if    ($ARGV[0] eq "-min")    { shift; $MIN = $ARGV[0]; }   # In 1024 blocks
+    elsif ($ARGV[0] eq "-table")  { shift; $TABLE = $ARGV[0]; } 
+    elsif ($ARGV[0] eq "-server") { shift; $SERVER = $ARGV[0]; }
+    elsif ($ARGV[0] eq "-inst")   { shift; $INST_LENGTH = $ARGV[0]; }
+    elsif ($ARGV[0] eq "-debug")  { shift; $DEBUG = $ARGV[0]; }
+    shift;
+}
+
+#################################################################
+##########################  Begin Main  #########################
+#################################################################
+
+$ALLSERVERS  = 1 unless ($SERVER);
+$INST_LENGTH = 5 unless ($INST_LENGTH);
+
+$TABLE = "default" unless ($TABLE);
+
+open(TABLE,"$HOME_LOC/$TABLE") || die "Can't Open File $TABLE";
+while($LINE=&lt;TABLE&gt;)
+{
+    if ($LINE ne "\n")
+    {
+    chop $LINE;
+    ($HOST,$IGNORE1,$IGNORE2,$IGNORE3) = split(/\:/,$LINE);
+
+    if (&amp;ping_server_bad("$HOST")) { warn "Can't Ping Server 
+       :$HOST:" unless (!($DEBUG)); }
+    else
+    {
+        &amp;find_inst;
+
+        if ($DEBUG &gt; 99)
+        {
+        print "HOST:$HOST: IGNORE1 :$IGNORE1: IGNORE2 :$IGNORE2: 
+              IGNORE3 :$IGNORE3:\n";
+        print "Running :$SNMPWALK_LOC $HOST $MIB_C \| $GREP_LOC 
+              \.$GINST:\n";
+        }
+
+        $IGNORE1 = "C1ANT5MAT9CHT4HIS" 
+                 unless ($IGNORE1); # If we don't have anything then let's set
+        $IGNORE2 = "CA2N4T6M8A1T3C5H7THIS" 
+                 unless ($IGNORE2); # to something that we can never match.
+        $IGNORE3 = "CAN3TMA7TCH2THI6S" unless ($IGNORE3);
+        
+        if (($SERVER eq "$HOST") || ($ALLSERVERS))
+        {
+          open(WALKER,"$SNMPWALK_LOC $HOST $MIB_C \| $GREP_LOC 
+             \.$GINST |") || die "Can't Walk $HOST $MIB_C\n";
+          while($WLINE=&lt;WALKER&gt;)
+          {
+              chop $WLINE;
+              ($MIB,$TYPE,$VALUE) = split(/\:/,$WLINE);
+              $MIB =~ s/\s+//g;
+              $MIB =~ /(\d+\.\d+)$/;
+              
+              $INST = $1;
+              
+              open(SNMPGET,"$SNMPGET_LOC $HOST $MIB_DIR.$INST |");
+              while($DLINE=&lt;SNMPGET&gt;)
+              {
+                  ($NULL,$NULL,$DNAME) = split(/\:/,$DLINE);
+              }
+
+              $DNAME =~ s/\s+//g;
+              
+              close SNMPGET;
+              
+              open(SNMPGET,"$SNMPGET_LOC $HOST $MIB_BSIZE.$INST |");
+              while($BLINE=&lt;SNMPGET&gt;)
+              {
+              ($NULL,$NULL,$BSIZE) = split(/\:/,$BLINE);
+              }
+              
+              close SNMPGET;
+              
+              $BSIZE =~ s/\s+//g;
+              
+              $LOCK_RES = &amp;inst_found; $LOCK_RES = "\[ $LOCK_RES \]";
+              
+              print "LOCK_RES :$LOCK_RES:\n" unless ($DEBUG &lt; 99);
+              
+              $VALUE = $VALUE * $BSIZE / 1024; # Put it in 1024 blocks
+              
+              if (($DNAME =~ /.*$IGNORE1.*/) ||
+                 ($DNAME =~ /.*$IGNORE2.*/) || 
+                 ($DNAME =~ /.*$IGNORE3.*/))
+              {
+                 $DNAME = "$DNAME "ignored"";
+              }
+
+              else
+              {
+                  if (($VALUE &lt;= $MIN) &amp;&amp; ($LOCK_RES eq "\[ 0 \]"))
+                  { 
+                     &amp;write_lock; 
+                     &amp;send_snmp_trap(0);
+                  }
+
+                  elsif (($VALUE &gt; $MIN) &amp;&amp; ($LOCK_RES eq "\[ 1 \]"))
+                  {
+                     &amp;remove_lock;
+                     &amp;send_snmp_trap(1);
+                  }
+              }
+
+              $VALUE = $VALUE / $BSIZE * 1024; # Display it as the 
+                                               # original block size
+
+              write unless (!($DEBUG));
+
+          } # end while($WLINE=&lt;WALKER&gt;)
+       }     # end if (($SERVER eq "$HOST") || ($ALLSERVERS))
+   }         # end else from if (&amp;ping_server_bad("$HOST"))    
+
+    }             # end if ($LINE ne "\n")
+}                 # end while($LINE=&lt;TABLE&gt;)
+
+#################################################################
+######################  Begin SubRoutines  ######################
+#################################################################
+
+format STDOUT_TOP =
+Server     MountPoint        BlocksLeft    BlockSize    MIB        LockFile
+---------  ----------------  ------------  -----------  ---------  ----------
+.
+
+format STDOUT =
+@&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  @&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  @&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  @&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  @&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;  @&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+$HOST,     $DNAME,           $VALUE,       $BSIZE,      $INST,     $LOCK_RES
+.
+
+sub inst_found
+{
+    if (-e "$LOCK_FILE_LOC/$HOST\.$INST") { return 1; }
+    else { return 0; }
+}
+
+sub remove_lock
+{
+    if ($DEBUG &gt; 99) { print "Removing Lockfile $LOCK_FILE_LOC/$HOST\.$INST\n"; }
+    unlink "$LOCK_FILE_LOC/$HOST\.$INST";
+}
+
+sub write_lock
+{
+    if ($DEBUG &gt; 99) { print "Writing Lockfile 
+         $TOUCH_LOC $LOCK_FILE_LOC/$HOST\.$INST\n"; }
+    system "$TOUCH_LOC $LOCK_FILE_LOC/$HOST\.$INST";
+}
+
+#################################################################
+## send_snmp_trap ##
+####################
+##
+# This subroutine allows you to send diff traps depending on the
+#  passed parm and gives you a chance to send both good and bad
+#  traps.
+#
+# $1 - integer - This will be added to the specific event ID.
+# 
+# If we created two traps:
+#  2789.2500.0.1000 = Major
+#  2789.2500.0.1001 = Good 
+#
+# If we declare:
+#  $SNMP_SPECIFIC_TRAP     = "1000";
+# 
+# We could send the 1st by using:
+#  send_snmp_trap(0);  # Here is the math (1000 + 0 = 1000)
+#  And to send the second one:
+#  send_snmp_trap(1);  # Here is the math (1000 + 1 = 1001)
+#
+# This way you could set up multiple traps with diff errors using 
+#  the same function for all.
+#
+##
+#################################################################
+
+sub send_snmp_trap
+{
+    $TOTAL_TRAPS_CREATED    = 2;  # Let's do some checking/reminding 
+                                  # here. This number should be the 
+                                  # total number of traps that you 
+                                  # created on the nms.
+
+    $SNMP_ENTERPRISE_ID     = ".1.3.6.1.4.1.2789.2500"; 
+    $SNMP_SPECIFIC_TRAP     = "1500";
+
+    $PASSED_PARM            = $_[0];
+    $SNMP_SPECIFIC_TRAP    += $PASSED_PARM;
+
+    $SNMP_TRAP_LOC          = "/opt/OV/bin/snmptrap";
+    $SNMP_COMM_NAME         = "public";
+    $SNMP_TRAP_HOST         = "nms";
+
+    $SNMP_GEN_TRAP          = "6";
+
+    chop($SNMP_TIME_STAMP        = "1" . `date +%H%S`); 
+
+    $SNMP_EVENT_IDENT_ONE   = ".1.3.6.1.4.1.2789.2500.$SNMP_SPECIFIC_TRAP.1"; 
+    $SNMP_EVENT_VTYPE_ONE   = "octetstringascii";
+    $SNMP_EVENT_VAR_ONE     = "$DNAME";
+
+    $SNMP_EVENT_IDENT_TWO   = ".1.3.6.1.4.1.2789.2500.$SNMP_SPECIFIC_TRAP.2"; 
+    $SNMP_EVENT_VTYPE_TWO   = "integer";
+    $SNMP_EVENT_VAR_TWO     = "$VALUE";
+
+    $SNMP_EVENT_IDENT_THREE = ".1.3.6.1.4.1.2789.2500.$SNMP_SPECIFIC_TRAP.3"; 
+    $SNMP_EVENT_VTYPE_THREE = "integer";
+    $SNMP_EVENT_VAR_THREE   = "$BSIZE";
+
+    $SNMP_EVENT_IDENT_FOUR  = ".1.3.6.1.4.1.2789.2500.$SNMP_SPECIFIC_TRAP.4"; 
+    $SNMP_EVENT_VTYPE_FOUR  = "octetstringascii";
+    $SNMP_EVENT_VAR_FOUR    = "$INST";
+
+    $SNMP_EVENT_IDENT_FIVE  = ".1.3.6.1.4.1.2789.2500.$SNMP_SPECIFIC_TRAP.5"; 
+    $SNMP_EVENT_VTYPE_FIVE  = "integer";
+    $SNMP_EVENT_VAR_FIVE    = "$MIN";
+ 
+    $SNMP_TRAP = "$SNMP_TRAP_LOC \-c $SNMP_COMM_NAME $SNMP_TRAP_HOST 
+      $SNMP_ENTERPRISE_ID \"$HOST\" $SNMP_GEN_TRAP $SNMP_SPECIFIC_TRAP 
+      $SNMP_TIME_STAMP 
+      $SNMP_EVENT_IDENT_ONE   $SNMP_EVENT_VTYPE_ONE   \"$SNMP_EVENT_VAR_ONE\" 
+      $SNMP_EVENT_IDENT_TWO   $SNMP_EVENT_VTYPE_TWO   \"$SNMP_EVENT_VAR_TWO\"
+      $SNMP_EVENT_IDENT_THREE $SNMP_EVENT_VTYPE_THREE \"$SNMP_EVENT_VAR_THREE\"
+      $SNMP_EVENT_IDENT_FOUR  $SNMP_EVENT_VTYPE_FOUR  \"$SNMP_EVENT_VAR_FOUR\"
+      $SNMP_EVENT_IDENT_FIVE  $SNMP_EVENT_VTYPE_FIVE  \"$SNMP_EVENT_VAR_FIVE\"";
+    
+    if (!($PASSED_PARM &lt; $TOTAL_TRAPS_CREATED))
+    {
+       die "ERROR SNMPTrap with a Specific Number \&gt; 
+           $TOTAL_TRAPS_CREATED\nSNMP_TRAP:$SNMP_TRAP:\n";
+    }
+   
+    # Sending a trap using Net-SNMP
+    #
+    #system "/usr/local/bin/snmptrap $SNMP_TRAP_HOST $SNMP_COMM_NAME 
+    #$SNMP_ENTERPRISE_ID '' $SNMP_GEN_TRAP $SNMP_SPECIFIC_TRAP ''
+    #$SNMP_EVENT_IDENT_ONE s \"$SNMP_EVENT_VAR_ONE\"
+    #$SNMP_EVENT_IDENT_TWO i \"$SNMP_EVENT_VAR_TWO\"
+    #$SNMP_EVENT_IDENT_THREE i \"$SNMP_EVENT_VAR_THREE\"
+    #$SNMP_EVENT_IDENT_FOUR s \"$SNMP_EVENT_VAR_FOUR\"";
+    #$SNMP_EVENT_IDENT_FIVE i \"$SNMP_EVENT_VAR_FIVE\"";
+
+    # Sending a trap using Perl
+    #
+    #use SNMP_util "0.54";  # This will load the BER and SNMP_Session for us
+    #snmptrap("$SNMP_COMM_NAME\@$SNMP_TRAP_HOST:162", "$SNMP_ENTERPRISE_ID",
+    #mylocalhostname, $SNMP_GEN_TRAP, $SNMP_SPECIFIC_TRAP,
+    #"$SNMP_EVENT_IDENT_ONE", "string", "$SNMP_EVENT_VAR_ONE",
+    #"$SNMP_EVENT_IDENT_TWO", "int", "$SNMP_EVENT_VAR_TWO",
+    #"$SNMP_EVENT_IDENT_THREE", "int", "$SNMP_EVENT_VAR_THREE",
+    #"$SNMP_EVENT_IDENT_FOUR", "string", "$SNMP_EVENT_VAR_FOUR",
+    #"$SNMP_EVENT_IDENT_FIVE", "int", "$SNMP_EVENT_VAR_FIVE");
+
+    # Sending a trap using OpenView's snmptrap (using VARs from above)
+    #
+    if($SEND_SNMP_TRAP) {
+        print "ERROR Running SnmpTrap Result ";
+        print ":$SEND_SNMP_TRAP: :$SNMP_TRAP:\n"
+    }
+
+sub find_inst
+{
+    open(SNMPWALK2,"$SNMPWALK_LOC $HOST $MIB_DIR |") || 
+                                die "Can't Find Inst for $HOST\n";
+    while($DLINE=&lt;SNMPWALK2&gt;)
+    {
+      chomp $DLINE;
+      ($DIRTY_INST,$NULL,$DIRTY_NAME) = split(/\:/,$DLINE);
+      $DIRTY_NAME =~ s/\s+//g;  # Lose the whitespace, folks!
+      print "DIRTY_INST :$DIRTY_INST:\nDIRTY_NAME :$DIRTY_NAME:\n" 
+                            unless (!($DEBUG&gt;99));
+        if ($DIRTY_NAME eq "/")
+        {
+            $DIRTY_INST =~ /fileSystemDir\.(\d*)\.1/;
+            $GINST = $1;
+            $LENGTH = (length($GINST) - $INST_LENGTH);
+            while ($LENGTH--) { chop $GINST; }
+            close SNMPWALK;
+            print "Found Inst DIRTY_INST :$DIRTY_INST: DIRTY_NAME\
+                 :$DIRTY_NAME: GINST :$GINST:\n" 
+                            unless (!($DEBUG &gt; 99));
+            return 0;
+        }
+    }
+
+    close SNMPWALK2;
+    die "Can't Find Inst for HOST :$HOST:";
+}
+
+sub ping_server_bad
+{
+    local $SERVER  = $_[0];
+    $RES = system "$PING_LOC $SERVER $PING_TIMEOUT \&gt; /dev/null";
+    print "Res from Ping :$RES: \- :$PING_LOC $SERVER:\n" 
+                                          unless (!($DEBUG));
+    return $RES;
+}</pre></blockquote>
+
+The script contains a handful of useful features:</p>
+
+<ul><li>
+<a name="INDEX-1937" />We use an external ASCII file for a list
+of servers to poll. We specify the file by using the switch
+<i class="command">-table FILENAME</i>. If no <i class="command">-table</i>
+switch is given, the file named <em class="filename">default</em> in the
+current directory is used.
+</p>
+</li><li>
+<a name="INDEX-1938" /><a name="INDEX-1939" /><a name="INDEX-1940" />We
+can specify a single server name (which must appear in the file
+above) to poll using the switch <i class="command">-server
+SERVER_NAME</i>.
+</p>
+</li><li>
+<a name="INDEX-1941" />We can ignore up to three filesystems
+per server. For example, we might want to ignore filesystems that are
+being used for software development.
+</p>
+</li><li>
+<a name="INDEX-1942" />The script polls only
+servers that respond to a <i class="command">ping</i>. We don't
+want to get filesystem traps from a server that is down or not on the
+network.
+</p>
+</li><li>
+<a name="INDEX-1943" />We can set the minimum threshold
+for each list of servers in 1024-byte blocks using the <i class="command">-min
+blocks</i> option.
+</p>
+</li><li>
+<a name="INDEX-1944" />The script sends a trap when a
+server's threshold has been met and sends another trap when the
+state goes back to normal.
+</p>
+</li><li>
+<a name="INDEX-1945" /><a name="INDEX-1946" /><a name="INDEX-1947" /><a name="INDEX-1948" />We
+use lockfiles to prevent the server from sending out too many
+redundant traps.<a href="#FOOTNOTE-69">[69]</a> When a threshold has been met, a file named
+<em class="filename">hostname.instance</em> is created. We send a trap
+only if the lockfile doesn't exist. When the space frees up, we
+delete the lockfile, allowing us to generate a trap the next time
+free storage falls below the threshold.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-69" />[69]There have been a few times that we
+have missed the fact that a system has filled up because a trap was
+lost during transmission. Using <i class="command">cron</i>, we
+frequently delete everything in the <em class="filename">lock</em>
+directory. This resubmits the entries, if any, at that time.</p>
+</blockquote>
+</li><li>
+We can set the number of leading instance digits used to grab the
+appropriate filesystem with the <i class="command">-inst</i> switch.
+Unfortunately, the number of instance digits you can safely use to
+isolate a local filesystem varies from installation to installation.
+The default is five, but a lower value may be appropriate.
+</p>
+</li><li>
+The script displays a useful table when we invoke it with the
+<i class="command">-debug</i> flag.
+</p>
+</li></ul>
+<a name="INDEX-1949" /><a name="INDEX-1950" /><a name="INDEX-1951" />The
+script starts by reading the table of servers in which we're
+interested. It <i class="command">ping</i>s the servers and ignores those
+that don't respond. It then calls the subroutine
+<tt class="literal">find_inst</tt>, which incorporates most of the
+instance-number logic. This subroutine walks the filesystem table to
+find a list of all the filesystems and their instance numbers. It
+extracts the entry for the root filesystem (/), which we know exists,
+and which we assume is a local disk. (We can't assume that the
+root filesystem will be listed first; we do assume that you
+won't use a script like this to monitor diskless workstations).
+We then store the first <tt class="literal">INST_LENGTH</tt> digits of the
+instance number in the variable <tt class="literal">GINST</tt>, and return.
+</p>
+
+<a name="INDEX-1952" />Back in
+the main program, we ask for the number of blocks available for each
+filesystem; we compare the instance number to
+<tt class="literal">GINST</tt>, which selects the local filesystems (i.e.,
+the filesystems with an instance number whose initial digits match
+the instance number for /). We then ask for the total number of
+blocks, which allows us to compare the space available against our
+threshholds. If the value is less then our minimum we send one of the
+two enterprise-specific traps we've defined for this program,
+1500, which indicates that the filesystem's free space is below
+the threshold. If the free space has returned to a safe level we send
+trap 1501, which is an "out of danger" notification. Some
+additional logic uses a lockfile to prevent the script from
+bombarding the NMS with repeated notifications; we send at most one
+warning a day and send an "out of danger" only if
+we've previously sent a warning. In either case, we stuff the
+trap with useful information: a number of variable bindings
+specifying the filesystem, the available space, its total capacity,
+its instance number, and the threshold we've set. Later,
+we'll see how to map these traps into OpenView categories.
+</p>
+
+Let's put the program to work by creating a table called
+<em class="filename">default</em> that lists the servers we are interested
+in watching:
+</p>
+
+<blockquote><pre class="code">db_serv0
+db_serv1
+db_serv2</pre></blockquote>
+
+Now we can run the script with the <i class="command">-debug</i> option
+to show us a table of the results. The following command asks for all
+filesystems on the server <em class="emphasis">db_serv0</em> with fewer
+than 50,000 blocks (50 MB) free:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/local/bin/disk_space/polling.pl -min 50000 -server db_serv0 -debug 1</b></tt>
+Res from Ping :0: - :/usr/sbin/ping db_serv0:
+Server      MountPoint         BlocksLeft  BlockSize  MIB              LockFile
+----------  -----------------  ----------  ---------  ---------------  --------
+db_serv0  /                  207766      1024       38010880.1       [ 0 ]
+db_serv0  /usr               334091      1024       38010886.1       [ 0 ]
+db_serv0  /opt               937538      1024       38010887.1       [ 0 ]
+db_serv0  /var               414964      1024       38010888.1       [ 0 ]
+db_serv0  /db1               324954      1024       38010889.1       [ 0 ]</pre></blockquote>
+
+Notice that we didn't need to specify a table explicitly;
+because we omitted the <i class="command">-table</i> option, the
+<em class="filename">polling.pl</em> script used the default file we put
+in the current directory. The <i class="command">-server</i> switch let
+us limit the test to the server named <em class="emphasis">db_serv0</em>;
+if we had omitted this option the script would have checked all
+servers within the default table. If the free space on any of the
+filesystems falls under 50,000 1024-byte blocks, the program sends a
+trap and writes a lockfile with the instance number.
+</p>
+
+<a name="INDEX-1953" /><a name="INDEX-1954" /><a name="INDEX-1955" /><a name="INDEX-1956" />
+<a name="INDEX-1957" />Because SNMP traps use UDP, they are
+unreliable. This means that some traps may never reach their
+destination. This could spell disaster -- in our situation,
+we're sending traps to notify a manager that a filesystem is
+full. We don't want those traps to disappear, especially since
+we've designed our program so that it doesn't send
+duplicate notifications. One workaround is to have
+<i class="command">cron</i> delete some or all of the files in the
+<em class="filename">lock</em> directory. We like to delete everything in
+the <em class="filename">lock</em> directory every hour; this means that
+we'll get a notification every hour until some free storage
+appears in the filesystem. Another plausible policy is to delete only
+the production-server lockfiles. With this policy, we'll get
+hourly notification about filesystem capacity problems on the server
+we care about most; on other machines (e.g., development machines,
+test machines), we will get only a single notification.
+</p>
+
+Let's say that the filesystem <em class="emphasis">/db1</em> is a
+test system and we don't care if it fills up. We can ignore
+this filesystem by specifying it in our table. We can list up to
+three filesystems we would like to ignore after the server name
+(which must be followed by a ":"):
+</p>
+
+<blockquote><pre class="code">db_serv0:db1</pre></blockquote>
+
+Running the <em class="filename">polling.pl</em> script again gives these
+results:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/local/bin/disk_space/polling.pl -min 50000 -server db_serv0 -debug 1</b></tt>
+Res from Ping :0: - :/usr/sbin/ping db_serv0:
+Server      MountPoint         BlocksLeft  BlockSize  MIB              LockFile
+----------  -----------------  ----------  ---------  ---------------  --------
+db_serv0    /                  207766      1024       38010880.1       [ 0 ]
+db_serv0    /usr               334091      1024       38010886.1       [ 0 ]
+db_serv0    /opt               937538      1024       38010887.1       [ 0 ]
+db_serv0    /var               414964      1024       38010888.1       [ 0 ]
+db_serv0    /db1 (ignored)     324954      1024       38010889.1       [ 0 ]</pre></blockquote>
+
+When the <em class="emphasis">/db1</em> filesystem drops below the minimum
+disk space, the script will not send any traps or create any
+lockfiles.
+</p>
+
+<a name="INDEX-1958" />Now let's go beyond
+experimentation. The following <em class="filename">crontab</em> entries
+run our program twice every hour:
+</p>
+
+<blockquote><pre class="code">4,34 * * * * /opt/OV/bin/polling.pl -min 50000
+5,35 * * * * /opt/OV/bin/polling.pl -min 17000 -table stocks_table
+7,37 * * * * /opt/OV/bin/polling.pl -min 25000 -table bonds_table -inst 3</pre></blockquote>
+
+<a name="INDEX-1959" />Next we need to define how the traps
+<i class="command">polling.pl</i> generates should be handled when they
+arrive at the NMS. Here's the entry in OpenView's
+<em class="filename">trapd.conf</em> file that shows how to handle these
+traps:
+</p>
+
+<blockquote><pre class="code">EVENT DiskSpaceLow .1.3.6.1.4.1.2789.2500.0.1500 "Threshold Alarms" Major
+FORMAT Disk Space For FileSystem :$1: Is Low With :$2: 
+1024 Blocks Left - Current FS Block Size :$3: - Min Threshold 
+:$5: - Inst :$4:
+SDESC
+$1 - octetstringascii   - FileSystem
+$2 - integer            - Current Size
+$3 - integer            - Block Size
+$4 - octetstringascii   - INST
+$5 - integer            - Min Threshold Size
+EDESC
+#
+#
+#
+EVENT DiskSpaceNormal .1.3.6.1.4.1.2789.2500.0.1501 "Threshold Alarms" Normal
+FORMAT Disk Space For FileSystem :$1: Is Normal With :$2: 
+1024 Blocks Left - Current FS Block Size :$3: - Min Threshold 
+:$5: - Inst :$4:
+SDESC
+$1 - octetstringascii   - FileSystem
+$2 - integer            - Current Size
+$3 - integer            - Block Size
+$4 - octetstringascii   - INST
+$5 - integer            - Min Threshold size
+EDESC</pre></blockquote>
+
+These entries define two OpenView events: a
+<em class="emphasis">DiskSpaceLow</em> event that is used when a
+filesystem's capacity is below the threshold, and a
+<em class="emphasis">DiskSpaceNormal</em> event. We place both of these in
+the Threshold Alarms category; the low disk space event has a
+severity of Major, while the "normal" event has a
+severity of Normal. If you're using some other package to
+listen for traps, you'll have to configure it accordingly.
+<a name="INDEX-1960" /><a name="INDEX-1961" /> <a name="INDEX-1962" /><a name="INDEX-1963" /> 
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.4. Veritas Disk Check</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.6. Port Monitor</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

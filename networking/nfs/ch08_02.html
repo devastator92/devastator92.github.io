@@ -1,0 +1,390 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Setting up a diskless client (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.2. Setting up a diskless client</h2>
+
+To set up a diskless client, you must have<a name="INDEX-1214" /> <a name="INDEX-1215" /> the appropriate operating system
+software loaded on its boot server. If the client and server are of
+the same architecture, then they can share the
+<em class="emphasis">/usr</em> filesystem, including <a name="INDEX-1216" />the same
+<em class="emphasis">/usr/platform</em>/<em class="emphasis">&lt;platform&gt;</em>
+directory. <a name="INDEX-1217" />However, if the client has a different
+processor or platform architecture, the server must contain the
+relevant <em class="emphasis">/usr</em> filesystem and/or
+<em class="emphasis">/usr/platform/&lt;platform&gt;</em> directory for the
+client. The <em class="emphasis">/usr</em> filesystem contains the
+operating system itself, and will be different for each diskless
+client processor architecture. The <em class="emphasis">/usr/platform</em>
+directory contains subdirectories that in turn contain executable
+files that depend on both the machine's hardware implementation
+(platform) and CPU architecture. Often several different hardware
+implementations share the same set of platform specific executables.
+Thus, you will find that <em class="emphasis">/usr/platform</em> contains
+lots of symbolic links to directories that contain the common machine
+architecture.
+</p>
+
+Platform architecture and processor architecture
+<a name="INDEX-1218" />
+<a name="INDEX-1219" />
+<a name="INDEX-1220" />
+<a name="INDEX-1221" />are
+not the same thing; processor architecture guarantees that binaries
+are compatible, while platform architecture compatibility means that
+page sizes, kernel data structures, and supported devices are the
+same. You can determine the platform architecture of a running
+machine using <em class="emphasis">uname -i</em>:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>uname -i</b></tt> 
+SUNW,Ultra-5_10</pre></blockquote>
+
+You can also determine the machine architecture the platform
+directory in /<em class="emphasis">usr/platform</em> is likely
+symbolically linked to:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>uname -m</b></tt> 
+sun4u</pre></blockquote>
+
+If clients and their server have the same processor architecture but
+different platform architectures, then they can share
+<em class="emphasis">/usr</em> but <em class="emphasis">/usr/platform</em>
+needs to include subdirectories for both the client and server
+platform architectures. Platform specific binaries for each client
+are normally placed in <em class="emphasis">/export</em> on the server.
+</p>
+
+In Solaris, an unbundled product called
+<em class="emphasis">AdminSuite</em> is used to set up servers for
+diskless NFS clients. This product is currently available as
+<a name="INDEX-1222" /> <a name="INDEX-1223" />part of the <em class="emphasis">Solaris
+Easy Access Server</em> (<em class="emphasis">SEAS</em>) 2.0 product
+and works on Solaris up to Solaris 7.
+</p>
+
+For each new diskless client, the AdminSuite software <a name="INDEX-1224" /> <a name="INDEX-1225" />can be used to perform the
+following steps:
+</p>
+
+<ul><li>
+Give the client a name and an IP address, and
+<a name="INDEX-1226" /> <a name="INDEX-1227" />add
+them both to the NIS <em class="emphasis">hosts</em> map or
+/<em class="emphasis">etc/hosts</em> file if desired.
+</p>
+</li>
+<li>
+Set up the boot parameters <a name="INDEX-1228" />for the client, including its
+name and the paths to its root and swap filesystems on the server.
+The boot server keeps these values in its
+<em class="emphasis">/etc/bootparams</em> file or
+in<a name="INDEX-1229" /> the NIS <em class="emphasis">bootparams</em>
+map. A typical <em class="emphasis">bootparams</em> file entry looks like
+this:
+</p>
+
+<blockquote><pre class="code">buonanotte      root=sunne:/export/root/buonanotte \ 
+                swap=sunne:/export/swap/buonanotte</pre></blockquote>
+
+
+The first line indicates the name of the diskless client and the
+location of its root filesystem, and the second line gives the
+location of the client's swap filesystem. Note that:
+</p>
+<ul>
+<li>
+The swap "filesystem" is really just a single file
+exported from the server.
+</p>
+</li>
+<li>
+Solaris diskless clients do not actually use
+<em class="emphasis">bootparams</em> to locate the swap area; this is done
+by the diskless administration utlities setting up the appropriate
+entry in the client's <em class="emphasis">vfstab</em> file.
+</p>
+</li>
+</ul>
+</li>
+<li>
+The client system's MAC address and <a name="INDEX-1230" />hostname must be added to the NIS
+<em class="emphasis">ethers</em> map (or the
+<em class="emphasis">/etc/ethers</em> file) so that it can determine its
+IP address using the Reverse ARP (RARP) protocol. To find the
+client's MAC address, power it on without the network cable
+attached, and look for its MAC address in the power-on diagnostic
+messages.
+</p>
+</li><li>
+Add an entry for the client to the <a name="INDEX-1231" />server's
+<em class="emphasis">/tftpboot</em> directory, so the server knows how to
+locate a boot block for the client. Diskless client servers use this
+information to locate the appropriate boot code and to determine if
+they should answer queries about booting the client.
+</p>
+</li><li>
+Create root and swap filesystems for the
+client<a name="INDEX-1232" />
+<a name="INDEX-1233" />
+on the boot server. These filesystems must be listed in the
+server's <em class="emphasis">/etc/dfs/dfstab</em> file so they can
+be NFS-mounted. After the AdminSuite software updates
+<em class="emphasis">/etc/dfs/dfstab</em>, it will run
+<em class="emphasis">shareall</em> to have the changes take effect. Most
+systems restrict access to a diskless client root filesystem to that
+client. In addition, the filesystem export must allow
+<em class="emphasis">root</em> to operate on the NFS-mounted filesystem
+for normal system operation. A typical <em class="emphasis">/etc/dfs/dfstab</em>
+entry for a diskless client's root filesystem is:
+</p>
+
+<blockquote><pre class="code">share -F nfs -o rw=vineyard,root=vineyard
+/export/root/vineyard
+share -F nfs -o rw=vineyard,root=vineyard /export/swap/vineyard</pre></blockquote>
+
+
+The <em class="emphasis">rw</em> option prevents other diskless clients
+from accessing this filesystem, while the <em class="emphasis">root</em>
+option ensures that the superuser on the client will be given normal
+<em class="emphasis">root</em> privileges on this filesystem.
+</p>
+</li></ul>
+
+
+Most of these steps could be performed by hand, and if moving a
+client's diskless configuration from one server to another, you
+may find yourself doing just that. However, creating a root
+filesystem for a client from scratch is not feasible, and it is
+easiest and safest to use software like AdminSuite to add new
+diskless<a name="INDEX-1234" />
+<a name="INDEX-1235" /> clients
+to the network.
+</p>
+
+TheAdminSuite software comes<a name="INDEX-1236" />
+in two forms:
+</p>
+
+<ul><li>
+A GUI that is launched from the <em class="emphasis">solstice</em>
+<a name="INDEX-1237" />
+<a name="INDEX-1238" />
+<a name="INDEX-1239" />command:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>solstice &amp;</b></tt></pre></blockquote>
+
+
+
+You then double click on the Host Manager icon. Host Manager
+<a name="INDEX-1240" /> <a name="INDEX-1241" />comes up as simple screen with an Edit
+menu item that lets you add new diskless clients, modify existing
+ones, and delete existing ones. When you add a new diskless client,
+you have to tell it that you want it to be diskless. One reason for
+this is that Host Manager is intended to be what its name implies: a
+general means for managing hosts, whether they be diskless, servers,
+standalone or other types. The other reason is that "other
+types" includes another kind of NFS client: cache-only clients
+(referred to as AutoClient hosts in Sun's product
+documentation). There is another type of "diskless"
+client, which Host Manager doesn't support: a disk-full client
+that is installed over the network. A client with disks can have the
+operating system installed onto those disks, via a network install
+(<em class="emphasis">netinstall</em> ). Such netinstall clients are
+<a name="INDEX-1242" />
+<a name="INDEX-1243" />configured on the server in a manner
+very similar to how diskless clients are, except that unique root and
+swap filesystems are not created, and when the client boots over the
+network, it is presented with a set of screens for installation. We
+will discuss <em class="emphasis">netinstall</em> later in this chapter,
+in <a href="ch08_08.html#nfs2-CHP-8-SECT-8">Section 8.8, "Brief introduction to JumpStart administration"</a>.
+</p>
+</li>
+
+<li>
+A set of command line tools. The command
+<em class="emphasis">admhostadd</em>, which <a name="INDEX-1244" />
+<a name="INDEX-1245" />will
+typically live in <em class="emphasis">/opt/SUNWadm/bin</em>, is
+used<a name="INDEX-1246" /> to add a <a name="INDEX-1247" />diskless<a name="INDEX-1248" /> <a name="INDEX-1249" /> client.
+</p>
+</li></ul>
+
+
+It is beyond the scope of this book to describe the details of Host
+Manager, or its command-line equivalents, including how to install
+them. You should refer to the AdminSuite documentation, and the
+online manpages, typically kept under
+<em class="emphasis">/opt/SUNWadm/man</em>.
+</p>
+
+Regardless of what form of the <a name="INDEX-1250" />
+<a name="INDEX-1251" />AdminSuite software is used, the
+default server filesystem naming conventions for diskless client
+files are shown in <a href="ch08_02.html#nfs2-CHP-8-TABLE-1">Table 8-1</a>.
+</p>
+
+<a name="nfs2-CHP-8-TABLE-1" /><h4 class="objtitle">Table 8-1. Diskless client filesystem locations </h4><table border="1">
+
+
+
+<tr>
+<th>
+Filesystem</p>
+</th>
+<th>
+Contents</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+/export/root</p>
+</td>
+<td>
+Root filesystems</p>
+</td>
+</tr>
+<tr>
+<td>
+/export/swap</p>
+</td>
+<td>
+Swap filesystems</p>
+</td>
+</tr>
+<tr>
+<td>
+/export/exec</p>
+</td>
+<td>
+<em class="emphasis">/usr</em> executables, libraries, etc.</p>
+</td>
+</tr>
+
+</table><p>
+
+The /<em class="emphasis">export/exec</em> directory contains
+<a name="INDEX-1252" />a set of directories specific to a release
+of the operating system, and processor architecture. For example, a
+Solaris 7 SPARC client would look for a directory called
+/<em class="emphasis">export/exec/Solaris_2.7_sparc.all/usr</em>. If all
+clients have the same processor architecture as the server, then
+<em class="emphasis">/export/exec/&lt;os-release-name&gt;_&lt;processor_name&gt;.all</em>
+will contain symbolic links to the server's
+<em class="emphasis">/usr</em> filesystem.
+</p>
+
+To configure a server with many disks and many clients, create
+several directories for root and swap filesystems and distribute them
+over several disks. For example, on a server with two disks, split
+the <em class="emphasis">/export/root</em> and
+<em class="emphasis">/export/swap</em> filesystems, as shown in <a href="ch08_02.html#nfs2-CHP-8-TABLE-2">Table 8-2</a>. 
+</p>
+
+<a name="nfs2-CHP-8-TABLE-2" /><h4 class="objtitle">Table 8-2. Diskless client filesystems on two disks </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Disk</p>
+</th>
+<th>
+Root Filesystems</p>
+</th>
+<th>
+Swap Filesystems</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+0</p>
+</td>
+<td>
+/export/root1</p>
+</td>
+<td>
+/export/swap1</p>
+</td>
+</tr>
+<tr>
+<td>
+1</p>
+</td>
+<td>
+/export/root2</p>
+</td>
+<td>
+/export/swap2</p>
+</td>
+</tr>
+
+</table><p>
+
+Some implementations (not the AdminSuitesoftware) of the client installation tools do not allow
+you to specify a root or swap filesystem directory other than
+<em class="emphasis">/export/root</em> or
+<em class="emphasis">/export/swap</em>. Perform the installation using the
+tools' defaults, and after the client has been installed, move
+its root and swap filesystems. After moving the client's
+filesystems, be sure to update the <em class="emphasis">bootparams</em>
+file and NIS map with the new filesystem locations.
+</p>
+
+As an alternative to performing an installation
+<a name="INDEX-1253" />and
+then juggling directories, use symbolic links to point the
+<em class="emphasis">/export</em> subdirectories to the desired disk for
+this client. To force an installation on
+<em class="emphasis">/export/root2</em> and
+<em class="emphasis">/export/swap2</em>, for example, create the following
+symbolic links on the diskless client server:
+</p>
+
+<blockquote><pre class="code">server# <tt class="userinput"><b>cd /export</b></tt> 
+server# <tt class="userinput"><b>ln -s root2 root</b></tt> 
+server# <tt class="userinput"><b>ln -s swap2 swap</b></tt></pre></blockquote>
+
+Verify that the <em class="emphasis">bootparams</em> entries for the
+client reflect the actual location of its root and swap filesystems,
+and also check the client's <em class="emphasis">/etc/vfstab</em>
+file to be sure it mounts its filesystems from
+<em class="emphasis">/export/root2</em> and
+<em class="emphasis">/export/swap2</em>. If the client's
+<em class="emphasis">/etc/vfstab</em> file contains the generic
+<em class="emphasis">/export/root</em> or
+<em class="emphasis">/export/swap</em> pathnames, the client <a name="INDEX-1254" /> <a name="INDEX-1255" />won't be able
+to boot if these symbolic links point to the wrong subdirectories.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8. Diskless Clients</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.3. Diskless client boot process</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

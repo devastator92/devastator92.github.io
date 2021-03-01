@@ -1,0 +1,263 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>Veritas Disk Check (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">12.4. Veritas Disk Check</h2>
+
+<a name="INDEX-1915" /><a name="INDEX-1916" /><a name="INDEX-1917" /><a name="INDEX-1918" /><a name="INDEX-1919" /><a name="INDEX-1920" /><a name="INDEX-1921" /><a name="INDEX-1922" />The
+Veritas Volume Manager is a package that allows you to manipulate
+disks and their partitions. It gives you the ability to add and
+remove mirrors, work with RAID arrays, and resize partitions, to name
+a few things. Although Veritas is a specialized and expensive package
+that is usually found at large data centers, don't assume that
+you can skip this section. The point isn't to show you how to
+monitor Veritas, but to show you how you can provide meaningful traps
+using a typical status program. You should be able to extract the
+ideas from the script we present here and use them within your own
+context.
+</p>
+
+Veritas Volume Manager (<i class="command">vxvm</i>) comes with a utility
+called <i class="command">vxprint</i>. This program displays records from
+the Volume Manager configuration and shows the status of each of your
+local disks. If there is an error, such as a bad disk or broken
+mirror, this command will report it. A healthy
+<i class="command">vxprint</i> on the rootvol (/) looks like this:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>vxprint -h rootvol</b></tt>
+Disk group: rootdg
+
+TY NAME         ASSOC        KSTATE   LENGTH   PLOFFS   STATE    TUTIL0  PUTIL0
+v  rootvol      root         ENABLED  922320   -        ACTIVE   -       -
+pl rootvol-01   rootvol      ENABLED  922320   -        ACTIVE   -       -
+sd rootdisk-B0  rootvol-01   ENABLED  1        0        -        -       Block0
+sd rootdisk-02  rootvol-01   ENABLED  922319   1        -        -       -
+pl rootvol-02   rootvol      ENABLED  922320   -        ACTIVE   -       -
+sd disk01-01    rootvol-02   ENABLED  922320   0        -        -       -</pre></blockquote>
+
+The <tt class="literal">KSTATE</tt> (kernel state) and
+<tt class="literal">STATE</tt> columns give us a behind-the-scenes look at
+our disks, mirrors, etc. Without explaining the output in detail, a
+<tt class="literal">KSTATE</tt> of <tt class="literal">ENABLED</tt> is a good
+sign; a <tt class="literal">STATE</tt> of <tt class="literal">ACTIVE</tt> or -
+indicates that there are no problems. We can take this output and
+pipe it into a script that sends SNMP traps when errors are
+encountered. We can send different traps of an appropriate severity,
+based on the type of error that <i class="command">vxprint</i> reported.
+Here's a script that runs <i class="command">vxprint</i> and
+analyzes the results:
+</p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl -wc
+
+$VXPRINT_LOC    = "/usr/sbin/vxprint";
+$HOSTNAME       = `/bin/uname -n`; chop $HOSTNAME;
+
+while ($ARGV[0] =~ /^-/)
+{
+    if    ($ARGV[0] eq "-debug")        { shift; $DEBUG = $ARGV[0]; }
+    elsif ($ARGV[0] eq "-state_active") { $SHOW_STATE_ACTIVE = 1; }
+    shift;
+}
+
+####################################################################
+###########################  Begin Main  ###########################
+####################################################################
+
+&amp;get_vxprint;  # Get it, process it, and send traps if errors found!
+
+####################################################################
+########################  Begin SubRoutines  #######################
+####################################################################
+
+sub get_vxprint
+{
+
+    open(VXPRINT,"$VXPRINT_LOC |") || die "Can't Open $VXPRINT_LOC";
+    while($VXLINE=&lt;VXPRINT&gt;)
+    {
+        print $VXLINE unless ($DEBUG &lt; 2);
+        if ($VXLINE ne "\n")
+        {
+            &amp;is_a_disk_group_name;
+            &amp;split_vxprint_output;
+
+            if (($TY ne "TY")   &amp;&amp;
+                ($TY ne "Disk") &amp;&amp;
+                ($TY ne "dg")   &amp;&amp;
+                ($TY ne "dm"))
+            {
+                if (($SHOW_STATE_ACTIVE) &amp;&amp; ($STATE eq "ACTIVE"))
+                {
+                    print "ACTIVE: $VXLINE";
+                }
+                if (($STATE ne "ACTIVE") &amp;&amp;
+                    ($STATE ne "DISABLED") &amp;&amp;
+                    ($STATE ne "SYNC") &amp;&amp;
+                    ($STATE ne "CLEAN") &amp;&amp;
+                    ($STATE ne "SPARE") &amp;&amp;
+                    ($STATE ne "-")      &amp;&amp;
+                    ($STATE ne ""))
+                {
+                    &amp;send_error_msgs;
+                }
+                elsif (($KSTATE ne "ENABLED") &amp;&amp;
+                       ($KSTATE ne "DISABLED") &amp;&amp;
+                       ($KSTATE ne "-")       &amp;&amp;
+                       ($KSTATE ne ""))
+                {
+                    &amp;send_error_msgs;
+                }
+            } # end if (($TY
+        }     # end if ($VXLINE
+    }         # end while($VXLINE
+}             # end sub get_vxprint
+
+sub is_a_disk_group_name
+{
+    if ($VXLINE =~ /^Disk\sgroup\:\s(\w+)\n/)
+    {
+        $DISK_GROUP = $1;
+        print "Found Disk Group :$1:\n" unless (!($DEBUG));
+        return 1;
+    }
+}
+
+sub split_vxprint_output
+{
+($TY, $NAME, $ASSOC, $KSTATE,
+    $LENGTH, $PLOFFS, $STATE, $TUTIL0,
+    $PUTIL0) = split(/\s+/,$VXLINE);
+    
+    if ($DEBUG) { 
+        print "SPLIT: $TY $NAME $ASSOC $KSTATE ";
+        print "$LENGTH $PLOFFS $STATE $TUTIL0 $PUTIL0:\n";
+            }
+}
+
+sub send_snmp_trap
+{
+    $SNMP_TRAP_LOC          = "/opt/OV/bin/snmptrap";
+    $SNMP_COMM_NAME         = "public";
+    $SNMP_TRAP_HOST         = "nms";
+
+    $SNMP_ENTERPRISE_ID     = ".1.3.6.1.4.1.2789.2500";
+    $SNMP_GEN_TRAP          = "6";
+    $SNMP_SPECIFIC_TRAP     = "1000";
+
+    chop($SNMP_TIME_STAMP        = "1" . `date +%H%S`); 
+    $SNMP_EVENT_IDENT_ONE   = ".1.3.6.1.4.1.2789.2500.1000.1";
+    $SNMP_EVENT_VTYPE_ONE   = "octetstringascii";
+    $SNMP_EVENT_VAR_ONE     = "$HOSTNAME";
+
+    $SNMP_EVENT_IDENT_TWO   = ".1.3.6.1.4.1.2789.2500.1000.2";
+    $SNMP_EVENT_VTYPE_TWO   = "octetstringascii";
+    $SNMP_EVENT_VAR_TWO     = "$NAME";
+
+    $SNMP_EVENT_IDENT_THREE = ".1.3.6.1.4.1.2789.2500.1000.3";
+    $SNMP_EVENT_VTYPE_THREE = "octetstringascii";
+    $SNMP_EVENT_VAR_THREE   = "$STATE";
+
+    $SNMP_EVENT_IDENT_FOUR  = ".1.3.6.1.4.1.2789.2500.1000.4";
+    $SNMP_EVENT_VTYPE_FOUR  = "octetstringascii";
+    $SNMP_EVENT_VAR_FOUR    = "$DISK_GROUP";
+
+    $SNMP_TRAP = "$SNMP_TRAP_LOC \-c $SNMP_COMM_NAME $SNMP_TRAP_HOST 
+    $SNMP_ENTERPRISE_ID \"\" $SNMP_GEN_TRAP $SNMP_SPECIFIC_TRAP $SNMP_TIME_STAMP
+    $SNMP_EVENT_IDENT_ONE   $SNMP_EVENT_VTYPE_ONE   \"$SNMP_EVENT_VAR_ONE\"
+    $SNMP_EVENT_IDENT_TWO   $SNMP_EVENT_VTYPE_TWO   \"$SNMP_EVENT_VAR_TWO\"
+    $SNMP_EVENT_IDENT_THREE $SNMP_EVENT_VTYPE_THREE \"$SNMP_EVENT_VAR_THREE\"
+    $SNMP_EVENT_IDENT_FOUR  $SNMP_EVENT_VTYPE_FOUR  \"$SNMP_EVENT_VAR_FOUR\"";
+
+    # Sending a trap using Net-SNMP
+    #
+    #system "/usr/local/bin/snmptrap $SNMP_TRAP_HOST $SNMP_COMM_NAME 
+    #$SNMP_ENTERPRISE_ID '' $SNMP_GEN_TRAP $SNMP_SPECIFIC_TRAP ''
+    #$SNMP_EVENT_IDENT_ONE s \"$SNMP_EVENT_VAR_ONE\" 
+    #$SNMP_EVENT_IDENT_TWO s \"$SNMP_EVENT_VAR_TWO\"
+    #$SNMP_EVENT_IDENT_THREE s \"$SNMP_EVENT_VAR_THREE\"
+    #$SNMP_EVENT_IDENT_FOUR s \"$SNMP_EVENT_VAR_FOUR\"";
+
+    # Sending a trap using Perl
+    #
+    #use SNMP_util "0.54";  # This will load the BER and SNMP_Session for us
+    #snmptrap("$SNMP_COMM_NAME\@$SNMP_TRAP_HOST:162", "$SNMP_ENTERPRISE_ID",
+    #mylocalhostname, $SNMP_GEN_TRAP, $SNMP_SPECIFIC_TRAP, 
+    #"$SNMP_EVENT_IDENT_ONE", "string", "$SNMP_EVENT_VAR_ONE",
+    #"$SNMP_EVENT_IDENT_TWO", "string", "$SNMP_EVENT_VAR_TWO",
+    #"$SNMP_EVENT_IDENT_THREE", "string", "$SNMP_EVENT_VAR_THREE",
+    #"$SNMP_EVENT_IDENT_FOUR", "string", "$SNMP_EVENT_VAR_FOUR");
+
+    # Sending a trap using OpenView's snmptrap (using VARs from above)
+    #
+    if($SEND_SNMP_TRAP) {
+         print "Problem Running SnmpTrap with Result ";
+         print ":$SEND_SNMP_TRAP: :$SNMP_TRAP:\n";
+    }
+
+sub send_error_msgs
+{
+    $TY =~ s/^v/Volume/;
+    $TY =~ s/^pl/Plex/;
+    $TY =~ s/^sd/SubDisk/;
+
+    print "VXfs Problem: Host:[$HOSTNAME] State:[$STATE] DiskGroup:[$DISK_GROUP] 
+        Type:[$TY] FileSystem:[$NAME] Assoc:[$ASSOC] Kstate:[$KSTATE]\n" 
+        unless (!($DEBUG));
+
+    &amp;send_snmp_trap;
+}</pre></blockquote>
+
+<a name="INDEX-1923" />Knowing what the output of
+<i class="command">vxprint</i> should look like, we can formulate Perl
+statements that figure out when to generate a trap. That task makes
+up most of the <tt class="literal">get_vxprint</tt> subroutine. We also
+know what types of error messages will be produced. Our script tries
+to ignore all the information from the healthy disks and sort the
+error messages. For example, if the <tt class="literal">STATE</tt> field
+contains <tt class="literal">NEEDSYNC</tt>, the disk mirrors are probably
+not synchronized and the volume needs some sort of attention. The
+script doesn't handle this particular case explicitly, but it
+is caught with the default entry.
+</p>
+
+The actual mechanism for sending the trap is tied up in a large
+number of variables. Basically, though, we use any of the trap
+utilities we've discussed; the enterprise ID is
+<em class="emphasis">.1.3.6.1.4.1.2789.2500</em> ; the specific trap ID is
+<em class="emphasis">1000</em> ; and we include four variable bindings,
+which report the hostname, the volume name, the volume's state,
+and the disk group.
+</p>
+
+As with the previous script, it's a simple matter to run this
+script periodically and watch the results on whatever
+network-management software you're using. It's also easy
+to see how you could develop similar scripts that generate reports
+from other status programs.<a name="INDEX-1924" /><a name="INDEX-1925" /><a name="INDEX-1926" /><a name="INDEX-1927" /><a name="INDEX-1928" /> 
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.3. Throw Core</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.5. Disk-Space Checker</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

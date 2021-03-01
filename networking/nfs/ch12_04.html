@@ -1,0 +1,1082 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>NFS security (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">12.4. NFS security</h2>
+
+Filesystem security has two aspects: controlling <a name="INDEX-1751" />
+<a name="INDEX-1752" />access
+to and operations on files, and limiting exposure of the contents of
+the files. Controlling access to remote files involves mapping Unix
+file operation semantics into the NFS system, so that certain
+operations are disallowed if the remote user fails to provide the
+proper credentials. To avoid giving superuser permissions across the
+network, additional constraints are put in place for access to files
+by <em class="emphasis">root</em>. Even more stringent NFS security
+requires proving that the Unix-style credentials contained in each
+NFS request are valid; that is, the server must know that the NFS
+client's request was made by a valid user and not an imposter
+on the network.
+</p>
+
+Limiting disclosure of data in a file is more difficult, as it
+<a name="INDEX-1753" />
+<a name="INDEX-1754" />usually
+involves encrypting the contents of the file. The client application
+may choose to enforce its own data encryption and store the file on
+the server in encrypted form. In this case, the client's NFS
+requests going over the network contain blocks of encrypted data.
+However, if the file is stored and used in clear text form, NFS
+requests to read or write the file will contain clear text as well.
+Sending parts of files over a network is subject to some data
+exposure concerns. In general, if security would be compromised by
+any part of a file being disclosed, then either the file should not
+be placed on an NFS-mounted filesystem, or you should use a security
+mechanism for RPC that encrypts NFS remote procedure calls and
+responses over the network. We will cover one such mechanism later in
+this section.
+</p>
+
+You can prevent damage to files by restricting write permissions
+<a name="INDEX-1755" />
+<a name="INDEX-1756" />and enforcing user authentication.
+With NFS you have the choice of deploying some simple security
+mechanisms and more complex, but stronger RPC security mechanisms.
+The latter will ensure that user authentication is made secure as
+well, and will be described later in this section. This section
+presents ways of restricting access based on the user credentials
+presented in NFS requests, and then looks at validating the
+credentials themselves using stronger RPC security.
+</p>
+
+<a name="nfs2-CHP-12-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">12.4.1. RPC security</h3>
+
+Under the default RPC security <a name="INDEX-1757" />
+<a name="INDEX-1758" />
+<a name="INDEX-1759" />
+<a name="INDEX-1760" />mechanism,
+AUTH_SYS, every NFS request, including mount requests, contains a set
+of user credentials with a UID and a list of group IDs (GIDs) to
+which the UID belongs. NFS credentials are the same as those used for
+accessing local files, that is, if you belong to five groups, your
+NFS credentials contain your UID and five GIDs. On the NFS server,
+these credentials are used to perform the permission checks that are
+part of Unix file accesses  --  verifying write permission to
+remove a file, or execute permission to search directories. There are
+three areas in which NFS credentials may not match the user's
+local credential structure: the user is the superuser, the user is in
+too many groups, or no credentials were supplied (an
+"anonymous" request). Mapping of root and anonymous users
+is covered in the next section.
+</p>
+
+Problems with too many groups<a name="INDEX-1761" />
+<a name="INDEX-1762" /> depend upon the implementation of NFS
+used by the client and the server, and may be an issue only if they
+are different (including different revisions of the same operating
+system). Every NFS implementation has a limit on the number of groups
+that can be passed in a credentials structure for an NFS RPC. This
+number usually agrees with the maximum number of groups to which a
+user may belong, but it may be smaller. On Solaris 8 the default and
+maximum number of groups is 16 and 32, respectively. However, under
+the AUTH_SYS RPC security mechanism, the maximum is 16. If the
+client's group limit is larger than the server's, and a
+user is in more groups than the server allows, then the
+server's attempt to parse and verify the credential structure
+will fail, yielding error messages like:
+</p>
+
+<blockquote><pre class="code">RPC: Authentication error</pre></blockquote>
+
+Authentication errors may occur when trying to mount a filesystem, in
+which case the superuser is in too many groups. Errors may also occur
+when a particular user tries to access files on the NFS server; these
+errors result from any NFS RPC operation. Pay particular attention to
+the <em class="emphasis">group</em> file in a heterogeneous environment,
+where the NIS-managed <em class="emphasis">group</em> map may be appended
+to a local file with several entries for common users like
+<em class="emphasis">root</em> and <em class="emphasis">bin</em>. The only
+solution is to restrict the number <a name="INDEX-1763" /> <a name="INDEX-1764" /> <a name="INDEX-1765" /> <a name="INDEX-1766" />of groups to the smallest value allowed
+by all systems that are running NFS.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">12.4.2. Superuser mapping</h3>
+
+The superuser is not given normal file <a name="INDEX-1767" /> <a name="INDEX-1768" /> <a name="INDEX-1769" />access permissions to NFS-mounted
+files. The motivation behind this restriction is that root access
+should be granted on a per-machine basis. A user who is capable of
+becoming root on one machine should not necessarily have permission
+to modify files on a file server. Similarly, a
+<em class="emphasis">setuid</em> program that assumes root privileges may
+not function properly or
+as<a name="INDEX-1770" /> <a name="INDEX-1771" /> expected if it is
+allowed to operate on remote files.
+</p>
+
+To enforce restrictions on
+<a name="INDEX-1772" />superuser
+access, the root's UID is mapped to the anonymous user
+<em class="emphasis">nobody</em> in the NFS RPC credential structure. The
+superuser frequently has fewer permissions than a nonprivileged user
+for NFS-mounted filesystems, since <em class="emphasis">nobody</em>
+'s group usually includes no other users. In the
+password file, <em class="emphasis">nobody</em> has a UID of 60001, and
+the group <em class="emphasis">nobody</em> also has a GID of 60001. When
+an executable, that is owned by root with the
+<em class="emphasis">setuid</em> bit set on the permissions, runs, its
+effective user ID is root, which gets mapped to
+<em class="emphasis">nobody</em>. The executable still has permissions on
+the local system, but it cannot get to remote files unless they have
+been explicitly exported with root access enabled.
+</p>
+
+Most implementations of NFS allow the root UID mapping to be
+defeated. Some do this by letting you change the UID used for
+<em class="emphasis">nobody</em> in the server's kernel. Others do
+this by letting you specify the UID for the anonymous user at the
+time you export the filesystem. For example, in this line in
+<em class="emphasis">/etc/dfs/dfstab</em>:
+</p>
+
+<blockquote><pre class="code">share -o ro,anon=0 /export/home/stuff</pre></blockquote>
+
+Changing the UID for <em class="emphasis">nobody</em> from 60001 to 0
+allows the superuser to access all files exported from the server,
+which may be less restrictive than desired.
+</p>
+
+Most NFS servers let you grant root permission on an exported
+filesystem on a per-host basis using the <em class="emphasis">root</em>=
+export option. The server exporting a filesystem grants root access
+to a host or list of hosts by including them in the
+<em class="emphasis">/etc/dfs/dfstab</em> file:
+</p>
+
+<blockquote><pre class="code">share -o rw,root=bitatron:corvette /export/home/work</pre></blockquote>
+
+The superuser on hosts <em class="emphasis">bitatron</em> and
+<em class="emphasis">corvette</em> is given normal root filesystem
+privileges on the server's
+<em class="emphasis">/export/home/work</em> directory. The name of a
+netgroup may be substituted for a hostname; all of the hosts in the
+netgroup are granted root access.
+</p>
+
+Root permissions on a remote filesystem <a name="INDEX-1773" /> <a name="INDEX-1774" />should be extended only when
+absolutely necessary. While privileged users may find it annoying to
+have to log into the server owning a filesystem in order to modify
+something owned by root, this restriction also eliminates many common
+mistakes. If a system administrator wants to purge
+<em class="emphasis">/usr/local</em> on one host (to rebuild it, for
+example), executing <em class="emphasis">rm -rf *</em> will have
+disastrous consequences if there is an NFS-mounted filesystem with
+root permission under <em class="emphasis">/usr/local</em>. If
+<em class="emphasis">/usr/local/bin</em> is NFS-mounted, then it is
+possible to wipe out the server's copy of this directory from a
+client when root permissions are extended over the network.
+</p>
+
+One clear-cut case where root permissions should be extended on an
+NFS filesystem is for the root and swap partitions of a diskless
+client, where they are mandatory. One other possible scenario in
+which root permissions are useful is for cross-server mounted
+filesystems. Assuming that only the system administration staff is
+given superuser privileges on the file servers, extending these
+permissions across NFS mounts may make software distribution and
+maintenance a little easier. Again, the pitfalls await, but hopefully
+the community with networked root permissions is small and
+experienced enough to use these sharp instruments safely.
+</p>
+
+On the client side, you may want to protect the NFS client from
+foreign <em class="emphasis">setuid</em> executables of unknown origin.
+NFS-mounted <em class="emphasis">setuid</em> executables
+<a name="INDEX-1775" />
+<a name="INDEX-1776" />should not be trusted unless you control
+superuser access to the server from which they are mounted. If
+security on the NFS server is compromised, it's possible for
+the attacker to create <em class="emphasis">setuid</em> executables which
+will be found  --  and executed  --  by users who NFS mount the
+filesystem. The <em class="emphasis">setuid</em> process will have root
+permission on the host on which it is running, which means it can
+damage files on the local host. Execution of NFS-mounted
+<em class="emphasis">setuid</em> executables can be disabled with the
+<em class="emphasis">nosuid</em> mount option. This option may be
+specified as a suboption to the <em class="emphasis">-o</em> command-line
+flag, the automounter map entry, or in the
+<em class="emphasis">/etc/vfstab</em> entry:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">automounter auto_local entry:</i>
+bin                    -ro,nosuid           toolbox:/usr/local/bin 
+vfstab entry:
+toolbox:/usr/local/bin - /usr/local/bin nfs - no ro,nosuid</pre></blockquote>
+
+A bonus is that on many systems, such as Solaris, the
+<em class="emphasis">nosuid</em> option also disables access to block and
+character device nodes (if not, check your system's
+documentation for a <em class="emphasis">nodev</em> option). NFS is a file
+access protocol and it doesn't allow remote device access.
+However it allows device nodes to be stored on file servers, and they
+are interpreted by the NFS client's operating system. So here
+is another problem with mounting without <em class="emphasis">nosuid</em>.
+Suppose under your NFS client's <em class="emphasis">/dev</em>
+directory you have a device node with permissions restricted to root
+or a select group of users. The device node might be protecting a
+sensitive resource, like an unmounted disk partition containing, say,
+personal information of every employee. Let's say the major
+device number is 100, and the minor is 0. If you mount an NFS
+filesystem without <em class="emphasis">nosuid</em>, and if that
+filesystem has a device node with wide open permissions, a major
+number of 100, and a minor number of 0, then there is nothing
+stopping unauthorized users from using the remote device node to
+access your sensitive local device.
+</p>
+
+The only clear-cut case where NFS filesystems should be mounted
+without the <em class="emphasis">nosuid</em> option is when the filesystem
+is a root partition of a diskless client. Here you have no choice,
+since diskless operation requires setuid execution and device access.
+</p>
+
+We've discussed problems with <em class="emphasis">setuid</em> and
+device nodes from the NFS client's perspective. There is also a
+server perspective. Solaris and other NFS server implementations have
+a <em class="emphasis">nosuid</em> option that applies to the exported
+filesystem:
+</p>
+
+<blockquote><pre class="code">share -o rw,nosuid /export/home/stuff</pre></blockquote>
+
+This option is highly recommended. Otherwise, malicious or careless
+users on your NFS clients could create setuid executables and device
+nodes that would allow a careless or cooperating user logged into the
+server to commit a security breach, such as gaining superuser access.
+Once again, the only clear-cut case where NFS filesystems should be
+exported without the <em class="emphasis">nosuid</em> (and
+<em class="emphasis">nodev</em> if your system supports it, and decouples
+<em class="emphasis">nosuid</em> from <em class="emphasis">nodev</em>
+semantics) option is when the filesystem is a root partition of a
+diskless client, because there is no choice if diskless operation is
+desired. You should ensure that any users logged into the diskless
+NFS server can't access the root partitions, lest the superuser
+on the diskless client is careless. Let's say the root
+partitions are all under <em class="emphasis">/export/root</em>. Then you
+should change the permissions of directory
+<em class="emphasis">/export/root</em> so that no one but<a name="INDEX-1777" /> <a name="INDEX-1778" /> <a name="INDEX-1779" /> superuser can
+access:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>chown root /export/root</b></tt>
+# <tt class="userinput"><b>chmod 700 /export/root</b></tt></pre></blockquote>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">12.4.3. Unknown user mapping</h3>
+
+NFS handles requests that do not have valid <a name="INDEX-1780" /> <a name="INDEX-1781" />credentials in them by mapping
+them to the <em class="emphasis">anonymous</em> user. There are several
+cases in which an NFS request has no valid credential structure in
+it:
+</p>
+
+<ul><li>
+The NFS client and server are using a more secure form of RPC like
+RPC/DH, but the user on the client has not provided the proper
+authentication information. RPC/DH will be discussed later in this
+chapter.
+</p>
+</li><li>
+The client is a PC running PC/NFS, but the PC user has not supplied a
+valid username and password. The PC/NFS mechanisms used to establish
+user credentials are described in <a href="ch10_03.html#nfs2-CHP-10-SECT-3">Section 10.3, "Configuring PC/NFS"</a>.
+</p>
+</li><li>
+The client is not a Unix machine and cannot produce Unix-style
+credentials.
+</p>
+</li><li>
+The request was fabricated (not sent by a real NFS client), and is
+simply missing the credentials structure.
+</p>
+</li></ul>
+Note that this is somewhat different behavior from Solaris 8 NFS
+servers. In Solaris 8 the default is that invalid credentials are
+rejected. The philosophy is that allowing an NFS user with an invalid
+credential is no different then allowing a user to log in as user
+<em class="emphasis">nobody</em> if he has forgotten his password.
+However, there is a way to override the default behavior:
+</p>
+
+<blockquote><pre class="code">share -o sec=sys:none,rw  /export/home/engin</pre></blockquote>
+
+This says to export the filesystem, permitting AUTH_SYS credentials.
+However if a user's NFS request comes in with invalid
+credentials or non-AUTH_SYS security, treat and accept the user as
+anonymous. You can also map all users to anonymous, whether they have
+valid credentials or not:
+</p>
+
+<blockquote><pre class="code">share -o sec=none,rw  /export/home/engin</pre></blockquote>
+
+By default, the anonymous user is <em class="emphasis">nobody</em>, so
+unknown users (making the credential-less requests) and superuser can
+access only files with world permissions set. The
+<em class="emphasis">anon</em> export option allows a server to change the
+mapping of anonymous requests. By setting the anonymous user ID in
+<em class="emphasis">/etc/dfs/dfstab</em>, the unknown user in an
+anonymous request is mapped to a well-known local user:
+</p>
+
+<blockquote><pre class="code">share -o rw,anon=100 /export/home/engin</pre></blockquote>
+
+In this example, any request that arrives without user credentials
+will be executed with UID 100. If
+<em class="emphasis">/export/home/engin</em> is owned by UID 100, this
+ensures that unknown users can access the directory once it is
+mounted. The user ID mapping does not affect the real or effective
+user ID of the process accessing the NFS-mounted file. The anonymous
+user mapping just changes the user credentials used by the NFS server
+for determining file access permissions.
+</p>
+
+The anonymous user mapping is valid only for the filesystem that is
+exported with the <em class="emphasis">anon</em> option. It is possible to
+set up different mappings for each filesystem exported by specifying
+a different anonymous user ID value in each line of the
+<em class="emphasis">/etc/dfs/dfstab</em> file:
+</p>
+
+<blockquote><pre class="code">share -o rw,anon=100 /export/home/engin
+share -o rw,anon=200 /export/home/admin
+share -o rw,anon=300 /export/home/marketing</pre></blockquote>
+
+Anonymous users should almost <em class="emphasis">never</em> be mapped to
+root, as this would grant superuser access to filesystems to any user
+without a valid password file entry on the server. An exception would
+be when you are exporting read-only, and the data is not sensitive.
+One application of this is exporting directories containing the
+operating system installation. Since operating systems like Solaris
+are often installed over the network, and superuser on the client
+drives the installation, it would be tedious to list every possible
+client that you want to install the operating system on.
+</p>
+
+Anonymous users should be thought of as transient or even unwanted
+users, and should be given as few file access permissions as
+possible. RPC calls with missing UIDs in the credential structures
+are rejected out of hand on the server if the server exports its
+filesystems with <em class="emphasis">anon=-1</em>. Rather than mapping
+anonymous users to <em class="emphasis">nobody</em>, filesystems that
+specify <em class="emphasis">anon=-1</em> return authentication errors for
+RPC calls with no credentials in them.
+</p>
+
+Normally, with the anonymous user mapped to
+<em class="emphasis">nobody</em>, anonymous requests are accepted but have
+few, if any, permissions to access files on the server. Mapping
+unknown users is a risky venture. Requests that are missing UIDs in
+their credentials may be appearing from outside the local network, or
+they may originate from machines on which security has been
+compromised. Thus, if you must export filesystems with the anonymous
+user mapped to a UID other than nobody, you should limit it to a
+smaller set of hosts:
+</p>
+
+<blockquote><pre class="code">share -o rw=engineering,anon=100 /export/home/engin # a nergroup
+share -o rw=admin1:admin2,anon=200 /export/home/admin # a pair of hosts
+share -o rw=.marketing.widget.com,anon=300 /export/home/marketing # a domain</pre></blockquote>
+
+We discuss limiting exports to certain hosts in the <a name="INDEX-1782" /> <a name="INDEX-1783" />next section.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">12.4.4. Access to filesystems</h3>
+
+In addition to being protected from root <a name="INDEX-1784" /> <a name="INDEX-1785" />access, some
+<a name="INDEX-1786" />filesystems require protection from
+certain hosts. A machine containing source code is a good example;
+the source code may be made available only to a selected set of
+machines and not to the network at large. The list of hosts to which
+access is restricted is included in the server's
+<em class="emphasis">/etc/dfs/dfstab</em> file with the
+<em class="emphasis">rw=</em> option:
+</p>
+
+<blockquote><pre class="code">share -o rw=noreast,root=noreast /export/root/noreast</pre></blockquote>
+
+This specification is typical of that for the root filesystem of a
+diskless client. The client machine is given root access to the
+filesystem, and access is further restricted to host
+<em class="emphasis">noreast</em> only. No user can look at
+<em class="emphasis">noreast</em> 's root filesystem unless he or
+she can log into <em class="emphasis">noreast</em> and look locally. The
+hosts listed in a <em class="emphasis">rw=</em> list can be individual
+hostnames or netgroup names, separated by colons. On Solaris 8, the
+hosts can also be DNS domain names, if prefixed by a leading dot (.),
+or a network number if preceded by a leading at sign (@). Solaris 8
+also has the capability to deny specific hosts (individual hostnames,
+netgroups, domains, or network numbers) access. For example:
+</p>
+
+<blockquote><pre class="code">share -o rw=-marketing /source</pre></blockquote>
+
+Restricting host access ensures that NFS is not used to circumvent
+login restrictions. If a user cannot log into a host to restrict
+access to one or more filesystems, the user should not be able to
+recreate that host's environment <a name="INDEX-1787" /> <a name="INDEX-1788" />by mounting all of its NFS-mounted
+filesystems on another system.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">12.4.5. Read-only access</h3>
+
+By default, NFS filesystems are exported with
+<a name="INDEX-1789" />
+<a name="INDEX-1790" />write access enabled for any host that
+mounts them. Using the <em class="emphasis">ro or ro=</em> option in the
+<em class="emphasis">/etc/dfs/dfstab</em> file, you can specify whether
+the filesystem is exported read-only, and to what hosts:
+</p>
+
+<blockquote><pre class="code">share -o ro=system-engineering /source</pre></blockquote>
+
+In this example, the machines in <em class="emphasis">system-engineering</em>
+netgroup are authorized to only browse the source code;
+they get read-only access. Of course, this prevents users on machines
+authorized to modify the source from doing their job. So you might
+instead use:
+</p>
+
+<blockquote><pre class="code">share -o rw=source-group,ro=system-engineering /source</pre></blockquote>
+
+In this example, the machines in <em class="emphasis">source-group</em>
+are authorized to modify the source code get read and write access,
+whereas the machines in the <em class="emphasis">system-engineering</em>
+netgroup, which are authorized to only browse the source
+code, get read-only access.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.6" /><div class="sect2">
+<h3 class="sect2">12.4.6. Port monitoring</h3>
+
+Port monitoring is used to frustrate "spoofing"  -- 
+hand-crafted <a name="INDEX-1791" /> <a name="INDEX-1792" />imitations of valid NFS requests
+that are sent from unauthorized user processes. A clever user could
+build an NFS request and send it to the <em class="emphasis">nfsd</em>
+daemon port<a name="INDEX-1793" /> on a server, hoping to grab all or
+part of a file on the server. If the request came from a valid NFS
+client kernel, it would originate from a privileged UDP or TCP port
+(a port less than 1024) on the client. Because all UDP and TCP
+packets contain both source and destination port numbers, the NFS
+server can check the originating port number to be sure it came from
+a privileged port.
+</p>
+
+NFS port monitoring may or may not be enabled by default. It is
+usually governed by a kernel variable that is modified at boot time.
+Solaris 8 lets you modify this via the
+<em class="emphasis">/etc/system</em> file, which is read-only at boot
+time. You would add this entry to <em class="emphasis">/etc/system</em> to
+enable port monitoring:
+</p>
+
+<blockquote><pre class="code">set nfssrv:nfs_portmon = 1</pre></blockquote>
+
+In addition, if you don't want to reboot your server for this
+to take effect, then, you can change it on the fly by doing:
+</p>
+
+<blockquote><pre class="code">echo "nfs_portmon/W1" | adb -k -w</pre></blockquote>
+
+This script sets the value of <em class="emphasis">nfs_ portmon</em> to 1
+in the kernel's memory image, enabling port monitoring. Any
+request that is received from a nonprivileged port is rejected.
+</p>
+
+By default, some <em class="emphasis">mountd</em> daemons perform port
+checking, to be sure that mount requests are coming from processes
+running with root privileges. It rejects requests that are received
+from nonprivileged ports. To turn off port monitoring in the mount
+daemon, add the <em class="emphasis">-n</em> flag to its invocation in the
+boot script:
+</p>
+
+<blockquote><pre class="code">mountd -n</pre></blockquote>
+
+Not all NFS clients send requests from privileged ports; in
+particular, some PC implementations of the NFS client code will not
+work with port monitoring enabled. In addition, some older NFS
+implementations on Unix workstations use nonprivileged ports and
+require port monitoring to be disabled. This is one reason why, by
+default, the Solaris 8 <em class="emphasis">nfs_ portmon</em> tunable is
+set to zero. Another reason is that on operating systems like
+Windows, with no concept of privileged users, anyone can write a
+program that binds to a port less than 1024. The Solaris 8
+<em class="emphasis">mountd</em> also does not monitor ports, nor is there
+any way to turn on mount request port monitoring. The reason is that
+as of Solaris 2.6 and onward, each NFS request is checked against the
+<em class="emphasis">rw=</em>, <em class="emphasis">ro=</em>, and
+<em class="emphasis">root=</em> lists. With that much checking,
+filehandles given out a mount time are longer magic keys granting
+access to an exported filesystem as they were in previous versions of
+Solaris and in other, current and past, NFS server implementations.
+</p>
+
+Check your system's documentation and boot scripts <a name="INDEX-1794" /> <a name="INDEX-1795" />to determine under
+what conditions, if any, port monitoring is enabled.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.7" /><div class="sect2">
+<h3 class="sect2">12.4.7. Using NFS through firewalls</h3>
+
+If you are behind a firewall that has the <a name="INDEX-1796" />
+<a name="INDEX-1797" />
+<a name="INDEX-1798" />purpose
+of keeping intruders out of your network, you may find your firewall
+also prevents you from accessing services on the greater Internet.
+One of these services is NFS. It is true there aren't nearly as
+many public NFS servers on the Internet as FTP or HTTP servers. This
+is a pity, because for downloading large files over wide area
+networks, NFS is the best of the three protocols, since it copes with
+dropped connections. It is very annoying to have an FTP or HTTP
+connection time-out halfway into a 10 MB download. From a security
+risk perspective, there is no difference between surfing NFS servers
+and surfing Web servers.
+</p>
+
+You, or an organization that is collaborating with you, might have an
+NFS server outside your firewall that you wish to access. Configuring
+a firewall to allow this can be daunting if you consider what an NFS
+client does to access an NFS server:
+</p>
+
+<ul>
+<li>
+The NFS client first contacts the NFS server's portmapper or
+rpcbind daemon to find the port of the mount daemon. While the
+portmapper and rpcbind daemons listen on a well-known port,
+<em class="emphasis">mountd</em> typically does not. Since:
+</p>
+<ul>
+<li>
+Firewalls typically filter based on ports.</p>
+</li>
+<li>
+Firewalls typically block all incoming UDP traffic except for some
+DNS traffic to specific DNS servers.
+</p>
+</li>
+<li>
+Portmapper requests and responses often use UDP. </p>
+</li>
+</ul>
+<em class="emphasis">mountd</em> alone can frustrate your aim.</p>
+</li>
+<li>
+The NFS client then contacts the <em class="emphasis">mountd</em> daemon
+to get the root filehandle for the mounted filesystem.
+</p>
+</li>
+<li>
+The NFS client then contacts the portmapper or rpcbind daemon to find
+the port that the NFS server typically listens on. The NFS server is
+all but certainly listening on port 2049, so changing the firewall
+filters to allow requests to 2049 is not hard to do. But again we
+have the issue of the portmapper requests themselves going over UDP.
+</p>
+</li>
+<li>
+After the NFS client mounts the filesystem, if it does any file or
+record locking, the lock requests will require a consultation with
+the portmapper or rpcbind daemon to find the lock manager's
+port. Some lock managers listen on a fixed port, so this would seem
+to be a surmountable issue. However, the lock manager makes callbacks
+to the client's lock manager, and the source port of the
+callbacks is not fixed.
+</p>
+</li><li>
+Then there is the status monitor, which is also not on a fixed port.
+The status monitor is needed every time a client makes first contact
+with a lock manager, and also for recovery.
+</p>
+</li></ul>
+To deal with this, you can pass the following options to the
+<em class="emphasis">mount</em> command, the automounter map entry, or the
+<em class="emphasis">vfstab:</em>
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">mount commmand:</i>
+mount -o <tt class="userinput"><b>proto=tcp</b></tt>,<tt class="userinput"><b>public</b></tt> nfs.eisler.com:/export/home/mre /mre
+
+<i class="lineannotation">automounter auto_home entry:</i>
+mre -<tt class="userinput"><b>proto=tcp</b></tt>,<tt class="userinput"><b>public</b></tt> nfs.eisler.com:/export/home/&amp;
+
+<i class="lineannotation">vfstab entry:</i>
+nfs.eisler.com:/export/home/mre - /mre nfs - no <tt class="userinput"><b>proto=tcp</b></tt>,<tt class="userinput"><b>public</b></tt></pre></blockquote>
+
+The <em class="emphasis">proto=tcp</em> option forces the mount to use the
+TCP/IP protocol. Firewalls prefer to deal with TCP because it
+establishes state that the firewall can use to know if a TCP segment
+from the outside is a response from an external server, or a call
+from an external client. The former is not usually deemed risky,
+whereas the latter usually is.
+</p>
+
+The <em class="emphasis">public</em> option does the following:</p>
+
+<ul><li>
+Bypasses the portmapper entirely and always contacts the NFS server
+on port 2049 (or a different port if the <em class="emphasis">port=</em>
+option is specified to the <em class="emphasis">mount</em> command). It
+sends a NULL ping to the NFS Version 3 server first, and if that
+fails, tries the NFS Version 2 server next.
+</p>
+</li><li>
+Makes the NFS client contact the NFS server directory to get the
+initial filehandle. How is this possible? The NFS client sends a
+LOOKUP request using a null filehandle (the <em class="emphasis">public
+filehandle</em>) and a pathname to the server (in the preceding
+example, the pathname would be <em class="emphasis">/export/home)</em>.
+Null filehandles are extremely unlikely to map to a real file or
+directory, so this tells the server that understands public
+filehandles that this is really a mount request. The name is
+interpreted as a multicomponent place-name, with each component
+separated by slashes (/). A filehandle is returned from LOOKUP.
+</p>
+</li><li>
+Marks the NFS mounts with the <em class="emphasis">llock</em> option. This
+is an undocumented mount option that says to handle all locking
+requests for file on the NFS filesystem locally. This is somewhat
+dangerous in that if there is real contention for the filesystem from
+multiple NFS clients, file corruption can result. But as long as you
+know what you are doing (and you can share the filesystem to a single
+host, or share it read-only to be sure), this is safe to do.
+</p>
+</li></ul>
+If your firewall uses Network Address Translation,
+which<a name="INDEX-1799" /> translates private IP addresses behind the
+firewall to public IP addresses in front of the firewall, you
+shouldn't have problems. However, if you are using any of the
+security schemes discussed in the section <a href="ch12_05.html#nfs2-CHP-12-SECT-5">Section 12.5, "Stronger security for NFS"</a>, be advised that they are designed for
+Intranets, and require collateral network services like a directory
+service (NIS for example), or a key service (a Kerberos Key
+Distribution Center for example). So it is not likely you'll be
+able to use these schemes through a firewall until the LIPKEY scheme,
+discussed in <a href="ch12_05.html#nfs2-CHP-12-SECT-5.7">Section 12.5.7, "NFS security futures"</a>, becomes available.
+</p>
+
+Some NFS servers require the <em class="emphasis">public</em> option in
+the <em class="emphasis">dfstab</em> or the equivalent when exporting the
+filesystem in order for the server to accept the public filehandle.
+This is not the case for Solaris 8 NFS servers.
+</p>
+
+What about allowing NFS clients from the greater Internet to access
+NFS servers located behind your firewall? This a reasonable thing to
+do as well, provided you take some care. The NFS clients will be
+required to mount the servers' filesystems with the
+<em class="emphasis">public</em> option. You will then configure your
+firewall to allow TCP connections to originate from outside your
+Intranet to a specific list of NFS servers behind the firewall.
+Unless Network Address Translation gets in the way, you'll want
+to use the <em class="emphasis">rw=</em> or <em class="emphasis">ro=</em>
+options to export the filesystems only to specific NFS clients
+outside your Intranet. Of course, you should export with the
+<em class="emphasis">nosuid</em> option, too.
+</p>
+
+If you are going to use NFS firewalls to access critical data, be
+<a name="INDEX-1800" />
+<a name="INDEX-1801" />
+<a name="INDEX-1802" />sure to
+read <a href="ch12_05.html#nfs2-CHP-12-SECT-5.3">Section 12.5.3, "NFS and IPSec"</a> later in this
+chapter.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-4.8" /><div class="sect2">
+<h3 class="sect2">12.4.8. Access control lists</h3>
+
+Some NFS servers exist in an operating environment <a name="INDEX-1803" /> <a name="INDEX-1804" />that
+supports Access Control Lists (ACLs). An ACL extends the basic set of
+read, write, execute permissions beyond those of file owner, group
+owner, and other. Let's say we have a set of users called
+<em class="emphasis">linus</em>, <em class="emphasis">charlie</em>,
+<em class="emphasis">lucy</em>, and <em class="emphasis">sally</em>, and these
+users comprise the group <em class="emphasis">peanuts</em>. Suppose
+<em class="emphasis">lucy</em> owns a file called
+<em class="emphasis">blockhead</em>, with group ownership assigned to
+<em class="emphasis">peanuts</em>. The permissions of this file are 0660
+(in octal). Thus <em class="emphasis">lucy</em> can read and write to the
+file, as can all the members of her group. However,
+<em class="emphasis">lucy</em> decides she doesn't want
+<em class="emphasis">charlie</em> to read the file, but still wants to
+allow the other <em class="emphasis">peanuts</em> group members to access
+the file. What <em class="emphasis">lucy</em> can do is change the
+permissions to 0600, and then create an ACL that explicitly lists
+only <em class="emphasis">linus</em> and <em class="emphasis">sally</em> as
+being authorized to read and write the file, in addition to herself.
+Most Unix systems, including Solaris 2.5 and higher, support a draft
+standard of ACLs from the POSIX standards body. Under Solaris,
+<em class="emphasis">lucy</em> would prevent <em class="emphasis">charlie</em>
+from accessing her file by doing:
+</p>
+
+<blockquote><pre class="code">% chmod 0600 blockhead
+% setfacl -m mask:rw-,user:linus:rw-,user:sally:rw- blockhead</pre></blockquote>
+
+To understand what <em class="emphasis">setfacl</em> did, let's read
+back the ACL for <em class="emphasis">blockhead</em>:
+</p>
+
+<blockquote><pre class="code">% getfacl blockhead
+
+# file: blockhead
+# owner: lucy
+# group: peanuts
+user::rw-
+user:linus:rw-             #effective:rw-
+user:sally:rw-             #effective:rw-
+group::---                 #effective:---
+mask:rw-
+other:---</pre></blockquote>
+
+The <em class="emphasis">user:</em> entries for <em class="emphasis">sally</em>
+and <em class="emphasis">linus</em> correspond to the
+<em class="emphasis">rw</em> permissions <em class="emphasis">lucy</em>
+requested. The <em class="emphasis">user::</em> entry simply points out
+that the owner of the file, <em class="emphasis">lucy</em> has
+<em class="emphasis">rw</em> permissions. The <em class="emphasis">group::</em>
+entry simply says that the group owner, <em class="emphasis">peanuts</em>,
+has no access. The <em class="emphasis">mask:</em> entry says what the
+maximum permissions are for any users (other than the file owner) and
+groups. If <em class="emphasis">lucy</em> had not included mask
+permissions in the <em class="emphasis">setfacl</em> command, then
+<em class="emphasis">linus</em> and <em class="emphasis">sally</em> would be
+denied access. The <em class="emphasis">getfacl</em> command would instead
+have shown:
+</p>
+
+<blockquote><pre class="code">% getfacl blockhead
+
+# file: blockhead
+# owner: lucy
+# group: peanuts
+user::rw-
+user:linus:rw-             #effective:<tt class="userinput"><b>---</b></tt>
+user:sally:rw-             #effective:<tt class="userinput"><b>---</b></tt>
+group::---                 #effective:<tt class="userinput"><b>---</b></tt>
+mask:---
+other:---</pre></blockquote>
+
+Note the difference from the two sets of <em class="emphasis">getfacl</em>
+output: the effective permissions granted to
+<em class="emphasis">linus</em> and <em class="emphasis">sally</em>.
+</p>
+
+Once you have the ACL on a file the way you want it, you can take the
+output of <em class="emphasis">getfacl</em> on one file and apply it to
+another file:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>touch patty</b></tt>
+% <tt class="userinput"><b>getfacl blockhead | setfacl -f /dev/stdin patty</b></tt>
+% <tt class="userinput"><b>getfacl patty</b></tt>
+# file: patty
+# owner: lucy
+# group: peanuts
+user::rw-
+user:linus:rw-             #effective:rw-
+user:sally:rw-             #effective:rw-
+group::---                 #effective:---
+mask:rw-
+other:---</pre></blockquote>
+
+It would be hard to disagree if you think this is a pretty arcane way
+to accomplish something that should be fairly simple. Nonetheless,
+ACLs can be leveraged to solve the "too many groups"
+problem described earlier in this chapter in <a href="ch12_04.html#nfs2-CHP-12-SECT-4.1">Section 12.4.1, "RPC security"</a>. Rather than put users into lots of
+groups, you can put lots of users into ACLs. The previous example
+showed how to copy an ACL from one file to another. You can also set
+a default ACL on a directory, such that any files or directories
+created under the top-level directory are inherited. Any files or
+directories created in a subdirectory inherit the default ACL. It is
+easier to hand edit a file containing the ACL description than to
+create one on the command line. User <em class="emphasis">lucy</em>
+creates the following file:
+</p>
+
+<blockquote><pre class="code">user::rwx
+user:linus:rwx
+user:sally:rwx
+group::---
+mask:rwx
+other:---
+default:user::rwx
+default:user:linus:rwx
+default:user:sally:rwx
+default:group::---
+default:mask:rwx
+default:other:---</pre></blockquote>
+
+It is the <em class="emphasis">default:</em> entries that result in
+inherited ACLs. The reason why we add execution permissions is so
+that directories have search permissions, i.e., so
+<em class="emphasis">lucy</em> and her cohorts can change their current
+working directories to her protected directories.
+</p>
+
+Once you've got default ACLs set up for various groups of
+users, you then apply it to each top-level directory that you create:
+</p>
+
+<blockquote><pre class="code">% mkdir lucystuff
+% setfacl -f /home/lucy/acl.default lucystuff</pre></blockquote>
+
+Note that you cannot apply an ACL file with
+<em class="emphasis">default:</em> entries in it to nondirectories.
+You'll have to create another file without the
+<em class="emphasis">default:</em> entries to use <em class="emphasis">setfacl -f</em>
+on nondirectories:
+</p>
+
+<blockquote><pre class="code">% grep -v '^default:' | /home/lucy/acl.default &gt; /home/lucy/acl.files</pre></blockquote>
+
+The preceding example strips out the <em class="emphasis">default:</em>
+entries. However it leaves the executable bit on in the entries:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cat /home/lucy/acl.files</b></tt>
+user::rwx
+user:linus:rwx
+user:sally:rwx
+group::---
+mask:rwx
+other:---</pre></blockquote>
+
+This might not be desirable for setting an ACL on existing regular
+files that don't have the executable bit. So we create a third
+ACL file:
+</p>
+
+<blockquote><pre class="code">%  <tt class="userinput"><b>sed 's/x$/-/' /home/lucy/acl.files | sed 's/^mask.*$/mask:rwx/' \</b></tt>
+<tt class="userinput"><b>   &gt; /home/lucy/acl.noxfiles</b></tt></pre></blockquote>
+
+This first turns off every execute permission bit, but then sets the
+mask to allow execute permission should we later decide to enable
+execute permission on a file:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cat /home/lucy/acl.noxfiles</b></tt>
+user::rw-
+user:linus:rw-
+user:sally:rw-
+group::---
+mask:rwx
+other:---</pre></blockquote>
+
+With an ACL file with <em class="emphasis">default:</em> entries, and the
+two ACL files without <em class="emphasis">default:</em> entries,
+<em class="emphasis">lucy</em> can add protection to existing trees of
+files. In the following example, <em class="emphasis">oldstuff</em> is an
+existing directory containing a hierarchy of files and
+subdirectories:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">fix the directories:</i>
+% find oldstuff -type d -exec setfacl -f /home/lucy/acl.default {} \;
+
+<i class="lineannotation">fix the nonexecutable files:</i>
+% find oldstuff ! -type d ! ( -perm -u=x -o -perm -g=x -o -perm -o=x ) \
+  -exec setfacl -f /home/lucy/acl.noxfiles {} \;
+
+<i class="lineannotation">fix the executable files:</i>
+% find oldstuff ! -type d ( -perm -u=x -o -perm -g=x -o -perm -o=x ) \
+  -exec setfacl -f /home/lucy/acl.noxfiles {} \;</pre></blockquote>
+
+In addition to solving the "too many groups in NFS"
+problem, another advantage of ACLs versus groups is potential
+decentralization. As the system administrator, you are called on
+constantly to add groups, or to modify existing groups (add or delete
+users from groups). With ACLs, users can effectively administer their
+own groups. It is a shame that constructing ACLs is so arcane,
+because it effectively eliminates a way to decentralize a security
+access control for logical groups of users. You might want to create
+template ACL files and scripts for setting them to make it easier for
+your users to use them as a way to wean them off of groups. If you
+succeed, you'll reduce your workload and deal with fewer issues
+of "too many groups in NFS."
+</p>
+
+
+<a name="ch12-8-fm2xml" /><blockquote><b>TIP: </b> 
+In Solaris, ACLs are not preserved when copying a file from the local
+<em class="emphasis">ufs</em> filesystem to a file in the
+<em class="emphasis">tmpfs</em> (<em class="emphasis">/tmp</em>) filesystem.
+This can be a problem if you later copy the file back from
+<em class="emphasis">/tmp</em> to a <em class="emphasis">ufs</em> filesystem.
+Also, in Solaris, ACLs are not, by default, preserved when generating
+tar or cpio archives. You need to use the -<em class="emphasis">p</em>
+option to <em class="emphasis">tar</em> to preserve ACLs when creating and
+restoring a <em class="emphasis">tar</em> archive. You need to use the
+<em class="emphasis">-P</em> option to <em class="emphasis">cpio</em> when
+creating and restoring <em class="emphasis">cpio</em> archives. Be aware
+that non-Solaris systems probably will not be able to read archives
+with ACLs in them.
+</p>
+</blockquote>
+
+<a name="nfs2-CHP-12-SECT-4.8.1" /><div class="sect3">
+<h3 class="sect3">12.4.8.1. ACLs that deny access</h3>
+
+We showed how we can prevent <em class="emphasis">charlie</em> from
+<a name="INDEX-1805" />getting access to
+<em class="emphasis">lucy's</em> files by creating an ACL that
+included only <em class="emphasis">linus</em> and
+<em class="emphasis">sally</em>. Another way <em class="emphasis">lucy</em>
+could have denied <em class="emphasis">charlie</em> files is to set a deny
+entry for charlie:
+</p>
+
+<blockquote><pre class="code">% setfacl -m user:charlie:--- blockhead </pre></blockquote>
+
+No matter what the group ownership of <em class="emphasis">blockhead</em>
+is, and no matter what the other permissions on
+<em class="emphasis">blockhead</em> are, <em class="emphasis">charlie</em> will
+not be able read or write the file.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-4.8.2" /><div class="sect3">
+<h3 class="sect3">12.4.8.2. ACLs and NFS</h3>
+
+ACLs are ultimately enforced by <a name="INDEX-1806" /> <a name="INDEX-1807" />the local filesystem on the NFS server.
+However, the NFS protocol has no way to pass ACLs back to the client.
+This is a problem for NFS Version 2 clients, because they use the
+nine basic permissions bits (read, write, execute for user, group,
+and other) and the file owner and group to decide if a user should
+have access to the file. For this reason, the Solaris NFS Version 2
+server reports the minimum possible permissions in the nine
+permission bits whenever an ACL is set on a file. For example,
+let's suppose the permissions on a file are 0666 or
+<em class="emphasis">rw-rw-rw-</em>. Now let's say an ACL is added
+for user <em class="emphasis">charlie</em> that gives him permissions of
+<em class="emphasis"> -- -</em>, i.e., he is denied access. When an ACL
+is set on a file, the Solaris NFS Version 2 server will see that
+there is a user that has no access to the file. As a result, it will
+report to most NFS Version 2 clients permissions of 0600, thereby
+denying nearly everyone (those accessing from NFS clients) but
+<em class="emphasis">lucy</em> access to the file. If it did not, then
+what would happen is that the NFS client would see permissions of
+0666 and allow <em class="emphasis">charlie</em> to access the file.
+Usually <em class="emphasis">charlie</em>'s application would
+succeed in opening the file, but attempts to read or write the file
+would fail in odd ways. This isn't desirable. Even less
+desirable is that if the file were cached on the NFS client,
+<em class="emphasis">charlie</em> would be allowed to read the
+file.<a href="#FOOTNOTE-21">[21]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-21" />[21]A similar security issue occurs when the
+superuser accesses a file owned by a user with permissions 0600. If
+the superuser is mapped to nobody on the server, then the superuser
+shouldn't be allowed to access the file. But if the file is
+cached, the superuser can read it. This is an issue only with NFS
+Version 2, not Version 3.</p> </blockquote>
+
+This is not the case for the NFS Version 3 server though. With the
+NFS Version 3 protocol, there is an <em class="emphasis">ACCESS</em>
+operation that the client sends to the server to see if the indicated
+user has access to the file. Thus the exact, unmapped permissions are
+rendered back to the NFS Version 3 client.
+</p>
+
+We said that the Solaris NFS server will report to most NFS Version 2
+clients permissions of 0600. However, starting with Solaris 2.5 and
+higher, a side band protocol to NFS was added, such that if the
+protocol exists, the client can not only get the exact permissions,
+but also use the sideband protocol's ACCESS procedure for
+allowing the server to permissions the access checks. This then
+prevents <em class="emphasis">charlie</em> or the superuser from gaining
+unauthorized access to files.
+</p>
+
+What if you have NFS clients that are not running Solaris 2.5 or
+higher, or are not running Solaris at all? In that situation you have
+two choices: live with the fact that some users will be denied access
+due to the minimal permissions behavior, or you can use the
+<em class="emphasis">aclok</em> option of the Solaris
+<em class="emphasis">share</em> command to allow maximal access. If the
+filesystem is shared with <em class="emphasis">aclok</em>, then if anyone
+has read access to the files, then everyone does. So,
+<em class="emphasis">charlie</em> would then be allowed to access file
+<em class="emphasis">blockhead</em>.
+</p>
+
+Another issue with NFS and ACLs is that the NFS protocol has no way
+to set or retrieve ACLs, i.e., there is no protocol support for the
+<em class="emphasis">setfacl</em> or <em class="emphasis">getfacl</em> command.
+Once again, the sideband protocol in Solaris 2.5 and higher comes to
+the rescue. The sideband protocol allows ACLs to be set and
+retrieved, so <em class="emphasis">setfacl</em> and
+<em class="emphasis">getfacl</em> work <a name="INDEX-1808" /> <a name="INDEX-1809" />across NFS.
+</p>
+
+
+<a name="ch12-12-fm2xml" /><blockquote><b>TIP: </b> 
+IBM's AIX and Compaq's Tru64 Unix have sideband ACL
+protocols for manipulating ACLs over NFS. Unfortunately, none of the
+three protocols are compatible with each other.
+</p>
+</blockquote>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-4.8.3" /><div class="sect3">
+<h3 class="sect3">12.4.8.3. Are ACLs worth it?</h3>
+
+With all the arcane details, caveats, and limitations we've
+seen, you as the system administrator may decide that ACLs are more
+pain than benefit. Nonetheless, ACLs are a feature that are available
+to users. Even if you don't want to actively support them, your
+users might attempt to use them, so it is a good idea to
+become<a name="INDEX-1810" />
+<a name="INDEX-1811" /> familiar
+<a name="INDEX-1812" />
+<a name="INDEX-1813" />with
+ACLs.
+</p>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.3. Password and NIS security</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.5. Stronger security for NFS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

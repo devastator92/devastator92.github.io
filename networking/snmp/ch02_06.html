@@ -1,0 +1,933 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:47 GMT -->
+<head><title>SNMP Operations (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">2.6. SNMP Operations</h2>
+
+<a name="INDEX-300" /> <a name="INDEX-301" /><a name="INDEX-302" /><a name="INDEX-303" />We've discussed how SNMP
+organizes information, but we've left out how we actually go
+about gathering management information. Now, we're going to
+take a look under the hood to see how SNMP does its thing.
+</p>
+
+<a name="INDEX-304" /><a name="INDEX-305" />The <em class="firstterm">Protocol
+Data Unit</em> (PDU) is the message format that managers and
+agents use to send and receive information. There is a standard PDU
+format for each of the following SNMP operations:
+</p>
+
+<ul><li>
+<i class="command">get</i></p>
+</li><li>
+<i class="command">get-next</i></p>
+</li><li>
+<i class="command">get-bulk</i> (SNMPv2 and SNMPv3)</p>
+</li><li>
+<i class="command">set</i></p>
+</li><li>
+<i class="command">get-response</i></p>
+</li><li>
+<i class="command">trap</i></p>
+</li><li>
+<i class="command">notification</i> (SNMPv2 and SNMPv3)</p>
+</li><li>
+<i class="command">inform</i> (SNMPv2 and SNMPv3)</p>
+</li><li>
+<i class="command">report</i> (SNMPv2 and SNMPv3)</p>
+</li></ul>
+Let's take a look at each of these operations.</p>
+
+<a name="enettdg-CHP-2-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">2.6.1. The get Operation</h3>
+
+<a name="INDEX-306" /><a name="INDEX-307" /><a name="INDEX-308" /><a name="INDEX-309" /><a name="INDEX-310" /> <a name="INDEX-311" />
+<a name="INDEX-312" />The <em class="emphasis">get</em>
+request is initiated by the NMS, which sends the request to the
+agent. The agent receives the request and processes it to best of its
+ability. Some devices that are under heavy load, such as routers, may
+not be able to respond to the request and will have to drop it. If
+the agent is successful in gathering the requested information, it
+sends a <i class="command">get-response</i> back to the NMS, where it is
+processed. This process is illustrated in <a href="ch02_06.html#enettdg-CHP-2-FIG-5">Figure 2-5</a>. 
+</p>
+
+<a name="enettdg-CHP-2-FIG-5" /><div class="figure"><img height="123" alt="Figure 2-5" src="figs/snmp_0205.gif" width="467" /></div><h4 class="objtitle">Figure 2-5.  get request sequence</h4>
+
+How did the agent know what the NMS was looking for? One of the items
+in the <i class="command">get</i> request is a <em class="firstterm">variable
+binding</em>. A variable binding, or varbind, is a list of MIB
+objects that allows a request's recipient to see what the
+originator wants to know. Variable bindings can be thought of as
+<em class="emphasis">OID=value</em> pairs that make it easy for the
+originator (the NMS, in this case) to pick out the information it
+needs when the recipient fills the request and sends back a response.
+Let's look at this operation in action:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget cisco.ora.com public .1.3.6.1.2.1.1.6.0</b></tt>
+<a name="INDEX-313" />
+system.sysLocation.0 = ""</pre></blockquote>
+
+
+
+<a name="ch02-15-fm2xml" /><blockquote><b>TIP: </b> 
+All the Unix commands
+presented in this chapter come from the Net-SNMP agent package
+(formerly the UCD-SNMP project), a freely available Unix and Windows
+NT agent. <a href="ch05_01.html">Chapter 5, "Network-Management Software"</a> provides a URL from which you
+can download the package. The commands in this package are summarized
+in <a href="appc_01.html">Appendix C, "Net-SNMP Tools"</a>.
+</p>
+</blockquote>
+
+<a name="INDEX-314" /><a name="INDEX-315" /><a name="INDEX-316" /><a name="INDEX-317" />Several things are going on in this
+example. First, we're running a command on a Unix host. The
+command is called <i class="command">snmpget</i>. Its main job is to
+facilitate the gathering of management data using a
+<em class="emphasis">get</em> request. We've given it three
+arguments on the command line: the name of the device we would like
+to query (<em class="emphasis">cisco.ora.com</em>), the read-only
+community string (<em class="emphasis">public</em>), and the OID we would
+like gathered (<em class="emphasis">.1.3.6.1.2.1.1.6.0</em>). If we look
+back at <a href="ch02_05.html#enettdg-CHP-2-TABLE-5">Table 2-5</a> we see that
+<em class="emphasis">1.3.6.1.2.1.1</em> is the <em class="emphasis">system</em>
+group, but there are two more integers at the end of the OID:
+<em class="emphasis">.6</em> and <em class="emphasis">.0</em>. The
+<em class="emphasis">.6</em> is actually the MIB variable that we wish to
+query; its human-readable name is <em class="emphasis">sysLocation</em>.
+In this case, we would like to see what the system location is set to
+on the Cisco router. As you can see by the response
+(<tt class="literal">system.sysLocation.0</tt> <tt class="literal">=</tt>
+<tt class="literal">""</tt>), the system location on this router currently
+is not set to anything. Also note that the response from
+<i class="command">snmpget</i> is in variable binding format,
+<em class="emphasis">OID=value</em>.
+</p>
+
+<a name="INDEX-318" /><a name="INDEX-319" /><a name="INDEX-320" /><a name="INDEX-321" /><a name="INDEX-322" />There is one more thing to look
+at. Why does the MIB variable have a <em class="emphasis">.0</em> tacked
+on the end? In SNMP, MIB objects are defined by the convention
+<em class="emphasis">x.y</em>, where
+<em class="emphasis">x</em> is the actual OID of the managed object (in
+our example, <em class="emphasis">1.3.6.1.2.1.1.6</em> ) and
+<em class="emphasis">y</em> is the instance identifier. For scalar objects
+(that is, objects that aren't defined as a row in a table)
+<em class="emphasis">y</em> is always 0. In the case of a table, the
+instance identifier lets you select a specific row of the table; 1 is
+the first row, 2 is the second row, etc. For example, consider the
+<em class="emphasis">ifTable</em> object we looked at earlier in this
+chapter. When looking up values in the <em class="emphasis">ifTable</em>,
+we would use a nonzero instance identifier to select a particular row
+<a name="INDEX-323" /><a name="INDEX-324" /><a name="INDEX-325" />
+in the table (in this case, a particular network interface).
+</p>
+
+
+<a name="ch02-17-fm2xml" /><blockquote><b>TIP: </b> 
+Graphical NMS applications, which
+include most commercial packages, do not use command-line programs to
+retrieve management information. We use these commands to give you a
+feel for how the retrieval commands work and what they typically
+return. The information a graphical NMS retrieves and its retrieval
+process are identical to these command-line programs; the NMS just
+lets you formulate queries and displays the results using a more
+convenient GUI.
+</p>
+</blockquote>
+
+The <i class="command">get</i>command is useful for
+retrieving a single MIB object at a time. Trying to manage anything
+in this manner can be a waste of time, though. This is where the
+<i class="command">get-next</i> command comes in. It allows you to
+retrieve more than one object from a device, over a period of time.
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">2.6.2. The get-next Operation</h3>
+
+<a name="INDEX-326" /><a name="INDEX-327" /><a name="INDEX-328" /><a name="INDEX-329" />The <i class="command">get-next</i>
+operation lets you issue a sequence of commands to retrieve a group
+of values from a MIB. In other words, for each MIB object we want to
+retrieve, a separate <i class="command">get-next</i> request and
+<i class="command">get-response</i> are generated. The
+<i class="command">get-next</i> command traverses a subtree in
+lexicographic order. Since an OID is a sequence of integers,
+it's easy for an agent to start at the root of its SMI object
+tree and work its way down until it finds the OID it is looking for.
+When the NMS receives a response from the agent for the
+<i class="command">get-next</i> command it just issued, it issues another
+<i class="command">get-next</i> command. It keeps doing this until the
+agent returns an error, signifying that the end of the MIB has been
+reached and there are no more objects left to get.
+</p>
+
+If we look at another example, we can see this behavior in action.
+This time we'll use a command called
+<i class="command">snmpwalk</i>. This command simply facilitates the
+<i class="command">get-next </i>procedure for us. It's invoked just
+like the <i class="command">snmpget</i> command, except this time we specify which branch to
+start at (in this case, the <em class="emphasis">system</em> group):
+</p>
+
+<blockquote><pre class="code">$<tt class="userinput"><b>snmpwalk cisco.ora.com public system</b></tt>
+system.sysDescr.0 = "Cisco Internetwork Operating System Software 
+..IOS (tm) 2500 Software (C2500-I-L), Version 11.2(5), RELEASE 
+SOFTWARE (fc1)..Copyright (c) 1986-1997 by cisco Systems, Inc...
+Compiled Mon 31-Mar-97 19:53 by ckralik"
+system.sysObjectID.0 = OID: enterprises.9.1.19
+system.sysUpTime.0 = Timeticks: (27210723) 3 days, 3:35:07.23
+system.sysContact.0 = ""
+system.sysName.0 = "cisco.ora.com"
+system.sysLocation.0 = ""
+system.sysServices.0 = 6</pre></blockquote>
+
+The <i class="command">get-next</i> sequence returns seven MIB variables.
+Each of these objects is part of the <em class="emphasis">system</em>
+group as it's defined in RFC 1213. We see a system object ID,
+the amount of time the system has been up, the contact person, etc.
+</p>
+
+Given that you've just looked up some object, how does
+<i class="command">get-next</i> figure out which object to look up next?
+<i class="command">get-next</i> is based on the concept of the
+lexicographic ordering of the MIB's object tree. This order is
+made much simpler because every node in the tree is assigned a
+number. To understand what this means, let's start at the root
+of the tree and walk down to the <em class="emphasis">system</em> node.
+</p>
+
+<a name="INDEX-330" />To get to the <em class="emphasis">system</em>
+group (OID <em class="emphasis">1.3.6.1.2.1.1</em>), we start at the root
+of the object tree and work our way down. <a href="ch02_06.html#enettdg-CHP-2-FIG-6">Figure 2-6</a> shows the logical progression from the root of
+the tree all the way to the <em class="emphasis">system</em> group. At
+each node in the tree, we visit the lowest-numbered branch. Thus,
+when we're at the root node, we start by visiting
+<em class="emphasis">ccitt</em>. This node has no nodes underneath it, so
+we move to the <em class="emphasis">iso</em> node. Since
+<em class="emphasis">iso</em> does have a child we move to that node,
+<em class="emphasis">org</em>. The process continues until we reach the
+<em class="emphasis">system</em> node. Since each branch is made up of
+ascending integers (<em class="emphasis">ccitt(0) iso(1) join(2)</em>, for
+example), the agent has no problem traversing this tree structure all
+the way down to the <em class="emphasis">system(1)</em> group. If we were
+to continue this walk, we'd proceed to
+<em class="emphasis">system.1</em>
+(<em class="emphasis">system.sysLocation</em>),
+<em class="emphasis">system.2</em>, and the other objects in the
+<em class="emphasis">system</em> group. Next, we'd go to
+<em class="emphasis">interfaces(2)</em>, and so on.
+</p>
+
+<a name="enettdg-CHP-2-FIG-6" /><div class="figure"><img height="417" alt="Figure 2-6" src="figs/snmp_0206.gif" width="445" /></div><h4 class="objtitle">Figure 2-6. Walking the MIB tree</h4>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">2.6.3. The get-bulk Operation</h3>
+
+<a name="INDEX-331" /><a name="INDEX-332" /><a name="INDEX-333" /><a name="INDEX-334" /><a name="INDEX-335" /><a name="INDEX-336" />SNMPv2 defines the
+<i class="command">get-bulk</i> operation, which allows a management
+application to retrieve a large section of a table at once. The
+standard <i class="command">get</i> operation can attempt to retrieve
+more than one MIB object at once, but message sizes are limited by
+the agent's capabilities. If the agent can't return all
+the requested responses, it returns an error message with no data.
+The <i class="command">get-bulk</i> operation, on the other hand, tells
+the agent to send as much of the response back as it can. This means
+that incomplete responses are possible. Two fields must be set when
+issuing a <i class="command">get-bulk</i> command: nonrepeaters and
+max-repetitions. Nonrepeaters tells the <i class="command">get-bulk</i>
+command that the first <em class="emphasis">N</em> objects can be
+retrieved with a simple <i class="command">get-next</i> operation.
+Max-repetitions tells the <i class="command">get-bulk</i> command to
+attempt up to <em class="emphasis">M</em> <i class="command">get-next</i>
+operations to retrieve the remaining objects. <a href="ch02_06.html#enettdg-CHP-2-FIG-7">Figure 2-7</a> shows the <i class="command">get-bulk</i> command
+sequence.
+</p>
+
+<a name="enettdg-CHP-2-FIG-7" /><div class="figure"><img height="123" alt="Figure 2-7" src="figs/snmp_0207.gif" width="467" /></div><h4 class="objtitle">Figure 2-7.  get-bulk request sequence</h4>
+
+<a name="INDEX-337" /><a name="INDEX-338" />In <a href="ch02_06.html#enettdg-CHP-2-FIG-7">Figure 2-7</a>,
+we're requesting three bindings: <em class="emphasis">sysDescr</em>,
+<em class="emphasis">ifInOctets</em>, and
+<em class="emphasis">ifOutOctets</em>. The total number of variable
+bindings that we've requested is given by the formula
+<em class="emphasis">N + (M * R)</em>, where <em class="emphasis">N</em> is the
+number of nonrepeaters (i.e., scalar objects in the request -- in
+this case 1, because <em class="emphasis">sysDescr</em> is the only scalar
+object), <em class="emphasis">M</em> is max-repetitions (in this case,
+we've set it arbitrarily to 3), and <em class="emphasis">R</em> is
+the number of nonscalar objects in the request (in this case 2,
+because <em class="emphasis">ifInOctets</em> and
+<em class="emphasis">ifOutOctets</em> are both nonscalar). Plugging in the
+numbers from this example, we get 1 + (3 * 2) = 7, which is the total
+number of variable bindings that can be returned by this
+<i class="command">get-bulk</i> request.
+</p>
+
+<a name="INDEX-339" />The Net-SNMP package comes with a
+command for issuing <i class="command">get-bulk</i> queries. If we
+execute this command using all the parameters previously discussed,
+it will look like the following:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpbulkget -v2c -B 1 3 linux.ora.com public sysDescr ifInOctets ifOutOctets</b></tt>
+system.sysDescr.0 = "Linux linux 2.2.5-15 #3 Thu May 27 19:33:18 EDT 1999 i686"
+interfaces.ifTable.ifEntry.ifInOctets.1 = 70840
+interfaces.ifTable.ifEntry.ifOutOctets.1 = 70840
+interfaces.ifTable.ifEntry.ifInOctets.2 = 143548020
+interfaces.ifTable.ifEntry.ifOutOctets.2 = 111725152
+interfaces.ifTable.ifEntry.ifInOctets.3 = 0
+interfaces.ifTable.ifEntry.ifOutOctets.3 = 0</pre></blockquote>
+
+<a name="INDEX-340" /><a name="INDEX-341" />Since <i class="command">get-bulk</i> is an
+SNMPv2 command, you have to tell <i class="command">snmpgetbulk</i> to
+use an SNMPv2 PDU with the <i class="command">-v2c</i> option. The
+nonrepeaters and max-repetitions are set with the <i class="command">-B 1
+3</i> option. This sets nonrepeaters to 1 and max-repetitions
+to 3. Notice that the command returned seven variable bindings: one
+for <em class="emphasis">sysDescr</em> and three each for
+<em class="emphasis">ifInOctets</em> and <em class="emphasis">ifOutOctets</em>.
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.4" /><div class="sect2">
+<h3 class="sect2">2.6.4. The set Operation</h3>
+
+<a name="INDEX-342" /><a name="INDEX-343" /><a name="INDEX-344" />The <em class="emphasis">set</em> command
+is used to change the value of a managed object or to create a new
+row in a table. Objects that are defined in the MIB as read-write or
+write-only can be altered or created using this command. It is
+possible for an NMS to set more than one object at a time.
+</p>
+
+<a name="enettdg-CHP-2-FIG-8" /><div class="figure"><img height="170" alt="Figure 2-8" src="figs/snmp_0208.gif" width="464" /></div><h4 class="objtitle">Figure 2-8.  set request sequence</h4>
+
+<a name="INDEX-345" /><a href="ch02_06.html#enettdg-CHP-2-FIG-8">Figure 2-8</a> shows the
+<i class="command">set</i> request sequence. It's similar to the
+other commands we've seen so far, but it is actually changing
+something in the device's configuration, as opposed to just
+retrieving a response to a query. If we look at an example of an
+actual <i class="command">set</i>, you will see the command take place.
+The following example queries the <em class="emphasis">sysLocation</em>
+variable, then sets it to a value:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget cisco.ora.com public system.sysLocation.0</b></tt>
+system.sysLocation.0 = ""
+$ <tt class="userinput"><b>snmpset cisco.ora.com private system.sysLocation.0 s "Atlanta, GA"</b></tt>
+system.sysLocation.0 = "Atlanta, GA"
+$ <tt class="userinput"><b>snmpget cisco.ora.com public system.sysLocation.0</b></tt>
+system.sysLocation.0 = "Atlanta, GA"</pre></blockquote>
+
+<a name="INDEX-346" /><a name="INDEX-347" /><a name="INDEX-348" />The first command is the familiar
+<i class="command">get</i> command, which displays the current value of
+<em class="emphasis">sysLocation</em>. In one of the previous examples we
+saw that it was undefined; this is still the case. The second command
+is <i class="command">snmpset</i>. For this command, we supply the
+hostname, the read-write community string
+(<em class="emphasis">private</em>), and the variable we want to set
+(<em class="emphasis">system.sysLocation.0</em>), together with its new
+value (<tt class="literal">s</tt> <tt class="literal">"Atlanta,</tt>
+<tt class="literal">GA"</tt>). The <tt class="literal">s</tt> tells
+<i class="command">snmpset</i> that we want to set<em class="citetitle">
+</em>the value of <em class="emphasis">sysLocation</em> to a
+string; and <tt class="literal">"Atlanta,</tt> <tt class="literal">GA"</tt> is
+the new value itself. How do we know that
+<em class="emphasis">sysLocation</em> requires a string value? The
+definition of <em class="emphasis">sysLocation</em> in RFC 1213 looks like
+this:
+</p>
+
+<blockquote><pre class="code">sysLocation OBJECT-TYPE
+    SYNTAX  DisplayString (SIZE (0..255))
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "The physical location of this node (e.g., 'telephone closet,
+         3rd floor')."
+    ::= { system 6 }</pre></blockquote>
+
+<a name="INDEX-349" />The <tt class="literal">SYNTAX</tt> for
+<em class="emphasis">sysLocation</em> is <tt class="literal">DisplayString</tt>
+<tt class="literal">(SIZE</tt> <tt class="literal">(0..255))</tt>, which means
+that it's a string with a maximum length of 255 characters. The
+<i class="command">snmpset</i> command succeeds and reports the new value
+of <em class="emphasis">sysLocation</em>. But just to confirm, we run a
+final <i class="command">snmpget</i>, which tells us that the
+<i class="command">set</i> actually took effect. It is possible to set
+more than one object at a time, but if any of the sets fail, they all
+fail (i.e., no values are changed). This behavior is intended.
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.5" /><div class="sect2">
+<h3 class="sect2">2.6.5. get, get-next, get-bulk, and set Error Responses</h3>
+
+<a name="INDEX-350" /><a name="INDEX-351" /><a name="INDEX-352" />
+<a name="INDEX-353" /><a name="INDEX-354" /><a name="INDEX-355" /><a name="INDEX-356" />Error responses help you determine
+wether your <i class="command">get</i> or <i class="command">set</i> request
+was processed correctly by the agent. The <i class="command">get</i>,
+<i class="command">get-next</i>, and <i class="command">set</i> operations
+can return the error responses shown in <a href="ch02_06.html#enettdg-CHP-2-TABLE-6">Table 2-6</a>.
+The error status for each error is show in parentheses.
+</p>
+
+<a name="enettdg-CHP-2-TABLE-6" /><h4 class="objtitle">Table 2-6. SNMPv1 Error Messages </h4><table border="1">
+
+
+
+<tr>
+<th>
+SNMPv1 Error Message</p>
+</th>
+<th>
+Description</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">noError(0)</pre></blockquote>
+</td>
+<td>
+There was no problem performing the request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">tooBig(1)</pre></blockquote>
+</td>
+<td>
+The response to your request was too big to fit into one response.</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">noSuchName(2)</pre></blockquote>
+</td>
+<td>
+<a name="INDEX-357" />An agent was asked to get or set an
+OID that it can't find; i.e., the OID doesn't exist.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">badValue(3)</pre></blockquote>
+</td>
+<td>
+A read-write or write-only object was set to an inconsistent value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">readOnly(4)</pre></blockquote>
+</td>
+<td>
+This error is generally not used. The <tt class="literal">noSuchName</tt>
+error is equivalent to this one.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">genErr(5)</pre></blockquote>
+</td>
+<td>
+This is a catch-all error. If an error occurs for which none of the
+previous messages is appropriate, a <tt class="literal">genError</tt> is
+issued.
+</p>
+</td>
+</tr>
+
+</table><p>
+
+The SNMPv1 error messages are not very robust. In an attempt to fix
+this problem, SNMPv2 defines additional error responses that are
+valid for <i class="command">get</i>, <i class="command">set</i>,
+<i class="command">get-next</i>, and <i class="command">get-bulk</i>
+operations, provided that both the agent and NMS support SNMPv2.
+These responses are listed in <a href="ch02_06.html#enettdg-CHP-2-TABLE-7">Table 2-7</a>.
+</p>
+
+<a name="enettdg-CHP-2-TABLE-7" /><h4 class="objtitle">Table 2-7. SNMPv2 Error Messages </h4><table border="1">
+
+
+
+<tr>
+<th>
+<a name="INDEX-358" />SNMPv2 Error Message
+</p>
+</th>
+<th>
+Description</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<a name="INDEX-359" /><blockquote><pre class="code">noAccess(6)</pre></blockquote>
+</td>
+<td>
+A <i class="command">set</i> to an inaccessible variable was attempted.
+This typically occurs when the variable has an
+<tt class="literal">ACCESS</tt> type of <tt class="literal">not-accessible</tt>.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">wrongType(7)</pre></blockquote>
+</td>
+<td>
+An object was set to a type that is different from its definition.
+This error will occur if you try to set an object that is of type
+<tt class="literal">INTEGER</tt> to a string, for example.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">wrongLength(8)</pre></blockquote>
+</td>
+<td>
+An object's value was set to something other than what it calls
+for. For instance, a string can be defined to have a maximum
+character size. This error occurs if you try to set a string object
+to a value that exceeds its maximum length.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<a name="INDEX-360" /><blockquote><pre class="code">wrongEncoding(9)</pre></blockquote>
+</td>
+<td>
+A <i class="command">set</i> operation was attempted using the wrong
+encoding for the object being set.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">wrongValue(10)</pre></blockquote>
+</td>
+<td>
+<a name="INDEX-361" />A variable was set to a value it
+doesn't understand. This can occur when a read-write is defined
+as an enumeration, and you try to set it to a value that is not one
+of the enumerated types.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<a name="INDEX-362" /><blockquote><pre class="code">noCreation(11)</pre></blockquote>
+</td>
+<td>
+You tried to set a nonexistent variable or create a variable that
+doesn't exist in the MIB.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">inconsistentValue</pre></blockquote>
+</td>
+<td>
+A MIB variable is in an inconsistent state, and is not accepting any
+<i class="command">set</i> requests.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">resourceUnavailable(13)</pre></blockquote>
+</td>
+<td>
+No system resources are available to perform a <i class="command">set</i>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">commitFailed(14)</pre></blockquote>
+</td>
+<td>
+This is a catch-all error for <i class="command">set</i> failures.</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">undoFailed(15)</pre></blockquote>
+</td>
+<td>
+A <i class="command">set</i> failed and the agent was unable to roll back
+all the previous <i class="command">set</i>s up until the point of
+failure.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<a name="INDEX-363" /><blockquote><pre class="code">authorizationError(16)</pre></blockquote>
+</td>
+<td>
+An SNMP command could not be authenticated; in other words, someone
+has supplied an incorrect community string.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">notWritable(17)</pre></blockquote>
+</td>
+<td>
+A variable will not accept a <i class="command">set</i>, even though it
+is supposed to.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">inconsistentName(18)</pre></blockquote>
+</td>
+<td>
+You attempted to set a variable, but that attempt failed because the
+variable was in some kind of inconsistent state.
+</p>
+</td>
+</tr>
+
+</table><p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.6" /><div class="sect2">
+<h3 class="sect2">2.6.6. SNMP Traps</h3>
+
+<a name="INDEX-364" /><a name="INDEX-365" />A trap
+is a way for an agent to tell the NMS that something bad has
+happened. In the <a href="ch01_03.html#enettdg-CHP-1-SECT-3">Section 1.3, "Managers and Agents"</a> of <a href="ch01_01.html">Chapter 1, "What Is SNMP?"</a> we explored the notion of traps at a general
+level; now we'll look at them in a bit more detail. <a href="ch02_06.html#enettdg-CHP-2-FIG-9">Figure 2-9</a> shows the trap-generation sequence.
+</p>
+
+<a name="enettdg-CHP-2-FIG-9" /><div class="figure"><img height="152" alt="Figure 2-9" src="figs/snmp_0209.gif" width="467" /></div><h4 class="objtitle">Figure 2-9.  Trap generation</h4>
+
+<a name="INDEX-366" /> <a name="INDEX-367" /><a name="INDEX-368" /><a name="INDEX-369" /><a name="INDEX-370" />The trap originates from the
+agent and is sent to the trap destination, as configured within the
+agent itself. The trap destination is typically the IP address of the
+NMS. No acknowledgment is sent from the NMS to the agent, so the
+agent has no way of knowing if the trap makes it to the NMS. Since
+SNMP uses UDP, and since traps are designed to report problems with
+your network, traps are especially prone to getting lost and not
+making it to their destinations. However, the fact that traps can get
+lost doesn't make them any less useful; in a well-planned
+environment, they are an integral part of network management.
+It's better for your equipment to try to tell you that
+something is wrong, even if the message may never reach you, than
+simply to give up and let you guess what happened. Here are a few
+situations that a trap might report:
+</p>
+
+<ul><li>
+A network interface on the device (where the agent is running) has
+gone down.
+</p>
+</li><li>
+A network interface on the device (where the agent is running) has
+come back up.
+</p>
+</li><li>
+An incoming call to a modem rack was unable to establish a connection
+to a modem.
+</p>
+</li><li>
+The fan on a switch or router has failed.</p>
+</li></ul>
+<a name="INDEX-371" /><a name="INDEX-372" /><a name="INDEX-373" /><a name="INDEX-374" />When an NMS receives a trap, it needs to
+know how to interpret it; that is, it needs to know what the trap
+means and how to interpret the information it carries. A trap is
+first identified by its generic trap number. There are seven generic
+trap numbers (0-6), shown in <a href="ch02_06.html#enettdg-CHP-2-TABLE-8">Table 2-8</a>. Generic
+trap 6 is a special catch-all category for
+"enterprise-specific" traps, which are traps defined by
+vendors or users that fall outside of the six generic trap
+categories. Enterprise-specific traps are further identified by an
+enterprise ID (i.e., an object ID somewhere in the
+<em class="emphasis">enterprises</em> branch of the MIB tree,
+<em class="emphasis">iso.org.dod.internet.private.enterprises</em>) and a
+specific trap number chosen by the enterprise that defined the trap.
+Thus, the object ID of an enterprise-specific trap is
+<em class="emphasis">enterprise-id.specific-trap-number</em>. For example,
+when Cisco defines special traps for its private MIBs, it places them
+all in its enterprise-specific MIB tree
+(<em class="emphasis">iso.org.dod.internet.private.enterprises.cisco</em>).
+As we'll see in <a href="ch10_01.html">Chapter 10, "Traps"</a>, you are
+free to define your own enterprise-specific traps; the only
+requirement is that you register your own enterprise number with
+IANA.
+</p>
+
+<a name="INDEX-375" />
+<a name="INDEX-376" /><a name="INDEX-377" />A trap is usually packed with
+information. As you'd expect, this information is in the form
+of MIB objects and their values; as mentioned earlier, these
+object-value pairs are known as variable bindings. For the generic
+traps 0 through 5, knowledge of what the trap contains is generally
+built into the NMS software or trap receiver. The variable bindings
+contained by an enterprise-specific trap are determined by whomever
+defined the trap. For example, if a modem in a modem rack fails, the
+rack's agent may send a trap to the NMS informing it of the
+failure. The trap will most likely be an enterprise-specific trap
+defined by the rack's manufacturer; the trap's contents
+are up to the manufacturer, but it will probably contain enough
+information to let you determine exactly what failed (for example,
+the position of the modem card in the rack and the channel on the
+modem card).
+</p>
+
+<a name="enettdg-CHP-2-TABLE-8" /><h4 class="objtitle">Table 2-8. Generic Traps </h4><table border="1">
+
+
+
+<tr>
+<th>
+Generic Trap Name and Number</p>
+</th>
+<th>
+Definition</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<em class="emphasis">coldStart</em><a name="INDEX-378" /> <a name="INDEX-379" /> (0)
+</p>
+</td>
+<td>
+<a name="INDEX-380" />Indicates that the agent has
+rebooted. All management variables will be reset; specifically,
+<tt class="literal">Counter</tt>s and <tt class="literal">Gauge</tt>s will be
+reset to zero (0). One nice thing about the
+<em class="emphasis">coldStart</em> trap is that it can be used to
+determine when new hardware is added to the network. When a device is
+powered on, it sends this trap to its trap destination. If the trap
+destination is set correctly (i.e., to the IP address of your NMS)
+the NMS can receive the trap and determine whether it needs to manage
+the device.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">warmStart</em> (1)</p>
+</td>
+<td>
+<a name="INDEX-381" />Indicates that the agent has
+reinitialized itself. None of the management variables will be reset.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">linkDown</em><a name="INDEX-382" /> (2)
+</p>
+</td>
+<td>
+<a name="INDEX-383" />Sent when an interface on a device
+goes down. The first variable binding identifies which interface went
+down.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">linkUp</em><a name="INDEX-384" /> (3)
+</p>
+</td>
+<td>
+Sent when an interface on a device comes back up. The first variable
+binding identifies which interface came back up.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">authenticationFailure</em><a name="INDEX-385" /> (4)
+</p>
+</td>
+<td>
+<a name="INDEX-386" />Indicates that someone has tried to
+query your agent with an incorrect community string; useful in
+determining if someone is trying to gain unauthorized access to one
+of your devices.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">egpNeighborLoss</em><a name="INDEX-387" /> (5)
+</p>
+</td>
+<td>
+Indicates that an <em class="firstterm">Exterior Gateway Protocol</em>
+(EGP) neighbor has gone down.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">enterpriseSpecific</em> (6)</p>
+</td>
+<td>
+Indicates that the trap is enterprise-specific. SNMP vendors and
+users define their own traps under the private-enterprise branch of
+the SMI object tree. To process this trap properly, the NMS has to
+decode the specific trap number that is part of the SNMP message.
+</p>
+</td>
+</tr>
+
+</table><p>
+
+In <a href="ch01_01.html">Chapter 1, "What Is SNMP?"</a> we mentioned that RFC 1697 is the
+RDBMS MIB. One of traps defined by this MIB is
+<em class="emphasis">rdbmsOutOfSpace</em> :
+</p>
+
+<blockquote><pre class="code">rdbmsOutOfSpace TRAP-TYPE
+    ENTERPRISE  rdbmsTraps
+    VARIABLES   { rdbmsSrvInfoDiskOutOfSpaces }
+    DESCRIPTION
+        "An rdbmsOutOfSpace trap signifies that one of the database
+         servers managed by this agent has been unable to allocate
+         space for one of the databases managed by this agent. Care
+         should be taken to avoid flooding the network with these traps."
+    ::= 2</pre></blockquote>
+
+The enterprise is <em class="emphasis">rdbmsTraps</em> and the specific
+trap number is 2. This trap has one variable binding,
+<em class="emphasis">rdbmsSrvInfoDiskOutOfSpaces</em>. If we look
+elsewhere in the MIB, we will find that this variable is a scalar
+object. Its definition is:
+</p>
+
+<blockquote><pre class="code">rdbmsSrvInfoDiskOutOfSpaces OBJECT-TYPE
+    SYNTAX  Counter
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "The total number of times the server has been unable to obtain
+         disk space that it wanted, since server startup. This would be
+         inspected by an agent on receipt of an rdbmsOutOfSpace trap."
+    ::= { rdbmsSrvInfoEntry  9 }</pre></blockquote>
+
+The <tt class="literal">DESCRIPTION</tt> for this object indicates why the
+note about taking care to avoid flooding the network (in the
+<tt class="literal">DESCRIPTION</tt> text for the
+<tt class="literal">TRAP-TYPE</tt>) is so important. Every time the RDBMS
+is unable to allocate space for the database, the agent will send a
+trap. A busy (and full) database could end up sending this trap
+thousands of times a day.
+</p>
+
+Some commercial RDBMS vendors, such as Oracle, provide an SNMP agent
+with their database engines. Agents such as these typically have
+functionality above and beyond that found in the RDBMS MIB.<a name="INDEX-388" /><a name="INDEX-389" />
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.7" /><div class="sect2">
+<h3 class="sect2">2.6.7. SNMP Notification</h3>
+
+In an effort to standardize the PDU format of SNMPv1 traps (recall
+that SNMPv1 traps have a different PDU format from
+<i class="command">get</i> and <i class="command">set</i>), SNMPv2 defines a
+<tt class="literal">NOTIFICATION-TYPE</tt>. The PDU format for
+<tt class="literal">NOTIFICATION-TYPE</tt> is identical to that for
+<em class="emphasis">get</em> and <em class="emphasis">set</em>. RFC 2863
+redefines the <em class="emphasis">linkDown</em> generic notification type
+like so:<a name="INDEX-390" /><a name="INDEX-391" /><a name="INDEX-392" />
+<a name="INDEX-393" />
+</p>
+
+<blockquote><pre class="code">linkDown NOTIFICATION-TYPE
+    OBJECTS { ifIndex, ifAdminStatus, ifOperStatus }
+    STATUS  current
+    DESCRIPTION
+        "A linkDown trap signifies that the SNMPv2 entity, acting in an
+         agent role, has detected that the ifOperStatus object for one
+         of its communication links left the down state and transitioned
+         into some other state (but not into the notPresent state). This
+         other state is indicated by the included value of ifOperStatus."
+    ::= { snmpTraps 3 }</pre></blockquote>
+
+The list of bindings is called <tt class="literal">OBJECTS</tt> rather than
+<tt class="literal">VARIABLES</tt>, but little else has changed. The first
+object is the specific interface (<em class="emphasis">ifIndex</em>) that
+transitioned from the <em class="emphasis">linkDown</em> condition to some
+other condition. The OID for this trap is
+<em class="emphasis">1.3.6.1.6.3.1.1.5.3</em>, or
+<em class="emphasis">iso.org.dod.internet.snmpV2.snmpModules.snmpMIB.snmpMIBObjects.snmpTraps.linkDown</em>.
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.8" /><div class="sect2">
+<h3 class="sect2">2.6.8. SNMP inform</h3>
+
+<a name="INDEX-394" /><a name="INDEX-395" /><a name="INDEX-396" />
+<a name="INDEX-397" />
+<a name="INDEX-398" />
+<a name="INDEX-399" />Finally, SNMPv2 provides an
+<i class="command">inform</i> mechanism, which allows for
+manager-to-manager communication. This operation can be useful when
+the need arises for more than one NMS in the network. When an
+<i class="command">inform</i> is sent from one NMS to another, the
+receiver sends a response to the sender acknowledging receipt of the
+event. This behavior is similar to that of the <i class="command">get</i>
+and <i class="command">set</i>requests. Note that
+an SNMP <i class="command">inform</i> can be used to send SNMPv2 traps to
+an NMS. If you use an <i class="command">inform</i> for this purpose, the
+agent will be notified when the NMS receives the trap.
+</p>
+
+</div>
+<a name="enettdg-CHP-2-SECT-6.9" /><div class="sect2">
+<h3 class="sect2">2.6.9. SNMP report</h3>
+
+<a name="INDEX-400" />The
+<i class="command">report</i> operation was defined in the draft version
+SNMPv2 but never implemented. It is now part of the SNMPv3
+specification and is intended to allow SNMP engines to communicate
+with each other (mainly to report problems with processing SNMP
+messages).<a name="INDEX-401" /><a name="INDEX-402" /> <a name="INDEX-403" /> 
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.5. A Closer Look at MIB-II</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.7. Host Management Revisited</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:49 GMT -->
+</html>

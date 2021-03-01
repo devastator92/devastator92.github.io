@@ -1,0 +1,1420 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>DNS and Internet Firewalls (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.3. DNS and Internet Firewalls</h2>
+
+
+<a name="INDEX-1880" />
+<a name="INDEX-1881" />The Domain Name System wasn't
+designed to work with Internet firewalls. It's a testimony to
+the flexibility of DNS and of its BIND implementation that you can
+configure DNS to work with, or even through, an Internet firewall.</p><p>
+
+
+That said, configuring BIND to work in a firewalled environment,
+although not difficult, takes a good, complete understanding of DNS
+and a few of BIND's more obscure features. Describing it also
+requires a large portion of this chapter, so here's a roadmap.</p><p>
+
+
+We'll start by describing the two major families of Internet
+firewall software -- packet filters and application gateways. The
+capabilities of each family have a bearing on how you'll need
+to configure BIND to work through the firewall. Next, we'll
+detail the two most common DNS architectures used with firewalls,
+forwarders and internal roots, and describe the advantages and
+disadvantages of each. We'll then introduce a solution using a
+new feature, forward zones, which combines the best of internal roots
+and forwarders. Finally, we'll discuss split namespaces and the
+configuration of the bastion host, the host at the core of your
+firewall system.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">11.3.1. Types of Firewall Software</h3>
+
+
+<a name="INDEX-1882" />Before
+you start configuring BIND to work with your firewall, it's
+important to understand what your firewall is capable of. Your
+firewall's capabilities will influence your choice of DNS
+architecture and determine how you implement it. If you don't
+know the answers to the questions in this section, track down someone
+in your organization who does know and ask. Better yet, work with
+your firewall's administrator when designing your DNS
+architecture to ensure it will coexist with the firewall.</p><p>
+
+
+Note that this is far from a complete explanation of Internet
+firewalls. These few paragraphs describe only the two most common
+types of Internet firewalls and only in enough detail to show how the
+differences in their capabilities affect name servers. For a
+comprehensive treatment of Internet firewalls, see Elizabeth D.
+Zwicky, Simon Cooper, and D. Brent Chapman's
+<a name="INDEX-1883" /><em class="citetitle">Building
+Internet Firewalls </em>(O'Reilly).</p><p>
+
+
+<a name="dns4-CHP-11-SECT-3.1.1" /><div class="sect3">
+<h3 class="sect3">11.3.1.1. Packet filters</h3>
+
+
+The first type of firewall we'll cover is the
+<a name="INDEX-1884" />packet-filtering firewall.
+Packet-filtering firewalls operate largely at the transport and
+network levels of the TCP/IP stack (layers three and four of the OSI
+reference model, if you dig that). They decide whether to route a
+packet based on packet-level criteria like the transport protocol
+(e.g., whether it's TCP or UDP), the source and destination IP
+address, and the source and destination port (see <a href="ch11_03.html#dns4-CHP-11-FIG-1">Figure 11-1</a>).</p><p>
+
+
+<a name="dns4-CHP-11-FIG-1" /><div class="figure"><img height="202" alt="Figure 11-1" src="figs/dns4_1101.gif" width="182" /></div><h4 class="objtitle">Figure 11-1. Packet filters operate at the network and transport layers of the stack</h4>
+
+What's most important to us about packet-filtering firewalls is
+that you can typically configure them to allow DNS traffic
+selectively between hosts on the Internet and your internal hosts.
+That is, you can let an arbitrary set of internal hosts communicate
+with Internet name servers. Some packet-filtering firewalls can even
+permit your name servers to query name servers on the Internet, but
+not vice versa. All router-based Internet firewalls are
+packet-filtering firewalls. Checkpoint's FireWall-1,
+Cisco's PIX, and Sun's SunScreen are popular commercial
+packet-filtering firewalls.</p><p>
+
+
+<a name="ch11-17-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">A Gotcha with BIND 8 or 9 and Packet-Filtering Firewalls</h4>
+
+
+BIND 4 name servers always send queries from port 53, the well-known
+port for DNS servers, to port 53. Resolvers, on the other hand,
+usually send queries from high-numbered ports (above 1023) to port
+53. Though name servers clearly have to send their queries
+<em class="emphasis">to</em> the DNS port on a remote host, there's
+no reason they have to send the queries <em class="emphasis">from</em> the
+DNS port. And, wouldn't you know it, BIND 8 and 9 name servers
+don't send queries from port 53 by default. Instead, they send
+queries from high-numbered ports, the same as resolvers do.</p><p>
+
+
+This can cause problems with packet-filtering firewalls that are
+configured to allow name server-to-name server traffic but not
+resolver-to-name server traffic, because they typically expect name
+server-to-name server traffic to originate from port 53 and terminate
+at port 53.</p><p>
+
+
+There are two solutions to this problem:</p><p>
+
+
+<ul><li>Reconfigure the firewall to allow your name server to send and
+receive queries from ports other than 53 (assuming this doesn't
+compromise the security of the firewall by allowing packets from
+Internet hosts to high-numbered ports on internal name servers).</p></li></ul>
+<ul><li>Configure BIND to revert to its old behavior with the
+<em class="emphasis">query-source</em> substatement.</p></li></ul>
+<em class="emphasis">query-source</em> takes as arguments an address
+specification and an optional port number. For example, the
+statement:</p><p>
+
+
+<blockquote><pre class="code">options { query-source address * port 53; };</pre></blockquote>
+
+
+tells BIND to use port 53 as the source port for queries sent from
+all local network interfaces. You can use a nonwildcard address
+specification to limit the addresses that BIND will send queries
+from. For example, on <em class="emphasis">wormhole.movie.edu</em>, the statement:</p><p>
+
+
+<blockquote><pre class="code">options { query-source address 192.249.249.1 port *; };</pre></blockquote>
+
+
+tells BIND to send all queries from the 192.249.249.1 address (i.e.,
+not from 192.253.253.1) and to use dynamic, high-numbered ports.</p><p>
+
+
+The use of <em class="emphasis">query-source</em> with a wildcard address
+is broken in BIND 9 before 9.1.0, though you can tell an early BIND 9
+name server to send all queries from a particular address's
+port 53.</p><p>
+
+</td></tr></table><p></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.1.2" /><div class="sect3">
+<h3 class="sect3">11.3.1.2. Application gateways</h3>
+
+
+<a name="INDEX-1885" />
+<a name="INDEX-1886" />Application
+gateways operate at the application protocol level, several layers
+higher in the OSI reference model than most packet filters (see <a href="ch11_03.html#dns4-CHP-11-FIG-2">Figure 11-2</a>). In a sense, they "understand"
+the application protocol in the same way a server for that particular
+application would. An FTP application gateway, for example, can make
+the decision to allow or deny a particular FTP operation, such as a
+<em class="emphasis">RETR</em> (a <em class="emphasis">get</em>) or a
+<em class="emphasis">STOR</em> (a <em class="emphasis">put</em>).</p><p>
+
+
+<a name="dns4-CHP-11-FIG-2" /><div class="figure"><img height="192" alt="Figure 11-2" src="figs/dns4_1102.gif" width="227" /></div><h4 class="objtitle">Figure 11-2. Application gateways operate at the application layer of the stack</h4>
+
+The bad news, and what's important for our purposes, is that
+most application gateway-based firewalls handle only
+<a name="INDEX-1887" />TCP-based application protocols. DNS, of
+course, is largely UDP-based, and we know of no application gateways
+for DNS. This implies that if you run an application gateway-based
+firewall, your internal hosts will likely not be able to communicate
+directly with name servers on the Internet.</p><p>
+
+
+The popular <a name="INDEX-1888" />Firewall Toolkit from
+<a name="INDEX-1889" />Trusted Information Systems (TIS, now
+part of Network Associates) is a suite of application gateways for
+common Internet protocols such as Telnet, FTP, and HTTP. Network
+Associates' Gauntlet product is also based on application
+gateways, as is Axent's Eagle Firewall.</p><p>
+
+
+Note that these two categories of firewall are really just
+generalizations. The state of the art in firewalls changes very
+quickly, and by the time you read this, you may have a firewall that
+includes an application gateway for DNS. Which family your firewall
+falls into is important only because it suggests what that firewall
+is capable of; what's more important is whether your particular
+firewall will let you permit DNS traffic between arbitrary internal
+hosts and the Internet<a name="INDEX-1890" />.</p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">11.3.2. A Bad Example</h3>
+
+
+The simplest configuration is to allow DNS traffic to pass freely
+through your firewall (assuming you can configure your firewall to do
+that). That way, any internal name server can query any name server
+on the Internet, and any Internet name server can query any of your
+internal name servers. You don't need any special
+configuration.</p><p>
+
+
+Unfortunately, this is a really bad idea, for a number of reasons:</p><p>
+
+
+<dl>
+<dt><i>Version control</i></dt>
+<dd><a name="INDEX-1891" /> <a name="INDEX-1892" />The developers
+of BIND are constantly finding and fixing security-related bugs in
+the BIND code. Consequently, it's important to run a recent
+version of BIND, especially on name servers directly exposed to the
+Internet. If one or just a few of your name servers communicate
+directly with name servers on the Internet, upgrading them to a new
+version is easy. If any of the name servers on your network can
+communicate directly with name servers on the Internet, upgrading all
+of them is vastly more difficult.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Possible vector for attack</i></dt>
+<dd>Even if you're not running a name server on a particular host,
+a hacker might be able to take advantage of your allowing DNS traffic
+through your firewall and attack that host. For example, a
+co-conspirator working on the inside could set up a Telnet daemon
+listening on the host's DNS port, allowing the hacker to
+<em class="filename">telnet</em> right in.</p></dd>
+
+</dl>
+
+
+For the rest of this chapter, we'll try to set a good example.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">11.3.3. Internet Forwarders</h3>
+
+
+<a name="INDEX-1893" />Given the dangers of allowing
+bidirectional DNS traffic through the firewall unrestricted, most
+organizations limit the internal hosts that can "talk
+DNS" to the Internet. In an application gateway firewall, or
+any firewall without the ability to pass DNS traffic, the only host
+that can communicate with Internet name servers is the bastion host
+(see <a href="ch11_03.html#dns4-CHP-11-FIG-3">Figure 11-3</a>).</p><p>
+
+
+<a name="dns4-CHP-11-FIG-3" /><div class="figure"><img height="167" alt="Figure 11-3" src="figs/dns4_1103.gif" width="438" /></div><h4 class="objtitle">Figure 11-3. A small network, showing the bastion host</h4>
+
+In a packet-filtering firewall, the firewall's administrator
+can configure the firewall to let any set of internal name servers
+communicate with Internet name servers. Often, this is a small set of
+hosts that run name servers under the direct control of the network
+administrator (see <a href="ch11_03.html#dns4-CHP-11-FIG-4">Figure 11-4</a>).</p><p>
+
+
+<a name="dns4-CHP-11-FIG-4" /><div class="figure"><img height="232" alt="Figure 11-4" src="figs/dns4_1104.gif" width="438" /></div><h4 class="objtitle">Figure 11-4. A small network, showing select internal name servers</h4>
+
+Internal name servers that can directly query name servers on the
+Internet don't require any special configuration. Their root
+hints files contain the Internet's root name servers, which
+enables them to resolve Internet domain names. Internal name servers
+that <em class="emphasis">can't</em> query name servers on the
+Internet, however, need to know to forward queries they can't
+resolve to one of the name servers that can. This is done with the
+<em class="emphasis">forwarders</em> directive or substatement, introduced
+in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>.</p><p>
+
+
+<a href="ch11_03.html#dns4-CHP-11-FIG-5">Figure 11-5</a> illustrates a common forwarding setup,
+with internal name servers forwarding queries to a name server
+running on a bastion host.</p><p>
+
+
+<a name="dns4-CHP-11-FIG-5" /><div class="figure"><img height="380" alt="Figure 11-5" src="figs/dns4_1105.gif" width="477" /></div><h4 class="objtitle">Figure 11-5. Using forwarders</h4>
+
+At Movie U., we put in a firewall to protect ourselves from the Big
+Bad Internet several years ago. Ours is a packet-filtering firewall,
+and we negotiated with our firewall administrator to allow DNS
+traffic between Internet name servers and two of our name servers,
+<em class="emphasis">terminator.movie.edu</em> and
+<em class="emphasis">wormhole.movie.edu</em>.
+Here's how we configured the other internal name servers at the
+university. For our BIND 8 and 9 name servers, we used the following:</p><p>
+
+
+<blockquote><pre class="code">options {
+	forwarders { 192.249.249.1; 192.249.249.3; };
+	forward only;
+};</pre></blockquote>
+
+
+and for our BIND 4 name servers, we used:</p><p>
+
+
+<blockquote><pre class="code">forwarders 192.249.249.3 192.249.249.1
+options forward-only</pre></blockquote>
+
+
+We vary the order in which the forwarders appear to help spread the
+load between them, though that's not necessary with BIND 8.2.3
+name servers, which choose which forwarder to query according to
+roundtrip time.</p><p>
+
+
+When an internal name server receives a query for a name it
+can't resolve locally, such as an Internet domain name, it
+forwards that query to one of our forwarders, which can resolve the
+name using name servers on the Internet. Simple!</p><p>
+
+
+<a name="dns4-CHP-11-SECT-3.3.1" /><div class="sect3">
+<h3 class="sect3">11.3.3.1. The trouble with forwarding</h3>
+
+
+Unfortunately, it's a little too simple. Forwarding starts to
+get in the way once you delegate subdomains or build an extensive
+network. To explain what we mean, take a look at part of the
+configuration file on <em class="emphasis">zardoz.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	forwarders { 192.249.249.1; 192.253.253.3; };
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+};</pre></blockquote>
+
+
+<em class="emphasis">zardoz.movie.edu</em> is a slave
+for <em class="emphasis">movie.edu</em> and uses our
+two forwarders. What happens when <em class="emphasis">zardoz.movie.edu</em> receives a query for a
+name in <em class="emphasis">fx.movie.edu</em> ? As an
+authoritative <em class="emphasis">movie.edu</em> name
+server, <em class="emphasis">zardoz.movie.edu</em> has the NS records that
+delegate <em class="emphasis">fx.movie.edu</em> to its
+authoritative name servers. But it's also been configured to
+forward queries it can't resolve locally to <em class="emphasis">terminator.movie.edu</em> and <em class="emphasis">wormhole.movie.edu</em>. Which will it do?</p><p>
+
+
+It turns out that <em class="emphasis">zardoz.movie.edu</em> ignores the delegation
+information and forwards the query to <em class="emphasis">terminator.movie.edu</em>. That works since
+<em class="emphasis">terminator.movie.edu</em>receives the recursive query and asks an <em class="emphasis">fx.movie.edu</em> name server on <em class="emphasis">zardoz.movie.edu</em>'s behalf. But
+it's not particularly efficient since <em class="emphasis">zardoz.movie.edu</em> could easily have sent
+the query directly.</p><p>
+
+
+Now imagine that the scale of the network is much larger: a corporate
+network that spans continents, with tens of thousands of hosts and
+hundreds or thousands of name servers. All the internal name servers
+that don't have direct Internet connectivity -- the vast
+majority of them -- use a small set of forwarders. What's
+wrong with this picture?</p><p>
+
+
+<dl>
+<dt><i>Single point of failure</i></dt>
+<dd>If the forwarders fail, your name servers lose the ability to resolve
+both Internet domain names and internal domain names that they
+don't have cached or stored as authoritative data.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Concentration of load</i></dt>
+<dd>The forwarders have an enormous query load placed on them. This is
+both because of the large number of internal name servers that use
+them, and because the queries are recursive and require a good deal
+of work to answer.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Inefficient resolution</i></dt>
+<dd>Imagine two internal name servers, authoritative for <em class="emphasis">west.acmebw.com</em> and <em class="emphasis">east.acmebw.com</em>, respectively, both on
+the same network segment in Boulder, Colorado. Both are configured to
+use the company's forwarder in Bethesda, Maryland. For the
+<em class="emphasis">west.acmebw.com</em> name server
+to resolve a name in <em class="emphasis">east.acmebw.com</em>, it sends a query to the
+forwarder in Bethesda. The forwarder in Bethesda then sends a query
+back to Boulder to the <em class="emphasis">east.acmebw.com</em>name server, the original querier's neighbor. The
+<em class="emphasis">east.acmebw.com</em> name server
+replies by sending a response back to Bethesda, which the forwarder
+sends back to Boulder.</p><p>
+
+
+In a traditional configuration with root name servers, the
+<em class="emphasis">west.acmebw.com</em> name server
+would have learned quickly that an <em class="emphasis">east.acmebw.com</em> name server was next
+door and would favor it (because of its low roundtrip time). Using
+forwarders "short-circuits" the normally efficient
+resolution process.</p></dd>
+
+</dl>
+
+
+The upshot is that forwarding is fine for small networks and simple
+namespaces, but probably inadequate for large networks and complex
+namespaces. We found this out the hard way at Movie U., as our
+network grew and we were forced to find an alternative.<a name="INDEX-1894" /></p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.3.2" /><div class="sect3">
+<h3 class="sect3">11.3.3.2. Using forward zones</h3>
+
+
+We can solve this problem by using the <a name="INDEX-1895" />forward zones
+introduced in BIND 8.2. We change <em class="emphasis">zardoz.movie.edu</em>'s configuration
+to this:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	forwarders { 192.249.249.1; 192.253.253.3; };
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+	forwarders {};
+};</pre></blockquote>
+
+
+Now, if <em class="emphasis">zardoz.movie.edu</em>
+receives a query for a domain name ending in <em class="emphasis">movie.edu</em> but outside the <em class="emphasis">movie.edu</em> zone (e.g., in <em class="emphasis">fx.movie.edu</em>), it ignores the forwarders
+and sends iterative queries.</p><p>
+
+
+With this configuration, <em class="emphasis">zardoz.movie.edu</em> still sends queries for
+domain names in our reverse-mapping zones to our forwarders. To
+relieve that load, we can add a few <em class="emphasis">zone
+</em>statements to <em class="filename">named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">zone "249.249.192.in-addr.arpa" {
+	type stub;
+	masters { 192.249.249.3; };
+	file "stub.192.249.249";
+	forwarders {};
+};
+
+zone "253.253.192.in-addr.arpa" {
+	type stub;
+	masters { 192.249.249.3; };
+	file "stub.192.253.253";
+	forwarders {};
+};
+
+zone "254.253.192.in-addr.arpa" {
+	type stub;
+	masters { 192.253.254.2; };
+	file "stub.192.253.254";
+	forwarders {};
+};
+
+zone "20.254.192.in-addr.arpa" {
+	type stub;
+	masters { 192.253.254.2; };
+	file "stub.192.254.20";
+	forwarders {};
+};</pre></blockquote>
+
+
+These new <em class="emphasis">zone</em> statements bear some explaining:
+first of all, they configure Movie U.'s reverse-mapping zones
+as stubs. That makes our name server track the NS records for those
+zones by periodically querying the master name servers for those
+zones. The <em class="emphasis">forwarders</em> substatement then turns
+off forwarding for domain names in the reverse-mapping domains. Now,
+instead of querying the forwarders for, say, the PTR record for
+<em class="emphasis">2.254.253.192.in-addr.arpa</em>,
+<em class="emphasis">zardoz.movie.edu</em> will query one of the
+<em class="emphasis">254.253.192.in-addr.arpa</em>name servers directly.</p><p>
+
+
+We'll need <em class="emphasis">zone</em> statements like these on
+all of our internal name servers, which also implies that we'll
+need all of our name servers to run some version of BIND 8 after
+8.2.<a href="#FOOTNOTE-84">[84]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-84" />[84]As we mentioned in the last chapter, BIND 9
+doesn't support forward zones until BIND 9.1.0.</p><p>
+
+</blockquote>
+
+
+This gives us a fairly robust resolution architecture that minimizes
+our exposure to the Internet: it uses efficient, robust iterative
+name resolution to resolve internal domain names, and forwarders only
+when necessary to resolve Internet domain names. If our forwarders
+fail or we lose our connection to the Internet, we lose only our
+ability to resolve Internet domain names.</p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">11.3.4. Internal Roots</h3>
+
+
+<a name="INDEX-1896" /> <a name="INDEX-1897" />If you want to avoid the scalability
+problems of forwarding, you can set up your own root name servers.
+These internal roots will serve only the name servers in your
+organization. They'll know about only the portions of the
+namespace relevant to your organization.</p><p>
+
+
+What good are they? By using an architecture based on root name
+servers, you gain the scalability of the Internet's namespace
+(which should be good enough for most companies), plus redundancy,
+distributed load, and efficient resolution. You can have as many
+internal roots as the Internet has roots -- 13 or so -- whereas
+having that many forwarders may be an undue security exposure and a
+configuration burden. Most of all, the internal roots don't get
+used frivolously. Name servers need to consult an internal root only
+when they time out the NS records for your top-level zones. Using
+forwarders, name servers may have to query a forwarder once
+<em class="emphasis">per resolution</em>.</p><p>
+
+
+The moral of our story is that if you have, or intend to have, a
+large namespace and lots of internal name servers, internal root name
+servers will scale better than any other solution.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-3.4.1" /><div class="sect3">
+<h3 class="sect3">11.3.4.1. Where to put internal root name servers</h3>
+
+
+Since name servers "lock on" to the closest root name
+server by favoring the one with the lowest roundtrip time, it pays to
+pepper your network with internal root name servers. If your
+organization's network spans the U.S., Europe, and the Pacific
+Rim, consider locating at least one internal root name server on each
+continent. If you have three major sites in Europe, give each of them
+an internal root.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.2" /><div class="sect3">
+<h3 class="sect3">11.3.4.2. Forward-mapping delegation</h3>
+
+
+Here's how an internal root name server is configured. An
+internal root delegates directly to any zones you administer. For
+example, on the <em class="emphasis">movie.edu</em>network, the root zone's data file would contain:</p><p>
+
+
+<blockquote><pre class="code">movie.edu.  86400  IN  NS  terminator.movie.edu.
+            86400  IN  NS  wormhole.movie.edu.
+            86400  IN  NS  zardoz.movie.edu.
+terminator.movie.edu.  86400  IN  A  192.249.249.3
+wormhole.movie.edu.    86400  IN  A  192.249.249.1
+                       86400  IN  A  192.253.253.1
+zardoz.movie.edu.      86400  IN  A  192.249.249.9
+                       86400  IN  A  192.253.253.9</pre></blockquote>
+
+
+On the Internet, this information would appear in the <em class="emphasis">edu</em> name servers' zone data files.
+On the <em class="emphasis">movie.edu</em> network, of
+course, there aren't any <em class="emphasis">edu</em>name servers, so you delegate directly to <em class="emphasis">movie.edu</em> from the root.</p><p>
+
+
+Notice that this doesn't contain delegation to <em class="emphasis">fx.movie.edu</em> or to any other subdomain
+of <em class="emphasis">movie.edu</em>. The
+<em class="emphasis">movie.edu</em> name servers know
+which name servers are authoritative for all <em class="emphasis">movie.edu</em> subdomains, and all queries
+for information in those subdomains pass through the <em class="emphasis">movie.edu</em> name servers, so there's
+no need to delegate them here.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.3" /><div class="sect3">
+<h3 class="sect3">11.3.4.3. in-addr.arpa delegation</h3>
+
+
+<a name="INDEX-1898" />We also need to delegate from the internal
+roots to the <em class="emphasis">in-addr.arpa</em>
+zones that correspond to the networks at the university:</p><p>
+
+
+<blockquote><pre class="code">249.249.192.in-addr.arpa.  86400  IN  NS  terminator.movie.edu.
+                           86400  IN  NS  wormhole.movie.edu.
+                           86400  IN  NS  zardoz.movie.edu.
+253.253.192.in-addr.arpa.  86400  IN  NS  terminator.movie.edu.
+                           86400  IN  NS  wormhole.movie.edu.
+                           86400  IN  NS  zardoz.movie.edu.
+254.253.192.in-addr.arpa.  86400  IN  NS  bladerunner.fx.movie.edu.
+                           86400  IN  NS  outland.fx.movie.edu.
+                           86400  IN  NS  alien.fx.movie.edu.
+20.254.192.in-addr.arpa.   86400  IN  NS  bladerunner.fx.movie.edu.
+                           86400  IN  NS  outland.fx.movie.edu.
+                           86400  IN  NS  alien.fx.movie.edu.</pre></blockquote>
+
+
+Notice that we <em class="emphasis">did</em> include delegation for the
+<em class="emphasis">254.253.192.in-addr.arpa</em> and
+the <em class="emphasis">20.254.192.in-addr.arpa</em>zones, even though they correspond to the <em class="emphasis">fx.movie.edu</em> zone. We don't need
+to delegate to <em class="emphasis">fx.movie.edu</em>
+because we'd already delegated to its parent, <em class="emphasis">movie.edu</em>. The <em class="emphasis">movie.edu</em> name servers delegate to
+<em class="emphasis">fx.movie.edu</em>, so by
+transitivity the roots delegate to <em class="emphasis">fx.movie.edu</em>. Since neither of the other
+<em class="emphasis">in-addr.arpa</em> zones is a
+parent of <em class="emphasis">254.253.192.in-addr.arpa</em>or <em class="emphasis">20.254.192.in-addr.arpa</em>, we need to
+delegate both zones from the root. As we explained earlier, we
+don't need to add address records for the three Special Effects
+name servers, <em class="emphasis">bladerunner.fx.movie.edu</em><em class="emphasis">,
+</em><em class="emphasis">outland.fx.movie.edu</em>, and <em class="emphasis">alien.fx.movie.edu</em>, because a remote
+name server can already find their addresses by following delegation
+from <em class="emphasis">movie.edu</em>.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.4" /><div class="sect3">
+<h3 class="sect3">11.3.4.4. The db.root file</h3>
+
+
+<a name="INDEX-1899" />All that's left is to add an SOA
+record for the root zone and NS records for this internal root name
+server and any others:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+.  IN  SOA  rainman.movie.edu.  hostmaster.movie.edu.  (
+            1    ; serial
+            3h   ; refresh
+            1h   ; retry
+            1w   ; expire
+            1h ) ; negative caching TTL
+
+   IN  NS  rainman.movie.edu.
+   IN  NS  awakenings.movie.edu.
+
+rainman.movie.edu.    IN  A  192.249.249.254
+awakenings.movie.edu. IN  A  192.253.253.254</pre></blockquote>
+
+
+<em class="emphasis">rainman.movie.edu</em> and
+<em class="emphasis">awakenings.movie.edu</em> are the
+hosts running the internal root name servers. We shouldn't run
+an internal root on a bastion host, because if a name server on the
+Internet accidentally queries it for data it's not
+authoritative for, the internal root will respond with its list of
+roots -- all internal!</p><p>
+
+
+So the whole <em class="filename">db.root </em>file (by convention, we
+call the root zone's data file <em class="filename">db.root</em>)
+looks like this:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+.  IN  SOA  rainman.movie.edu.  hostmaster.movie.edu.  (
+            1    ; serial
+            3h   ; refresh
+            1h   ; retry
+            1w   ; expire
+            1h ) ; negative caching TTL
+
+   IN  NS  rainman.movie.edu.
+   IN  NS  awakenings.movie.edu.
+
+rainman.movie.edu.    IN  A  192.249.249.254
+awakenings.movie.edu. IN  A  192.253.253.254
+
+movie.edu.  IN  NS  terminator.movie.edu.
+            IN  NS  wormhole.movie.edu.
+            IN  NS  zardoz.movie.edu.
+
+terminator.movie.edu.  IN  A  192.249.249.3
+wormhole.movie.edu.    IN  A  192.249.249.1
+                       IN  A  192.253.253.1
+zardoz.movie.edu.      IN  A  192.249.249.9
+                       IN  A  192.253.253.9
+
+249.249.192.in-addr.arpa.  IN  NS  terminator.movie.edu.
+                           IN  NS  wormhole.movie.edu.
+                           IN  NS  zardoz.movie.edu.
+253.253.192.in-addr.arpa.  IN  NS  terminator.movie.edu.
+                           IN  NS  wormhole.movie.edu.
+                           IN  NS  zardoz.movie.edu.
+254.253.192.in-addr.arpa.  IN  NS  bladerunner.fx.movie.edu.
+                           IN  NS  outland.fx.movie.edu.
+                           IN  NS  alien.fx.movie.edu.
+20.254.192.in-addr.arpa.   IN  NS  bladerunner.fx.movie.edu.
+                           IN  NS  outland.fx.movie.edu.
+                           IN  NS  alien.fx.movie.edu.</pre></blockquote>
+
+
+The <em class="filename">named.conf </em>file on both the internal root
+name servers, <em class="emphasis">rainman.movie.edu</em>and <em class="emphasis">awakenings.movie.edu</em>, contains the
+lines:</p><p>
+
+
+<blockquote><pre class="code">zone "." {
+	type master;
+	file "db.root";
+};</pre></blockquote>
+
+
+Or, for a BIND 4 server's <em class="filename">named.boot </em>file:</p><p>
+
+
+<blockquote><pre class="code">primary    .    db.root</pre></blockquote>
+
+
+This replaces a <em class="emphasis">zone</em> statement of type
+<em class="emphasis">hint</em> or a <a name="INDEX-1900" /><em class="emphasis">cache
+</em>directive -- a root name server doesn't need a
+root hints file to tell it where the other roots are; it can find
+that in <em class="filename">db.root</em>. Did we really mean that
+eachroot name server is a primary master for
+the root zone? Not unless you're running an ancient version of
+BIND. All BIND versions after 4.9 let you declare a server as a slave
+for the root zone, but BIND 4.8.3 and earlier insist that all root
+name servers load the root zone as primaries.</p><p>
+
+
+If you don't have a lot of idle hosts sitting around that you
+can turn into internal roots, don't despair! Any internal name
+server (i.e., one that's not running on a bastion host or
+outside your firewall) can serve double duty as an internal root
+<em class="emphasis">and</em> as an authoritative name server for whatever
+other zones you need it to load. Remember, a single name server can
+be authoritative for many, many zones, including the root zone.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.5" /><div class="sect3">
+<h3 class="sect3">11.3.4.5. Configuring other internal name servers</h3>
+
+
+Once you've set up internal root name servers, configure all
+your name servers on hosts anywhere on your internal network to use
+them. Any name server running on a host without direct Internet
+connectivity (i.e., behind the firewall) should list the internal
+roots in its root hints file:</p><p>
+
+
+<blockquote><pre class="code">; Internal root hints file, for Movie U. hosts without direct
+; Internet connectivity
+;
+; Don't use this file on a host with Internet connectivity!
+;
+
+.  99999999  IN  NS  rainman.movie.edu.
+   99999999  IN  NS  awakenings.movie.edu.
+
+rainman.movie.edu.     99999999  IN  A  192.249.249.254
+awakenings.movie.edu.  99999999  IN  A  192.253.253.254</pre></blockquote>
+
+
+Name servers running on hosts using this root hints file will be able
+to resolve domain names in <em class="emphasis">movie.edu</em> and in Movie U.'s
+<em class="emphasis">in-addr.arpa</em> domains, but
+not outside those domains.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.6" /><div class="sect3">
+<h3 class="sect3">11.3.4.6. How internal name servers use internal roots</h3>
+
+
+To tie together how this whole scheme works, let's go through
+an example of name resolution on an internal caching-only name server
+using these internal root name servers. First, the internal name
+server receives a query for a domain name in <em class="emphasis">movie.edu</em>, say the address of
+<em class="emphasis">gump.fx.movie.edu</em>. If the
+internal name server doesn't have any "better"
+information cached, it starts by querying an internal root name
+server. If it has communicated with the internal roots before, it has
+a roundtrip time associated with each, telling it which of the
+internal roots is responding to it most quickly. It then sends a
+nonrecursive query to that internal root for <em class="emphasis">gump.fx.movie.edu</em>'s address. The
+internal root answers with a referral to the <em class="emphasis">movie.edu</em> name servers on <em class="emphasis">terminator.movie.edu</em>, <em class="emphasis">wormhole.movie.edu</em>, and <em class="emphasis">zardoz.movie.edu</em>. The caching-only name
+server follows up by sending another nonrecursive query to one of the
+<em class="emphasis">movie.edu</em> name servers for
+<em class="emphasis">gump.fx.movie.edu</em>'s
+address. The <em class="emphasis">movie.edu</em> name
+server responds with a referral to the <em class="emphasis">fx.movie.edu</em> name servers. The
+caching-only name server sends the same nonrecursive query for
+<em class="emphasis">gump.fx.movie.edu</em>'s
+address to one of the <em class="emphasis">fx.movie.edu</em>name servers and finally receives a response.</p><p>
+
+
+Contrast this with the way a forwarding setup would work. Let's
+imagine that instead of using internal root name servers, our
+caching-only name server were configured to forward queries first to
+<em class="emphasis">terminator.movie.edu</em> and
+then to <em class="emphasis">wormhole.movie.edu</em>.
+In that case, the caching-only name server would check its cache for
+the address of <em class="emphasis">gump.fx.movie.edu</em>and, not finding it, would forward the query to
+<em class="emphasis">terminator.movie.edu</em>. Then,
+<em class="emphasis">terminator.movie.edu</em> would
+query an <em class="emphasis">fx.movie.edu</em> name
+server on the caching-only name server's behalf and return the
+answer. Should the caching-only name server need to look up another
+name in <em class="emphasis">fx.movie.edu</em>, it
+would still ask the forwarder, even though the forwarder's
+response to the query for <em class="emphasis">gump.fx.movie.edu</em>'s address
+probably contains the names and addresses of the <em class="emphasis">fx.movie.edu</em> name servers.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.7" /><div class="sect3">
+<h3 class="sect3">11.3.4.7. Mail from internal hosts to the Internet</h3>
+
+
+<a name="INDEX-1901" />
+<a name="INDEX-1902" />But wait! That's not all internal
+roots will do for you. We talked about getting mail to the Internet
+without changing <em class="filename">sendmail </em>'s configuration
+all over the network.</p><p>
+
+
+Wildcard records are the key to getting mail to
+work -- specifically, wildcard <a name="INDEX-1903" /> <a name="INDEX-1904" />MX records. Let's say that we want
+mail to the Internet to be forwarded through <em class="emphasis">postmanrings2x.movie.edu</em>, the Movie U.
+bastion host, which has direct Internet connectivity. Adding the
+following records to <em class="filename">db.root</em> will get the job
+done:</p><p>
+
+
+<blockquote><pre class="code">*        IN    MX    5 postmanrings2x.movie.edu.
+*.edu.   IN    MX    10 postmanrings2x.movie.edu.</pre></blockquote>
+
+
+We need the <em class="emphasis">*.edu</em> MX record
+in addition to the <em class="emphasis">*</em> record
+because of wildcard production rules, which you can read more about
+in <a href="ch16_02.html#dns4-CHP-16-SECT-2">Section 16.2, "Wildcards"</a> of <a href="ch16_01.html">Chapter 16, "Miscellaneous"</a>. Basically, since there is explicit data for
+<em class="emphasis">movie.edu</em> in the zone, the
+first wildcard won't match <em class="emphasis">movie.edu</em> or any other subdomains of
+<em class="emphasis">edu</em>. We need another,
+explicit wildcard record for <em class="emphasis">edu</em>to match subdomains of <em class="emphasis">edu</em>besides <em class="emphasis">movie.edu</em>.</p><p>
+
+
+Now mailers on our internal <em class="emphasis">movie.edu</em>hosts will send mail addressed to Internet domain names
+to <em class="emphasis">postmanrings2x.movie.edu</em>for forwarding. For example, mail addressed to
+<em class="emphasis">nic.ddn.mil</em> will match the
+first wildcard MX record:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup -type=mx nic.ddn.mil.</b></tt> <i class="lineannotation"> -- Matches the MX record for *</i>
+Server:  rainman.movie.edu
+Address:  192.249.249.19
+
+nic.ddn.mil
+     preference = 5, mail exchanger = postmanrings2x.movie.edu
+postmanrings2x.movie.edu    internet address = 192.249.249.20</pre></blockquote>
+
+
+Mail addressed to <em class="emphasis">vangogh.cs.berkeley.edu</em>will match the second MX record:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup -type=mx vangogh.cs.berkeley.edu.</b></tt> <i class="lineannotation"> -- Matches the MX record for *.edu</i>
+Server:  rainman.movie.edu
+Address:  192.249.249.19
+
+vangogh.cs.berkeley.edu
+     preference = 10, mail exchanger = postmanrings2x.movie.edu
+postmanrings2x.movie.edu    internet address = 192.249.249.20</pre></blockquote>
+
+
+Once the mail has reached <em class="emphasis">postmanrings2x.movie.edu</em>, our bastion
+host, <em class="emphasis">postmanrings2x.movie.edu</em>'s mailer
+will look up the MX records for these addresses itself. Since
+<em class="emphasis">postmanrings2x.movie.edu</em>
+will resolve the destination's domain name using the
+Internet's namespace instead of the internal namespace, it will
+find the real MX records for the domain name and deliver the mail. No
+changes to <em class="filename">sendmail </em>'s configuration are
+necessary.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.8" /><div class="sect3">
+<h3 class="sect3">11.3.4.8. Mail to specific Internet domain names</h3>
+
+
+<a name="INDEX-1905" />
+<a name="INDEX-1906" />Another nice perk of this internal
+root scheme is that it gives you the ability to forward mail
+addressed to certain Internet domain names through particular bastion
+hosts, if you have more than one. We can choose, for example, to send
+all mail addressed to recipients in the <em class="emphasis">uk</em> domain to our bastion host in London
+first and then out onto the Internet. This can be very useful if we
+want our mail to travel across our own network as far as possible or
+if we're billed for our usage of some network in the U.K.</p><p>
+
+
+Movie U. has a private network connection to our sister university in
+London near Pinewood Studios. For security reasons, we'd like
+to send mail addressed to correspondents in the U.K. across our
+private link and then through the Pinewood host. So we add the
+following wildcard records to <em class="filename">db.root</em>:</p><p>
+
+
+<blockquote><pre class="code">; holygrail.movie.ac.uk is at the other end of our U.K. Internet link
+*.uk.    IN    MX    10 holygrail.movie.ac.uk.
+holygrail.movie.ac.uk.    IN   A    192.168.76.4</pre></blockquote>
+
+
+Now, mail addressed to users in subdomains of <em class="emphasis">uk</em> will be forwarded to the host
+<em class="emphasis">holygrail.movie.ac.uk</em> at our
+sister university, which presumably has facilities to forward that
+mail to other points in the U.K.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.4.9" /><div class="sect3">
+<h3 class="sect3">11.3.4.9. The trouble with internal roots</h3>
+
+
+Unfortunately, just as forwarding has its problems, internal root
+architectures have their limitations. Chief among these is the fact
+that your internal hosts can't see the Internet namespace. On
+some networks, this isn't an issue because most internal hosts
+don't have any direct Internet connectivity. The few that do
+can have their resolvers configured to use a name server on the
+bastion host. Some of these hosts will probably need to run proxy
+servers to allow other internal hosts access to services on the
+Internet.</p><p>
+
+
+On other networks, however, the Internet firewall or other software
+may require that all internal hosts have the ability to resolve names
+in the Internet's namespace. For these networks, an internal
+root architecture won't work.<a name="INDEX-1907" /> <a name="INDEX-1908" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">11.3.5. A Split Namespace</h3>
+
+
+<a name="INDEX-1909" /> <a name="INDEX-1910" />Many
+organizations would like to advertise different zone data to the
+Internet than they advertise internally. In most cases, much of the
+internal zone data is irrelevant to the Internet because of the
+organization's Internet firewall. The firewall may not allow
+direct access to most internal hosts, and may also translate
+internal, unregistered IP addresses into a range of IP addresses
+registered to the organization. Therefore, the organization might
+need to trim out irrelevant information from the external view of the
+zone or change internal addresses to their external equivalents.</p><p>
+
+
+Unfortunately, BIND doesn't support automatic filtering and
+translation of zone data. Consequently, many organizations manually
+create what have become known as "split namespaces." In a
+split namespace, the real namespace is available only internally,
+while a pared-down, translated version of it called the
+<em class="firstterm">shadow namespace</em><a name="INDEX-1911" />
+<a name="INDEX-1912" /> is visible to the Internet.</p><p>
+
+
+The shadow namespace contains the name-to-address and address-to-name
+mappings of only those hosts accessible from the Internet through the
+firewall. The addresses advertised may be the translated equivalents
+of internal addresses. The shadow namespace may also contain one or
+more MX records to direct mail from the Internet through the firewall
+to a mail server.</p><p>
+
+
+Since Movie U. has an Internet firewall that greatly limits access
+from the Internet to the internal network, we elected to create a
+shadow namespace. For the zone <em class="emphasis">movie.edu</em>, the only information we need
+to give out is about the domain name <em class="emphasis">movie.edu</em> (an SOA record and a few NS
+records), the bastion host (<em class="emphasis">postmanrings2x.movie.edu</em>), and our new
+external name server, <em class="emphasis">ns.movie.edu</em>, which also functions as an
+external web server, <em class="emphasis">www.movie.edu</em>. The address of the
+external interface on the bastion host is 200.1.4.2, and the address
+of the name/web server is 200.1.4.3. The shadow <em class="emphasis">movie.edu</em> zone data file looks like
+this:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@    IN    SOA    ns.movie.edu.    hostmaster.movie.edu. (
+                           1    ; Serial
+                           3h   ; Refresh
+                           1h   ; Retry
+                           1w   ; Expire
+                           1h ) ; Negative caching TTL
+
+    IN    NS    ns.movie.edu.
+    IN    NS    ns1.isp.net.        ; our ISP's name server is a movie.edu slave
+
+    IN    A     200.1.4.3
+    IN    MX    10 postmanrings2x.movie.edu.
+    IN    MX    100 mail.isp.net.
+
+www             IN    CNAME movie.edu.
+
+postmanrings2x  IN    A     200.1.4.2
+                IN    MX    10 postmanrings2x.movie.edu.
+                IN    MX    100 mail.isp.net.
+
+;postmanrings2x.movie.edu handles mail addressed to ns.movie.edu
+ns              IN    A     200.1.4.3
+                IN    MX    10 postmanrings2x.movie.edu.
+                IN    MX    100 mail.isp.net.
+
+*               IN    MX    10 postmanrings2x.movie.edu.
+                IN    MX    100 mail.isp.net.</pre></blockquote>
+
+
+Note that there's no mention of any of the subdomains of
+<em class="emphasis">movie.edu</em>, including any
+delegation to the name servers for those subdomains. The information
+simply isn't necessary since there's nothing in any of
+the subdomains that you can get to from the Internet, and inbound
+mail addressed to hosts in the subdomains is caught by the wildcard.</p><p>
+
+
+The <em class="filename">db.200.1.4 </em>file, which we need in order to
+reverse map the two Movie U. IP addresses that hosts on the Internet
+might see, looks like this:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@    IN    SOA    ns.movie.edu.    hostmaster.movie.edu. (
+                           1    ; Serial
+                           3h   ; Refresh
+                           1h   ; Retry
+                           1w   ; Expire
+                           1h ) ; Negative caching TTL
+
+    IN    NS    ns.movie.edu.
+    IN    NS    ns.isp.net.
+
+2    IN    PTR    postmanrings2x.movie.edu.
+3    IN    PTR    ns1.movie.edu.</pre></blockquote>
+
+
+One precaution we have to take is to make sure that the resolver on
+our bastion host isn't configured to use the server on
+<em class="emphasis">ns.movie.edu</em>. Since that
+server can't see the real, internal <em class="emphasis">movie.edu</em>, using it would render
+<em class="emphasis">postmanrings2x.movie.edu</em>
+unable to map internal domain names to addresses or internal
+addresses to names.<a name="INDEX-1913" /></p><p>
+
+
+<a name="dns4-CHP-11-SECT-3.5.1" /><div class="sect3">
+<h3 class="sect3">11.3.5.1. Configuring the bastion host</h3>
+
+
+<a name="INDEX-1914" />The
+bastion host is a special case in a split namespace configuration. It
+has a foot in each environment: one network interface connects it to
+the Internet and another connects it to the internal network. Now
+that we have split our namespace in two, how can our bastion host see
+both the Internet namespace and our real internal namespace? If we
+configure it with the Internet's root name servers in its root
+hints file, it will follow delegation from the Internet's
+<em class="emphasis">edu</em> name servers to an
+external <em class="emphasis">movie.edu</em> name
+server with shadow zone data. It would be blind to our internal
+namespace, which it needs to see to log connections, deliver inbound
+mail, and more. On the other hand, if we configure it with our
+internal roots, then it won't see the Internet's
+namespace, which it clearly needs to do in order to function as a
+bastion host. What to do?</p><p>
+
+
+If we have internal name servers that can resolve both internal and
+Internet domain names -- using forward zones per the configuration
+earlier in this chapter, for example -- we can simply configure
+the bastion host's resolver to query those name servers. But if
+we use forwarding internally, depending on the type of firewall
+we're running, we may also need to run a forwarder on the
+bastion host itself. If the firewall won't pass DNS traffic,
+we'll need to run at least a caching-only name server,
+configured with the Internet roots, on the bastion host so that our
+internal name servers will have somewhere to forward their unresolved
+queries.</p><p>
+
+
+If our internal name servers don't support forward zones, the
+name server on our bastion host must be configured as a slave for
+<em class="emphasis">movie.edu</em> and any
+<em class="emphasis">in-addr.arpa</em> zones in which
+it needs to resolve addresses. This way, if it receives a query for a
+domain name in <em class="emphasis">movie.edu</em>, it
+uses its local authoritative data to resolve the name. (If our
+internal name servers support forward zones and are configured
+correctly, the name server on our bastion host will never receive
+queries for names in <em class="emphasis">movie.edu</em>.) If the domain name is in a
+delegated subdomain of <em class="emphasis">movie.edu</em>, it follows NS records in the
+zone data to query an internal name server for the name. Therefore,
+it doesn't need to be configured as a slave for any <em class="emphasis">movie.edu</em> subdomains, such as
+<em class="emphasis">fx.movie.edu</em>, just the
+"topmost" zone (see <a href="ch11_03.html#dns4-CHP-11-FIG-6">Figure 11-6</a>).</p><p>
+
+
+<a name="dns4-CHP-11-FIG-6" /><div class="figure"><img height="271" alt="Figure 11-6" src="figs/dns4_1106.gif" width="471" /></div><h4 class="objtitle">Figure 11-6. A split DNS solution</h4>
+
+The <em class="filename">named.conf </em><a name="INDEX-1915" />file
+on our bastion host looks like this:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+};
+
+zone "249.249.192.in-addr.arpa" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.192.249.249";
+};
+
+zone "253.253.192.in-addr.arpa" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.192.253.253";
+};
+
+zone "254.253.192.in-addr.arpa" {
+	type slave;
+	masters { 192.253.254.2; };
+	file "bak.192.253.254";
+};
+
+zone "20.254.192.in-addr.arpa" {
+	type slave;
+	masters { 192.253.254.2; };
+	file "bak.192.254.20";
+};
+
+zone "." {
+	type hint;
+	file "db.cache";
+};</pre></blockquote>
+
+
+An equivalent<em class="filename"> named.boot</em> file would look like
+this:</p><p>
+
+
+<blockquote><pre class="code">directory    /var/named
+secondary    movie.edu    192.249.249.3   bak.movie.edu
+secondary    249.249.192.in-addr.arpa    192.249.249.3    bak.192.249.249
+secondary    253.253.192.in-addr.arpa    192.249.249.3    bak.192.253.253
+secondary    254.253.192.in-addr.arpa    192.253.254.2    bak.192.253.254
+secondary    20.254.192.in-addr.arpa     192.253.254.2    bak.192.254.20
+cache    .    db.cache    ; lists Internet roots</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.5.2" /><div class="sect3">
+<h3 class="sect3">11.3.5.2. Protecting zone data on the bastion host</h3>
+
+
+<a name="INDEX-1916" />Unfortunately, loading these zones
+on the bastion host also exposes them to the possibility of
+disclosure on the Internet, which we were trying to avoid by
+splitting the namespace in the first place. But as long as
+we're running BIND 4.9 or better, we can protect the zone data
+using the <em class="emphasis">secure_zone</em> TXT
+record or the <em class="emphasis">allow-query</em> substatement, both
+discussed earlier in the chapter. With
+<em class="emphasis">allow-query</em>, we can place a global access list
+on our zone data. Here's the new <em class="emphasis">options
+</em>statement from our <em class="filename">named.conf </em>file:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	allow-query { 127/8; 192.249.249/24; 192.253.253/24;
+		192.253.254/24; 192.254.20/24; };
+};</pre></blockquote>
+
+
+With BIND 4.9's <em class="emphasis">secure_zone</em> feature, we can turn off all
+external access to our zone data by including these TXT records in
+each zone data file:</p><p>
+
+
+<blockquote><pre class="code">secure_zone     IN    TXT    "192.249.249.0:255.255.255.0"
+                IN    TXT    "192.253.253.0:255.255.255.0"
+                IN    TXT    "192.253.254.0:255.255.255.0"
+                IN    TXT    "192.254.20.0:255.255.255.0"
+                IN    TXT    "127.0.0.1:H"</pre></blockquote>
+
+
+Don't forget to include the loopback address in the list, or
+the bastion host's resolver may not get answers from its own
+name server!</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.5.3" /><div class="sect3">
+<h3 class="sect3">11.3.5.3. The final configuration</h3>
+
+
+Finally, we need to apply the other security precautions we discussed
+earlier to our bastion host's name server. In particular, we
+should:</p><p>
+
+
+<ul><li>Restrict zone transfers</p></li><li>Use the ID pool feature (on BIND 8.2 or newer name servers but not
+BIND 9)</p></li><li>(Optionally) Run BIND <em class="emphasis">chroot</em> ed and with least
+privilege</p></li></ul>
+In the end, our <em class="filename">named.conf </em>file ends up looking
+like this:</p><p>
+
+
+<blockquote><pre class="code">acl "internal" {
+	127/8; 192.249.249/24; 192.253.253/24;
+	192.253.254/24; 192.254.20/24;
+};
+
+options {
+	directory "/var/named";
+	allow-query { "internal"; };
+	allow-transfer { none; };
+	use-id-pool yes;
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+};
+
+zone "249.249.192.in-addr.arpa" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.192.249.249";
+};
+
+zone "253.253.192.in-addr.arpa" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.192.253.253";
+};
+
+zone "254.253.192.in-addr.arpa" {
+	type slave;
+	masters { 192.253.254.2; };
+	file "bak.192.253.254";
+};
+
+zone "20.254.192.in-addr.arpa" {
+	type slave;
+	masters { 192.253.254.2; };
+	file "bak.192.254.20";
+};
+
+zone "." {
+	type hint;
+	file "db.cache";
+};</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-3.5.4" /><div class="sect3">
+<h3 class="sect3">11.3.5.4. Using views on the bastion host</h3>
+
+
+<a name="INDEX-1917" />If we're running BIND 9 on our
+bastion host, we can use views to safely present the shadow
+<em class="emphasis">movie.edu</em> to the outside
+world on the same name server that resolves Internet domain names.
+That may obviate the need to run an external name server on the same
+host as our web server, <em class="emphasis">www.movie.edu</em>. If not, it'll give
+us two name servers to advertise the external <em class="emphasis">movie.edu</em>.</p><p>
+
+
+This configuration is very similar to one shown in <a href="ch10_06.html#dns4-CHP-10-SECT-6">Section 10.6, "Views"</a>:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+};
+
+acl "internal" {
+	127/8; 192.249.249/24; 192.253.253/24; 192.253.254/24; 192.254.20/24;
+};
+
+view "internal" {
+	match-clients { "internal"; };
+	recursion yes;
+
+	zone "movie.edu" {
+		type slave;
+		masters { 192.249.249.3; };
+		file "bak.movie.edu";
+	 };
+
+	zone "249.249.192.in-addr.arpa" {
+		type slave;
+		masters { 192.249.249.3; };
+		file "bak.192.249.249";
+	};
+
+	zone "253.253.192.in-addr.arpa" {
+		type slave;
+		masters { 192.249.249.3; };
+		file "bak.192.253.253";
+	};
+
+	zone "254.253.192.in-addr.arpa" {
+		type slave;
+		masters { 192.253.254.2; };
+		file "bak.192.253.254";
+	};
+
+	zone "20.254.192.in-addr.arpa" {
+		type slave;
+		masters { 192.253.254.2; };
+		file "bak.192.254.20";
+	};
+
+	zone "." {
+		type hint;
+		file "db.cache";
+	};
+};
+
+view "external" {
+	match-clients { any; };
+	recursion no;
+
+	acl "ns1.isp.net" { 199.11.28.12; };
+
+	zone "movie.edu" {
+		type master;
+		file "db.movie.edu.external";
+		allow-transfer { "ns1.isp.net"; };
+	};
+
+	zone "4.1.200.in-addr.arpa" {
+		type master;
+		file "db.200.1.4";
+		allow-transfer { "ns1.isp.net"; };
+	};
+
+	zone "." {
+		type hint;
+		file "db.cache";
+	};
+};</pre></blockquote>
+
+
+Notice that the internal and external views present different
+versions of <em class="filename">movie.edu</em>: one loaded from the zone
+data file <em class="filename">db.movie.edu</em>, and one loaded from
+<em class="filename">db.movie.edu.external</em>. If there were more than a
+few zones in our external view, we probably would have used a
+different subdirectory for our external zone data files than we used
+for the internal<a name="INDEX-1918" /> zone<a name="INDEX-1919" /> data<a name="INDEX-1920" /> <a name="INDEX-1921" /> files.<a name="INDEX-1922" /> <a name="INDEX-1923" /></p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. Securing Your Name Server</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.4. The DNS Security Extensions</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+</html>

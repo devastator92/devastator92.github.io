@@ -1,0 +1,259 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch17_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:54 GMT -->
+<head><title>Network Performance Analysis (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch17_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 17. Network Performance Analysis</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-17-SECT-1">Network congestion and network interfaces</a><br />
+<a href="ch17_02.html">Network partitioning hardware</a><br />
+<a href="ch17_03.html">Network infrastructure</a><br />
+<a href="ch17_04.html">Impact of partitioning</a><br />
+<a href="ch17_05.html">Protocol filtering</a><br /></p><p></div>
+
+
+This chapter explores network diagnostics and partitioning schemes
+aimed at reducing congestion and improving the local host's
+interface to the network. <a name="INDEX-2529" /></a><a name="INDEX-2530" /></a></p><p>
+
+
+<div class="sect1"><a name="nfs2-CHP-17-SECT-1" /></a>
+<h2 class="sect1">17.1. Network congestion and network interfaces</h2>
+
+
+A network that was designed to ensure transparent <a name="INDEX-2531" /></a>
+<a name="INDEX-2532" /></a>access to filesystems and to provide
+"plug-and-play" services for new clients is a prime
+candidate for regular expansion. Joining several independent networks
+with routers, switches, hubs, bridges, or repeaters may add to the
+traffic level on one or more of the networks. However, a network
+cannot grow indefinitely without eventually experiencing congestion
+problems. Therefore, don't grow a network without planning its
+physical topology (cable routing and limitations) as well as its
+logical design. After several spurts of growth, performance on the
+network may suffer due to excessive loading.</p><p>
+
+
+The problems discussed in this section affect NIS as well as NFS
+service. Adding network partitioning hardware affects the
+transmission of broadcast packets, and poorly placed bridges,
+switches, or routers can create new bottlenecks in frequently used
+network "virtual circuits." Throughout this chapter, the
+emphasis will be on planning and capacity evaluation, rather than on
+low-level electrical details.</p><p>
+
+
+<a name="nfs2-CHP-17-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">17.1.1. Local network interface</h3>
+
+
+Ethernet cabling problems, such as incorrect<a name="INDEX-2533" /></a> <a name="INDEX-2534" /></a> <a name="INDEX-2535" /></a> or poorly made Category-5 cabling,
+affect all of the machines on the
+<a name="INDEX-2536" /></a>
+<a name="INDEX-2537" /></a>network.
+Conversely, a local interface problem is visible only to the machine
+suffering from it. An Ethernet interface device driver that cannot
+handle the packet traffic is an example of such a local interface
+problem.</p><p>
+
+
+<a name="INDEX-2538" /></a>The <em class="emphasis">netstat</em>
+tool gives a good
+<a name="INDEX-2539" /></a>
+<a name="INDEX-2540" /></a>indication of the reliability of the local
+physical network interface:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>netstat -in</b></tt> 
+Name Mtu  Net/Dest     Address      Ipkts   Ierrs  Opkts   Oerrs Collis Queue  
+lo0  8232 127.0.0.0    127.0.0.1    7188    0      7188     0     0      0     
+hme0 1500 129.144.8.0  129.144.8.3  139478  11     102155   0     3055   0</pre></blockquote>
+
+
+The first three columns show the network interface, the maximum
+transmission unit (MTU) for that interface, and the network to which
+the interface is connected. The <em class="emphasis">Address</em> column
+shows the local IP address (the hostname would have been shown had we
+not specified <em class="emphasis">-n</em>). The last five columns contain
+counts of the total number of packets sent and received, as well as
+errors encountered while handling packets. The collision count
+indicates the number of times a collision occurred when
+this<a name="INDEX-2541" /></a>
+<a name="INDEX-2542" /></a> host was transmitting.</p><p>
+
+
+Input errors can be caused by:</p><p>
+
+
+<ul><li><a name="INDEX-2543" /></a>Malformed or
+runt packets, damaged on the network by electrical problems.</p><p></li><li><a name="INDEX-2544" /></a>Bad CRC
+checksums, which may indicate that another host has a network
+interface problem and is sending corrupted packets. Alternatively,
+the cable connecting this workstation to the network may be damaged
+and corrupting frames as they are received.</p><p></li><li>The device driver's inability to receive the packet
+<a name="INDEX-2545" /></a>due to insufficient buffer space.</p><p></li></ul>
+A high output error rate indicates a fault in the local host's
+connection to the network or prolonged periods of collisions (a
+jammed network). Errors included in this count are exclusive of
+packet collisions.</p><p>
+
+
+Ideally, both the input and output error rates should be as close to
+zero as possible, although some short bursts of errors may occur as
+cables are unplugged and reconnected, or during periods of intense
+network traffic. After a power failure, for example, the flood of
+packets from every diskless client that automatically reboots may
+generate input errors on the servers that attempt to boot all of them
+in parallel. During normal operation, an error rate of more than a
+fraction of 1% deserves investigation. This rate seems incredibly
+small, but consider the data rates on a Fast Ethernet: at 100 Mb/sec,
+the maximum bandwidth of a network is about 150,000 minimum-sized
+packets each second. An error rate of 0.01% means that fifteen of
+those 150,000 packets get damaged each second. Diagnosis and
+resolution of low-level electrical problems such as CRC errors is
+beyond the scope of this book, although such an effort should be
+undertaken if high error rates <a name="INDEX-2546" /></a> <a name="INDEX-2547" /></a> <a name="INDEX-2548" /></a>are persistent.</p><p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-17-SECT-1.2" /></a><div class="sect2">
+<a name="INDEX-2549" /></a><a name="INDEX-2550" /></a><h3 class="sect2">17.1.2. Collisions and network saturation</h3>
+
+
+Ethernet is similar to an<a name="INDEX-2551" /></a> <a name="INDEX-2552" /></a>
+<a name="INDEX-2553" /></a> old party-line telephone: everybody
+listens at once, everybody talks at once, and sometimes two talkers
+start at the same time. In a well-conditioned network, with only two
+hosts on it, it's possible to use close to the maximum
+network's bandwidth. However, NFS clients and servers live in a
+burst-filled environment, where many machines try to use the network
+at the same time. When you remove the well-behaved conditions, usable
+network bandwidth decreases rapidly.</p><p>
+
+
+On the Ethernet, a host first checks for a transmission in progress
+on the network before attempting one of its own. This process is
+known as<a name="INDEX-2554" /></a>
+<a name="INDEX-2555" /></a> <em class="emphasis">carrier
+sense</em>. When two or more hosts transmit packets at exactly
+the same time, neither can sense a carrier, and a collision results.
+Each host recognizes that a collision has occurred, and backs off for
+a period of time, <em class="emphasis">t,</em> before attempting to
+transmit again. For each successive retransmission attempt that
+results in a collision, <em class="emphasis">t</em> is increased
+exponentially, with a small random variation. The variation in
+back-off periods ensures that machines generating collisions do not
+fall into lock step and seize the network.</p><p>
+
+
+As machines are added to the network,
+the<a name="INDEX-2556" /></a> probability of a collision
+increases. Network utilization is measured as a percentage of the
+ideal bandwidth consumed by the traffic on the cable at the point of
+measurement. Various levels of utilization are usually compared on a
+logarithmic scale. The relative decrease in usable bandwidth going
+from 5% utilization to 10% utilization, is about the same as going
+from 10% all the way to 30% utilization.</p><p>
+
+
+<a name="INDEX-2557" /></a>Measuring network utilization
+requires a LAN analyzer or similar device. Instead of measuring the
+traffic load directly, you
+<a name="INDEX-2558" /></a>can
+use the average collision rate as seen by all hosts on the network as
+a good indication of whether the network is overloaded or not. The
+<a name="INDEX-2559" /></a>collision
+rate, as a percentage of output packets, is one of the best measures
+of network utilization. The <em class="emphasis">Collis</em> field in the
+output of <em class="emphasis">netstat -in</em> shows the number of
+collisions:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>netstat -in</b></tt> 
+Name Mtu  Net/Dest     Address      Ipkts   Ierrs  Opkts   Oerrs Collis Queue  
+lo0  8232 127.0.0.0    127.0.0.1    7188    0      7188     0     0      0     
+hme0 1500 129.144.8.0  129.144.8.3  139478  11     102155   0     3055   0</pre></blockquote>
+
+
+The collision rate for a host is the number of collisions seen by
+that host divided by the number of packets it writes, as shown in
+<a href="ch17_01.html#nfs2-CHP-17-FIG-1">Figure 17-1</a>.</p><p>
+
+
+<a name="nfs2-CHP-17-FIG-1" /></a><div class="figure"><img height="36" alt="Figure 17-1" src="figs/nfs2.1701.gif" width="306" /></div><h4 class="objtitle">Figure 17-1. Collision rate calculation</h4>
+
+Collisions are counted only when the local host is transmitting; the
+collision rate experienced by the host is dependent on its network
+usage. Because network transmissions are random events, it's
+possible to see small numbers of collisions even on the most lightly
+loaded networks. A collision rate<a name="INDEX-2560" /></a> <a name="INDEX-2561" /></a> <a name="INDEX-2562" /></a> upwards of 5% is the first sign of
+network loading, and it's an indication that partitioning the
+network may <a name="INDEX-2563" /></a> <a name="INDEX-2564" /></a>be advisable.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.5. Server tuning</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17.2. Network partitioning hardware</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch17_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:55 GMT -->
+</html>

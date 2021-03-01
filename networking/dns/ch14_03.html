@@ -1,0 +1,1263 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Potential Problem List (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.3. Potential Problem List</h2>
+
+
+<a name="INDEX-2146" />Now that we've given you
+a nice set of tools, let's talk about how you can use them to
+diagnose real problems. There are some problems that are easy to
+recognize and correct. We should cover these as a matter of
+course -- they're some of the most common problems because
+they're caused by some of the most common mistakes. Here are
+the contestants, in no particular order. We call 'em our
+"Unlucky Thirteen."</p><p>
+
+
+<a name="dns4-CHP-14-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">14.3.1. Forgot to Increment Serial Number</h3>
+
+
+<a name="INDEX-2147" /><a name="INDEX-2148" />The main
+symptom of this problem is that slave name servers don't pick
+up any changes you made to the zone's data file on the primary
+master. The slaves think the zone data hasn't changed since the
+serial number is still the same.</p><p>
+
+
+How do you check whether or not you remembered to increment the
+serial number? Unfortunately, that's not so easy. If you
+don't remember what the old serial number was and your serial
+number gives you no indication of when it was updated, there's
+no direct way to tell whether it's changed.<a href="#FOOTNOTE-102">[102]</a> When you
+reload the primary, it loads the updated zone file regardless of
+whether you've changed the serial number. It checks the
+file's timestamp, sees that it's been modified since it
+last loaded the data, and reads the file. About the best you can do
+is to use <em class="filename">nslookup</em> to compare the data returned
+by the primary and by a slave. If they return different data, you
+probably forgot to increment the serial number. If you can remember a
+recent change you made, you can look for that data. If you
+can't remember a recent change, you could try transferring the
+zone from a primary and from a slave, sorting the results, and using
+<em class="filename">diff</em> to compare them.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-102" />[102]On
+the other hand, if you encode the date into the serial number, as
+many people do (e.g., 2001010500 is the first rev of data on January
+5, 2001), you may be able to tell at a glance whether you updated the
+serial number when you made the change.</p><p>
+
+</blockquote>
+
+
+The good news is that, although determining whether the zone was
+transferred is tricky, making sure the zone is transferred is simple.
+Just increment the serial number on the primary master's copy
+of the zone data file and reload the zone on the primary. The slaves
+should pick up the new data within their refresh interval, or sooner
+if they use NOTIFY. If you want to make sure the slaves transfer the
+new data, you can execute <em class="filename">named-xfer </em>by hand (on
+the slaves, naturally):</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/sbin/named-xfer -z movie.edu -f db.movie -s 0 terminator.movie.edu</b></tt>
+# <tt class="userinput"><b>echo $?</b></tt></pre></blockquote>
+
+
+If <em class="filename">named-xfer</em> returns 1 or 4, the zone was
+transferred successfully. Other return values indicate that no zone
+was transferred, either because of an error or because the slave
+thought the zone was up to date. (See <a href="ch14_02.html#dns4-CHP-14-SECT-2.1">Section 14.2.1, "How to Use named-xfer"</a> earlier in this chapter for more
+details.)</p><p>
+
+
+There's another variation of the "forgot to increment the
+serial number" problem. We see it in environments where
+administrators use tools like <em class="filename">h2n</em> to create zone
+data files from the host table. With scripts
+like<a name="INDEX-2149" />
+<em class="filename">h2n</em>, it's temptingly easy to delete old
+zone data files and create new ones from scratch. Some administrators
+do this occasionally because they mistakenly believe that data in the
+old zone data files can creep into the new ones. The problem with
+deleting the zone data files is that, without the old data file to
+read for the current serial number, <em class="filename">h2n</em> starts
+over at serial number 1. If your zone's serial number on the
+primary master rolls all the way back to 1 from 598 or what-have-you,
+the slaves (Versions 4.8.3 and earlier) won't complain; they
+just figure they're all caught up and don't need zone
+transfers. A 4.9 or later slave server, however, is ever watchful and
+will emit a <em class="emphasis">syslog</em> error message warning you
+that something might be wrong:</p><p>
+
+
+<blockquote><pre class="code">Jun  7 20:14:26 wormhole named[29618]: Zone "movie.edu"
+                (class 1) SOA serial# (1) rcvd from [192.249.249.3]
+                is &lt; ours (112)</pre></blockquote>
+
+
+So if the serial number on the primary master looks suspiciously low,
+check the serial number on the slaves, too, and compare them:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+&gt; <tt class="userinput"><b>set q=soa</b></tt>
+&gt; <tt class="userinput"><b>movie.edu.</b></tt>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+movie.edu
+        origin = terminator.movie.edu
+        mail addr = al.robocop.movie.edu
+        serial = 1
+        refresh = 10800 (3 hours)
+        retry   = 3600 (1 hour)
+        expire  = 604800 (7 days)
+        minimum ttl = 86400 (1 day)
+&gt; <tt class="userinput"><b>server wormhole.movie.edu.</b></tt>
+Default Server:  wormhole.movie.edu
+Addresses:  192.249.249.1, 192.253.253.1
+
+&gt; <tt class="userinput"><b>movie.edu.</b></tt>
+Server:  wormhole.movie.edu
+Addresses:  192.249.249.1, 192.253.253.1
+
+movie.edu
+        origin = terminator.movie.edu
+        mail addr = al.robocop.movie.edu
+        serial = 112
+        refresh = 10800 (3 hours)
+        retry   = 3600 (1 hour)
+        expire  = 604800 (7 days)
+        minimum ttl = 86400 (1 day)</pre></blockquote>
+
+
+<em class="emphasis">wormhole.movie.edu</em>, as a
+<em class="emphasis">movie.edu</em> slave, should
+never have a larger serial number than the primary master, so clearly
+something's amiss.</p><p>
+
+
+This problem is really easy to spot, by the way, with the tool
+we'll write in <a href="ch15_01.html">Chapter 15, "Programming with the Resolver and Name Server Library Routines"</a>, coming up
+next.<a name="INDEX-2150" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">14.3.2. Forgot to Reload Primary Master Name Server</h3>
+
+
+<a name="INDEX-2151" /><a name="INDEX-2152" />Occasionally, you
+may forget to reload your primary master name server after making a
+change to the configuration file or to a zone data file. The name
+server won't know to load the new configuration or the new zone
+data -- it doesn't automatically check the timestamp of the
+file and notice that it changed. Consequently, any changes
+you've made won't be reflected in the name server's
+data: new zones won't be loaded, and new records won't
+percolate out to the slaves.</p><p>
+
+
+To check when you last reloaded the name server, scan the
+<em class="emphasis">syslog</em> output for the last entry like this for a
+BIND 9 name server:</p><p>
+
+
+<blockquote><pre class="code">Mar  8 17:22:08 terminator named[22317]: loading configuration from '/etc/named.conf'</pre></blockquote>
+
+
+Or like this for a BIND 4.9 or BIND 8 name server:</p><p>
+
+
+<a name="INDEX-2153" /><blockquote><pre class="code">Mar  8 17:22:08 terminator named[22317]: reloading nameserver</pre></blockquote>
+
+
+These messages tell you the last time you sent a reload command to
+the name server. If you killed and then restarted the name server,
+you'll see an entry like this on a BIND 9 name server:</p><p>
+
+
+<blockquote><pre class="code">Mar  8 17:22:08 terminator named[22317]: starting BIND 9.1.0</pre></blockquote>
+
+
+On a BIND 8 name server, it'd look like:</p><p>
+
+
+<a name="INDEX-2154" /><blockquote><pre class="code">Mar  8 17:22:08 terminator named[22317]: restarted</pre></blockquote>
+
+
+or, on a 4.9 name server:</p><p>
+
+
+<blockquote><pre class="code">Mar  8 17:22:08 terminator named[22317]: starting</pre></blockquote>
+
+
+If the time of the restart or reload doesn't correlate with the
+time you made the last change, reload the name server again. And
+check that you incremented the serial numbers in zone data files you
+changed, too. If you're not sure when you edited the zone data
+file, you can check the file modification time by doing a long
+listing of the file with <em class="filename">ls -l</em>.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">14.3.3. Slave Name Server Can't Load Zone Data</h3>
+
+
+<a name="INDEX-2155" /><a name="INDEX-2156" />If a slave name server
+can't get the current serial number for a zone from its master
+name server, it logs a message via <em class="emphasis">syslog</em>. On a
+BIND 9 name server, that looks like:</p><p>
+
+
+<blockquote><pre class="code">Sep 25 22:02:38 wormhole named[21246]: refresh_callback: zone 
+movie.edu/IN: failure for 192.249.249.3#53: timed out</pre></blockquote>
+
+
+On BIND 8, look for:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 11:55:25 wormhole named[544]: Err/TO getting serial# for "movie.edu"</pre></blockquote>
+
+
+On BIND 4, it looks like this:</p><p>
+
+
+<blockquote><pre class="code">Mar  3 8:19:34 wormhole named[22261]: zoneref: Masters for secondary
+       zone movie.edu unreachable</pre></blockquote>
+
+
+If you let this problem fester, the slave will expire the zone. A
+BIND 9 name server will report:</p><p>
+
+
+<blockquote><pre class="code">Sep 25 23:20:20 wormhole named[21246]: zone_expire: zone 
+movie.edu/IN: expired</pre></blockquote>
+
+
+A BIND 4.9 or 8 name server will log:</p><p>
+
+
+<blockquote><pre class="code">Mar  8 17:12:43 wormhole named[22261]: secondary zone
+       "movie.edu" expired</pre></blockquote>
+
+
+Once the zone has expired, you'll start
+getting<a name="INDEX-2157" />
+SERVFAIL errors when you query the name server for data in the zone:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup robocop wormhole.movie.edu.</b></tt>
+Server:  wormhole.movie.edu
+Addresses:  192.249.249.1, 192.253.253.1
+
+*** wormhole.movie.edu can't find robocop.movie.edu: Server failed</pre></blockquote>
+
+
+There are three leading causes of this problem: a loss
+in<a name="INDEX-2158" /> connectivity
+to the master server due to network failure, an incorrect IP address
+for the master server in the configuration file, or a syntax error in
+the zone data file on the master server. First check the
+configuration file's entry for the zone and see what IP address
+the slave is attempting to load from:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+                type slave;
+                masters { 192.249.249.3; };
+                file "bak.movie.edu";
+};</pre></blockquote>
+
+
+On a BIND 4 server, the directive looks like this:</p><p>
+
+
+<blockquote><pre class="code">secondary        movie.edu        192.249.249.3        bak.movie.edu</pre></blockquote>
+
+
+Make sure that's really the IP address of the master name
+server. If it is, check connectivity to that IP address:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping 192.249.249.3 -n 10</b></tt>
+PING 192.249.249.3: 64 byte packets
+
+----192.249.249.3 PING Statistics----
+10 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+
+If the master server isn't reachable, make sure that the host
+the name server runs on is really running (e.g., is powered on, etc.)
+or look for a network problem. If the host is reachable, make sure
+<em class="filename">named</em> is running on the host and that you can
+manually transfer the zone:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/sbin/named-xfer -z movie.edu -f /tmp/db.movie.edu -s 0 192.249.249.3</b></tt>
+# <tt class="userinput"><b>echo $?</b></tt>
+2</pre></blockquote>
+
+
+A return code of 2 means that an error occurred. Check to see if
+there is a <em class="emphasis">syslog</em> message. In this case, there
+was a message:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 14:56:07 zardoz named-xfer[695]: record too short from [192.249.249.3], zone movie.edu</pre></blockquote>
+
+
+At first glance, this error looks like a truncation problem. The real
+problem is easier to see if you use <em class="filename">nslookup </em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup - terminator.movie.edu</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+<i class="lineannotation">&gt; </i><tt class="userinput"><b>ls movie.edu</b></tt>                  <i class="lineannotation"> -- This attempts a zone transfer</i>
+[terminator.movie.edu]
+*** Can't list domain movie.edu: Query refused</pre></blockquote>
+
+
+What's happening here is that <em class="filename">named</em> is
+refusing to allow you to transfer its zone data. The remote server
+has secured its zone data with an <em class="emphasis">allow-transfer</em>
+substatement, the <em class="emphasis">secure_zone</em> resource record, or the
+<em class="emphasis">xfrnets</em> boot file directive.</p><p>
+
+
+If the master server is responding as not authoritative for the zone,
+you'll see a message like this from your BIND 9 name server:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 13:29:23 zardoz named[21890]: refresh_callback: zone 
+movie.edu/IN: 
+non-authoritative answer from 192.249.249.3#53</pre></blockquote>
+
+
+Or on BIND 8, like this:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 11:58:36 zardoz named[544]: Err/TO getting serial# for "movie.edu"
+Jan  6 11:58:36 zardoz named-xfer[793]: [192.249.249.3] not authoritative for
+     movie.edu, SOA query got rcode 0, aa 0, ancount 0, aucount 0</pre></blockquote>
+
+
+If this is the correct master server, the server
+<em class="emphasis">should</em> be authoritative for the zone. This
+probably indicates that the master had a problem loading the zone,
+usually because of a syntax error in the zone data file. Contact the
+administrator of the master server and have her check her
+<em class="emphasis">syslog</em> output for indications of a syntax error
+(see problem 5, coming up).<a name="INDEX-2159" /><a name="INDEX-2160" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">14.3.4. Added Name to Zone Data File but Forgot     to Add PTR Record</h3>
+
+
+<a name="INDEX-2161" /><a name="INDEX-2162" />
+<a name="INDEX-2163" /><a name="INDEX-2164" /><a name="INDEX-2165" /><a name="INDEX-2166" />Because mappings of host names to IP
+addresses are disjointed from mappings of IP addresses to host names
+in DNS, it's easy to forget to add a PTR record for a new host.
+Adding the A record is intuitive, but many people who are used to
+host tables assume that adding an address record takes care of the
+reverse mapping, too. That's not true -- you need to add a
+PTR record for the host to the appropriate reverse-mapping zone.</p><p>
+
+
+Forgetting to add the PTR record for a host's address usually
+causes that host to fail authentication checks. For example, users on
+the host won't be able to <em class="filename">rlogin</em> to other
+hosts without specifying a password, and <em class="filename">rsh</em> or
+<em class="filename">rcp</em> to other hosts simply won't work. The
+servers these commands talk to must be able to map a client's
+IP address to a domain name to check <em class="filename">.rhosts</em> and
+<em class="filename">hosts.equiv</em>. These users' connections will
+cause entries like this to be <em class="emphasis">syslog</em>ged:</p><p>
+
+
+<blockquote><pre class="code">Aug 15 17:32:36 terminator inetd[23194]: login/tcp:
+       Connection from unknown (192.249.249.23)</pre></blockquote>
+
+
+<a name="INDEX-2167" />Also, many large FTP archives, including
+<em class="emphasis">ftp.uu.net</em>, refuse anonymous FTP access to hosts whose IP addresses don't map back to domain names. <em class="emphasis">ftp.uu.net</em>'s FTP server emits a message that reads, in part:</p><p>
+
+
+<blockquote><pre class="code">530- Sorry, we're unable to map your IP address 140.186.66.1 to a hostname
+530- in the DNS.  This is probably because your nameserver does not have a
+530- PTR record for your address in its tables, or because your reverse
+530- nameservers are not registered.  We refuse service to hosts whose
+530- names we cannot resolve.</pre></blockquote>
+
+
+That makes the reason you can't use anonymous FTP pretty
+evident. Other FTP sites, however, don't bother printing
+informative messages; they simply deny service.</p><p>
+
+
+<em class="filename">nslookup</em> is handy for checking whether
+you've forgotten the PTR record or not:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+<i class="lineannotation">&gt; </i><tt class="userinput"><b>beetlejuice</b></tt>      <i class="lineannotation"> -- Check for a name-to-address mapping</i>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+Name:    beetlejuice.movie.edu
+Address:  192.249.249.23
+
+<i class="lineannotation">&gt; </i><tt class="userinput"><b>192.249.249.23</b></tt>  <i class="lineannotation"> -- Now check for a corresponding address-to-name mapping</i>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+*** terminator.movie.edu can't find 192.249.249.23: Non-existent domain</pre></blockquote>
+
+
+On the primary master for <em class="emphasis">249.249.192.in-addr.arpa</em>, a quick check
+of the <em class="filename">db.192.249.249</em> file will tell you if the
+PTR record hasn't been added to the zone data file yet or if
+the name server hasn't been reloaded. If the name server having
+trouble is a slave for the zone, check that the serial number was
+incremented on the primary master and that the slave has had enough
+time to load the zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">14.3.5. Syntax Error in Configuration File     or Zone Data File</h3>
+
+
+<a name="INDEX-2168" /><a name="INDEX-2169" /><a name="INDEX-2170" /><a name="INDEX-2171" />Syntax errors in a name server's
+configuration file and in zone data files are also relatively common
+(more or less, depending on the experience of the administrator).
+Generally, an error in the config file will cause the name server to
+fail to load one or more zones. Some typos in the <em class="emphasis">options
+</em>statement will cause the name server to fail to start at
+all and to log an error like this via <em class="emphasis">syslog</em>
+(BIND 9):</p><p>
+
+
+<blockquote><pre class="code">Sep 26 13:39:30 terminator named[21924]: change directory to '/var/name' failed: file not found
+Sep 26 13:39:30 terminator named[21924]: options configuration failed: file not found
+Sep 26 13:39:30 terminator named[21924]: loading configuration: failure
+Sep 26 13:39:30 terminator named[21924]: exiting (due to fatal error)</pre></blockquote>
+
+
+A BIND 8 name server logs:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 11:59:29 terminator named[544]: can't change directory to /var/name: No
+     such file or directory</pre></blockquote>
+
+
+Note that you won't see an error message when you try to start
+<em class="filename">named</em> on the command line or at boot time, but
+<em class="filename">named</em> won't stay running for long.</p><p>
+
+
+If the syntax error is in a less important line in the config
+file -- say, in a <em class="emphasis">zone</em> statement -- only
+that zone will be affected. Usually, the name server won't be
+able to load the zone at all (say, you misspell "masters"
+or the name of the zone data file, or you forget to put quotes around
+the filename or domain name). This would produce <em class="emphasis">syslog
+</em>output from BIND 9 like this:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 13:43:03 terminator named[21938]: /etc/named.conf:80: 
+parse error near 'masters'
+Sep 26 13:43:03 terminator named[21938]: loading configuration: failure
+Sep 26 13:43:03 terminator named[21938]: exiting (due to fatal error)</pre></blockquote>
+
+
+Or from BIND 8:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 12:01:36 terminator named[841]: /etc/named.conf:10: syntax error near
+     'movie.edu'</pre></blockquote>
+
+
+If a zone data file contains a syntax error yet the name server
+succeeds in loading the zone, it will either answer as
+nonauthoritative for <em class="emphasis">all</em> data in the zone or
+return a SERVFAIL error for lookups in the zone:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup carrie</b></tt>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+Non-authoritative answer:
+Name:    carrie.movie.edu
+Address:  192.253.253.4</pre></blockquote>
+
+
+Here's the BIND 9 <em class="emphasis">syslog</em> message produced
+by the syntax error that caused this problem:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 13:45:40 terminator named[21951]: error: dns_rdata_fromtext: db.movie.edu:11: 
+near 'postmanrings2x': unexpected token
+Sep 26 13:45:40 terminator named[21951]: error: dns_zone_load: zone movie.edu/IN: 
+database db.movie.edu: dns_db_load failed: unexpected token
+Sep 26 13:45:40 terminator named[21951]: critical: loading zones: unexpected token
+Sep 26 13:45:40 terminator named[21951]: critical: exiting (due to fatal error)</pre></blockquote>
+
+
+Here's BIND 8's error:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 15:07:46 terminator named[693]: db.movie.edu:11: Priority error
+     (postmanrings2x.movie.edu.)
+Jan  6 15:07:46 terminator named[693]: master zone "movie.edu" (IN) rejected due
+     to errors (serial 1997010600)</pre></blockquote>
+
+
+If you looked in the zone data file for the problem, you'd find
+this record:</p><p>
+
+
+<blockquote><pre class="code">postmanrings2x     IN     MX     postmanrings2x.movie.edu.</pre></blockquote>
+
+
+The MX record is missing the preference field, which causes the error.</p><p>
+
+
+Note that unless you correlate the lack of authority (when you expect
+the name server to be authoritative) with a problem or scan your
+<em class="filename">syslog</em> file assiduously, you might never notice
+the syntax error!</p><p>
+
+
+Starting with BIND 4.9.4, an "invalid" host name can be a
+syntax error:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 12:04:10 terminator named[841]: owner name "ID_4.movie.edu" IN (primary)
+     is invalid - rejecting
+Jan  6 12:04:10 terminator named[841]: db.movie.edu:11: owner name error
+Jan  6 12:04:10 terminator named[841]: db.movie.edu:11: Database error near (A)
+Jan  6 12:04:10 terminator named[841]: master zone "movie.edu" (IN) rejected
+     due to errors (serial 1997010600)</pre></blockquote>
+
+
+BIND 9, however, doesn't implement name checking as of 9.1.0. A
+future version of BIND 9 may.<a name="INDEX-2172" /><a name="INDEX-2173" /><a name="INDEX-2174" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">14.3.6. Missing Dot at the End of a Domain Name in a Zone Data File</h3>
+
+
+It's <em class="emphasis">very</em> easy to leave
+off<a name="INDEX-2175" /><a name="INDEX-2176" /><a name="INDEX-2177" />
+<a name="INDEX-2178" /><a name="INDEX-2179" /> trailing dots when
+editing a zone data file. Since the rules for when to use them change
+so often (don't use them in the configuration file,
+don'tuse them in
+<em class="filename">resolv.conf</em>, do use them in zone data files to
+override $ORIGIN . . . ), it's hard to keep them straight.
+These resource records:</p><p>
+
+
+<blockquote><pre class="code">zorba         IN     MX     10 zelig.movie.edu
+movie.edu     IN     NS     terminator.movie.edu</pre></blockquote>
+
+
+really don't look that odd to the untrained eye, but they
+probably don't do what they're intended to. In the
+<em class="filename">db.movie.edu</em> file, they'd be equivalent
+to:</p><p>
+
+
+<blockquote><pre class="code">zorba.movie.edu.        IN    MX    10 zelig.movie.edu.movie.edu.
+movie.edu.movie.edu.    IN    NS    terminator.movie.edu.movie.edu.</pre></blockquote>
+
+
+unless the origin were explicitly changed.</p><p>
+
+
+If you omit a trailing dot after a domain name in the resource
+record's data (as opposed to leaving off a trailing dot in the
+resource record's <em class="emphasis">name</em>), you usually end
+up with wacky NS or MX records:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup -type=mx zorba.movie.edu.</b></tt>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+zorba.movie.edu      preference = 10, mail exchanger
+                     = zelig.movie.edu.movie.edu
+zorba.movie.edu      preference = 50, mail exchanger
+                     = postmanrings2x.movie.edu.movie.edu</pre></blockquote>
+
+
+The cause of this should be fairly clear from the
+<em class="filename">nslookup</em> output. But if you forget the trailing
+dot on the domain name field in a record (as in the <em class="emphasis">movie.edu</em> NS record just listed),
+spotting your mistake might not be as easy. If you try to look up the
+record with <em class="filename">nslookup</em>, you won't find it
+under the domain name you thought you used. Dumping your name
+server's database may help you root it out:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN edu.movie.edu.
+movie    IN    NS    terminator.movie.edu.movie.edu.</pre></blockquote>
+
+
+The $ORIGIN line looks odd enough to stand out.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.7" /><div class="sect2">
+<h3 class="sect2">14.3.7. Missing Root Hints Data</h3>
+
+
+<a name="INDEX-2180" /><a name="INDEX-2181" />If, for some reason, you forget to
+install a root hints file on your name server or if you accidentally
+delete it, your name server will be unable to resolve names outside
+of its authoritative data. This behavior is easy to recognize using
+<em class="filename">nslookup</em>, but be careful to use full,
+dot-terminated domain names or else the search list may cause
+misleading failures:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+<i class="lineannotation">&gt; </i><tt class="userinput"><b>ftp.uu.net.</b></tt>    <i class="lineannotation"> -- A lookup of a name outside your name server's authoritative data</i>
+<i class="lineannotation">                                 -- causes a SERVFAIL error...</i>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+*** terminator.movie.edu can't find ftp.uu.net.: Server failed</pre></blockquote>
+
+
+A lookup of a name in your name server's authoritative data
+returns a response:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>wormhole.movie.edu.</b></tt>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+Name:    wormhole.movie.edu
+Addresses:  192.249.249.1, 192.253.253.1
+
+&gt; <tt class="userinput"><b>^D</b></tt></pre></blockquote>
+
+
+To confirm your suspicion that the root hints data is missing, check
+the <em class="emphasis">syslog</em> output for an error like this:</p><p>
+
+
+<blockquote><pre class="code">Jan  6 15:10:22 terminator named[764]: No root nameservers for class IN</pre></blockquote>
+
+
+Class 1, you'll remember, is the IN, or Internet, class. This
+error indicates that because no root hints data was available, no
+root name servers were found.</p><p>
+
+
+You're unlikely to run into this problem with BIND 9, since it
+has built-in root hints.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.8" /><div class="sect2">
+<h3 class="sect2">14.3.8. Loss of Network Connectivity</h3>
+
+
+<a name="INDEX-2182" /><a name="INDEX-2183" /><a name="INDEX-2184" />Though the Internet is
+more reliable today than it was back in the wild and woolly days of
+the ARPAnet, network outages are still relatively common. Without
+"lifting the hood" and poking around in debugging output,
+these failures usually look like poor performance:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup nisc.sri.com.</b></tt>
+Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+*** Request to terminator.movie.edu timed out ***</pre></blockquote>
+
+
+If you turn on name server debugging, though, you may see that your
+name server, anyway, is healthy. It received the query from the
+resolver, sent the necessary queries, and waited patiently for a
+response. It just didn't get one. Here's what the
+debugging output might look like on a BIND 8 name server:</p><p>
+
+
+<blockquote><pre class="code">Debug turned ON, Level 1</pre></blockquote>
+
+
+Here, <em class="filename">nslookup</em> sends the first query to our
+local name server for the IP address of <em class="emphasis">nisc.sri.com</em>. Then the query is
+forwarded to another name server, and, when no answer is received, it
+is resent to a different name server:</p><p>
+
+
+<blockquote><pre class="code">datagram from [192.249.249.3].1051, fd 5, len 30
+req: nlookup(nisc.sri.com) id 18470 type=1 class=1
+req: missed 'nisc.sri.com' as 'com' (cname=0)
+forw: forw -&gt; [198.41.0.4].53 ds=7 nsid=58732 id=18470 0ms retry 4 sec
+resend(addr=1 n=0) -&gt; [128.9.0.107].53 ds=7 nsid=58732 id=18470 0ms</pre></blockquote>
+
+
+Now <em class="filename">nslookup</em> is getting impatient, and it
+queries our local name server again. Notice that it uses the same
+source port. The local name server ignores the duplicate query and
+tries forwarding the query two more times:</p><p>
+
+
+<blockquote><pre class="code">datagram from [192.249.249.3].1051, fd 5, len 30
+req: nlookup(nisc.sri.com) id 18470 type=1 class=1
+req: missed 'nisc.sri.com' as 'com' (cname=0)
+resend(addr=2 n=0) -&gt; [192.33.4.12].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=3 n=0) -&gt; [128.8.10.90].53 ds=7 nsid=58732 id=18470 0ms</pre></blockquote>
+
+
+<em class="filename">nslookup</em> queries the local name server again,
+and the name server fires off more queries:</p><p>
+
+
+<blockquote><pre class="code">datagram from [192.249.249.3].1051, fd 5, len 30
+req: nlookup(nisc.sri.com) id 18470 type=1 class=1
+req: missed 'nisc.sri.com' as 'com' (cname=0)
+resend(addr=4 n=0) -&gt; [192.203.230.10].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=0 n=1) -&gt; [198.41.0.4].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=1 n=1) -&gt; [128.9.0.107].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=2 n=1) -&gt; [192.33.4.12].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=3 n=1) -&gt; [128.8.10.90].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=4 n=1) -&gt; [192.203.230.10].53 ds=7 nsid=58732 id=18470 0ms
+resend(addr=0 n=2) -&gt; [198.41.0.4].53 ds=7 nsid=58732 id=18470 0ms
+Debug turned OFF</pre></blockquote>
+
+
+On a BIND 9 name server, there's considerably less detail at
+debug level 1. Still, you can see that the name server is trying
+repeatedly to look up <em class="emphasis">nisc.sri.com</em>:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 14:33:27.486 client 192.249.249.3#1028: query: nisc.sri.com A
+Sep 26 14:33:27.486 createfetch: nisc.sri.com. A
+Sep 26 14:33:32.489 client 192.249.249.3#1028: query: nisc.sri.com A
+Sep 26 14:33:32.490 createfetch: nisc.sri.com. A
+Sep 26 14:33:42.500 client 192.249.249.3#1028: query: nisc.sri.com A
+Sep 26 14:33:42.500 createfetch: nisc.sri.com. A
+Sep 26 14:34:02.512 client 192.249.249.3#1028: query: nisc.sri.com A
+Sep 26 14:34:02.512 createfetch: nisc.sri.com. A</pre></blockquote>
+
+
+At higher debug levels, you can actually see the timeouts, but BIND
+9.1.0 still doesn't show the addresses of the remote name
+servers tried.</p><p>
+
+
+From the BIND 8 debugging output, you can extract a list of the IP
+addresses of the name servers that your name server tried to query,
+and then check your connectivity to them. Odds are,
+<em class="filename">ping</em> won't have much better luck than your
+name server did:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping 198.41.0.4 -n 10</b></tt> <i class="lineannotation"> -- ping first name server queried</i>
+PING 198.41.0.4: 64 byte packets
+
+----198.41.0.4 PING Statistics----
+10 packets transmitted, 0 packets received, 100% packet loss
+% <tt class="userinput"><b>ping 128.9.0.107 -n 10</b></tt> <i class="lineannotation"> -- ping second name server queried</i>
+PING 128.9.0.107: 64 byte packets
+
+----128.9.0.107 PING Statistics----
+10 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+
+If it does, you should check that the remote name servers are really
+running. You might also check whether your Internet firewall is
+inadvertently blocking your name server's queries. If you've upgraded to BIND 8 or 9 recently, see <a href="ch11_03.html#ch11-17-fm2xml">the sidebar "A Gotcha with BIND 8 or 9 and Packet-Filtering Firewalls"</a> in <a href="ch11_01.html">Chapter 11, "Security"</a>, and see if it applies to you.</p><p>
+
+
+If <em class="filename">ping</em> can't get through either, all
+that's left to do is to locate the break in the network.
+Utilities like <em class="filename">traceroute</em> and <em class="filename">ping
+</em>'s record route option can be very helpful in
+determining whether the problem is on your network, the destination
+network, or somewhere in the middle.</p><p>
+
+
+Also, use your own common sense when tracking down the break. In this
+trace, for example, the remote name servers your name server tried to
+query are all root name servers. (You might have had their PTR
+records cached somewhere, so you could find out their domain names.)
+Now it's not very likely that each root's local network
+went down, nor that the Internet's backbone networks collapsed
+entirely. Occam's razor says that the simplest condition that
+could cause this behavior -- namely, the loss of
+<em class="emphasis">your</em> network's link to the
+Internet -- is the most likely
+cause.<a name="INDEX-2185" /><a name="INDEX-2186" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.9" /><div class="sect2">
+<h3 class="sect2">14.3.9. Missing Subdomain Delegation</h3>
+
+
+<a name="INDEX-2187" /><a name="INDEX-2188" /><a name="INDEX-2189" /><a name="INDEX-2190" /><a name="INDEX-2191" />Even though registrars do their
+very best to process your requests as quickly as possible, it may
+take a day or two for your subdomain's delegation to appear in
+your parent zone's name servers. If your parent zone
+isn't one of the generic top-level domains, your mileage may
+vary. Some parents are quick and responsible, others are slow and
+inconsistent. Just like in real life, though, you're stuck with
+them.</p><p>
+
+
+Until your zone's delegation appears in your parent
+zone's name servers, your name servers will be able to look up
+data in the Internet's namespace, but no one out on the
+Internet (outside of your domain) will know how to look up data in
+<em class="emphasis">your</em> namespace.</p><p>
+
+
+That means that even though you can send mail outside of your domain,
+the recipients won't be able to reply to it. Furthermore, no
+one will be able to <em class="filename">telnet</em> to,
+<em class="filename">ftp</em> to, or even <em class="filename">ping</em> your
+hosts by domain name.</p><p>
+
+
+Remember that this applies equally to any <em class="emphasis">in-addr.arpa</em> zones you may run. Until
+their parent zones add delegation to your servers, name servers on
+the Internet won't be able to reverse map addresses on your
+networks.</p><p>
+
+
+To determine whether or not your zone's delegation has made it
+into your parent zone's name servers, query a parent name
+server for the NS records for your zone. If the parent name server
+has the data, any name server on the Internet can find it:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+<i class="lineannotation">&gt; </i><tt class="userinput"><b>server a.root-servers.net.</b></tt> <i class="lineannotation"> -- Query a root name server</i>
+Default Server:  a.root-servers.net
+Address:  198.41.0.4
+
+&gt; <tt class="userinput"><b>set norecurse</b></tt>             <i class="lineannotation"> -- Instruct the server to answer out of its own data</i>
+&gt; <tt class="userinput"><b>set type=ns</b></tt>               <i class="lineannotation"> -- and to look for NS records</i>
+&gt; <tt class="userinput"><b>249.249.192.in-addr.arpa.</b></tt> <i class="lineannotation"> -- for 249.249.192.in-addr.arpa</i>
+Server:  a.root-servers.net
+Address:  198.41.0.4
+
+*** a.root-servers.net can't find 249.249.192.in-addr.arpa.: Non-existent domain</pre></blockquote>
+
+
+Here, the delegation clearly hasn't been added yet. You can
+either wait patiently or, if an unreasonable amount of time has
+passed since you requested delegation from your parent zone, contact
+your parent zone's administrator and ask what's up.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.10" /><div class="sect2">
+<h3 class="sect2">14.3.10. Incorrect Subdomain Delegation</h3>
+
+
+<a name="INDEX-2192" /><a name="INDEX-2193" />Incorrect
+<a name="INDEX-2194" />subdomain delegation is another
+familiar problem on the Internet. Keeping delegation up to date
+requires human intervention -- informing your parent zone's
+administrator of changes to your set of authoritative name servers.
+Consequently, delegation information often becomes inaccurate as
+administrators make changes without letting their parents know. Far
+too many administrators believe that setting up delegation is a
+one-shot deal: they let their parents know which name servers are
+authoritative once when they set up their zone and then they never
+talk to them again. They don't even call on Mother's Day.</p><p>
+
+
+An administrator may add a new name server, decommission another, and
+change the IP address of a third, all without telling the parent
+zone's administrator. Gradually, the number of name servers
+correctly delegated to by the parent zone dwindles. In the best case,
+this leads to long resolution times as querying name servers struggle
+to find an authoritative name server for the zone. If the delegation
+information becomes badly out of date and the last authoritative name
+server is brought down for maintenance, the information within and
+below the zone will be inaccessible.</p><p>
+
+
+If you suspect bad delegation from your parent zone to your zone,
+from your zone to one of your children, or from a remote zone to one
+of its children, you can check with <em class="filename">nslookup </em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+&gt; <tt class="userinput"><b>server a.root-servers.net.</b></tt>     <i class="lineannotation"> -- Set server to the parent zone's name server that </i>
+<i class="lineannotation">                                                             -- you suspect has bad delegation</i>
+Default Server:  a.root-servers.net
+Address:  198.41.0.4
+
+&gt; <tt class="userinput"><b>set type=ns</b></tt>                    <i class="lineannotation"> -- Look for NS records</i>
+&gt; <tt class="userinput"><b>hp.com.</b></tt>                        <i class="lineannotation"> -- for the zone in question</i>
+Server:  a.root-servers.net
+Address:  198.41.0.4
+
+Non-authoritative answer:
+hp.com          nameserver = RELAY.HP.COM
+hp.com          nameserver = HPLABS.HPL.HP.COM
+hp.com          nameserver = NNSC.NSF.NET
+hp.com          nameserver = HPSDLO.SDD.HP.COM
+
+Authoritative answers can be found from:
+hp.com          nameserver = RELAY.HP.COM
+hp.com          nameserver = HPLABS.HPL.HP.COM
+hp.com          nameserver = NNSC.NSF.NET
+hp.com          nameserver = HPSDLO.SDD.HP.COM
+RELAY.HP.COM    internet address = 15.255.152.2
+HPLABS.HPL.HP.COM       internet address = 15.255.176.47
+NNSC.NSF.NET    internet address = 128.89.1.178
+HPSDLO.SDD.HP.COM       internet address = 15.255.160.64
+HPSDLO.SDD.HP.COM       internet address = 15.26.112.11</pre></blockquote>
+
+
+Let's say you suspect that the delegation to <em class="emphasis">hpsdlo.sdd.hp.com</em> is incorrect. You now
+query <em class="emphasis">hpsdlo.sdd.hp.com</em> for
+data in the <em class="emphasis">hp.com</em> zone
+(e.g., the SOA record for <em class="emphasis">hp.com</em>) and check the answer:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>server hpsdlo.sdd.hp.com.</b></tt>
+Default Server:  hpsdlo.sdd.hp.com
+Addresses:  15.255.160.64, 15.26.112.11
+
+&gt; <tt class="userinput"><b>set norecurse</b></tt>
+&gt; <tt class="userinput"><b>set type=soa</b></tt>
+&gt; <tt class="userinput"><b>hp.com.</b></tt>
+Server:  hpsdlo.sdd.hp.com
+Addresses:  15.255.160.64, 15.26.112.11
+
+Non-authoritative answer:
+hp.com
+        origin = relay.hp.com
+        mail addr = hostmaster.hp.com
+        serial = 1001462
+        refresh = 21600 (6 hours)
+        retry   = 3600 (1 hour)
+        expire  = 604800 (7 days)
+        minimum ttl = 86400 (1 day)
+
+Authoritative answers can be found from:
+hp.com          nameserver = RELAY.HP.COM
+hp.com          nameserver = HPLABS.HPL.HP.COM
+hp.com          nameserver = NNSC.NSF.NET
+RELAY.HP.COM    internet address = 15.255.152.2
+HPLABS.HPL.HP.COM       internet address = 15.255.176.47
+NNSC.NSF.NET    internet address = 128.89.1.178</pre></blockquote>
+
+
+If <em class="emphasis">hpsdlo.sdd.hp.com</em> really
+were authoritative for <em class="emphasis">hp.com</em>, it would have responded with an
+authoritative answer. The administrator of the <em class="emphasis">hp.com</em> zone can tell you whether
+<em class="emphasis">hpsdlo.sdd.hp.com</em> should be
+an authoritative name server for <em class="emphasis">hp.com</em>, so that's who you should
+contact.</p><p>
+
+
+<a name="INDEX-2195" />Another common symptom of this is a
+"lame server" error message:</p><p>
+
+
+<blockquote><pre class="code">Oct 1 04:43:38 terminator named[146]: Lame server on '40.234.23.210.in-addr.arpa' 
+(in '210.in-addr.arpa'?): [198.41.0.5].53 'RS0.INTERNIC.NET': learnt(A=198.41.0.
+21,NS=128.63.2.53)</pre></blockquote>
+
+
+Here's how to read that: your name server was referred by the
+name server at 128.63.2.53 to the name server at 198.41.0.5 for a
+name in the domain <em class="emphasis">210.in-addr.arpa</em><em class="emphasis">,</em>
+specifically <em class="emphasis">40.234.23.210.in-addr.arpa</em>. The response
+from the name server at 198.41.0.5 indicated that it wasn't, in
+fact, authoritative for <em class="emphasis">210.in-addr.arpa</em>, and therefore either
+the delegation that 128.63.2.53 gave you is wrong or the server at
+198.41.0.5 is<a name="INDEX-2196" />
+misconfigured.<a name="INDEX-2197" /><a name="INDEX-2198" /><a name="INDEX-2199" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.11" /><div class="sect2">
+<h3 class="sect2">14.3.11. Syntax Error in resolv.conf</h3>
+
+
+Despite the<a name="INDEX-2200" /><a name="INDEX-2201" /><a name="INDEX-2202" /> <em class="filename">resolv.conf</em>
+file's simple syntax, people do occasionally make mistakes when
+editing it. And, unfortunately, lines with syntax errors in
+<em class="filename">resolv.conf</em> are silently ignored by the
+resolver. The result is usually that some part of your intended
+configuration doesn't take effect: either your local domain
+name or search list isn't set correctly, or the resolver
+won't query one of the name servers you configured it to query.
+Commands that rely on the search list won't work, your resolver
+won't query the right name server, or it won't query a
+name server at all.</p><p>
+
+
+The easiest way to check whether your
+<em class="filename">resolv.conf</em> file is having the intended effect
+is to run <em class="filename">nslookup</em>.
+<em class="filename">nslookup</em> will kindly report the local domain
+name and search list it derives from
+<em class="filename">resolv.conf</em>, plus the name server it's
+querying, when you type <em class="emphasis">set all</em>, as we showed
+you in <a href="ch12_01.html">Chapter 12, "nslookup and dig"</a>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+&gt; <tt class="userinput"><b>set all</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+Set options:
+  nodebug         defname          search         recurse
+  nod2            novc             noignoretc     port=53
+  querytype=A     class=IN         timeout=5      retry=4
+  root=ns.nic.ddn.mil.
+  domain=movie.edu
+  srchlist=movie.edu
+
+&gt;</pre></blockquote>
+
+
+Check that the output of<a name="INDEX-2203" /> <em class="emphasis">set all</em> is what
+you expect, given your <em class="filename">resolv.conf</em> file. For
+example, if you set <em class="emphasis">search fx.movie.edu
+movie.edu</em> in <em class="filename">resolv.conf</em>, you expect
+to see:</p><p>
+
+
+<blockquote><pre class="code">domain=fx.movie.edu
+srchlist=fx.movie.edu/movie.edu</pre></blockquote>
+
+
+in the output. If you don't see what you're expecting,
+look carefully at <em class="filename">resolv.conf</em>. If there's
+nothing obvious, look for unprintable characters (with <em class="filename">vi
+</em>'s <em class="emphasis">set list</em> command, for
+example). Watch out for trailing spaces, especially; on older
+resolvers, a trailing space after the domain name will set the local
+domain name to include a space. No real top-level domain names
+actually end with spaces, of course, so all of your
+non-dot-terminated lookups will fail.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.12" /><div class="sect2">
+<h3 class="sect2">14.3.12. Local Domain Name Not Set</h3>
+
+
+<a name="INDEX-2204" /><a name="INDEX-2205" />Failing
+to set your local domain name is another old standby gaffe. You can
+set it implicitly by setting your <em class="filename">hostname </em>to
+your host's fully qualified domain name or explicitly in
+<em class="filename">resolv.conf</em>. The characteristics of an unset
+local domain name are straightforward: folks who use single-label
+names (or abbreviated domain names) in commands get no joy:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet br</b></tt>
+br: No address associated with name
+% <tt class="userinput"><b>telnet br.fx</b></tt>
+br.fx: No address associated with name
+% <tt class="userinput"><b>telnet br.fx.movie.edu</b></tt>
+Trying...
+Connected to bladerunner.fx.movie.edu.
+Escape character is '^]'.
+
+HP-UX bladerunner.fx.movie.edu A.08.07 A 9000/730 (ttys1)
+login:</pre></blockquote>
+
+
+You can use <em class="filename">nslookup</em> to check this one, much as
+you do when you suspect a syntax error in
+<em class="filename">resolv.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+&gt; <tt class="userinput"><b>set all</b></tt>
+Default Server:  terminator.movie.edu
+Address:  192.249.249.3
+
+Set options:
+  nodebug         defname         search          recurse
+  nod2            novc            noignoretc      port=53
+  querytype=A     class=IN        timeout=5       retry=4
+  root=ns.nic.ddn.mil.
+  domain=
+  srchlist=</pre></blockquote>
+
+
+Notice that neither the local domain name nor the search list is set.
+You can also track this down by enabling debugging on the name
+server. (This, of course, requires access to the name server, which
+may not be running on the host that the problem is affecting.)
+Here's how the debugging output from a BIND 9 name server might
+look after trying those <em class="filename">telnet</em> commands:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 16:17:58.824 client 192.249.249.3#1032: query: br A
+Sep 26 16:17:58.825 createfetch: br. A
+Sep 26 16:18:09.996 client 192.249.249.3#1032: query: br.fx A
+Sep 26 16:18:09.996 createfetch: br.fx. A
+Sep 26 16:18:18.677 client 192.249.249.3#1032: query: br.fx.movie.edu A</pre></blockquote>
+
+
+On a BIND 8 name server, it would look something like this:</p><p>
+
+
+<blockquote><pre class="code">Debug turned ON, Level 1
+
+datagram from [192.249.249.3].1057, fd 5, len 20
+req: nlookup(br) id 27974 type=1 class=1
+req: missed 'br' as '' (cname=0)
+forw: forw -&gt; [198.41.0.4].53 ds=7 nsid=61691 id=27974 0ms retry 4 sec
+
+datagram from [198.41.0.4].53, fd 5, len 20
+ncache: dname br, type 1, class 1
+send_msg -&gt; [192.249.249.3].1057 (UDP 5) id=27974
+
+datagram from [192.249.249.3].1059, fd 5, len 23
+req: nlookup(br.fx) id 27975 type=1 class=1
+req: missed 'br.fx' as '' (cname=0)
+forw: forw -&gt; [128.9.0.107].53 ds=7 nsid=61692 id=27975 0ms retry 4 sec
+
+datagram from [128.9.0.107].53, fd 5, len 23
+ncache: dname br.fx, type 1, class 1
+send_msg -&gt; [192.249.249.3].1059 (UDP 5) id=27975
+
+datagram from [192.249.249.3].1060, fd 5, len 33
+req: nlookup(br.fx.movie.edu) id 27976 type=1 class=1
+req: found 'br.fx.movie.edu' as 'br.fx.movie.edu' (cname=0)
+req: nlookup(bladerunner.fx.movie.edu) id 27976 type=1 class=1
+req: found 'bladerunner.fx.movie.edu' as 'bladerunner.fx.movie.edu'
+     (cname=1)
+ns_req: answer -&gt; [192.249.249.3].1060 fd=5 id=27976 size=183 Local
+Debug turned OFF</pre></blockquote>
+
+
+Contrast this with the debugging output produced by the application
+of the search list in <a href="ch13_01.html">Chapter 13, "Reading BIND Debugging Output"</a>. The only names
+looked up here are exactly what the user typed, with no domain names
+appended at all. Clearly, the search list isn't being applied.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-3.13" /><div class="sect2">
+<h3 class="sect2">14.3.13. Response from Unexpected Source</h3>
+
+
+<a name="INDEX-2206" />One problem we've seen
+increasingly often in the DNS newsgroups is the "response from
+unexpected source." This was once called a Martian response:
+it's a response that comes from an IP address other than the
+one your name server sent a query to. When a BIND name server sends a
+query to a remote server, BIND conscientiously makes sure that
+answers come only from the IP addresses on that server. This helps
+minimize the possibility of accepting spoofed responses. BIND is
+equally demanding of itself: a BIND server makes every effort to
+reply via the same network interface that it received a query on.</p><p>
+
+
+Here's the error message you'd see upon receiving a
+possibly unsolicited response:</p><p>
+
+
+<blockquote><pre class="code">Mar  8 17:21:04 terminator named[235]: Response from unexpected source ([205. 199.4.131].53)</pre></blockquote>
+
+
+This can mean one of two things: either someone is trying to spoof
+your name server, or -- more likely -- you sent a query to an
+older BIND server or a different make of name server that's not
+as assiduous about replying from the same interface it receives
+queries on.<a name="INDEX-2207" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.2. Troubleshooting Tools and Techniques</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.4. Transition Problems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

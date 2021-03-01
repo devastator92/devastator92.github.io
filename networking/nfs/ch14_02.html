@@ -1,0 +1,715 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>NFS statistics (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch14_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.2. NFS statistics</h2>
+
+The client- and server-side implementations<a name="INDEX-2164" />
+<a name="INDEX-2165" /> <a name="INDEX-2166" /> of NFS compile per-call
+statistics of NFS service usage at both the RPC and application
+layers. <em class="emphasis">nfsstat -c</em> displays
+<a name="INDEX-2167" /> <a name="INDEX-2168" />the client-side statistics
+while <em class="emphasis">nfsstat -s</em> shows the server tallies. With
+no arguments, <em class="emphasis">nfsstat</em> prints out both sets of
+statistics:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -s</b></tt> 
+Server rpc:
+Connection oriented:
+calls       badcalls    nullrecv    badlen      xdrcall     dupchecks   
+10733943    0           0           0           0           1935861     
+dupreqs     
+0           
+Connectionless:
+calls       badcalls    nullrecv    badlen      xdrcall     dupchecks   
+136499      0           0           0           0           0           
+dupreqs     
+0           
+
+Server nfs:
+calls       badcalls    
+10870161    14          
+Version 2: (1716 calls)
+null        getattr     setattr     root        lookup      readlink    
+48 2%       0 0%        0 0%        0 0%        1537 89%    13 0%       
+read        wrcache     write       create      remove      rename      
+0 0%        0 0%        0 0%        0 0%        0 0%        0 0%        
+link        symlink     mkdir       rmdir       readdir     statfs      
+0 0%        0 0%        0 0%        0 0%        111 6%      7 0%        
+Version 3: (10856042 calls)
+null        getattr     setattr     lookup      access      readlink    
+136447 1%   4245200 39% 95412 0%    1430880 13% 2436623 22% 74093 0%    
+read        write       create      mkdir       symlink     mknod       
+376522 3%   277812 2%   165838 1%   25497 0%    24480 0%    0 0%        
+remove      rmdir       rename      link        readdir     readdirplus 
+359460 3%   33293 0%    8211 0%     69484 0%    69898 0%    876367 8%   
+fsstat      fsinfo      pathconf    commit      
+1579 0%     7698 0%     4253 0%     136995 1%   
+Server nfs_acl:
+Version 2: (2357 calls)
+null        getacl      setacl      getattr     access      
+0 0%        5 0%        0 0%        2170 92%    182 7%      
+Version 3: (10046 calls)
+null        getacl      setacl      
+0 0%        10039 99%   7 0%        </pre></blockquote>
+
+The server-side RPC fields indicate if there are problems removing
+the packets from the NFS service end point. The kernel reports
+statistics on connection-oriented RPC and connectionless RPC
+separately. The fields detail each kind of problem:
+</p>
+
+<dl>
+<dt><i>calls</i></dt>
+<dd>
+The NFS calls value represents the
+<a name="INDEX-2169" />
+<a name="INDEX-2170" />total number of NFS Version 2, NFS
+Version 3, NFS ACL Version 2 and NFS ACL Version 3 RPC calls made to
+this server from all clients. The RPC calls value represents the
+total number of NFS, NFS ACL, and NLM RPC calls made to this server
+from all clients. RPC calls made for other services, such as NIS, are
+not included in this count.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>badcalls</i></dt>
+<dd>
+These are RPC requests that were rejected out of hand by the
+server's RPC mechanism, before the request was passed to the
+NFS service routines in the kernel. An RPC call will be rejected if
+there is an authentication failure, where the calling client does not
+present valid credentials.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>nullrecv</i></dt>
+<dd>
+Not used in Solaris. Its value is always 0. </p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>badlen/xdrcall</i></dt>
+<dd>
+The RPC request received by the server was too short
+(<em class="emphasis">badlen</em>) or the XDR headers in the packet are
+malformed (<em class="emphasis">xdrcall</em> ). Most likely this is due to
+a malfunctioning client. It is rare, but possible, that the packet
+could have been truncated or damaged by a network problem. On a local
+area network, it's rare to have XDR headers damaged, but
+running NFS over a wide-area network could result in malformed
+requests. We'll look at ways of detecting and correcting packet
+damage on wide-area networks in <a href="ch18_04.html#nfs2-CHP-18-SECT-4">Section 18.4, "NFS over wide-area networks"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>dupchecks/dupreqs</i></dt>
+<dd>
+The <em class="emphasis">dupchecks</em>field indicates the number of RPC calls that were
+looked up in the duplicate request cache. The dupreqs field indicates
+the number of RPC calls that were actually found to be duplicates.
+Duplicate requests occur as a result of client retransmissions. A
+large number of dupreqs usually indicates that the server is not
+replying fast enough to its clients. Idempotent requests can be
+replayed without ill effects, therefore not all RPCs have to be
+looked up on the duplicate request cache. This explains why the
+dupchecks field does not match the calls field.
+</p>
+</dd>
+
+</dl>
+
+The statistics for each NFS version are reported independently,
+showing the total number of NFS calls made to this server using each
+version of the protocol. A version-specific breakdown by procedure of
+the calls handled is also provided. Each of the call types
+corresponds to a procedure within the NFS RPC and NFS_ACL RPC
+services.
+</p>
+
+The null procedure is included
+in<a name="INDEX-2171" /> <a name="INDEX-2172" /> every RPC program for
+<em class="emphasis">ping</em>ing the RPC server. The null procedure
+returns no value, but a successful return from a call to
+<em class="emphasis">null</em> ensures that the network is operational and
+that the server host is alive. <em class="emphasis">rpcinfo</em> calls the
+null procedure to check RPC server health. The automounter (see <a href="ch09_01.html">Chapter 9, "The Automounter"</a>) calls the null procedure of all NFS servers
+in parallel when multiple machines are listed for a single mount
+point. The automounter and <em class="emphasis">rpcinfo</em> should
+account for the total <em class="emphasis">null</em> calls reported by
+<em class="emphasis">nfsstat</em>.
+</p>
+
+Client-side RPC statistics include the number of calls of each type
+made to all servers, while the client NFS statistics indicate how
+successful the client machine is in reaching NFS servers:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -c</b></tt> 
+Client rpc:
+Connection oriented:
+calls       badcalls    badxids     timeouts    newcreds    badverfs    
+1753584     1412        18          64          0           0           
+timers      cantconn    nomem       interrupts  
+0           1317        0           18          
+Connectionless:
+calls       badcalls    retrans     badxids     timeouts    newcreds    
+12443       41          334         80          166         0           
+badverfs    timers      nomem       cantsend    
+0           4321        0           206         
+
+Client nfs:
+calls       badcalls    clgets      cltoomany   
+1661217     23          1661217     3521        
+Version 2: (234258 calls)
+null        getattr     setattr     root        lookup      readlink    
+0 0%        37 0%       0 0%        0 0%        184504 78%  811 0%      
+read        wrcache     write       create      remove      rename      
+49 0%       0 0%        24301 10%   3 0%        2 0%        0 0%        
+link        symlink     mkdir       rmdir       readdir     statfs      
+0 0%        0 0%        12 0%       12 0%       24500 10%   27 0%       
+Version 3: (1011525 calls)
+null        getattr     setattr     lookup      access      readlink    
+0 0%        417691 41%  14598 1%    223609 22%  47438 4%    695 0%      
+read        write       create      mkdir       symlink     mknod       
+56347 5%    221334 21%  1565 0%     106 0%      48 0%       0 0%        
+remove      rmdir       rename      link        readdir     readdirplus 
+807 0%      14 0%       676 0%      24 0%       475 0%      5204 0%     
+fsstat      fsinfo      pathconf    commit      
+8 0%        10612 1%    95 0%       10179 1%    
+
+Client nfs_acl:
+Version 2: (411477 calls)
+null        getacl      setacl      getattr     access      
+0 0%        181399 44%  0 0%        185858 45%  44220 10%   
+Version 3: (3957 calls)
+null        getacl      setacl      
+0 0%        3957 100%   0 0%        </pre></blockquote>
+
+In addition to the total number of NFS calls made and the number of
+rejected NFS calls (<em class="emphasis">badcalls</em>), the client-side
+statistics indicate if NFS calls are being delayed due to a lack of
+client RPC handles. Client RPC handles are opaque pointers used by
+the kernel to hold server connection information. In SunOS 4.x, the
+number of client handles was fixed, causing the NFS call to block
+until client handles became available. In Solaris, client handles are
+allocated dynamically. The kernel maintains a cache of up to 16
+client handles, which are reused to speed up communication with the
+server. The <em class="emphasis">clgets</em> count indicates the number of
+times a client handle has been requested. If the NFS call cannot find
+an unused client handle in the cache, it will not block until one
+frees up. Instead, it will create a brand new client handle and
+proceed. This count is reflected by <em class="emphasis">cltoomany</em>.
+The client handle is destroyed when the reply to the NFS call
+arrives. This count is of little use to system administrators since
+nothing can be done to increase the cache size and reduce the number
+of misses.
+</p>
+
+Included in the client RPC statistics are counts <a name="INDEX-2173" />for various failures experienced
+while trying to send NFS requests to a server:
+</p>
+
+<dl>
+<dt><i>calls</i></dt>
+<dd>
+Total number of calls made to all NFS servers.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>badcalls</i></dt>
+<dd>
+Number of RPC calls that returned an error. The two most common RPC
+failures are timeouts and interruptions, both of which increment the
+<em class="emphasis">badcalls</em> counter. The connection-oriented RPC
+statistics also increment the <em class="emphasis">interrupts</em>
+counter. There is no equivalent counter for connectionless RPC
+statistics. If a server reply is not received within the RPC timeout
+period, an RPC error occurs. If the RPC call is interrupted, as it
+may be if a filesystem is mounted with the <em class="emphasis">intr</em>
+option, then an RPC interrupt code is returned to the caller.
+<em class="emphasis">nfsstat</em> also reports the
+<em class="emphasis">badcalls</em> count in the NFS statistics. NFS call
+failures do not include RPC timeouts or interruptions, but do include
+other RPC failures such as authentication errors (which will be
+counted in both the NFS and RPC level statistics).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>badxids</i></dt>
+<dd>
+The number of bad XIDs. The XID in an NFS request is a serial number
+that uniquely identifies the request. When a request is
+retransmitted, it retains the same XID through the entire timeout and
+retransmission cycle. With the Solaris multithreaded kernel, it is
+possible for the NFS client to have several RPC requests outstanding
+at any time, to any number of NFS servers. When a response is
+received from an NFS server, the client matches the XID in the
+response to an RPC call in progress. If an XID is seen for which
+there is no active RPC call  --  because the client already
+received a response for that XID  --  then the client increments
+badxid. A high badxid count, therefore, indicates that the server is
+receiving some retransmitted requests, but is taking a long time to
+reply to all NFS requests. This scenario is explored in <a href="ch18_01.html#nfs2-CHP-18-SECT-1">Section 18.1, "Slow server compensation"</a>. 
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>timeouts</i></dt>
+<dd>
+Number of calls that timed out waiting for a server's response.
+For hard-mounted filesystems, calls that time out are retransmitted,
+with a new timeout period that may be longer than the previous one.
+However, calls made on soft-mounted filesystems may eventually fail
+if the retransmission count is exceeded, so that the call counts obey
+the relationship:
+</p>
+</dd>
+
+</dl>
+
+<blockquote><pre class="code">timeout + badcalls &gt;= retrans</pre></blockquote>
+The final retransmission of a request on a soft-mounted filesystem
+increments <em class="emphasis">badcalls</em> (as previously explained).
+For example, if a filesystem is mounted with
+<em class="emphasis">retrans=5</em>, the client reissues the same request
+five times before noting an RPC failure. All five requests are
+counted in <em class="emphasis">timeout</em>, since no replies are
+received. Of the failed attempts, four are counted in the
+<em class="emphasis">retrans</em> statistic and the last shows up in
+<em class="emphasis">badcalls</em>.
+</p>
+
+<dl>
+<dt><i>newcreds</i></dt>
+<dd>
+Number of times client authentication information had to be
+refreshed. This statistic only applies if a secure RPC mechanism has
+been integrated with the NFS service.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>badverfs</i></dt>
+<dd>
+Number of times server replies could not be authenticated. The number
+of times the client could not guarantee that the server was who it
+says it was. These are likely due to packet retransmissions more than
+security breaches, as explained later in this section.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>timers</i></dt>
+<dd>
+Number of times the starting RPC call timeout value was greater than
+or equal to the minimum specified timeout value for the call. Solaris
+attempts to dynamically tune the initial timeout based on the history
+of calls to the specific server. If the server has been sluggish in
+its reponse to this type of RPC call, the timeout will be greater
+than if the server had been replying normally. It makes sense to wait
+longer before retransmitting for the first time, since history
+indicates that this server is slow to reply. Most client
+implementations use an exponential back-off strategy that doubles or
+quadruples the timeout after each retransmission up to an
+implementation-specific limit.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>cantconn</i></dt>
+<dd>
+Number of times a connection-oriented RPC call failed due to a
+failure to establish a connection to the server. The reasons why
+connections cannot be created are varied; one example is the server
+may not be running the <em class="emphasis">nfsd</em> daemon.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>nomem</i></dt>
+<dd>
+Number of times a call failed due to lack of resources. The host is
+low in memory and cannot allocate enough temporary memory to handle
+the request.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>interrupts</i></dt>
+<dd>
+Number of times a connection-oriented RPC call was interrupted by a
+signal before completing. This counter applies to connection-oriented
+RPC calls only. Interrupted connection and connectionless RPC calls
+also increment <em class="emphasis">badcalls</em>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>retrans</i></dt>
+<dd>
+Number of calls that were retransmitted because no response was
+received from the NFS server within the timeout period. This is only
+reported for RPC over connectionless transports. An NFS client that
+is experiencing poor server response will have a large number of
+retransmitted calls.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>cantsend</i></dt>
+<dd>
+Number of times a request could not be sent. This counter is
+incremented when network plumbing problems occur. This will mostly
+occur when no memory is available to allocate buffers in the various
+network layer modules, or the request is interrupted while the client
+is waiting to queue the request downstream. The
+<em class="emphasis">nomem</em> and <em class="emphasis">interrupts</em>
+counters report statistics encountered in the RPC software layer,
+while the <em class="emphasis">cantsend</em> counter reports statistics
+gathered in the <a name="INDEX-2174" />kernel TLI layer.
+</p>
+</dd>
+
+</dl>
+
+The statistics shown by <em class="emphasis">nfsstat</em> are cumulative
+from the time the machine was booted, or the last time they were
+zeroed using <em class="emphasis">nfsstat -z</em>:
+</p>
+
+<blockquote><pre class="code">nfsstat -z      <i class="lineannotation">Resets all counters.</i>
+nfsstat -sz     <i class="lineannotation">Zeros server-side RPC and NFS statistics.</i>
+nfsstat -cz     <i class="lineannotation">Zeros client-side RPC and NFS statistics.</i> 
+nfsstat -crz    <i class="lineannotation">Zeros client-side RPC statistics only.</i></pre></blockquote>
+
+Only the superuser can reset the counters.</p>
+
+<em class="emphasis">nfsstat</em> provides a very coarse look at NFS
+activity and is limited in its usefulness for resolving performance
+problems. Server statistics are collected for all clients, while in
+many cases it is important to know the distribution of calls from
+each client. Similarly, client-side statistics are aggregated for all
+NFS servers.
+</p>
+
+However, you can still glean useful information from
+<em class="emphasis">nfsstat</em>. Consider the case where a client
+reports a high number of bad verifiers. The high
+<em class="emphasis">badverfs</em> count is most likely an indication that
+the client is having to retransmit its secure RPC requests. As
+explained in <a href="ch12_01.html#nfs2-CHP-12-SECT-1">Section 12.1, "User-oriented network security"</a>, every secure RPC call has a
+unique credential and verifier with a unique timestamp (in the case
+of AUTH_DES) or a unique sequence number (in the case of RPCSEC_GSS).
+The client expects the server to include this verifier (or some form
+of it) in its reply, so that the client can verify that it is indeed
+obtaining the reply from the server it called.
+</p>
+
+Consider the scenario where the client makes a secure RPC call using
+AUTH_DES, using timestamp T1 to generate its verifier. If no reply is
+received within the timeout period, the client retransmits the
+request, using timestamp T1+delta to generate its verifier (bumping
+up the <em class="emphasis">retrans</em> count). In the meantime, the
+server replies to the original request using timestamp T1 to generate
+its verifier:
+</p>
+
+<blockquote><pre class="code">RPC call (T1)               ---&gt;
+                         ** time out **
+RPC call (retry: T1+delta)  ---&gt;
+                            &lt;--- Server reply to first RPC call (T1 verifier)</pre></blockquote>
+
+The reply to the client's original request will cause the
+verifier check to fail because the client now expects T1+delta in the
+verifier, not T1. This consequently bumps up the
+<em class="emphasis">badverf</em> count. Fortunately, the Solaris client
+will wait for more replies to its retransmissions and, if the reply
+passes the verifier test, an NFS authentication error will be
+avoided. Bad verifiers are not a big problem, unless the count gets
+too high, especially when the system starts experiencing NFS
+authentication errors. Increasing the NFS <em class="emphasis">timeo</em>
+on the mount or automounter map may help alleviate this problem. Note
+also that this is less of a problem with TCP than UDP. Analysis of
+situations such as this will be the focus of <a href="ch16_01.html#nfs2-CHP-16-SECT-1">Section 16.1, "Characterization of NFS behavior"</a>, <a href="ch17_01.html">Chapter 17, "Network Performance Analysis"</a>, and <a href="ch18_01.html">Chapter 18, "Client-Side Performance Tuning"</a>.
+</p>
+
+For completeness, we should mention that verifier failures can also
+be caused when the security content expires before the response is
+received. This is rare but possible. It usually occurs when you have
+a network partition that is longer than the lifetime of the security
+context. Another cause might be a significant time skew between the
+client and server, as well as a router with a ghost packet stored,
+that fires after being delayed for a very long time. Note that this
+is not a problem with TCP.
+</p>
+
+<a name="nfs2-CHP-14-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">14.2.1. I/O statistics</h3>
+
+Solaris' <em class="emphasis">iostat</em> utility has been
+<a name="INDEX-2175" />
+<a name="INDEX-2176" />
+<a name="INDEX-2177" />
+<a name="INDEX-2178" />extended to report I/O statistics on
+NFS mounted filesystems, in addition to its traditional reports on
+disk, tape I/O, terminal activity, and CPU utilization. The
+<em class="emphasis">iostat</em> utility helps you measure and monitor
+performance by providing disk and network I/O throughput,
+utilization, queue lengths and response time.
+</p>
+
+The <em class="emphasis">-xn</em> directives instruct
+<em class="emphasis">iostat</em> to report extended disk statistics in
+tabular form, as well as display the names of the devices in
+descriptive format (for example, server:/export/path). The following
+example shows the output of <em class="emphasis">iostat -xn 20</em> during
+NFS activity on the client, while it concurrently reads from two
+separate NFS filesystems. The server <em class="emphasis">assisi</em> is
+connected to the same hub to which the client is connected, while the
+test server <em class="emphasis">paris</em> is on the other side of the
+hub and other side of the building network switches. The two servers
+are identical; they have the same memory, CPU, and OS configuration:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>iostat -xn 20</b></tt>
+  ...
+                    extended device statistics              
+    r/s    w/s   kr/s   kw/s wait actv wsvc_t asvc_t  %w  %b device
+    0.0    0.1    0.0    0.4  0.0  0.0    0.0    3.6   0   0 c0t0d0   
+    0.0    0.0    0.0    0.0  0.0  0.0    0.0    0.0   0   0 fd0
+    0.0    0.0    0.0    0.0  0.0  0.0    0.0    0.0   0   0 rome:vold(pid239)
+    9.7    0.0  310.4    0.0  0.0  3.3    0.2  336.7   0 100 paris:/export
+   34.1    0.0 1092.4    0.0  0.0  3.2    0.2   93.2   0  99 assisi:/export</pre></blockquote>
+
+The <em class="emphasis">iostat</em> utility iteratively reports the disk
+statistics every 20 seconds and calculates its statistics based on a
+delta from the previous values. The first set of statistics is
+usually uninteresting, since it reports the cumulative values since
+boot time. You should focus your attention on the following set of
+values reporting the current disk and network activity. Note that the
+previous example does not show the cumulative statistics. The output
+shown represents the second set of values, which report the I/O
+statistics within the last 20 seconds. The first two lines represent
+the header, then every disk and NFS filesystem on the system is
+presented in separate lines. The first line reports statistics for
+the local hard disk <em class="emphasis">c0t0d0</em>. The second line
+reports statistics for the local floppy disk
+<em class="emphasis">fd0</em>. The third line reports statistics for the
+volume manager <em class="emphasis">vold</em>. In Solaris, the volume
+manager is implemented as an NFS user-level server. The fourth and
+fifth lines report statistics for the NFS filesystems mounted on this
+host. Included in the statistics are various values that will help
+you analyze the performance of the NFS activity:
+</p>
+
+<dl>
+<dt><i>r/s</i></dt>
+<dd>
+Represents the number of read operations<a name="INDEX-2179" /> per second during the
+time interval specified. For NFS filesystems, this value represents
+the number of times the remote server was called to read data from a
+file, or read the contents of a directory. This quantity accounts for
+the number of read, readdir, and readdir+ RPCs performed during this
+interval. In the previous example, the client contacted the server
+<em class="emphasis">assisi</em> an average of 34.1 times per second to
+either read the contents of a file, or list the contents of
+directories.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>w/s</i></dt>
+<dd>
+Represents the number of write <a name="INDEX-2180" />operations per second during the time
+interval specified. For NFS filesystems, this value represents the
+number of times the remote server was called to write data to a file.
+It does not include directory operations such as mkdir, rmdir, etc.
+This quantity accounts for the number of write RPCs performed during
+this interval.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>kr/s</i></dt>
+<dd>
+Represents the number of kilobytes per
+second<a name="INDEX-2181" /> read during this interval. In the
+preceding example, the client is reading data at an average of
+1,092.4 KB/s from the NFS server assisi. The optional
+<em class="emphasis">-M</em> directive would instruct
+<em class="emphasis">iostat</em> to display data throughput in MB/sec
+instead of KB/sec.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>kw/s</i></dt>
+<dd>
+Represents the number of kilobytes
+written<a name="INDEX-2182" /> per second during this interval. The
+optional <em class="emphasis">-M</em> directive would instruct
+<em class="emphasis">iostat</em> to display data throughput in MB/sec.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>wait</i></dt>
+<dd>
+Reports the average number of requests waiting
+<a name="INDEX-2183" />to be
+processed. For NFS filesystems, this value gets incremented when a
+request is placed on the asynchronous request queue, and gets
+decreased when the request is taken off the queue and handed off to
+an NFS async thread to perform the RPC call. The length of the wait
+queue indicates the number of requests waiting to be sent to the NFS
+server.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>actv</i></dt>
+<dd>
+Reports the number of requests actively being processed (i.e., the
+length of the run queue). For NFS filesystems, this number represents
+the number of active NFS async threads waiting for the NFS server to
+respond (i.e., the number of outstanding requests being serviced by
+the NFS server). In the preceding example, the client has on average
+3.2 outstanding RPCs pending for a reply by the server
+<em class="emphasis">assisi</em> at all times during the interval
+specified. This number is controlled by the maximum number of NFS
+async threads configured on the system. <a href="ch18_01.html">Chapter 18, "Client-Side Performance Tuning"</a>
+will explain this in more detail.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>wsvc_t</i></dt>
+<dd>
+Reports the time spent in the wait queue in milliseconds. For NFS
+filesystems, this is the time the request waited before it could be
+sent out to the server.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>asvc_t</i></dt>
+<dd>
+Reports the time spent in the run queue in milliseconds. For NFS
+filesystems, this represents the average amount of time the client
+waits for the reply to its RPC requests, after they have been sent to
+the NFS server. In the preceding example, the server
+<em class="emphasis">assisi</em> takes on average 93.2 milliseconds to
+reply to the client's requests, where the server
+<em class="emphasis">paris</em> takes 336.7 milliseconds. Recall that the
+server <em class="emphasis">assisi</em> and the client are physically
+connected to the same hub, whereas packets to and from the server
+<em class="emphasis">paris</em> have to traverse multiple switches to
+communicate with the client. Analysis of <em class="emphasis">nfsstat
+-s</em> on paris indicated a large amount of NFS traffic
+directed at this server at the same time. This, added to server load,
+accounts for the slow response time.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>%w</i></dt>
+<dd>
+Reports the percentage of time that transactions are present in the
+wait queue ready to be processed. A large number for an NFS filesytem
+does not necessarily indicate a problem, given that there are
+multiple NFS async threads that perform the work.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>%b</i></dt>
+<dd>
+Reports the percentage of time that <em class="emphasis">actv</em> is
+non-zero (at least one request is being processsed). For NFS
+filesystems, it represents the activity level of the server mount
+point. 100% busy does not indicate a problem since the NFS server has
+multiple nfsd threads that can handle concurrent RPC requests. It
+simply indicates that the client has had requests continuously
+processed by the server during the measurement time.<a name="INDEX-2184" /> <a name="INDEX-2185" /> <a name="INDEX-2186" /> <a name="INDEX-2187" />
+</p>
+</dd>
+
+</dl>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14. NFS Diagnostic Tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.3. snoop</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

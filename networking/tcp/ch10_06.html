@@ -1,0 +1,878 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch10_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:30 GMT -->
+<head><title>Rewriting the Mail Address  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch10_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">10.6. Rewriting the Mail Address </h2>
+
+<p>Rewrite rules
+<a name="INDEX-2220" /> <a name="INDEX-2221" />are the heart of the
+<em class="emphasis">sendmail.cf</em> file. Rulesets are groups of
+individual rewrite rules used to parse email addresses from user mail
+programs and rewrite them into the form required by the mail delivery
+programs. Each rewrite rule is defined by an <tt class="literal">R</tt>
+command. The syntax of the <tt class="literal">R</tt><a name="INDEX-2222" /> command is:
+</p>
+
+<blockquote><pre class="code"> R<em class="replaceable">pattern transformation comment</em></pre></blockquote>
+
+<p>The fields in an <tt class="literal">R</tt> command are separated by tab
+characters. The comment field is ignored by the system, but good
+comments are vital if you want to have any hope of understanding
+what's going on. The pattern and transformation fields are the
+heart of this command.
+</p>
+
+<a name="tcp3-CHP-10-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">10.6.1. Pattern Matching </h3>
+
+<p>Rewrite rules
+<a name="INDEX-2223" />
+<a name="INDEX-2224" /> <a name="INDEX-2225" />match the input
+address against the pattern, and if a match is found, they rewrite
+the address in a new format using the rules defined in the
+transformation. A rewrite rule may process the same address several
+times because, after being rewritten, the address is again compared
+against the pattern. If it still matches, it is rewritten again. The
+cycle of pattern matching and rewriting continues until the address
+no longer matches the pattern.
+</p>
+
+<p>The pattern is defined using macros, classes, literals, and special
+metasymbols. The macros, classes, and literals provide the values
+against which the input is compared, and the metasymbols define the
+rules used in matching the pattern. <a href="ch10_06.html#tcp3-CHP-10-TABLE-3">Table 10-3</a>
+shows the metasymbols used for pattern
+<a name="INDEX-2226" />matching.
+</p>
+
+<a name="tcp3-CHP-10-TABLE-3" /><h4 class="objtitle">Table 10-3. Pattern matching metasymbols </h4><table border="1">
+
+<table border="1">
+
+<tr>
+<th>
+<p>Symbol</p>
+</th>
+<th>
+<p>Meaning</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>$@</p>
+</td>
+<td>
+<p>Match exactly zero tokens.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$*</p>
+</td>
+<td>
+<p>Match zero or more tokens.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$+</p>
+</td>
+<td>
+<p>Match one or more tokens.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$-</p>
+</td>
+<td>
+<p>Match exactly one token.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$=<em class="emphasis">x</em></p>
+</td>
+<td>
+<p>Match any token in class <em class="emphasis">x</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$~<em class="emphasis">x</em></p>
+</td>
+<td>
+<p>Match any token not in class <em class="emphasis">x</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$<em class="emphasis">x</em></p>
+</td>
+<td>
+<p>Match all tokens in macro <em class="emphasis">x</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$%<em class="emphasis">x</em></p>
+</td>
+<td>
+<p>Match any token in the NIS map named in macro
+<em class="emphasis">x</em>.<a href="#FOOTNOTE-122">[122]</a>
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$!<em class="emphasis">x</em></p>
+</td>
+<td>
+<p>Match any token not in the NIS map named in macro
+<em class="emphasis">x</em>.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$%y</p>
+</td>
+<td>
+<p>Match any token in the NIS <em class="emphasis">hosts.byname</em> map.</p>
+</td>
+</tr>
+</table>
+
+<blockquote>
+<a name="Footnote-122">
+[122] This symbol is specific to Sun operating systems.</p> </blockquote>
+
+<p>All of the metasymbols request a match for some number of tokens. A
+<em class="emphasis">token</em> is a string of characters in an email
+address delimited by an operator. The operators are the characters
+defined in the OperatorChars option. Operators are also counted as
+tokens when an address is parsed. For example:
+</p>
+
+<blockquote><pre class="code"> becky@rodent.wrotethebook.com</pre></blockquote>
+
+<p>This email address contains seven tokens: becky, @, rodent, .,
+wrotethebook, ., and com. This address would match the pattern:
+</p>
+
+<blockquote><pre class="code"> $-@$+</pre></blockquote>
+
+<p>The address matches the pattern because:</p>
+
+<ul><li>
+<p>It has exactly one token before the @ that matches the requirement of
+the <tt class="literal">$-</tt><a name="INDEX-2227" /> symbol.
+</p>
+</li><li>
+<p>It has an @ that matches the pattern's literal @.</p>
+</li><li>
+<p>It has one or more tokens after the @ that match the requirement of
+the <tt class="literal">$+</tt> symbol.
+</p>
+</li></ul>
+<p>Many addresses, such as <em class="emphasis">hostmaster@apnic.net</em> and
+<em class="emphasis">craigh@ora.com</em>, match this pattern, but other
+addresses do not. For example,
+<em class="emphasis">rebecca.hunt@wrotethebook.com</em> does not match
+because it has three tokens: rebecca, ., and hunt, before the @.
+Therefore, it fails to meet the requirement of exactly one token
+specified by the <tt class="literal">$-</tt> symbol. Using the metasymbols,
+macros, and literals, patterns can be constructed to match any type
+of email address.
+</p>
+
+<p>When an address matches a pattern, the strings from the address that
+match the metasymbols are assigned to <em class="emphasis">indefinite
+tokens</em><a name="INDEX-2228" />. The matching strings are
+called indefinite tokens because they may contain more than one token
+value. The indefinite tokens are identified numerically according to
+the relative position in the pattern of the metasymbol that the
+string matched. In other words, the indefinite token produced by the
+match of the first metasymbol is called $1; the match of the second
+symbol is called $2; the third is $3; and so on. When the address
+<em class="emphasis">becky@rodent.wrotethebook.com</em> matched the
+pattern <tt class="literal">$-@$+</tt>, two indefinite tokens were created.
+The first is identified as $1 and contains the single token, becky,
+that matched the <tt class="literal">$-</tt> symbol. The second indefinite
+token is $2 and contains the five tokens -- rodent, .,
+wrotethebook, ., and com -- that matched the <tt class="literal">$+</tt>
+symbol. The indefinite tokens created by the pattern matching can
+then be referenced by name ($1, $2, etc.) when rewriting the address.
+</p>
+
+<p>A few of the symbols in <a href="ch10_06.html#tcp3-CHP-10-TABLE-3">Table 10-3</a> are used only in
+special cases. The <a name="INDEX-2229" /><tt class="literal">$@</tt> symbol is
+normally used by itself to test for an empty, or null, address. The
+symbols that test against NIS maps can only be used on Sun systems
+that run the sendmail program that Sun provides with the operating
+system. We'll see in the next section that systems running
+basic sendmail can use NIS maps, but only for
+transformation -- not for pattern matching.
+</p>
+
+</div>
+<a name="tcp3-CHP-10-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">10.6.2. Transforming the Address </h3>
+
+<p>The transformation field, from <a name="INDEX-2230" /> <a name="INDEX-2231" /> <a name="INDEX-2232" /> <a name="INDEX-2233" />
+<a name="INDEX-2234" />the right-hand side of the rewrite
+rule, defines the format used for rewriting the address. It is
+defined with the same things used to define the pattern: literals,
+macros, and special metasymbols. Literals in the transformation are
+written into the new address exactly as shown. Macros are expanded
+and then written. The metasymbols perform special functions. The
+<a name="INDEX-2235" />transformation metasymbols and their
+functions are shown in <a href="ch10_06.html#tcp3-CHP-10-TABLE-4">Table 10-4</a>.
+</p>
+
+<table border="1">
+<tr>
+<th>
+<p>Symbol</p>
+</th>
+<th>
+<p>Meaning</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>$<em class="emphasis">n</em></p>
+</td>
+<td>
+<p>Substitute indefinite token <em class="emphasis">n</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$[<em class="emphasis">name</em>$]</p>
+</td>
+<td>
+<p>Substitute the canonical form of <em class="emphasis">name</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$<em class="emphasis">map key</em>$@<em class="emphasis">argument</em> $:<em class="emphasis">default</em>$)
+</p>
+</td>
+<td>
+<p>Substitute a value from database <em class="emphasis">map</em> indexed by
+<em class="emphasis">key</em>.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$&gt;<em class="emphasis">n</em></p>
+</td>
+<td>
+<p>Call ruleset <em class="emphasis">n</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$@</p>
+</td>
+<td>
+<p>Terminate ruleset.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>$:</p>
+</td>
+<td>
+<p>Terminate rewrite rule.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>The <tt class="literal">$</tt><a name="INDEX-2236" /><em class="replaceable">n</em>
+symbol, where <em class="replaceable">n</em> is a number, is used for
+the indefinite token substitution discussed above. The indefinite
+token is expanded and written to the "new" address.
+Indefinite token substitution is essential for flexible address
+rewriting. Without it, values could not be easily moved from the
+input address to the rewritten address. The following example
+demonstrates this.
+</p>
+
+<p>Addresses are always processed by several rewrite rules. No one rule
+tries to do everything. Assume the input address
+<em class="emphasis">mccafferty@rodent</em> has been through some
+preliminary processing and now is:
+</p>
+
+<blockquote><pre class="code">kathy.mccafferty&lt;@rodent&gt;</pre></blockquote>
+
+<p>Assume the current rewrite rule is:</p>
+
+<blockquote><pre class="code">R$+&lt;@$-&gt; $1&lt;@$2.$D&gt; user@host -&gt; user@host.domain</pre></blockquote>
+
+<p>The address matches the pattern because it contains one or more
+tokens before the literal <tt class="literal">&lt;@</tt>, exactly one token
+after the <tt class="literal">&lt;@</tt>, and then the literal
+<tt class="literal">&gt;</tt>. The pattern match produces two indefinite
+tokens that are used in the transformation to rewrite the address.
+</p>
+
+<p>The transformation contains the indefinite token $1, a literal
+<tt class="literal">&lt;@</tt>, indefinite token $2, a literal dot
+(<tt class="literal">.</tt>), the macro D, and the literal
+<tt class="literal">&gt;</tt>. After the pattern matching, $1 contains
+<em class="emphasis">kathy.mccafferty</em> and $2 contains
+<em class="emphasis">rodent</em>. Assume that the macro D was defined
+elsewhere in the <em class="emphasis">sendmail.cf</em> file as
+<em class="emphasis">wrotethebook.com</em>. In this case the input address
+is rewritten as:
+</p>
+
+<blockquote><pre class="code">kathy.mccafferty&lt;@rodent.wrotethebook.com&gt;</pre></blockquote>
+
+<p><a href="ch10_06.html#tcp3-CHP-10-FIG-3">Figure 10-3</a> illustrates this specific address
+rewrite. It shows the tokens derived from the input address and how
+those tokens are matched against the pattern. It also shows the
+indefinite tokens produced by the pattern matching and how the
+indefinite tokens and other values from the transformation are used
+to produce the rewritten address. After rewriting, the address is
+again compared to the pattern. This time it fails to match the
+pattern because it no longer contains exactly one token between the
+literal <tt class="literal">&lt;@</tt> and the literal
+<tt class="literal">&gt;</tt>. So, no further processing is done by this rewrite
+rule and the address is passed to the next rule in line. Rules in a
+ruleset are processed sequentially, though a few metasymbols can be
+used to modify this flow.
+</p>
+
+<a name="tcp3-CHP-10-FIG-3" /><div class="figure"><img height="199" alt="Figure 10-3" src="figs/tcp3_1003.gif" width="432" /></div><h4 class="objtitle">Figure 10-3. Rewriting an address</h4>
+
+<p>The <tt class="literal">$&gt;</tt><a name="INDEX-2237" /><em class="replaceable">n</em>
+symbol calls ruleset <em class="replaceable">n</em> and passes the
+address defined by the remainder of the transformation to ruleset
+<em class="replaceable">n</em> for processing. For example:
+</p>
+
+<blockquote><pre class="code">$&gt;9 $1 % $2</pre></blockquote>
+
+<p>This transformation calls ruleset 9 (<tt class="literal">$&gt;9</tt>), and
+passes the contents of $1, a literal %, and the contents of $2 to
+ruleset 9 for processing. When ruleset 9 finishes processing, it
+returns a rewritten address to the calling rule. The returned email
+address is then compared again to the pattern in the calling rule. If
+it still matches, ruleset 9 is called again.
+</p>
+
+<p>The recursion built into rewrite rules creates the possibility for
+infinite loops. sendmail does its best to detect possible loops, but
+you should take responsibility for writing rules that don't
+loop. The <tt class="literal">$@</tt> and the <tt class="literal">$:</tt> symbols
+are used to control processing and to prevent loops. If the
+transformation begins with the <tt class="literal">$@</tt> symbol, the
+entire ruleset is terminated and the remainder of the transformation
+is the value returned by the ruleset. If the transformation begins
+with the <tt class="literal">$:</tt> symbol, the individual rule is
+executed only once. Use <tt class="literal">$:</tt> to prevent recursion
+and to prevent loops when calling other rulesets. Use
+<tt class="literal">$@</tt> to exit a ruleset at a specific rule.
+</p>
+
+<p>The <tt class="literal">$[</tt><a name="INDEX-2238" /><em class="emphasis">name</em><tt class="literal">$]</tt>
+symbol converts a host's nickname or its IP address to its
+canonical name by passing the value <em class="emphasis">name</em> to the
+name server for resolution. For example, using the
+<em class="emphasis">wrotethebook.com</em> name servers,
+<tt class="literal">$[mouse$]</tt> returns
+<em class="emphasis">rodent.wrotethebook.com</em> and
+<tt class="literal">$[[172.16.12.1]$]</tt> returns
+<em class="emphasis">crab.wrotethebook.com</em>.
+</p>
+
+<p>In the same way that a hostname or address is used to look up a
+canonical name in the name server database, the
+<tt class="literal">$(</tt><em class="emphasis">map</em>
+<em class="emphasis">key</em><tt class="literal">$)</tt> syntax uses the
+<em class="emphasis">key</em> to retrieve information from the database
+identified by <em class="emphasis">map</em>. This is a more generalized
+database retrieval syntax than the one that returns canonical
+hostnames, and it is more complex to use. Before we get into the
+details of setting up and using databases from within sendmail,
+let's finish describing the rest of the syntax of rewrite
+rules.
+</p>
+
+<p>There is a special rewrite rule syntax that is used in ruleset 0.
+Ruleset 0 defines the triple (<em class="emphasis">mailer, host,
+user</em>) that specifies the mail delivery program, the
+recipient host, and the recipient user.
+</p>
+
+<p>The special transformation syntax used to do this is:</p>
+
+<blockquote><pre class="code"> $#<em class="replaceable">mailer</em>$@<em class="replaceable">host</em>$:<em class="replaceable">user</em></pre></blockquote>
+
+<p>An example of this syntax taken from the
+<em class="emphasis">generic-linux.cf</em> sample file is:
+</p>
+
+<blockquote><pre class="code"> R$*&lt;@$*&gt;$*   $#esmtp $@ $2 $: $1 &lt; @ $2 &gt; $3 user@host.domain</pre></blockquote>
+
+<p>Assume the email address
+<em class="emphasis">david&lt;@ora.wrotethebook.com&gt;</em> is processed
+by this rule. The address matches the pattern
+<tt class="literal">$*&lt;@$+&gt;$*</tt> because:
+</p>
+
+<ul><li>
+<p>The address has zero or more tokens (david) that match the first
+<tt class="literal">$*</tt> symbol.
+</p>
+</li><li>
+<p>The address has a literal &lt;@.</p>
+</li><li>
+<p>The address has zero or more tokens (the five tokens in
+ora.wrotethebook.com) that match the requirement of the second
+<tt class="literal">$*</tt> symbol.
+</p>
+</li><li>
+<p>The address has a literal &gt;.</p>
+</li><li>
+<p>The address has zero or more (in this case, zero) tokens that match
+the requirement of the last <tt class="literal">$*</tt> symbol.
+</p>
+</li></ul>
+<p>This pattern match produces two indefinite tokens. Indefinite token
+$1 contains <em class="emphasis">david</em> and $2 contains
+<em class="emphasis">ora.wrotethebook.com</em>. No other matches occurred,
+so $3 is null. These indefinite tokens are used to rewrite the
+address into the following triple:
+</p>
+
+<blockquote><pre class="code"> $#smtp$@ora.wrotethebook.com$:david&lt;@ora.wrotethebook.com&gt;</pre></blockquote>
+
+<p>The components of this triple are:</p>
+
+<dl>
+<dt><b><tt class="literal">$#smtp</tt></b></dt>
+<dd>
+<p><tt class="literal">smtp</tt> is the internal name of the mailer that
+delivers the message.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">$@ora.wrotethebook.com</tt></b></dt>
+<dd>
+<p><tt class="literal">ora.wrotethebook.com</tt> is the recipient host.</p>
+</dd>
+
+
+<dt><b><tt class="literal">$:david&lt;@ora.wrotethebook.com&gt;</tt></b></dt>
+<dd>
+<p><tt class="literal">david&lt;@ora.wrotethebook.com&gt;</tt> is the
+recipient user.
+</p>
+</dd>
+
+</dl>
+
+<p>There are a few variations on the mailer triple syntax that are also
+used in the templates of some rules. Two of these variations use only
+the "mailer" component.
+</p>
+
+<dl>
+<dt><b><tt class="literal">$#OK</tt></b></dt>
+<dd>
+<p>Indicates that the input address passed a security test. For example,
+the address is permitted to relay mail.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">$#discard</tt></b></dt>
+<dd>
+<p>Indicates that the input address failed some security test and that
+the email message should be discarded.
+</p>
+</dd>
+
+</dl>
+
+
+<a name="ch10-4-fm2xml" /><blockquote><b>TIP:</b> Neither <tt class="literal">OK</tt>, <tt class="literal">discard</tt>, nor
+<tt class="literal">error</tt> (which is discussed in a second) is declared
+in <tt class="literal">M</tt> commands like real mailers. But the sendmail
+documentation refers to them as "mailers" and so do we.
+</p>
+</blockquote>
+
+<p>The <tt class="literal">$#OK</tt> and <tt class="literal">$#discard</tt> mailers
+are used in relay control and security. The
+<tt class="literal">$#discard</tt> mailer silently discards the mail and
+does not return an error message to the sender. The
+<tt class="literal">$#error</tt> mailer also handles undeliverable mail,
+but unlike <tt class="literal">$#discard</tt>, it returns an error message
+to the sender. The template syntax used with the
+<tt class="literal">$#error</tt> mailer is more complex than the syntax of
+either <tt class="literal">$#OK</tt> or <tt class="literal">$#discard</tt>. That
+syntax is shown here:
+</p>
+
+<blockquote><pre class="code">$#error $@<em class="emphasis">dsn-code</em> $:<em class="emphasis">message</em></pre></blockquote>
+
+<p>The mailer value must be <tt class="literal">$#error</tt>. The
+<tt class="literal">$:</tt><em class="replaceable">message</em> field
+contains the text of the error message that you wish to send. The
+<tt class="literal">$@</tt><em class="replaceable">dsn-code</em> field is
+optional. If it is provided, it appears before the
+<em class="replaceable">message</em> and must contain a valid
+<a name="INDEX-2239" /><a name="INDEX-2240" />
+<a name="INDEX-2241" />Delivery
+Status Notification (DSN) error code as defined by RFC 1893,
+<em class="emphasis">Mail System Status Codes</em>.
+</p>
+
+<p>DSN codes are composed of three dot-separated components:</p>
+
+<dl>
+<a name="INDEX-2242" /><dt><b><tt class="literal">class</tt></b></dt>
+<dd>
+<p>Provides a broad classification of the status. Three values are
+defined for class in the
+RFC: <tt class="literal">2</tt> means success, <tt class="literal">4</tt> means
+temporary failure, and <tt class="literal">5</tt> means permanent failure.
+</p>
+</dd>
+
+
+<a name="INDEX-2243" /><dt><b><tt class="literal">subject</tt></b></dt>
+<dd>
+<p>Classifies the error messages as relating to one of eight categories:</p>
+
+<dl>
+<dt><b><tt class="literal">0</tt> (Undefined)</b></dt>
+<dd>
+<p>The specific category cannot be determined.</p>
+</dd>
+
+
+<dt><b><tt class="literal">1</tt> (Addressing)</b></dt>
+<dd>
+<p>A problem was encountered with the address.</p>
+</dd>
+
+
+<dt><b><tt class="literal">2</tt> (Mailbox)</b></dt>
+<dd>
+<p>A problem was encountered with the delivery mailbox.</p>
+</dd>
+
+
+<dt><b><tt class="literal">3</tt> (Mail system)</b></dt>
+<dd>
+<p>The destination mail delivery system is having a problem.</p>
+</dd>
+
+
+<dt><b><tt class="literal">4</tt> (Network)</b></dt>
+<dd>
+<p>The network infrastructure is having a problem.</p>
+</dd>
+
+
+<dt><b><tt class="literal">5</tt> (Protocol)</b></dt>
+<dd>
+<p>A protocol problem was encountered.</p>
+</dd>
+
+
+<dt><b><tt class="literal">6</tt> (Content)</b></dt>
+<dd>
+<p>The message content caused a translation error.</p>
+</dd>
+
+
+<dt><b><tt class="literal">7</tt> (Security)</b></dt>
+<dd>
+<p>A security problem was reported.</p>
+</dd>
+
+</dl>
+</dd>
+
+
+<a name="INDEX-2244" /><dt><b><tt class="literal">detail</tt></b></dt>
+<dd>
+<p>Provides the details of the specific error. The detail value is meaningful only in
+context of the subject code. For example, x<tt class="literal">.1.1</tt> means a bad
+destination user address and x<tt class="literal">.1.2</tt> means a bad destination host
+address, while x<tt class="literal">.2.1</tt> means the mailbox is disabled and x<tt class="literal">.2.2</tt> means the
+mailbox is full. There are far too many detail codes to list here.
+See RFC 1893 for a full list.
+</p>
+</dd>
+
+</dl>
+
+<p>An error message written to use the DSN format might be:</p>
+
+<blockquote><pre class="code">R&lt;@$+&gt; $#error$@5.1.1$:"user address required"</pre></blockquote>
+
+<p>This rule returns the DSN code <tt class="literal">5.1.1</tt> and the
+message <tt class="literal">"user address required"</tt> when the address
+matches the pattern. The DSN code has a <tt class="literal">5</tt> in the class field, meaning it is
+a permanent failure; a <tt class="literal">1</tt> in the subject field, meaning it is an
+addressing failure; and a <tt class="literal">1</tt> in the detail field, meaning that, given the
+subject value of 1, it is a bad user address.
+</p>
+
+<p>Error codes and the error syntax are part of the advanced
+configuration options used for relay control and security. These
+values are generated by the <tt class="literal">m4</tt> macro used to
+select these advanced features. These values are very rarely placed
+in the <em class="emphasis">sendmail.cf</em> file by a system
+administrator <a name="INDEX-2245" /> <a name="INDEX-2246" /> <a name="INDEX-2247" /> <a name="INDEX-2248" /> <a name="INDEX-2249" />directly. 
+</p>
+
+<a name="tcp3-CHP-10-SECT-6.2.1" /><div class="sect3">
+<h3 class="sect3">10.6.2.1. Transforming with a database </h3>
+
+<p>External <a name="INDEX-2250" /> <a name="INDEX-2251" />
+<a name="INDEX-2252" />
+<a name="INDEX-2253" />
+<a name="INDEX-2254" />databases
+can be used to transform addresses in rewrite rules. The database is
+included in the transformation part of a rule by using the following
+syntax:
+</p>
+
+<blockquote><pre class="code"> $(<em class="replaceable">map key</em> [$@<em class="replaceable">argument</em>...] [$:<em class="replaceable">default</em>] $)</pre></blockquote>
+
+<p><em class="replaceable">map</em> is the name assigned to the database
+within the <em class="emphasis">sendmail.cf</em> file. The name assigned
+to <em class="replaceable">map</em> is not limited by the rules that
+govern macro names. Like mailer names, map names are used only inside
+of the <em class="emphasis">sendmail.cf</em> file and can be any name you
+choose. Select a simple descriptive name, such as "users"
+or "mailboxes". The map name is assigned with a
+<tt class="literal">K</tt> command. (More on the <tt class="literal">K</tt>
+command in a moment.)
+</p>
+
+<p><em class="replaceable">key</em> is the value used to index into the
+database. The value returned from the database for this key is used
+to rewrite the input address. If no value is returned, the input
+address is not changed unless a <em class="replaceable">default</em>
+value is provided.
+</p>
+
+<p>An <em class="replaceable">argument</em> is an additional value passed
+to the database procedure along with the key. Multiple arguments can
+be used, but each argument must start with <tt class="literal">$@</tt>. The
+argument can be used by the database procedure to modify the value it
+returns to sendmail. It is referenced inside the database as
+<tt class="literal">%</tt><em class="emphasis">n</em>, where
+<em class="replaceable">n</em> is a digit that indicates the order in
+which the argument appears in the rewrite rule -- %1, %2, and so
+on -- when multiple arguments are used. (Argument %0 is the
+<em class="replaceable">key</em>.)
+</p>
+
+<p>An example will make the use of arguments clear. Assume the following
+input address:
+</p>
+
+<blockquote><pre class="code"> tom.martin&lt;@sugar&gt;</pre></blockquote>
+
+<p>Further, assume the following database with the internal sendmail
+name of "relays":
+</p>
+
+<blockquote><pre class="code">oil     %1&lt;@relay.fats.com&gt; 
+sugar   %1&lt;@relay.calories.com&gt;
+salt    %1&lt;@server.sodium.org&gt;</pre></blockquote>
+
+<p>Finally, assume the following rewrite rule:</p>
+
+<blockquote><pre class="code"> R$+&lt;@$-&gt; $(relays $2 $@ $1 $:$1&lt;@$2&gt; $)</pre></blockquote>
+
+<p>The input address <em class="emphasis">tom.martin&lt;@sugar&gt;</em>
+matches the pattern because it has one or more tokens (tom.martin)
+before the literal &lt;@ and exactly one token (sugar) after it. The
+pattern matching creates two indefinite tokens and passes them to the
+transformation. The transformation calls the database (relays) and
+passes it token $2 (sugar) as the key and token $1 (tom.martin) as
+the argument. If the key is not found in the database, the default
+($1&lt;@$2&gt;) is used. In this case, the key is found in the
+database. The database program uses the key to retrieve
+"%1@relay.calories.com", expands the %1 argument, and
+returns "tom.martin@relay.calories.com" to sendmail,
+which uses the returned value to replace the input address.
+</p>
+
+<p>Before a database can be used within sendmail, it must be defined.
+This is done with the <tt class="literal">K</tt><a name="INDEX-2255" /> command. The syntax of the
+<tt class="literal">K</tt> command is:
+</p>
+
+<blockquote><pre class="code"> K<em class="replaceable">name type</em> [<em class="replaceable">arguments</em>]</pre></blockquote>
+
+<p><em class="replaceable">name</em> is the name used to reference this
+database within sendmail. In the example above, the
+<em class="replaceable">name</em> is "relays".
+</p>
+
+<p><em class="replaceable">type</em> is the class of database. The
+<em class="replaceable">type</em> specified in the <tt class="literal">K</tt>
+command must match the database support compiled into your sendmail.
+ost sendmail programs do not support all database types, but a few
+basic types are widely supported. Common types are hash, btree, and
+nis. There are many more, all of which are described in <a href="appe_01.html">Appendix E, "A sendmail Reference"</a>.
+</p>
+
+<p><em class="replaceable">arguments</em> are optional. Generally, the
+only argument is the path of the database file. Occasionally the
+arguments include flags that are interpreted by the database program.
+The full list of <tt class="literal">K</tt> command flags that can be
+passed in the argument field is found in <a href="appe_01.html">Appendix E, "A sendmail Reference"</a>.
+</p>
+
+<p>To define the "relays" database file used in the example
+above, we might enter the following command in the
+<em class="emphasis">sendmail.cf</em> file:
+</p>
+
+<blockquote><pre class="code"> Krelays hash /etc/mail/relays</pre></blockquote>
+
+<p>The name <em class="emphasis">relays</em> is simply a name you chose
+because it is descriptive. The database type
+<em class="emphasis">hash</em> is a type supported by your version of
+sendmail and was used by you when you built the database file.
+Finally, the argument <em class="emphasis">/etc/mail/relays</em> is the
+location of the database file you created.
+</p>
+
+<p>Don't worry if you're confused about how to build and use
+database files within sendmail. We will revisit this topic later in
+the chapter and the examples will make the practical use of database
+files clear.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-10-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">10.6.3. The Set Ruleset Command </h3>
+
+<p>Rulesets are groups
+<a name="INDEX-2256" />
+<a name="INDEX-2257" /> <a name="INDEX-2258" /> <a name="INDEX-2259" />of associated rewrite rules that can
+be referenced by a name or a number. The <tt class="literal">S</tt> command
+marks the beginning of a ruleset and names it. In the
+<tt class="literal">S</tt><em class="replaceable">name</em> command syntax,
+<em class="replaceable">name</em> identifies the ruleset. Optionally a number
+can also be assigned to the ruleset using the full
+<tt class="literal">S</tt><em class="replaceable">name=number</em> syntax. In that
+case, the ruleset can be referenced either by its name or its number.
+It is even possible to identify a ruleset with a number instead of a
+name by using the old <tt class="literal">S</tt><em class="replaceable">number</em>
+syntax. This form of the syntax is primarily found in old
+configurations because old versions of sendmail used numbers to
+identify rulesets.
+</p>
+
+<p>Rulesets can be thought of as subroutines, or functions, designed to
+process email addresses. They are called from mailer definitions,
+from individual rewrite rules, or directly by sendmail. Six rulesets
+have special functions and are called directly by sendmail. These
+are:
+</p>
+
+<ul><li>
+<p>Ruleset canonify (3) is the first ruleset applied to addresses. It
+converts an address to the canonical form:
+<em class="emphasis">local-part</em>@<em class="emphasis">host.domain</em>.
+</p>
+</li><li>
+<p>Ruleset parse (0) is applied to the addresses used to deliver the
+mail. Ruleset parse is applied after ruleset canonify, and only to
+the recipient addresses actually used for mail delivery. It resolves
+the address to the triple (<em class="replaceable">mailer,</em>
+<em class="replaceable">host, user</em>) composed of the name of the
+mailer that will deliver the mail, the recipient hostname, and the
+recipient username.
+</p>
+</li><li>
+<p>Ruleset sender (1) is applied to all sender addresses in the message.</p>
+</li><li>
+<p>Ruleset recipient (2) is applied to all recipient addresses in the
+message.
+</p>
+</li><li>
+<p>Ruleset final (4) is applied to all addresses in the message and is
+used to translate internal address formats into external address
+formats.
+</p>
+</li><li>
+<p>Ruleset localaddr (5) is applied to local addresses after sendmail
+processes the address against the aliases file. Ruleset 5 is applied
+only to local addresses that do not have an alias.
+</p>
+</li></ul>
+<p><a href="ch10_06.html#tcp3-CHP-10-FIG-4">Figure 10-4</a> shows the flow of the message and
+addresses through these rulesets. The S and R symbols stand for
+additional rulesets. They have names just like all normal rulesets,
+but the names are not fixed as is the case with the rulesets
+described above. The S and R ruleset names are identified in the S
+and R fields of the mailer definition. Each mailer may specify its
+own S and R rulesets for mailer-specific cleanup of the sender and
+recipient addresses just before the message is delivered.
+</p>
+
+<a name="tcp3-CHP-10-FIG-4" /><div class="figure"><img height="220" alt="Figure 10-4" src="figs/tcp3_1004.gif" width="442" /></div><h4 class="objtitle">Figure 10-4. Sequence of rulesets</h4>
+
+<p>There are, of course, many more rulesets in most
+<em class="emphasis">sendmail.cf</em> files. The other rulesets provide
+additional address processing, and are called by existing rulesets
+using the <tt class="literal">$&gt;</tt><em class="emphasis">n</em> construct.
+(See <a href="ch10_08.html#tcp3-CHP-10-TABLE-5">Table 10-5</a> later in this chapter.) The
+rulesets provided in any vendor's
+<em class="emphasis">sendmail.cf</em> file will be adequate for delivering
+SMTP mail. It's unlikely you'll have to add to these
+rulesets, unless you want to add new features to your mailer.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.5. sendmail.cf Configuration Language </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.7. Modifying a sendmail.cf File </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch10_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:31 GMT -->
+</html>

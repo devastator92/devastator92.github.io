@@ -1,0 +1,971 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/appd_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+<head><title>The dhcpd.conf Configuration File (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appd_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="appe_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">D.3. The dhcpd.conf Configuration File</h2>
+
+<p>When it starts, <tt class="literal">dhcpd</tt> reads its configuration from
+the
+<em class="emphasis">/etc/dhcpd.conf</em><a name="INDEX-3592" /> file. <em class="emphasis">dhcpd.conf</em>
+defines the network being served by the DHCP server and the
+configuration information the server provides to its clients.
+</p>
+
+<p><em class="emphasis">dhcpd.conf</em> is an ASCII text file. Comments in
+the file begin with a sharp sign (#). Keywords are case-insensitive.
+Whitespace can be used to format the file. Related statements are
+enclosed in curly braces. IP addresses can be entered as numeric
+addresses or as hostnames that resolve to addresses.
+</p>
+
+<p>Statements in the configuration file define the topology of the
+network being served. In the documentation these statements are
+called "declarations" because they declare something
+about the network topology. The statements that define the topology
+are <tt class="literal">shared-network</tt>, <tt class="literal">subnet</tt>,
+<tt class="literal">group</tt>, and <tt class="literal">host</tt>. All of these
+can appear multiple times in the configuration file. The statements
+define a hierarchical structure. The
+<tt class="literal">shared-network</tt> contains subnets, and subnets can
+contain hosts.
+</p>
+
+<p>Parameters and options can be associated with each of these
+statements. Parameters define things about the server and the
+protocol, such as the length of time for an address lease or where
+the boot file is located. The options provide the clients with values
+for the standard DHCP configuration options defined by the RFCs, for
+example, whether the client should enable IP forwarding. Parameters
+and options specified outside of a specific topology statement apply
+to all networks served by this server. Those specified in the
+<tt class="literal">group</tt> statement apply to all of the shared
+networks, subnets, or hosts grouped together by the statement. The
+<tt class="literal">shared-network</tt> statement options and parameters
+apply to all subnets on the shared network. <tt class="literal">Subnet</tt>
+options and parameters apply to everything on the subnet.
+<tt class="literal">Host</tt> options and parameters apply only to the
+individual host. Options applied at a general level can be overridden
+by the same option applied at a more specific level.
+<tt class="literal">Subnet</tt> options override global options and
+<tt class="literal">host</tt> options override <tt class="literal">subnet</tt>
+options. This structure allows the network administrator to define
+configuration information for the entire network and all of its
+parts.
+</p>
+
+<p>In the following sections, we examine the syntax of all of the
+topology statements and all the parameters and options that can be
+associated with them. We include many more parameters and options
+than you will ever use, and there is no need to study them all. Use
+this reference to look up the details of individual parameters and
+options when you need them. See <a href="ch09_01.html">Chapter 9, "Local Network Services"</a> for
+examples of how these statements, parameters, and options are
+actually used in a real-world configuration.
+</p>
+
+<a name="tcp3-APP-D-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">D.3.1. Topology Statements</h3>
+
+<dl>
+<a name="INDEX-3593" /><dt><b><tt class="literal">group {[</tt><em class="replaceable">parameters</em><tt class="literal">] [</tt><em class="replaceable">options</em><tt class="literal">]}</tt></b></dt>
+<dd>
+<p>The <tt class="literal">group</tt> statement groups together
+<tt class="literal">shared-network</tt>, <tt class="literal">subnet</tt>,
+<a name="INDEX-3594" /> <a name="INDEX-3595" /><tt class="literal">host</tt>, or
+other <tt class="literal">group</tt> statements to apply a set of
+parameters or options to all members of the group.
+</p>
+</dd>
+
+
+<a name="INDEX-3596" /><dt><b><tt class="literal">shared-network</tt> <em class="replaceable">name</em> <tt class="literal">{[</tt><em class="replaceable">parameters</em><tt class="literal">] [</tt><em class="replaceable">options</em><tt class="literal">] }</tt></b></dt>
+<dd>
+<p>The <tt class="literal">shared-network</tt> statement is used only if more
+than one IP subnet shares the same physical network. In most cases,
+different subnets are on different physical networks. The
+<em class="replaceable">name</em>, which must be provided, can be any
+descriptive name. It is used only in debugging messages. Parameters
+and options associated with the shared network are declared within
+the curly braces and apply to all subnets in the shared network. The
+subnets in a shared network must be defined within the curly braces
+of the <tt class="literal">shared-network</tt> statement. It is assumed
+that each <tt class="literal">shared-network</tt> statement contains at
+least two subnet statements; otherwise there is no need to use the
+<tt class="literal">shared-subnet</tt> statement. <tt class="literal">dhcpd</tt>
+cannot tell on which subnet of a shared network a client should boot.
+Therefore, dynamically allocated addresses are taken from the
+available range of all subnets on the shared network and assigned as
+needed.
+</p>
+</dd>
+
+
+<a name="INDEX-3597" /><dt><b><tt class="literal">subnet</tt> <em class="replaceable">address</em> <tt class="literal">mask</tt> <em class="replaceable">netmask</em> <tt class="literal">{ [</tt><em class="replaceable">parameters</em><tt class="literal">] [</tt><em class="replaceable">options</em><tt class="literal">] }</tt></b></dt>
+<dd>
+<p>The <tt class="literal">subnet</tt> statement defines the IP address and
+address mask of every subnet the daemon will serve. The address and
+mask are used to identify the clients that belong to the subnet. The
+parameters and options defined within the curly braces apply to every
+client on the subnet. Every subnet physically connected to the server
+must have a <tt class="literal">subnet</tt> statement even if the subnet
+does not have any clients.
+</p>
+</dd>
+
+
+<a name="INDEX-3598" /><dt><b><tt class="literal">host</tt> <em class="replaceable">hostname</em> <tt class="literal">{[</tt><em class="replaceable">parameters</em><tt class="literal">] [</tt><em class="replaceable">options</em><tt class="literal">] }</tt></b></dt>
+<dd>
+<p>The <tt class="literal">host</tt> statement defines parameters and options
+for individual clients. Every BOOTP client must have a
+<tt class="literal">host</tt> statement in the
+<em class="emphasis">dhcpd.conf</em> file. For DHCP clients, the
+<tt class="literal">host</tt> statement is optional. It is matched to an
+actual DHCP or BOOTP client by matching the
+<tt class="literal">dhcp-client-identifier</tt> provided by the client or
+by matching the hardware parameter to the hardware address of the
+client. BOOTP clients do not provide a
+<tt class="literal">dhcp-client-identifier</tt>, so use the hardware
+address for BOOTP clients. DHCP clients can be identified by either
+the <tt class="literal">dhcp-client-identifier</tt> or the hardware
+address.
+</p>
+</dd>
+
+</dl>
+
+</div>
+<a name="tcp3-APP-D-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">D.3.2. Configuration Parameters</h3>
+
+<p>The <a name="INDEX-3599" />
+<a name="INDEX-3600" />parameter statements defined in
+this section control the operation of the DHCP server and the DHCP
+protocol. The standard DHCP configuration values that are passed to
+clients are defined in option statements, which are covered in the
+next section. Some parameter statements can be associated with any of
+the topology statements discussed above. Others can be used only with
+specific statements. These are noted in the description of the
+parameter.
+</p>
+
+<dl>
+<a name="INDEX-3601" /><dt><b><tt class="literal">range [dynamic-bootp]</tt> <em class="replaceable">low-address</em> <tt class="literal">[</tt><em class="replaceable">high-address</em><tt class="literal">] ;</tt></b></dt>
+<dd>
+<p>The <tt class="literal">range</tt> parameter defines the scope of addresses
+that are available for dynamic assignment by defining the lowest and
+highest IP addresses available for assignment. The
+<tt class="literal">range</tt> parameter must be associated with a
+<tt class="literal">subnet</tt> statement. All addresses in the scope of
+the <tt class="literal">range</tt> parameter must be in the subnet in which
+the <tt class="literal">range</tt> parameter is declared. The
+<tt class="literal">dynamic-bootp</tt> flag is specified if addresses may
+be automatically assigned to BOOTP clients as well as DHCP clients.
+The <tt class="literal">range</tt> parameter must be defined if you intend
+to use dynamic address assignment. If the <tt class="literal">subnet</tt>
+statement does not include a <tt class="literal">range</tt> parameter,
+dynamic address assignments are not made to clients on the subnet.
+</p>
+</dd>
+
+
+<a name="INDEX-3602" /><dt><b><tt class="literal">default-lease-time</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>The life of an address lease in seconds that is used if the client
+does not request a specific lease length.
+</p>
+</dd>
+
+
+<a name="INDEX-3603" /><dt><b><tt class="literal">max-lease-time</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>The maximum life of an address lease in seconds regardless of the
+lease length the client requests.
+</p>
+</dd>
+
+
+<a name="INDEX-3604" /><dt><b><tt class="literal">hardware</tt> <em class="replaceable">type</em> <em class="replaceable">address</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines a client's hardware address. At present,
+<em class="replaceable">type</em> must be either
+<tt class="literal">ethernet</tt> or <tt class="literal">token-ring</tt>.
+<em class="replaceable">address</em> must be an appropriate physical
+address for the type of hardware. The hardware parameter must be
+associated with a host statement. It is required for a BOOTP client
+to be recognized. It is optional for DHCP clients, for which it is an
+alternative to the <tt class="literal">dhcp-client-identifier</tt> option.
+</p>
+</dd>
+
+
+<a name="INDEX-3605" /><dt><b><tt class="literal">filename</tt> <em class="replaceable">file</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Identifies the boot file for diskless clients.
+<em class="replaceable">file</em> is an ASCII string enclosed in
+quotation marks.
+</p>
+</dd>
+
+
+<a name="INDEX-3606" /><dt><b><tt class="literal">server-name</tt> <em class="replaceable">name</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>The hostname of the DHCP server that is provided to the client.
+<em class="replaceable">name</em> is an ASCII string enclosed in
+quotation marks.
+</p>
+</dd>
+
+
+<a name="INDEX-3607" /><dt><b><tt class="literal">next-server</tt> <em class="replaceable">name</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>The hostname or address of the server from which the boot file is to
+be loaded.
+</p>
+</dd>
+
+
+<a name="INDEX-3608" /><dt><b><tt class="literal">fixed-address</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">... ] ;</tt></b></dt>
+<dd>
+<p>Assigns one or more fixed IP addresses to a host. The
+<tt class="literal">fixed-address</tt> parameter is valid only when
+associated with a host statement. If more than one address is
+supplied, the client is assigned the address that is valid for the
+subnet on which it is booting. If none of the addresses is valid for
+the subnet, no configuration data is sent to the client.
+</p>
+</dd>
+
+
+<a name="INDEX-3609" /><dt><b><tt class="literal">dynamic-bootp-lease-cutoff</tt> <em class="replaceable">date</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Sets a termination date for addresses assigned to BOOTP clients.
+BOOTP clients don't have a way of renewing leases and
+don't know that address leases expire. By default,
+<tt class="literal">dhcpd</tt> assigns permanent addresses to BOOTP
+clients. This parameter changes that behavior. It is used only in
+special circumstances where the life of all systems is known in
+advance -- for example, on a college campus where it is known that
+all student systems will be removed by June.
+</p>
+</dd>
+
+
+<a name="INDEX-3610" /><dt><b><tt class="literal">dynamic-bootp-lease-length</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the life of an address lease in seconds for an address
+automatically assigned to a BOOTP client. As noted above, BOOTP
+clients do not understand address leases. This parameter is used only
+in special circumstances where clients use a BOOTP boot PROM and run
+an operating system that supports DHCP. During the boot the client
+acts as a BOOTP client, but once it boots the client runs DHCP and
+knows how to renew a lease. Use this parameter, and the previous one,
+with caution.
+</p>
+</dd>
+
+
+<a name="INDEX-3611" /><dt><b><tt class="literal">get-lease-hostnames</tt> <em class="replaceable">flag</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Tells <tt class="literal">dhcpd</tt> if it should send a DNS hostname to
+the client when it dynamically assigns it an IP address. If
+<em class="replaceable">flag</em> is <tt class="literal">true</tt>,
+<tt class="literal">dhcpd</tt> uses DNS to look up the hostnames for all
+dynamically assigned addresses, which dramatically slows DHCP
+performance. By default the <em class="replaceable">flag</em> is
+<tt class="literal">false</tt>, and no lookups are done.
+</p>
+</dd>
+
+
+<a name="INDEX-3612" /><dt><b><tt class="literal">use-host-decl-names</tt> <em class="replaceable">flag</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Causes the name provided on the host statement to be supplied to the
+client as its hostname.
+</p>
+</dd>
+
+
+<a name="INDEX-3613" /><dt><b><tt class="literal">server-identifier</tt> <em class="replaceable">hostname</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the value sent in the server identifier option. The default
+is to send the first IP address of the network interface.
+</p>
+</dd>
+
+
+<a name="INDEX-3614" /><a name="INDEX-3615" />
+<dt><b><tt class="literal">authoritative;</tt></b></dt>
+<dt><b><tt class="literal">not authoritative;</tt></b></dt>
+<dd>
+<p>Specifies whether or not the DHCP server is authoritative. The
+default is <tt class="literal">authoritative</tt>. <tt class="literal">not</tt>
+<tt class="literal">authoritative</tt> can be used if a DHCP server does
+not have the authority to set client addresses. It is possible to
+have a DHCP server that supports multiple networks and has address
+authority for some networks and no address authority for other
+networks.
+</p>
+</dd>
+
+
+<a name="INDEX-3616" /><dt><b><tt class="literal">use-lease-addr-for-default-route</tt> <em class="replaceable">flag</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Causes the leased IP address to be sent to the client as the default
+route in order to force Windows 95 clients to ARP for all IP
+addresses. This parameter is used only when the local router is the
+proxy ARP server. The <tt class="literal">option</tt>
+<tt class="literal">routers</tt> statement overrides this parameter.
+</p>
+</dd>
+
+
+<a name="INDEX-3617" /><dt><b><tt class="literal">always-reply-rfc1048</tt> <em class="replaceable">flag</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Sends responses that comply with RFC 1048 to a BOOTP client, even if
+that client does not send requests that comply with RFC 1048. This
+parameter is used when the server logs the message
+"(non-rfc1048)" for a BOOTP client's BOOTREQUEST.
+This parameter is generally used on a client-by-client basis.
+Upgrading the clients to DHCP is preferred.
+</p>
+</dd>
+
+
+<a name="INDEX-3618" /><a name="INDEX-3619" />
+<dt><b><tt class="literal">allow</tt> <em class="replaceable">keyword</em><tt class="literal">;</tt></b></dt>
+<dt><b><tt class="literal">deny</tt> <em class="replaceable">keyword</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Determines whether or not the server responds to certain types of
+requests. <em class="replaceable">keyword</em> defines the type of
+request that is allowed or denied. There are three possible keyword
+values:
+</p>
+
+<dl>
+<dt><b><tt class="literal">unknown-clients</tt></b></dt>
+<dd>
+<p>Determines whether the server dynamically assigns addresses to
+unknown clients. By default, dynamic addresses are assigned to
+unknown clients.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">bootp</tt></b></dt>
+<dd>
+<p>Determines whether the server responds to BOOTP requests. By default,
+BOOTP requests are allowed.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">booting</tt></b></dt>
+<dd>
+<p>Used inside a <tt class="literal">host</tt> declaration to specify whether
+the server responds to a particular client. By default, the DHCP
+server responds to all clients.
+</p>
+</dd>
+
+</dl>
+</dd>
+
+</dl>
+</div>
+<a name="tcp3-APP-D-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">D.3.3. DHCP Options</h3>
+
+<p>The option <a name="INDEX-3620" /> <a name="INDEX-3621" />statements available with
+<tt class="literal">dhcpd</tt> cover all of the standard DHCP configuration
+options currently defined in the RFCs. Furthermore, the syntax of the
+<em class="emphasis">dhcpd.conf</em> option statement is extensible. A new
+option can be identified by its decimal option code. All options are
+assigned a decimal option code, either in the RFC that describes the
+option, or in the vendor documentation if it is vendor-specific. The
+value assigned to the new option can be expressed as a string
+enclosed in quotes or as a colon-separated list of hexadecimal
+numbers. Imagine that a new DHCP option is created and assigned an
+option code of 133. Further, imagine that the value carried by this
+option is a 16-bit binary mask and that you want your clients to
+"turn on" the high-order 4-bits and "turn
+off" all other bits in the mask. You could add the following
+option to your configuration:
+</p>
+
+<blockquote><pre class="code"> option option-133 F0:00</pre></blockquote>
+
+<p>All option statements begin with the keyword
+<tt class="literal">option</tt>. The keyword is then followed by the name
+of the option and the value assigned to the option, in that order. In
+the example above, the option name is in the form
+<tt class="literal">option-</tt><em class="replaceable">nnn</em>, where
+<em class="replaceable">nnn</em> is the decimal option code assigned to
+the option. In this manner, any new option that appears can be added
+to <em class="emphasis">dhcpd.conf</em> file. The value assigned to this
+imaginary option is F000.
+</p>
+
+<p>Looking at the huge list of standard options, you may well wonder if
+they will ever need to be extended. The standard options are listed
+in the following section. The types of values that are assigned to
+options are:
+</p>
+
+<dl>
+<a name="INDEX-3622" /><dt><i><em class="emphasis">Address</em></i></dt>
+<dd>
+<p>An IP address written in dotted decimal notation, or a hostname that
+resolves to an address.
+</p>
+</dd>
+
+
+<a name="INDEX-3623" /><dt><i><em class="emphasis">String</em></i></dt>
+<dd>
+<p>A series of characters enclosed in quotation marks.</p>
+</dd>
+
+
+<a name="INDEX-3624" /><dt><i><em class="emphasis">Number</em></i></dt>
+<dd>
+<p>A numeric value.</p>
+</dd>
+
+
+<a name="INDEX-3625" /><dt><i><em class="emphasis">Flag</em></i></dt>
+<dd>
+<p>A switch containing either <tt class="literal">true</tt> or
+<tt class="literal">false</tt>, which can also be set as
+<tt class="literal">1</tt> or <tt class="literal">0</tt>, or
+<tt class="literal">yes</tt> or <tt class="literal">no</tt>.
+</p>
+</dd>
+
+</dl>
+
+<p>In this book, the list of options is divided into "Commonly
+used options" and "Other options."
+</p>
+
+<a name="tcp3-APP-D-SECT-3.3.1" /><div class="sect3">
+<h3 class="sect3">D.3.3.1. Commonly used options</h3>
+
+<dl>
+<dt><b><tt class="literal">option subnet-mask</tt> <em class="replaceable">mask</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Specifies the <a name="INDEX-3626" />subnet mask in dotted decimal
+notation. If the subnet mask option is not provided,
+<tt class="literal">dhcpd</tt> uses the network mask from the
+<tt class="literal">subnet</tt> statement.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option time-offset</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Specifies the number of seconds this time zone is offset from
+Coordinated Universal Time (UTC).
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option routers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the routers the client should use, in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option domain-name-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the Domain Name System (DNS) name servers the client should
+use, in order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option lpr-servers</tt> <em class="replaceable">address</em> <tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists line printer (LPR) servers the client should use, in order of
+preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option host-name</tt> <em class="replaceable">host</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the hostname the client should use.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option domain-name</tt> <em class="replaceable">domain</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the domain name.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option interface-mtu</tt> <em class="replaceable">bytes</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the MTU the client should use. The minimum legal value for
+the MTU is 68.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option broadcast-address</tt> <em class="replaceable">address</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the broadcast address for the client's subnet.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option static-routes</tt> <em class="replaceable">destination gateway</em><tt class="literal">[,</tt> <em class="replaceable">destination gateway</em><tt class="literal">... ] ;</tt></b></dt>
+<dd>
+<p>Lists the static routes the client should use. The default route
+cannot be specified in this manner. Use the routers option for the
+default route.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option trailer-encapsulation 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should use trailer encapsulation. 0 means
+that the client shouldn't use trailer encapsulation, and 1
+means that the client should use trailer encapsulation.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option nis-domain</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>A character string that defines the name of the Network Information
+Services (NIS) domain.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option nis-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists IP addresses of the NIS servers the client should use, in order
+of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option dhcp-client-identifier</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Used in the host statement to define the DHCP client identifier.
+<tt class="literal">dhcpd</tt> can use the client identifier to identify
+DHCP clients in lieu of the hardware address.
+</p>
+</dd>
+
+</dl>
+
+</div>
+
+<a name="tcp3-APP-D-SECT-3.3.2" /><div class="sect3">
+<h3 class="sect3">D.3.3.2. Other options</h3>
+
+<dl>
+<dt><b><tt class="literal">option time-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the time <a name="INDEX-3627" />servers the client should use, in
+order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option ien116-name-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...];</tt></b></dt>
+<dd>
+<p>Lists the IEN 116 name servers the client should use, in order of
+preference. IEN 116 is an obsolete name service. Avoid this and use
+DNS.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option log-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the MIT-LCS UDP log servers the client should use, in order of
+preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option cookie-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the cookie servers available to the client, in order of
+preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option impress-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the Image Impress servers available to the client, in order of
+preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option resource-location-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the Resource Location servers the client should use, in order
+of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option boot-size</tt> <em class="replaceable">blocks</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Specifies the number of 512-octet blocks in the boot file.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option merit-dump</tt> <em class="replaceable">path</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p><em class="replaceable">path</em> is a character string that identifies
+the location of the file the client should dump core to in the event
+of a crash.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option swap-server</tt> <em class="replaceable">address</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Specifies the IP address of the client's swap server.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option root-path</tt> <em class="replaceable">path</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p><em class="replaceable">path</em> is a character string that identifies
+the location of the client's root disk.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option ip-forwarding 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should do IP forwarding. 0 disables IP
+forwarding, and 1 enables it.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option non-local-source-routing 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should allow non-local source routes. Source
+routes are a potential security problem, as they can be used by
+intruders to route data off the local network in ways not intended by
+the local network administrator. 0 disables forwarding of non-local
+source-routed datagrams, and 1 enables forwarding. 0 is the more
+secure setting.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option policy-filter</tt> <em class="replaceable">address mask</em><tt class="literal">[,</tt> <em class="replaceable">address mask</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the IP addresses and masks that specify the only valid
+destination/mask pairs for incoming source routes. Any source-routed
+datagram whose next-hop address does not match one of the filters is
+discarded by the client.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option max-dgram-reassembly</tt> <em class="replaceable">bytes</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines, in bytes, the largest datagram the client should be prepared
+to reassemble. The value of <em class="replaceable">bytes</em> cannot
+be less than 576.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option default-ip-ttl</tt> <em class="replaceable">ttl</em> <tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the default time-to-live (TTL) for outgoing datagrams. </p>
+</dd>
+
+
+<dt><b><tt class="literal">option path-mtu-aging-timeout</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Sets the number of seconds for timing out Path MTU values discovered
+by the mechanism defined in RFC 1191.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option path-mtu-plateau-table</tt> <em class="replaceable">bytes</em><tt class="literal">[,</tt> <em class="replaceable">bytes</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Defines a table of MTU sizes to use when performing Path MTU
+Discovery as defined in RFC 1191. The minimum MTU value cannot be
+smaller than 68.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option all-subnets-local 0 | 1;</tt></b></dt>
+<dd>
+<p>Tells the client if all subnets of the local network use the same
+TU. 1 means that all subnets share the same MTU. 0 means that some
+subnets have smaller MTUs.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option perform-mask-discovery 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should use ICMP to discover the subnet mask.
+enables ICMP mask discovery, and 1 disables it. Because the DHCP
+server can provide the correct subnet mask, ICMP mask discovery is
+rarely used on networks that have a DHCP server.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option mask-supplier 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should respond to ICMP subnet mask requests.
+means that the client shouldn't respond, and 1 means that it
+should.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option router-discovery 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should use the Router Discovery mechanism
+defined in RFC 1256 to locate routers. 0 means it shouldn't,
+and 1 means it should perform router discovery. Because the DHCP
+server provides the correct list of routers, router discovery is
+rarely used on networks that have a DHCP server.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option router-solicitation-address</tt> <em class="replaceable">address</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the address to which the client should transmit a router
+solicitation request if router discovery is enabled.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option arp-cache-timeout</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the number of seconds entries are maintained in the ARP cache.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option ieee802-3-encapsulation 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should use Ethernet II (DIX) or IEEE 802.3
+Ethernet encapsulation on the network. 0 tells the client to use
+Ethernet II and 1 tells the client to use IEEE 802.3 encapsulation.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option default-tcp-ttl</tt> <em class="replaceable">ttl</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the default TTL for TCP segments. Possible values are 1 to
+255.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option tcp-keepalive-interval</tt> <em class="replaceable">seconds</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>The number of seconds TCP should wait before sending a keepalive
+message. 0 means that TCP should not generate keepalive messages.
+Keepalive messages are generally discouraged.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option tcp-keepalive-garbage 0 | 1;</tt></b></dt>
+<dd>
+<p>Specifies if the client should send TCP keepalive messages with an
+octet of garbage for compatibility with older implementations. 0
+means don't send a garbage octet and 1 means send it.
+Keepalives are generally discouraged.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option ntp-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of the Network Time Protocol (NTP) servers the
+client should use, in order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option netbios-name-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the NetBIOS name servers (NBNS) the client should use, in order
+of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option netbios-dd-server</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the NetBIOS datagram distribution servers (NBDD) the client
+should use, in order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option netbios-node-type</tt> <em class="replaceable">type</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the NetBIOS node type of the client. A
+<em class="replaceable">type</em> of 1 is a NetBIOS B-node; 2 is a
+P-node; 4 is an M-node; 8 is an H-node.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option netbios-scope</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>A character string that defines the NetBIOS over TCP/IP scope
+parameter as specified in RFC 1001/1002.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option font-servers</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the X Window System Font servers the client should use, in
+order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option x-display-manager</tt> <em class="replaceable">address</em><tt class="literal">[,</tt> <em class="replaceable">address</em><tt class="literal">...] ;</tt></b></dt>
+<dd>
+<p>Lists the systems running the X Window System Display Manager that
+the client should use, in order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option nisplus-domain</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Defines the NIS+ domain name.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option nisplus-servers</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the NIS+ servers' IP addresses. Servers are listed in
+order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option tftp-server-name</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Identifies a TFTP boot server.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option bootfile-name</tt> <em class="replaceable">string</em><tt class="literal">;</tt></b></dt>
+<dd>
+<p>Provides the name of the boot file found on the TFTP boot server.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option mobile-ip-home-agent</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of Mobile IP home agents available to the
+client.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option smtp-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of the SMTP servers in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option pop-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of POP3 servers in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option nntp-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of Network News Transport Protocol (NNTP)
+servers in order of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option www-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of web servers in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option finger-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of finger servers in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option irc-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of IRC servers in order of preference.</p>
+</dd>
+
+
+<dt><b><tt class="literal">option streettalk-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of StreetTalk servers in order <a name="INDEX-3628" />of preference.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">option streettalk-directory-assistance-server</tt> <em class="replaceable">ip-address</em> <tt class="literal">[,</tt> <em class="replaceable">ip-address</em><tt class="literal">... ];</tt></b></dt>
+<dd>
+<p>Lists the IP addresses of StreetTalk Directory Assistance (STDA)
+servers in order of preference.
+</p>
+
+
+</dd>
+
+</dl>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appd_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appe_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">D.2. The dhcpd Command</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">E. A sendmail Reference</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/appd_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+</html>

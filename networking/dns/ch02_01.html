@@ -1,0 +1,380 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:12 GMT -->
+<head><title>How Does DNS Work? (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch02_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 2. How Does DNS Work?</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-2-SECT-1">The Domain Name Space</a><br />
+<a href="ch02_02.html">The Internet Domain Name Space</a><br />
+<a href="ch02_03.html">Delegation</a><br />
+<a href="ch02_04.html">Name Servers and Zones</a><br />
+<a href="ch02_05.html">Resolvers</a><br />
+<a href="ch02_06.html">Resolution</a><br />
+<a href="ch02_07.html">Caching</a><br /><p></p></div>
+
+
+<em>"... and what is the use of a book," thought Alice,
+"without pictures or conversations?"</em></p><p>
+
+
+<a name="INDEX-87" /></a>The
+Domain Name System is basically a database of host information.
+Admittedly, you get a lot with that: funny dotted names, networked
+name servers, a shadowy "namespace." But keep in mind
+that, in the end, the service DNS provides is information about
+internet hosts.</p><p>
+
+
+We've already covered some important aspects of DNS, including
+its client-server architecture and the structure of the DNS database.
+However, we haven't gone into much detail, and we haven't
+explained the nuts and bolts of DNS's operation.</p><p>
+
+
+In this chapter, we explain and illustrate the mechanisms that make
+DNS work. We also introduce the terms you'll need to know to
+read the rest of the book (and to converse intelligently with your
+fellow zone administrators).</p><p>
+
+
+First, though, let's take a more detailed look at concepts
+introduced in the previous chapter. We'll try to add enough
+detail to spice it up a little.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-2-SECT-1" /></a>
+<h2 class="sect1">2.1. The Domain Name Space</h2>
+
+
+<a name="INDEX-88" /></a>DNS's <a name="INDEX-89" /></a> <a name="INDEX-90" /></a>distributed database is indexed by domain
+names. Each domain name is essentially just a path in a large
+inverted tree, called the <em class="emphasis">domain name space</em>. The
+tree's hierarchical structure, shown in <a href="ch02_01.html#dns4-CHP-2-FIG-1">Figure 2-1</a>, is similar to the structure of the Unix
+filesystem. The tree has a single root at the top.<a href="#FOOTNOTE-7">[7]</a> In the Unix filesystem, this is
+called the root directory, represented by a slash (
+<a name="INDEX-91" /></a>
+<a name="INDEX-92" /></a>/ ). DNS simply calls it "the
+<a name="INDEX-93" /></a>root."
+Like a filesystem, DNS's tree can branch any number of ways at
+each intersection point, or
+<em class="emphasis">node</em><a name="INDEX-94" /></a>.
+The depth of the tree is limited to 127 levels (a limit you're
+not likely to reach).<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-7" /></a>[7]Clearly this is a computer scientist's tree, not a
+botanist's.</p><p>
+
+</blockquote>
+
+
+<a name="dns4-CHP-2-FIG-1" /></a><div class="figure"><img height="271" alt="Figure 2-1" src="figs/dns4_0201.gif" width="375" /></div><h4 class="objtitle">Figure 2-1. The structure of the DNS namespace</h4>
+
+<a name="dns4-CHP-2-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">2.1.1. Domain Names</h3>
+
+
+Each node in the tree has a text <a name="INDEX-95" /></a>label (without dots) that can be up to 63
+characters long. A <a name="INDEX-96" /></a>null (zero-length) label is reserved for
+the root. The full <em class="emphasis">domain
+name</em><a name="INDEX-97" /></a>
+of any node in the tree is the sequence of labels on the path from
+that node to the root. Domain names are always read from the node
+toward the root ("up" the tree), with dots separating the
+names in the path.</p><p>
+
+
+If the root node's label actually appears in a node's
+domain name, the name looks as though it ends in a dot, as in
+"www.oreilly.com.". (It actually ends with a
+dot -- the separator -- and the root's null label.) When
+the root node's label appears by itself, it is written as a
+single dot (.) for convenience. Consequently, some software
+interprets a <a name="INDEX-98" /></a> <a name="INDEX-99" /></a>trailing dot in a domain name to indicate
+that the domain name is <em class="emphasis">absolute</em>. An
+<a name="INDEX-100" /></a>absolute domain name is written relative
+to the root and unambiguously specifies a node's location in
+the hierarchy. An absolute domain name is also referred to as a
+<a name="INDEX-101" /></a> <a name="INDEX-102" /></a> <a name="INDEX-103" /></a><em class="emphasis">fully qualified domain
+name</em>, often abbreviated <em class="emphasis">FQDN</em>. Names
+without trailing dots are sometimes interpreted as relative to some
+domain name other than the root, just as directory names without a
+leading slash are often interpreted as relative to the current
+directory.</p><p>
+
+
+DNS requires that <a name="INDEX-104" /></a>sibling nodes -- nodes that are
+children of the same parent -- have different labels. This
+restriction guarantees that a domain name uniquely identifies a
+single node in the tree. The restriction isn't really a
+limitation, because the labels need to be unique only among the
+children, not among all the nodes in the tree. The same restriction
+applies to the Unix filesystem: you can't give two sibling
+directories or two files in the same directory the same name. Just as
+you can't have two <em class="emphasis">hobbes.pa.ca.us</em> nodes
+in the namespace, you also can't have two
+<em class="emphasis">/usr/bin</em> directories (<a href="ch02_01.html#dns4-CHP-2-FIG-2">Figure 2-2</a>). You can, however, have both a
+<em class="emphasis">hobbes.pa.ca.us</em> and a
+<em class="emphasis">hobbes.lg.ca.us</em> node, as you can have both a
+<em class="emphasis">/bin</em> directory and a
+<em class="emphasis">/usr/bin</em> <a name="INDEX-105" /></a> <a name="INDEX-106" /></a>directory.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-2" /></a><div class="figure"><img height="421" alt="Figure 2-2" src="figs/dns4_0202.gif" width="484" /></div><h4 class="objtitle">Figure 2-2. Ensuring uniqueness in domain names and in Unix pathnames</h4>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">2.1.2. Domains</h3>
+
+
+<a name="INDEX-107" /></a>
+<a name="INDEX-108" /></a>A <em class="emphasis">domain</em>
+<a name="INDEX-109" /></a>is simply a
+subtree of the domain name space. The domain name of a domain is the
+same as the domain name of the node at the very top of the domain. So
+for example, the top of the <em class="emphasis">purdue.edu</em> domain is
+a node named <em class="emphasis">purdue.edu</em>, as shown in <a href="ch02_01.html#dns4-CHP-2-FIG-3">Figure 2-3</a>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-3" /></a><div class="figure"><img height="232" alt="Figure 2-3" src="figs/dns4_0203.gif" width="403" /></div><h4 class="objtitle">Figure 2-3. The purdue.edu domain</h4>
+
+Likewise, in a <a name="INDEX-110" /></a>
+<a name="INDEX-111" /></a>filesystem, at the top of the
+<em class="emphasis">/usr</em> directory, you'd expect to find a
+node called <em class="emphasis">/usr</em>, as shown in <a href="ch02_01.html#dns4-CHP-2-FIG-4">Figure 2-4</a>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-4" /></a><div class="figure"><img height="207" alt="Figure 2-4" src="figs/dns4_0204.gif" width="302" /></div><h4 class="objtitle">Figure 2-4. The /usr directory</h4>
+
+Any domain name in the subtree is considered a part of the domain.
+Because a domain name can be in many subtrees, it can also be in many
+domains. For example, the domain name <em class="emphasis">pa.ca.us</em>
+is part of the <em class="emphasis">ca.us</em> domain and also part of the
+<em class="emphasis">us</em> domain, as shown in <a href="ch02_01.html#dns4-CHP-2-FIG-5">Figure 2-5</a>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-5" /></a><div class="figure"><img height="217" alt="Figure 2-5" src="figs/dns4_0205.gif" width="373" /></div><h4 class="objtitle">Figure 2-5. A node in multiple domains</h4>
+
+So in the abstract, a domain is just a subtree of the domain name
+space. But if a domain is simply made up of domain names and other
+domains, where are all the hosts? Domains are groups of hosts, right?</p><p>
+
+
+The <a name="INDEX-112" /></a>hosts are there,
+represented by domain names. Remember, domain names are just indexes
+into the DNS database. The "hosts" are the domain names
+that point to information about individual hosts. And a domain
+contains all the hosts whose domain names are within the domain. The
+hosts are related <em class="emphasis">logically</em>, often by geography
+or organizational affiliation, and not necessarily by network or
+address or hardware type. You might have 10 different hosts, each on
+a different network and perhaps even in a different country, all in
+the same domain.<a href="#FOOTNOTE-8">[8]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-8" /></a>[8]One note of caution: don't
+confuse domains in the Domain Name System with domains in
+Sun's<a name="INDEX-113" /></a>
+Network Information Service (NIS). Though an NIS domain also refers
+to a group of hosts, and both types of domains have similarly
+structured names, the concepts are quite different. NIS uses
+hierarchical names, but the hierarchy ends there: hosts in the same
+NIS domain share certain data about hosts and users, but they
+can't navigate the NIS namespace to find data in other NIS
+domains. NT domains, which provide account management and security
+services, also don't have any relationship to DNS
+domains.</p><p>
+
+</blockquote>
+
+
+Domain names at the leaves of the tree generally represent individual
+hosts and may point to network addresses, hardware information, and
+mail routing information. Domain names in the interior of the tree
+can name a host <em class="emphasis">and</em> can point to information
+about the domain. Interior domain names aren't restricted to
+one or the other. They can represent both the domain they correspond
+to and a particular host on the network. For example,
+<em class="emphasis">hp.com</em> is both the name of the Hewlett-Packard
+Company's domain and the domain name of the hosts that run
+HP's main web server.</p><p>
+
+
+The type of information retrieved when you use a domain name depends
+on the context in which you use it. Sending mail to someone at
+<em class="emphasis">hp.com</em> returns mail routing information, while
+telneting to the domain name looks up the host information (in <a href="ch02_01.html#dns4-CHP-2-FIG-6">Figure 2-6</a>, for example,
+<em class="emphasis">hp.com</em>'s IP address).<a name="INDEX-114" /></a></p><p>
+
+
+<a name="dns4-CHP-2-FIG-6" /></a><div class="figure"><img height="166" alt="Figure 2-6" src="figs/dns4_0206.gif" width="206" /></div><h4 class="objtitle">Figure 2-6. An interior node with both host and structural data</h4>
+
+A domain may have several subtrees of its own, called
+<em class="emphasis">subdomains</em><a name="INDEX-115" /></a>.<a href="#FOOTNOTE-9">[9]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-9" /></a>[9]The terms <em class="emphasis">domain</em> and
+<em class="emphasis">subdomain</em> are often used interchangeably, or
+nearly so, in DNS and BIND documentation. Here, we use subdomain only
+as a relative term: a domain is a subdomain of another domain if the
+root of the subdomain is within the domain.</p><p>
+
+</blockquote>
+
+
+A simple way of deciding whether a
+<a name="INDEX-116" /></a>domain is a
+<a name="INDEX-117" /></a>subdomain of
+another domain is to compare their domain names. A subdomain's
+domain name ends with the domain name of its parent domain. For
+example, the domain <em class="emphasis">la.tyrell.com</em> must be a
+subdomain of <em class="emphasis">tyrell.com</em> because
+<em class="emphasis">la.tyrell.com</em> ends with
+<em class="emphasis">tyrell.com</em>. Similarly, it's a subdomain of
+<em class="emphasis">com</em>, as is <em class="emphasis">tyrell.com</em>.</p><p>
+
+
+<a name="INDEX-118" /></a>Besides being referred to in relative
+terms, as subdomains of other domains, domains are often referred to
+by <a name="INDEX-119" /></a><em class="emphasis">level</em>. On mailing
+lists and in Usenet newsgroups, you may see the terms
+<em class="emphasis">top-level domain</em><a name="INDEX-120" /></a>
+<a name="INDEX-121" /></a> or <em class="emphasis">second-level
+domain</em><a name="INDEX-122" /></a> bandied about.
+These terms simply refer to a domain's position in the domain
+name space:</p><p>
+
+
+<ul><li>A top-level domain is a child of the root.<p></p></li><li>A first-level domain is a child of the root (i.e., a top-level
+domain).<p></p></li><li>A second-level domain is a child of a first-level domain, and so
+on.<a name="INDEX-123" /></a><p></p></li></ul>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">2.1.3. Resource Records</h3>
+
+
+The data associated with domain names is contained in
+<a name="INDEX-124" /></a><em class="emphasis">resource records</em>, or
+RRs. Records are divided into
+<a name="INDEX-125" /></a>classes, each of
+which pertains to a type of network or software. Currently, there are
+classes for internets (any TCP/IP-based internet), networks based on
+the Chaosnet protocols, and networks that use Hesiod software.
+(Chaosnet is an old network of largely historic significance.)</p><p>
+
+
+The <a name="INDEX-126" /></a>internet
+class is by far the most popular. (We're not really sure if
+anyone still uses the <a name="INDEX-127" /></a>Chaosnet class, and use of the
+<a name="INDEX-128" /></a>
+<a name="INDEX-129" /></a>Hesiod class is
+confined mostly to MIT.) In this book, we concentrate on the internet
+class.</p><p>
+
+
+Within a class, records also come in several types, which correspond
+to the different varieties of data that may be stored in the domain
+name space. Different classes define different record types, though
+some types are common to more than one class. For example, almost
+every class defines an
+<em class="emphasis">address</em><a name="INDEX-130" /></a> type. Each record type in a given class
+defines a particular record syntax, which all resource records of
+that class and type must adhere to. (For details on internet resource
+record types and their syntaxes, see <a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a>.)</p><p>
+
+
+If this information seems sketchy, don't
+worry -- we'll cover the records in the internet class in
+more detail later. The common records are described in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, and a more comprehensive list is included as
+part of <a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a>.<a name="INDEX-131" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">1.5. Must I Use DNS?</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.2. The Internet Domain Name Space</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:16 GMT -->
+</html>

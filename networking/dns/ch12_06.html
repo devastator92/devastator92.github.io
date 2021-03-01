@@ -1,0 +1,510 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+<head><title>Less Common Tasks (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch12_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">12.6. Less Common Tasks</h2>
+
+
+Let's move on to some tricks you'll probably use less
+often but are still handy to have in your repertoire. Most of these
+will be helpful when you are trying to troubleshoot a DNS or BIND
+problem; they'll enable you to grub around in the messages the
+resolver sees and mimic a BIND name server querying another name
+server or transferring zone data.</p><p>
+
+
+<a name="dns4-CHP-12-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">12.6.1. Showing the Query and Response Messages</h3>
+
+
+<a name="INDEX-2014" /><a name="INDEX-2015" />If
+you need to, you can direct <em class="filename">nslookup</em> to show you
+the queries it sends out and the responses it receives. Turning
+on<a name="INDEX-2016" /><a name="INDEX-2017" /> <span class="option">debug</span> shows the
+responses. Turning on <span class="option">d2</span> shows the queries as well.
+When you want to turn off debugging completely, you have to use
+<em class="emphasis">set nodebug</em>, since <em class="emphasis">set nod2</em>
+turns off only level 2 debugging. After the following trace,
+we'll explain some parts of the output. If you want, pull out
+your copy of RFC 1035, turn to page 25, and read along with our
+explanation.</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>set debug</b></tt>
+&gt; <tt class="userinput"><b>wormhole</b></tt>
+Server:  terminator.movie.edu
+Address:  0.0.0.0
+
+------------
+Got answer:
+    HEADER:
+        opcode = QUERY, id = 6813, rcode = NOERROR
+        header flags:  response, auth. answer, want recursion,
+        recursion avail.  questions = 1,  answers = 2,
+        authority records = 2,  additional = 3
+
+    QUESTIONS:
+        wormhole.movie.edu, type = A, class = IN
+    ANSWERS:
+    -&gt;  wormhole.movie.edu
+        internet address = 192.253.253.1
+        ttl = 86400 (1D)
+    -&gt;  wormhole.movie.edu
+        internet address = 192.249.249.1
+        ttl = 86400 (1D)
+    AUTHORITY RECORDS:
+    -&gt;  movie.edu
+        nameserver = terminator.movie.edu
+        ttl = 86400 (1D)
+    -&gt;  movie.edu
+        nameserver = wormhole.movie.edu
+        ttl = 86400 (1D)
+    ADDITIONAL RECORDS:
+    -&gt;  terminator.movie.edu
+        internet address = 192.249.249.3
+        ttl = 86400 (1D)
+    -&gt;  wormhole.movie.edu
+        internet address = 192.253.253.1
+        ttl = 86400 (1D)
+    -&gt;  wormhole.movie.edu
+        internet address = 192.249.249.1
+        ttl = 86400 (1D)
+
+------------
+Name:    wormhole.movie.edu
+Addresses:  192.253.253.1, 192.249.249.1
+
+&gt; <tt class="userinput"><b>set d2</b></tt>
+&gt; <tt class="userinput"><b>wormhole</b></tt>
+Server:  terminator.movie.edu
+Address:  0.0.0.0
+
+<i class="lineannotation">This time the query is also shown.</i>
+
+------------
+SendRequest(  ), len 36
+    HEADER:
+        opcode = QUERY, id = 6814, rcode = NOERROR
+        header flags:  query, want recursion
+        questions = 1,  answers = 0,  authority records = 0,
+      additional = 0
+
+    QUESTIONS:
+        wormhole.movie.edu, type = A, class = IN
+
+------------
+------------
+Got answer (164 bytes):
+
+<i class="lineannotation">The answer is the same as above.</i></pre></blockquote>
+
+
+<a name="INDEX-2018" /><a name="INDEX-2019" />The
+lines between the dashes are the query and response messages. As
+promised, we'll go through the contents of the messages. DNS
+packets comprise five sections: Header, Question, Answer, Authority,
+and Additional.</p><p>
+
+
+<dl>
+<dt><i>Header section</i></dt>
+<dd>The<a name="INDEX-2020" /> header section is present in every
+query and response message. The operation code
+<em class="filename">nslookup</em> reports is always QUERY. There are
+other opcodes for asynchronous notification of zone changes (NOTIFY)
+and for dynamic updates (UPDATE), but <em class="filename">nslookup</em>
+doesn't see those because it just sends regular queries and
+receives responses.</p><p>
+
+
+The ID in the header is used to associate a response with a query and
+detect duplicate queries or responses. You have to look in the header
+flags to see which messages are queries and which are responses. The
+string<a name="INDEX-2021" />
+<em class="emphasis">want recursion</em> means that this is a recursive
+query. The flag is parroted in the response. The string
+<em class="emphasis">auth. answer</em> means that this response is
+authoritative. In other words, the response is from the name
+server's authoritative data, not from its cache. The response
+code,<a name="INDEX-2022" /><a name="INDEX-2023" /> <em class="emphasis">rcode</em>, can be one of
+<em class="emphasis">no error</em>, <em class="emphasis">server failure</em>,
+<em class="emphasis">name error</em> (also known as
+<em class="emphasis">nxdomain</em> or <em class="emphasis">nonexistent
+domain</em>), <em class="emphasis">not implemented</em>, or
+<em class="emphasis">refused</em>. The <em class="emphasis">server
+failure</em>, <em class="emphasis">name error</em>, <em class="emphasis">not
+implemented</em>, and <em class="emphasis">refused</em> response
+codes cause the <em class="filename">nslookup</em> "Server
+failed," "Nonexistent domain," "Not
+implemented," and "Query refused" errors,
+respectively. The last four entries in the header section are
+counters -- they indicate how many resource records there are in
+each of the next four sections.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Question section</i></dt>
+<dd><a name="INDEX-2024" />There is always one question in a DNS
+message; it includes the domain name and the requested datatype and
+class. There is never more than one question in a DNS
+message -- the capability of handling more than one would require
+a redesign of the message format. For one thing, the single authority
+bit would have to be changed because the answer section could contain
+a mix of authoritative and nonauthoritative answers. In the present
+design, setting the authoritative answer bit means that the name
+server is authoritative for the zone that contains the domain name in
+the question section.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Answer section</i></dt>
+<dd><a name="INDEX-2025" />This section contains the resource
+records that answer the question. There can be more than one resource
+record in the response. For example, if the host is multihomed, there
+will be more than one address resource record.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Authority section</i></dt>
+<dd>The<a name="INDEX-2026" /> authority section is where name
+server records are returned. When a response refers the querier to
+some other name servers, those name servers are listed here.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Additional section</i></dt>
+<dd><a name="INDEX-2027" />The additional records section adds
+information that may complete the information included in other
+sections. For instance, if a name server is listed in the authority
+section, the name server's address may be included in the
+additional records section. After all, to contact the name server,
+you need to have its address.</p></dd>
+
+</dl>
+
+
+For you sticklers for detail, there <em class="emphasis">is</em> a time
+when the number of questions in a DNS message isn't one: in
+an<a name="INDEX-2028" /><a name="INDEX-2029" />
+inverse query, when it's zero. In an inverse query, there is
+one answer in the query message, and the question section is empty.
+The name server fills in the question. But, as we said, inverse
+queries are almost
+nonexistent.<a name="INDEX-2030" /><a name="INDEX-2031" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">12.6.2. Querying Like a BIND Name Server</h3>
+
+
+<a name="INDEX-2032" /><a name="INDEX-2033" /><a name="INDEX-2034" />You can make
+<em class="filename">nslookup</em> send out the same query message a name
+server would. Name servers' query messages aren't that
+much different from resolvers' query messages in the first
+place. The primary difference in the query messages is that resolvers
+request recursive resolution and name servers seldom do. Requesting
+recursion is the default with <em class="filename">nslookup</em>, so you
+have to explicitly turn it off. The difference in operation between a
+resolver and a name server is that the resolver applies the search
+list, and the name server doesn't. By default,
+<em class="filename">nslookup</em> applies the search list, so that must
+be explicitly turned off as well. Of course, judicious use of the
+trailing dot will have the same effect.</p><p>
+
+
+<a name="INDEX-2035" />In raw <em class="filename">nslookup</em>
+terms, this means that to query like a resolver, you use
+<em class="filename">nslookup</em>'s default settings. To query like
+a name server, use <em class="emphasis">set norecurse</em> and
+<em class="emphasis">set nosearch</em>. On the command line, that's
+<em class="emphasis">nslookup -norecurse -nosearch</em>.</p><p>
+
+
+When a BIND name server receives a query, it looks for the answer in
+its authoritative data and in its cache. If it doesn't have the
+answer and it is authoritative for the zone, the name server responds
+that the name doesn't exist or that there are no records of the
+type sought. If the name server doesn't have the answer and it
+is <em class="emphasis">not</em> authoritative for the zone, it starts
+walking up the namespace looking for NS records. There are always NS
+records somewhere higher in the namespace. As a last resort, it uses
+the NS records for the root zone, the highest level.</p><p>
+
+
+If the name server has received a nonrecursive query, it responds to
+the querier by returning the NS records that it found. On the other
+hand, if the original query was a recursive query, the name server
+queries the remote name servers in the NS records that it found. When
+the name server receives a response from one of the remote name
+servers, it caches the response and, if necessary, repeats this
+process. The remote server's response either has the answer to
+the question or contains a list of name servers lower in the
+namespace and closer to the answer.</p><p>
+
+
+Let's assume for our example that we are trying to satisfy a
+recursive query and that we didn't find any NS records until we
+checked the <em class="emphasis">gov</em> zone. That
+is, in fact, the case when we ask the name server on <em class="emphasis">relay.hp.com</em> about <em class="emphasis">www.whitehouse.gov</em> -- it
+doesn't find any NS records until the <em class="emphasis">gov</em> zone. From there we switch servers
+to a <em class="emphasis">gov</em> name server and ask
+the same question. It directs us to the <em class="emphasis">whitehouse.gov</em> servers. We then switch
+to a <em class="emphasis">whitehouse.gov</em> name
+server and ask the same question:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  relay.hp.com
+Address:  15.255.152.2
+
+&gt; <tt class="userinput"><b>set norec</b></tt>           <i class="lineannotation"> -- Query like a name server: turn off recursion</i>
+&gt; <tt class="userinput"><b>set nosearch</b></tt>        <i class="lineannotation"> -- Turn off the search list</i>
+&gt; <tt class="userinput"><b>www.whitehouse.gov</b></tt>  <i class="lineannotation"> -- We don't need to dot-terminate since we've turned</i>
+                      <i class="lineannotation"> -- search off</i>
+Server:  relay.hp.com
+Address:  15.255.152.2
+
+Name:    www.whitehouse.gov
+Served by:
+- I.ROOT-SERVERS.NET
+          192.36.148.17
+          gov
+- E.ROOT-SERVERS.NET
+          192.203.230.10
+          gov
+- D.ROOT-SERVERS.NET
+          128.8.10.90
+          gov
+- B.ROOT-SERVERS.NET
+          128.9.0.107
+          gov
+- C.ROOT-SERVERS.NET
+          192.33.4.12
+          gov
+- A.ROOT-SERVERS.NET
+          198.41.0.4
+          gov
+- H.ROOT-SERVERS.NET
+          128.63.2.53
+          gov
+- G.ROOT-SERVERS.NET
+          192.112.36.4
+          gov
+- F.ROOT-SERVERS.NET
+          192.5.5.241
+          gov</pre></blockquote>
+
+
+Switch to a <em class="emphasis">gov</em> name server
+(you may have to turn recursion back on temporarily if your name
+server doesn't have the address of the <em class="emphasis">gov</em> name server already cached):</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>server e.root-servers.net</b></tt>
+Default Server:  e.root-servers.net
+Address: 192.203.230.10</pre></blockquote>
+
+
+Ask the same question of the <em class="emphasis">gov</em> name server. It will refer us to
+name servers closer to our desired answer:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>www.whitehouse.gov.</b></tt>
+Server:  e.root-servers.net
+Address:  192.203.230.10
+
+Name:    www.whitehouse.gov
+Served by:
+- DNSAUTH1.SYS.GTEI.NET
+
+          whitehouse.gov
+- DNSAUTH2.SYS.GTEI.NET
+
+          whitehouse.gov
+- DNSAUTH3.SYS.GTEI.NET
+
+          whitehouse.gov</pre></blockquote>
+
+
+Switch to a <em class="emphasis">whitehouse.gov</em>
+name server -- any of them will do:</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>server dnsauth2.sys.gtei.net.</b></tt>
+Default Server:  dnsauth2.sys.gtei.net
+Address:  4.2.49.3
+
+&gt; <tt class="userinput"><b>www.whitehouse.gov.</b></tt>
+Server:  sec1.dns.psi.net
+Address:  38.8.92.2
+
+Name:    www.whitehouse.gov
+Addresses:  198.137.240.91, 198.137.240.92</pre></blockquote>
+
+
+Hopefully, this example gives you a feeling for how name servers look
+up domain names. If you need to refresh your understanding of what
+this looks like graphically, flip back to Figures <a href="ch02_06.html#dns4-CHP-2-FIG-12">Figure 2-12</a> and <a href="ch02_06.html#dns4-CHP-2-FIG-13">Figure 2-13</a>.</p><p>
+
+
+Before we move on, notice that we asked each of the servers the very
+same question: "What's the address of <em class="emphasis">www.whitehouse.gov</em> ?" What do you
+think would happen if the <em class="emphasis">gov</em> name server had already cached
+<em class="emphasis">www.whitehouse.gov</em> 's
+address itself? The <em class="emphasis">gov</em> name
+server would have answered the question out of its cache instead of
+referring you to the <em class="emphasis">whitehouse.gov</em> name servers. Why is this
+significant? Suppose you messed up a particular host's address
+in your zone. Someone points it out to you, and you clean up the
+problem. Even though your name server now has the correct data, some
+remote sites find the old, messed-up data when they look up the
+domain name of the host. One of the name servers that serves a zone
+higher up in the namespace, such as a root name server, has cached
+the incorrect data; when it receives a query for that host's
+address, it returns the incorrect data instead of referring the
+querier to your name servers. What makes this problem hard to track
+down is that only one of the "higher up" name servers has
+cached the incorrect data, so only some of the remote lookups get the
+wrong answer -- the ones that use this server. Fun, huh?
+Eventually, though, the "higher up" name server will time
+out the old record. If you're pressed for time, you can contact
+the administrators of the remote name server and ask them to restart
+<em class="filename">named</em> to flush the cache. Of course, if the
+remote name server is an important, much-used name server, they may
+tell you where to go with that suggestion.<a name="INDEX-2036" /><a name="INDEX-2037" /><a name="INDEX-2038" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">12.6.3. Zone Transfers</h3>
+
+
+<a name="INDEX-2039" /><em class="filename">nslookup</em> can be used
+to transfer a whole zone using the <em class="emphasis">ls</em> command.
+This feature is useful for troubleshooting, for figuring out how to
+spell a remote host's domain name, or just for counting how
+many hosts are in some remote zone. Since the output can be
+substantial, <em class="filename">nslookup</em> allows you to redirect the
+output to a file. If you want to bail out in the middle of a
+transfer, you can interrupt it by typing your interrupt character.</p><p>
+
+
+Beware: some name servers won't let you pull a copy of their
+zones, either for security reasons or to limit the load placed on
+them. The Internet is a friendly place, but administrators must
+defend their turf.</p><p>
+
+
+Let's look at the <em class="emphasis">movie.edu</em> zone. As you can see in the
+following output, all the zone data is listed -- the SOA record is
+listed twice, which is an artifact of how the data is exchanged
+during the zone transfer. Since some <em class="filename">nslookup </em>s
+only show you address and name server records by default, we specify
+the -<span class="option">d</span> option to retrieve the whole zone:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt>
+Default Server:  terminator.movie.edu
+Address:  0.0.0.0
+
+&gt; <tt class="userinput"><b>ls -d movie.edu.</b></tt>
+[terminator.movie.edu]
+$ORIGIN movie.edu.
+@                       1D IN SOA       terminator al.robocop (
+                                        2000091400      ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        4W2D            ; expiry
+                                        1H )            ; minimum
+
+                        1D IN NS        terminator
+                        1D IN NS        wormhole
+wormhole                1D IN A         192.249.249.1
+                        1D IN A         192.253.253.1
+wh249                   1D IN A         192.249.249.1
+robocop                 1D IN A         192.249.249.2
+bigt                    1D IN CNAME     terminator
+cujo                    1D IN TXT       "Location:" "machine" "room" "dog" "house"
+wh253                   1D IN A         192.253.253.1
+wh                      1D IN CNAME     wormhole
+shining                 1D IN A         192.253.253.3
+terminator              1D IN A         192.249.249.3
+localhost               1D IN A         127.0.0.1
+fx                      1D IN NS        bladerunner.fx
+bladerunner.fx          1D IN A         192.253.254.2
+fx                      1D IN NS        outland.fx
+outland.fx              1D IN A         192.253.254.3
+fx                      1D IN NS        huskymo.boulder.acmebw.com.
+                        1D IN NS        tornado.acmebw.com.
+dh                      1D IN CNAME     diehard
+carrie                  1D IN A         192.253.253.4
+diehard                 1D IN A         192.249.249.4
+misery                  1D IN A         192.253.253.2
+@                       1D IN SOA       terminator al.robocop (
+                                        2000091400      ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        4W2D            ; expiry
+                                        1H )            ; minimum</pre></blockquote>
+
+
+Now let's say you missed a record in the beginning of the zone
+data, one that flew off the top of your screen.
+<em class="filename">nslookup</em> lets you save the listing of a zone to
+a file:</p><p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">&gt; </i><tt class="userinput"><b>ls -d movie.edu  &gt; /tmp/movie.edu</b></tt> <i class="lineannotation">  -- List all data into /tmp/movie.edu</i>
+[terminator.movie.edu]
+Received 25 answers (25 records).</pre></blockquote>
+
+
+Some versions of <em class="filename">nslookup</em> even support a
+built-in <em class="emphasis">view</em> command that sorts and displays
+the contents of a zone listing from interactive mode. In the latest
+BIND 8 releases, though, <em class="emphasis">view</em> is broken, and it
+isn't supported by BIND 9's <em class="filename">nslookup</em>
+as<a name="INDEX-2040" /> of
+9.1.0.<a name="INDEX-2041" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.5. Common Tasks</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.7. Troubleshooting nslookup Problems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+</html>

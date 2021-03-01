@@ -1,0 +1,144 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>DNS and WINS (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch16_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">16.7. DNS and WINS</h2>
+
+
+<a name="INDEX-2439" /> <a name="INDEX-2440" />In our
+first edition -- oh, for those simpler days! -- we mentioned
+the close alignment between NetBIOS names and domain names, but noted
+that, alas, there was no way for DNS to function as a NetBIOS name
+server. Basically, a name server would need to support dynamic
+updates to function as a NetBIOS name server.</p><p>
+
+
+Of course, BIND 8 and 9 support dynamic updates. Unfortunately, the
+DHCP server in Windows NT 4.0 doesn't send dynamic updates to
+name servers. It talks only to Microsoft's WINS servers. WINS
+servers handle their own peculiar, proprietary dynamic updates,
+though only for NetBIOS clients. In other words, a WINS server
+doesn't speak DNS.</p><p>
+
+
+However, Microsoft provides a name server in Windows NT 4.0, which in
+turn can talk to WINS servers. The Microsoft DNS Server has a nice
+graphical administration tool, as you would expect from Microsoft,
+and provides a handy hook into WINS: you can configure the server to
+query a WINS server for address data if it doesn't find the
+data in a DNS zone.</p><p>
+
+
+This is done by adding a new WINS<em class="firstterm"> </em>record to
+the zone. The WINS record, like the SOA record, is attached to the
+zone's domain name. It acts as a flag to tell the Microsoft DNS
+Server to query a WINS server if it doesn't find an address for
+the name it's looking up. The record:</p><p>
+
+
+<blockquote><pre class="code">@        0       IN     WINS            192.249.249.39 192.253.253.39</pre></blockquote>
+
+
+tells the Microsoft DNS Server to query the WINS servers running at
+192.249.249.39 and 192.253.253.39 (in that order) for the name. The
+zero TTL is a precaution against the record being looked up and
+cached.</p><p>
+
+
+There's also a companion WINS-R record that allows a Microsoft
+DNS Server to reverse map IP addresses using a NetBIOS NBSTAT
+request. If an <em class="emphasis">in-addr.arpa</em>zone contains a WINS-R record, like:</p><p>
+
+
+<blockquote><pre class="code">@        0      IN      WINS-R          movie.edu</pre></blockquote>
+
+
+and the IP address sought doesn't appear in the zone, the name
+server will attempt to send a NetBIOS NBSTAT request to the IP
+address being reverse mapped. This amounts to calling a phone number
+and asking the person on the other end, "What's your
+name?" The result has a dot and the domain name in the
+record-specific data appended, in this case ".movie.edu".</p><p>
+
+
+These records provide valuable glue between the two namespaces.
+Unfortunately, the integration isn't perfect. As they say, the
+devil is in the details.</p><p>
+
+
+The main problem, as we see it, is that only the Microsoft DNS
+Servers support the WINS and WINS-R records.<a href="#FOOTNOTE-106">[106]</a>
+Therefore, if you want lookups in the <em class="emphasis">fx.movie.edu</em> zone to be relayed to the
+Special Effects Department's WINS server, then all <em class="emphasis">fx.movie.edu</em> name servers must be
+Microsoft DNS Servers. Why? Imagine that the name servers for
+<em class="emphasis">fx.movie.edu</em> were mixed,
+some Microsoft DNS Servers and some BIND. If a remote name server
+needed to look up a NetBIOS name in <em class="emphasis">fx.movie.edu</em>, it would choose which of
+the <em class="emphasis">fx.movie.edu</em> name
+servers to query according to roundtrip time. If the server it
+happened to choose were a Microsoft DNS Server, it would be able to
+resolve the name to a dynamically assigned address. But if it
+happened to choose a BIND server, it wouldn't be able to
+resolve the name.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-106" />[106]And a
+few commercial products such as MetaInfo's Meta IP/DNS, which
+is a port of BIND 8 with WINS capabilities added on. Stock BIND,
+however, can't talk to WINS servers.</p><p>
+
+</blockquote>
+
+
+The best DNS-WINS configuration we've heard of so far puts all
+WINS-mapped data in its own zone, say <em class="emphasis">wins.movie.edu</em>. All the name servers for
+<em class="emphasis">wins.movie.edu</em> are Microsoft
+DNS Servers, and the zone <em class="emphasis">wins.movie.edu</em>contains just an SOA record, NS records, and a WINS
+record pointing to the WINS servers for <em class="emphasis">wins.movie.edu</em>. This way, there's
+no chance of inconsistent answers between authoritative servers for
+the zone.</p><p>
+
+
+Reverse-mapping data, of course, can't easily be split into
+separate zones for BIND and Microsoft name servers to maintain. So if
+you want both traditional, PTR record-based reverse mapping and
+WINS-R-enhanced reverse mapping, you'll need to host your
+reverse-mapping zones solely on Microsoft DNS Servers.</p><p>
+
+
+Another problem is that WINS and WINS-R are proprietary. BIND name
+servers don't understand them, and in fact a BIND slave that
+transfers a WINS record from a Microsoft DNS Server primary master
+will fail to load the zone because WINS is an unknown type. (We
+discussed this, and how to work around it, in <a href="ch14_01.html">Chapter 14, "Troubleshooting DNS and BIND"</a>.)</p><p>
+
+
+The answer to these problems is the DNS standard dynamic update
+functionality introduced in BIND 8, described in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>, and the support for it in Windows 2000.
+Dynamic update allows authorized addition and deletion of records in
+a BIND name server, which in turn gives the folks at Microsoft the
+functionality they need to use DNS as a name service for NetBIOS. So
+without further ado . . . <a name="INDEX-2441" /> <a name="INDEX-2442" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.6. Additional Resource Records</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16.8. DNS and Windows 2000</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

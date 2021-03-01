@@ -1,0 +1,493 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:35 GMT -->
+<head><title>Troubleshooting Network Access  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">13.4. Troubleshooting Network Access </h2>
+
+<p>The "no answer" and "cannot connect" errors
+indicate a problem in the lower layers of the network protocols. If
+the preliminary tests point to this type of problem, concentrate your
+testing on routing and on the network interface. Use the
+<tt class="literal">ifconfig</tt>, <tt class="literal">netstat</tt>, and
+<tt class="literal">arp</tt> commands to test the Network Access Layer.
+</p>
+
+<a name="tcp3-CHP-13-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">13.4.1. Troubleshooting with the ifconfig Command </h3>
+
+<p><tt class="literal">ifconfig</tt> checks
+<a name="INDEX-2883" />
+<a name="INDEX-2884" />
+<a name="INDEX-2885" />
+<a name="INDEX-2886" />the network interface configuration. Use
+this command to verify the user's configuration if the
+user's system has been recently configured or if the
+user's system cannot reach the remote host while other systems
+on the same network can.
+</p>
+
+<p>When <tt class="literal">ifconfig</tt> is entered with an interface name
+and no other arguments, it displays the current values assigned to
+that interface. For example, checking interface dnet0 on a Solaris 8
+system gives this report:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">ifconfig dnet0</b> 
+dnet0: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4&gt; mtu 1500 index 2
+        inet 172.16.55.105 netmask ffffff00 broadcast 172.16.55.255</pre></blockquote>
+
+<p>The <tt class="literal">ifconfig</tt> command displays two lines of output.
+The first line of the display shows the interface's name and
+its characteristics. Check for these characteristics:
+</p>
+
+<dl>
+<dt><i>UP</i></dt>
+<dd>
+<p>The interface is enabled for use. If the interface is
+"down," have the system's superuser bring the
+interface "up" with the <tt class="literal">ifconfig</tt>
+command (e.g., <tt class="literal">ifconfig dnet0 up</tt>). If the
+interface won't come up, replace the interface cable and try
+again. If it still fails, have the interface hardware checked.
+</p>
+</dd>
+
+
+<dt><i>RUNNING</i></dt>
+<dd>
+<p>This interface is operational. If the interface is not
+"running," the driver for this interface may not be
+properly installed. The system administrator should review all of the
+steps necessary to install this interface, looking for errors or
+missed steps.
+</p>
+</dd>
+
+</dl>
+
+<p>The second line of <tt class="literal">ifconfig</tt> output shows the IP
+address, the subnet mask (written in hexadecimal), and the broadcast
+address. Check these three fields to make sure the network interface
+is properly configured.
+</p>
+
+<p>Two common interface configuration problems are misconfigured subnet
+masks and incorrect IP addresses. A bad subnet mask is indicated when
+the host can reach other hosts on its local subnet and remote hosts
+on distant networks, but it cannot reach hosts on other local
+subnets. <tt class="literal">ifconfig</tt> quickly reveals if a bad subnet
+mask is set.
+</p>
+
+<p>An incorrectly set IP address can be a subtle problem. If the network
+part of the address is incorrect, every <tt class="literal">ping</tt> will
+fail with the "no answer" error. In this case, using
+<tt class="literal">ifconfig</tt> will reveal the incorrect address.
+However, if the host part of the address is wrong, the problem can be
+more difficult to detect. A small system, such as a PC that only
+connects out to other systems and never accepts incoming connections,
+can run for a long time with the wrong address without its user
+noticing the problem. Additionally, the system that suffers the ill
+effects may not be the one that is misconfigured. It is possible for
+someone to accidentally use your IP address on his system, and for
+his mistake to cause your system intermittent communications
+problems. An example of this problem is discussed later. This type of
+configuration error cannot be discovered by
+<tt class="literal">ifconfig</tt> because the error is on a remote host.
+The <tt class="literal">arp</tt> command is used for this type of problem.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">13.4.2. Troubleshooting with the arp Command </h3>
+
+<p>The <tt class="literal">arp</tt> command <a name="INDEX-2887" /> <a name="INDEX-2888" />
+<a name="INDEX-2889" />
+<a name="INDEX-2890" /> <a name="INDEX-2891" />is used to <a name="INDEX-2892" />analyze
+problems with IP-to-Ethernet address translation. The
+<tt class="literal">arp</tt> command has three useful options for
+troubleshooting:
+</p>
+
+<dl>
+<dt><b><tt class="literal">-a</tt></b></dt>
+<dd>
+<p>Display all ARP entries in the table.</p>
+</dd>
+
+
+<dt><b><tt class="literal">-d</tt> <em class="replaceable">hostname</em></b></dt>
+<dd>
+<p>Delete an entry from the ARP table.</p>
+</dd>
+
+
+<dt><b><tt class="literal">-s</tt> <em class="replaceable">hostname ether-address</em></b></dt>
+<dd>
+<p>Add a new entry to the table.</p>
+</dd>
+
+</dl>
+
+<p>With these three options you can view the contents of the ARP table,
+delete a problem entry, and install a corrected entry. The ability to
+install a corrected entry is useful in "buying time"
+while you look for the permanent fix.
+</p>
+
+<p>Use <tt class="literal">arp</tt> if you suspect that incorrect entries are
+getting into the address resolution table. One clear indication of
+problems with the ARP table is a report that the "wrong"
+host responded to some command, like <tt class="literal">ftp</tt> or
+<tt class="literal">telnet</tt>. Intermittent problems that affect only
+certain hosts can also indicate that the ARP table has been
+corrupted. ARP table problems are usually caused by two systems using
+the same IP address. The problems appear intermittent because the
+entry that appears in the table is the address of the host that
+responded quickest to the last ARP request. Sometimes the
+"correct" host responds first, and sometimes the
+"wrong" host responds first.
+</p>
+
+<p>If you suspect that two systems are using the same IP address,
+display the address resolution table with the <tt class="literal">arp
+-a</tt> command. Here's an example from a Solaris
+system:<a href="#FOOTNOTE-144">[144]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-144" /><p>[144]The format in which the ARP table is
+displayed may vary slightly between systems.</p> </blockquote>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">arp -a</b> 
+Net to Media Table: IPv4 
+Device   IP Address               Mask      Flags   Phys Addr  
+------ -------------------- --------------- ----- --------------- 
+dnet0  pecan                255.255.255.255       08:00:20:05:21:33 
+dnet0  horseshoe            255.255.255.255       00:00:0c:e0:80:b1 
+dnet0  crab                 255.255.255.255  SP   08:00:20:22:fd:51
+dnet0  BASE-ADDRESS.MCAST.NET 240.0.0.0      SM   01:00:5e:00:00:00</pre></blockquote>
+
+<p>It is easiest to verify that the IP and Ethernet address pairs are
+correct if you have a record of each host's correct Ethernet
+address. For this reason you should record each host's Ethernet
+and IP address when it is added to your network. If you have such a
+record, you'll quickly see if anything is wrong with the table.
+</p>
+
+<p>If you don't have this type of record, the first three bytes of
+the Ethernet address can help you to detect a problem. The first
+three bytes of the address identify the equipment manufacturer. A
+list of these identifying prefixes is found at
+<a href="http://www.iana.org/assignments/ethernet-numbers">http://www.iana.org/assignments/ethernet-numbers</a>.
+</p>
+
+<p>From the vendor prefixes we see that two of the ARP entries displayed
+in our example are Sun systems (8:0:20). If
+<em class="emphasis">horseshoe</em> is also supposed to be a Sun, the
+0:0:0c Cisco prefix indicates that a Cisco router has been mistakenly
+configured with <em class="emphasis">horseshoe</em>'s IP address.
+</p>
+
+<p>If neither checking a record of correct assignments nor checking the
+manufacturer prefix helps you identify the source of the errant ARP,
+try using <tt class="literal">telnet</tt> to connect to the IP address
+shown in the ARP entry. If the device supports
+<tt class="literal">telnet</tt>, the login banner might help you identify
+the incorrectly configured host.
+</p>
+
+<a name="tcp3-CHP-13-SECT-4.2.1" /><div class="sect3">
+<h3 class="sect3">13.4.2.1. ARP problem case study </h3>
+
+<p>A user called in asking if the server was down, and reported the
+following problem. The user's workstation, called
+<em class="emphasis">limulus</em>, appeared to "lock up" for
+minutes at a time when certain commands were used, while other
+commands worked with no problems. The network commands that involved
+the NIS name server all caused the lock-up problem, but some
+unrelated commands also caused the problem. The user reported seeing
+the error message:
+</p>
+
+<blockquote><pre class="code"> NFS getattr failed for server crab: RPC: Timed out</pre></blockquote>
+
+<p>The server <em class="emphasis">crab</em> was providing
+<em class="emphasis">limulus</em> with NIS and NFS services. The commands
+that failed on <em class="emphasis">limulus</em> were commands that
+required NIS service, or that were stored in the centrally maintained
+<em class="emphasis">/usr/local</em> directory exported from
+<em class="emphasis">crab</em>. The commands that ran correctly were
+installed locally on the user's workstation. No one else
+reported a problem with the server, and we were able to
+<tt class="literal">ping</tt> <em class="emphasis">limulus</em> from
+<em class="emphasis">crab</em> and get good responses.
+</p>
+
+<p>We had the user check the <em class="emphasis">messages</em>
+file<a href="#FOOTNOTE-145">[145]</a> for recent
+error messages, and she discovered this:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-145" /><p>[145]Check <em class="emphasis">/etc/syslog.conf</em> for
+the full path of the <em class="emphasis">messages</em> file. Common
+locations are <em class="emphasis">/var/adm/messages</em> and
+<em class="emphasis">/var/log/messages</em>.</p> </blockquote>
+
+<blockquote><pre class="code">Mar  6 13:38:23 limulus vmunix: duplicate IP address!!
+      sent from ethernet address: 0:0:c0:4:38:1a</pre></blockquote>
+
+<p>This message indicates that the workstation detected another host on
+the Ethernet responding to its IP address. The "imposter"
+used the Ethernet address 0:0:c0:4:38:1a in its ARP response. The
+correct Ethernet address for <em class="emphasis">limulus</em> is
+8:0:20:e:12:37. 
+</p>
+
+<p>We checked <em class="emphasis">crab</em>'s ARP table and found that
+it had the incorrect ARP entry for <em class="emphasis">limulus</em>. We
+deleted the bad <em class="emphasis">limulus</em> entry with the
+<tt class="literal">arp -d</tt> command, and installed the correct entry
+with the <tt class="literal">-s</tt> option, as shown below:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">arp -d limulus</b> 
+limulus (172.16.180.130) deleted
+# <b class="emphasis-bold">arp -s limulus 8:0:20:e:12:37</b></pre></blockquote>
+
+<p>ARP entries received via the ARP protocol are temporary. The values
+are held in the table for a finite lifetime and are deleted when that
+lifetime expires. New values are then obtained via the ARP protocol.
+Therefore, if some remote interfaces change, the local table adjusts
+and communications continue. Usually this is a good idea, but if
+someone is using the wrong IP address, that bad address can keep
+reappearing in the ARP table even if it is deleted. However, manually
+entered values are permanent; they stay in the table and can only be
+deleted manually. This allowed us to install a correct entry in the
+table without worrying about it being overwritten by a bad address.
+</p>
+
+<p>This quick fix resolved <em class="emphasis">limulus</em>'s
+immediate problem, but we still needed to find the culprit. We
+checked the <em class="emphasis">/etc/ethers</em> file to see if we had an
+entry for Ethernet address 0:0:c0:4:38:1a, but we didn't. From
+the first three bytes of this address, 0:0:c0, we knew that the
+device was a Western Digital card. Since our network has only Unix
+workstations and PCs, we assumed the Western Digital card was
+installed in a PC. We also guessed that the problem address was
+recently installed because the user had never had the problem before.
+We sent out an urgent announcement to all users asking if anyone had
+recently installed a new PC, reconfigured a PC, or installed TCP/IP
+software on a PC. We got one response. When we checked his system, we
+found out that he had entered the address 172.16.180.130 when he
+should have entered 172.16.180.138. The address was corrected and the
+problem did not recur.
+</p>
+
+<p>Nothing fancy was needed to solve this problem. Once we checked the
+error messages, we knew what the problem was and how to solve it.
+Involving the entire network user community allowed us to quickly
+locate the problem system and to avoid a room-to-room search for the
+PC. Reluctance to involve users and make them part of the solution is
+one of the costliest, and most common, mistakes <a name="INDEX-2893" />made by
+<a name="INDEX-2894" />
+<a name="INDEX-2895" />
+<a name="INDEX-2896" />
+<a name="INDEX-2897" />
+<a name="INDEX-2898" />network administrators.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-13-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">13.4.3. Checking the Interface with netstat </h3>
+
+<p>If the preliminary
+<a name="INDEX-2899" />
+<a name="INDEX-2900" />
+<a name="INDEX-2901" />tests lead you to suspect that the
+connection to the local area network is unreliable, the
+<tt class="literal">netstat -i</tt> command can provide useful information.
+The example below shows the output from the <tt class="literal">netstat
+-i</tt> command on a Solaris 8 system:<a href="#FOOTNOTE-146">[146]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-146" /><p>[146]The
+output on a Linux system is formatted differently, but the same
+statistics are provided.</p> </blockquote>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">netstat -i</b> 
+Name  Mtu  Net/Dest         Address   Ipkts Ierrs Opkts Oerrs Collis Queue 
+dnet0 1500 wrotethebook.com crab      442697  2   633424  2   50679  0
+lo0   1536 loopback         localhost 53040   0   53040   0   0      0</pre></blockquote>
+
+<p>The line for the loopback interface, lo0, can be ignored. Only the
+line for the real network interface is significant, and only the last
+five fields on that line provide significant troubleshooting
+information.
+</p>
+
+<p>Let's look at the last field first. There should be no packets
+queued (Queue) that cannot be transmitted. If the interface is up and
+running, and the system cannot deliver packets to the network,
+suspect a bad drop cable or a bad interface. Replace the cable and
+see if the problem goes away. If it doesn't, call the vendor
+for interface hardware repairs.
+</p>
+
+<p>The input errors (Ierrs) and the output errors (Oerrs) should be
+close to 0. Regardless of how much traffic has passed through this
+interface, 100 errors in either of these fields is high. High output
+errors could indicate a saturated local network or a bad physical
+connection between the host and the network. High input errors could
+indicate that the network is saturated, the local host is overloaded,
+or there is a physical network problem. Tools, such as
+<tt class="literal">ping</tt> statistics or a cable tester, can help you
+determine if it is a physical network problem. Evaluating the
+collision rate can help you determine if the local Ethernet is
+saturated.
+</p>
+
+<p>A high value in the collision field (Collis) is normal, but if the
+percentage of output packets that result in a collision is too high,
+it indicates that the network is saturated. Collision rates greater
+than 5% bear watching. If high collision rates are seen consistently,
+and are seen among a broad sampling of systems on the network, you
+may need to subdivide the network to reduce traffic load.
+</p>
+
+<p>Collision rates are a percentage of output packets. Don't use
+the total number of packets sent and received; use the values in the
+Opkts and Collis fields when determining the collision rate. For
+example, the output in the <tt class="literal">netstat</tt> example shows
+50679 collisions out of 633424 outgoing packets. That's a
+collision rate of 8%. This sample network could be overworked; check
+the statistics on other hosts on this network. If the other systems
+also show a high collision rate, consider subdividing this network.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">13.4.4. Subdividing an Ethernet </h3>
+
+<p>To reduce the
+<a name="INDEX-2902" />
+<a name="INDEX-2903" /> <a name="INDEX-2904" />collision rate, you must
+reduce the amount of traffic on the network segment. A simple way to
+do this is to create multiple segments out of the single segment.
+Each new segment will have fewer hosts and, therefore, less traffic.
+We'll see, however, that it's not quite this simple.
+</p>
+
+<p>The most effective way to subdivide an Ethernet is to install an
+Ethernet switch. Each port on the switch is essentially a separate
+Ethernet. So a 16-port switch gives you 16 Ethernets to work with
+when balancing the load. On most switches the ports can be used in a
+variety of ways (see <a href="ch13_04.html#tcp3-CHP-13-FIG-1">Figure 13-1</a>). Lightly used
+systems can be attached to a hub that is then attached to one of the
+switch ports to allow the systems to share a single segment. Servers
+and demanding systems can be given dedicated ports so that they
+don't need to share a segment with anyone. Most switches
+provide both 10 Mbps Ethernet and Fast Ethernet 100 Mbps ports. These
+are called <em class="emphasis">asymmetric</em>
+<em class="emphasis">switches</em> because different ports operate at
+different speeds. Use the Fast Ethernet ports to connect heavily used
+servers or segments. Most 10/100 switches have auto-sensing ports.
+This allows every port to be used at either 100 Mbps or at 10 Mbps,
+which gives you the maximum configuration flexibility.
+</p>
+
+<p><a name="INDEX-2905" />Gigabit Ethernet switches can also be
+used, but they have a unique place in the network topology. 10/100
+switches connect servers and local networks. Gigabit switches are
+primarily used to create a "collapsed backbone" to
+interconnect other switches. Gigabit switches are used when designing
+a new corporate backbone network. 10/100 switches are used when
+subdividing an individual Ethernet segment.
+</p>
+
+<p><a href="ch13_04.html#tcp3-CHP-13-FIG-1">Figure 13-1</a> shows an 8-port 10/100 Ethernet switch.
+Ports 1 and 2 are wired to Ethernet hubs. A few systems are connected
+to each hub. When new systems are added they are distributed evenly
+among the hubs to prevent any one segment from becoming overloaded.
+Additional hubs can be added to the available switch ports for future
+expansion. Port 4 attaches a demanding system with its own private
+segment. Port 6 operates at 100 Mbps and attaches a heavily used
+server. A port can be reserved for a future 100 Mbps connection to a
+second 10/100 Ethernet switch for even more expansion.
+</p>
+
+<a name="tcp3-CHP-13-FIG-1" /><div class="figure"><img height="313" alt="Figure 13-1" src="figs/tcp3_1301.gif" width="424" /></div><h4 class="objtitle">Figure 13-1. Subdividing an Ethernet with switches</h4>
+
+<p>Before allocating the ports on your switch, evaluate what services
+are in demand, and who talks to whom. Then develop a plan that
+reduces the amount of traffic flowing over any segment. For example,
+if the demanding system on Port 4 uses lots of bandwidth because it
+is constantly talking to one of the systems on Port 1, all of the
+systems on Port 1 will suffer because of this traffic. The computer
+that the demanding system communicates with should be moved to one of
+the vacant ports or to the same port (4) as the demanding system. Use
+your switch to the greatest advantage by balancing the load.
+</p>
+
+<p>Should you segment an old coaxial cable Ethernet by cutting the cable
+and joining it back together through a router or a bridge? No. If you
+have an old network that is finally reaching saturation, it is time
+to install a new network built on a more robust technology. A
+<em class="emphasis">shared media</em><a name="INDEX-2906" /> network, a network where everyone is
+on the same cable (in this example, a coaxial cable Ethernet) is an
+accident waiting to happen. Design a network that a user cannot bring
+down by merely disconnecting his system, or even by accidentally
+cutting a wire in his office. Use unshielded twisted pair (UTP)
+cable, ideally Category 5 cable, to create a 10BaseT Ethernet or
+100BaseT Fast Ethernet that wires equipment located in the
+user's office to a hub securely stored in a wire closet. The
+network components in the user's office should be sufficiently
+isolated from the network so that damage to those components does not
+damage the entire network. The new network will solve your collision
+problem and reduce the amount of hardware troubleshooting you are
+called upon to do.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">13.4.5. Network Hardware Problems </h3>
+
+<p>Some of the tests discussed in this section can show a network
+hardware problem. If a hardware problem is indicated, contact the
+people responsible for the hardware. If the problem appears to be in
+a leased telephone line, contact the telephone company. If the
+problem appears to be in a wide area network, contact the management
+of that network. Don't sit on a problem expecting it to go
+away. It could easily get worse.
+</p>
+
+<p>If the problem is in your local area network, you will have to handle
+it yourself. Some tools, such as the cable tester, can help. But
+frequently the only way to approach a hardware problem is by brute
+force -- disconnecting pieces of hardware until you find the one
+causing the problem. It is most convenient to do this at the switch
+or hub. If you identify a device causing the problem, repair or
+replace it. Remember that the problem can be the cable itself, rather
+than any particular device.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.3. Testing Basic Connectivity </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.5. Checking Routing </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:35 GMT -->
+</html>

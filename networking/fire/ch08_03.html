@@ -1,0 +1,366 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:29 GMT -->
+<head><title>What Does the Router Do with Packets? (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.3. What Does the Router Do with Packets?</h2>
+
+
+
+
+
+<a name="INDEX-526" /><a name="INDEX-527" /><a name="INDEX-528" />Once a packet filtering router has
+finished examining a specific packet, what can it do with that
+packet? There are two choices:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Pass the packet on</i></dt>
+<dd>Normally, if the packet passes the criteria in the packet filtering
+configuration, the router will forward the packet on towards its
+destination, just as a normal router (not a packet filtering router)
+would do.</p><p></dd>
+
+
+
+
+
+<dt><i>Drop the packet</i></dt>
+<dd>The other obvious action to take is to drop the packet if it fails
+the criteria in the packet filtering configuration.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch08-5053" /><div class="sect2">
+<h3 class="sect2">8.3.1. Logging Actions</h3>
+
+
+
+
+
+<a name="INDEX-529" /><a name="INDEX-530" />Regardless
+of whether the packet is forwarded or dropped
+("permitted" or "denied" in some packet
+filtering implementations), you might want the router to log the
+action that has been taken. This is especially true if you drop the
+packet because it runs afoul of your packet filtering rules. In this
+case, you'd like to know what's being tried that
+isn't allowed.</p><p>
+
+
+
+
+
+You probably aren't going to log every packet that is allowed,
+but you might want to log some of these packets. For example, you
+might want to log start-of-connection TCP packets, so that you can
+keep track of incoming and outgoing TCP connections. Not all packet
+filters will log allowed packets.</p><p>
+
+
+
+
+
+Different packet filtering implementations support different forms of
+logging. Some will log only specific information about a packet, and
+others will forward or log an entire dropped packet. Generally, your
+packet filter will need to be configured to log to a host somewhere
+via the <em class="emphasis">syslog</em> service. You don't want the
+only copy of the logs to be on the packet filter if it is
+compromised. Most packet filtering also occurs on dedicated routers,
+which rarely have large amounts of disk space to dedicate to logging.
+See the discussion of setting up logging in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, and <a href="ch26_01.html">Chapter 26, "Maintaining Firewalls"</a>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-5069" /><div class="sect2">
+<h3 class="sect2">8.3.2. Returning Error Codes</h3>
+
+
+
+
+
+<a name="INDEX-531" /><a name="INDEX-532" /><a name="INDEX-533" /><a name="INDEX-534" /><a name="INDEX-535" /><a name="INDEX-536" />When a packet
+is dropped, the router can send back an ICMP error code indicating
+what happened (in this case, many packages will refer to the packet
+as having been "rejected" instead of merely dropped).
+Sending back an ICMP error code has the effect of warning the sending
+machine not to retry sending the packet, thereby saving some network
+traffic and some time for the user on the remote side. (If you send
+back an ICMP error code, the user's connection attempt will
+fail immediately; otherwise, it will time out, which may take several
+minutes.)</p><p>
+
+
+
+
+
+There are two sets of relevant ICMP codes to choose from:</p><p>
+
+
+
+
+
+<ul><li>The generic "destination unreachable" codes  --  in
+particular, the "host unreachable" and "network
+unreachable" codes.</p><p></li><li>The "destination administratively unreachable" codes
+ --  in particular, the "host administratively
+unreachable" and "network administratively
+unreachable" codes.</p><p></li></ul>
+The first pair of ICMP error codes that the router might return,
+"host unreachable" and "network unreachable",
+were designed to indicate serious network problems: the destination
+host is down or something in the only path to the host is down. These
+error codes predate firewalls and packet filtering. The problem with
+returning one of these error codes is that some hosts (particularly
+if they're running older versions of Unix) take them quite
+literally. If these machines get back a "host
+unreachable" for a given host, they will assume that the host
+is totally unreachable and will close all currently open connections
+to it, even if the other connections were working perfectly well.</p><p>
+
+
+
+
+
+The second set of ICMP error codes the router might return,
+"host administratively unreachable" and "network
+administratively unreachable", were added to the official list
+of ICMP message types later, specifically to give packet filtering
+systems something to return when they dropped a packet. Even though
+they're in the standard, they're not implemented
+everywhere. Theoretically, this is not a problem; the RFCs specify
+that a host that gets an ICMP code it doesn't understand should
+simply ignore the packet. In practice, not all systems will handle
+this gracefully. The best the standard can do for you is ensure that
+it is officially not your fault if somebody else's system
+crashes when you send it an ICMP packet it doesn't understand.</p><p>
+
+
+
+
+
+There are several issues to consider when you are deciding whether or
+not your packet filtering system should return ICMP error codes:</p><p>
+
+
+
+
+
+<ul><li>Which message should you send?</p><p></li><li>Can you afford the overhead of generating and returning error codes?</p></li><li><p>Will returning these codes enable attackers to get too much
+information about your packet filtering?</p><p></li></ul>
+Which set of error codes makes sense for your site? Returning the old
+"host unreachable" and "network unreachable"
+codes is technically incorrect (remember that the host may or may not
+be unreachable, according to the packet filtering policy, depending
+on what host is attempting to access what service). Also, these error
+codes can cause many systems to react excessively (shutting down all
+connections to that host or network).</p><p>
+
+
+
+
+
+Returning the new "host administratively unreachable" or
+"network administratively unreachable" codes advertises
+the fact that there is a packet filtering system at your site, which
+you may or may not want to do. These codes may also cause excessive
+reactions in faulty IP implementations.</p><p>
+
+
+
+
+
+There is another consideration as well. Generating and returning ICMP
+error codes takes a certain small amount of effort on the part of the
+packet filtering router. An attacker could conceivably mount a denial
+of service attack by flooding the router with packets the router
+would reject and for which it would try to generate ICMP error
+packets. The issue isn't network bandwidth; it's CPU load
+on the router. (While it's busy generating ICMP packets,
+it's not able to do other things as quickly, like make
+filtering decisions.) On the other hand, not returning ICMP error
+codes will cause a small amount of excess network traffic, as the
+sending system tries and retries to send the packet being dropped.
+This traffic shouldn't amount to much, because the number of
+packets blocked by a packet filtering system should be a fraction of
+the total number of packets processed. (If it's not a small
+fraction, you've got more serious problems because people are
+apparently trying lots of things that "aren't
+allowed".)</p><p>
+
+
+
+
+
+If your router returns an ICMP error code for every packet that
+violates your filtering policy, you're also giving an attacker
+a way to probe your filtering system. By observing which packets
+evoke an ICMP error response, attackers can discover what types of
+packets do and don't violate your policy (and thus what types
+of packets are and are not allowed into your network). You should not
+give this information away because it greatly simplifies the
+attacker's job. The attacker knows that packets that
+don't get the ICMP error are going somewhere and can
+concentrate on those protocols where you actually have
+vulnerabilities. You'd rather that the attacker spent plenty of
+time sending you packets that you happily throw away. Returning ICMP
+error codes speeds up attack programs; if they get back an ICMP error
+for something they try, they don't have to wait for a timeout.</p><p>
+
+
+
+
+
+All in all, the safest thing to do seems to be to drop packets
+without returning any ICMP error codes. If your router offers enough
+flexibility, it might make sense to configure it to return ICMP error
+codes to internal systems (which would like to know immediately that
+something is going to fail, rather than wait for a timeout) but not
+to external systems (where the information would give an attacker a
+means to probe the filtering configuration of the firewall). Even if
+your router doesn't seem to offer such flexibility, you may be
+able to accomplish the same result by specifying packet filtering
+rules to allow the relevant inbound ICMP packets and disallow the
+relevant outbound ICMP packets.<a name="INDEX-537" /><a name="INDEX-538" /><a name="INDEX-539" /><a name="INDEX-540" /><a name="INDEX-541" /></p><p>
+
+
+
+
+
+Some packet filtering systems also allow you to shut off TCP
+connections without using ICMP, by responding with a TCP reset, which
+aborts the connection. This is the response that a machine would
+normally give if it received a TCP packet bound for a port where
+nothing was listening. Although TCP resets give away less information
+than ICMP error codes, they still speed up attack programs.</p><p>
+
+
+
+
+
+There is one case where you do not usually want to drop packets
+without an error. A number of systems use the authorization service
+implemented by <em class="emphasis">identd</em> to attempt to do user
+authentication on incoming connections (usually on mail and IRC
+connections). If you are not running <em class="emphasis">identd</em> or
+another server that provides information via the Auth protocol, it is
+advisable to return errors on these attempts, in
+order to speed up mail delivery to systems using this kind of
+authorization. If you drop packets without errors, the other system
+will have to wait for its request to time out before continuing the
+process of accepting the mail. This can significantly increase the
+load on your mail system if you need to deliver large amounts of
+mail. Auth and <em class="emphasis">identd</em> are discussed further in
+<a href="ch21_01.html#ch21-20321">Section 21.1, "What Is Authentication?"</a>.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-6-fm2xml" /><div class="sect2">
+<h3 class="sect2">8.3.3. Making Changes</h3>
+
+
+
+
+
+ore complicated packet filtering systems may take more complicated
+actions. In addition to deciding whether or not to forward the
+packet, they can decide to forward the packet to something other than
+its original destination, to change states, or to change the contents
+of the packet itself.</p><p>
+
+
+
+
+
+A packet filter can change the destination of the packet either by
+changing the destination information in the packet (for instance, as
+part of network address translation or load balancing between
+servers), or by encapsulating the packet inside another one (this
+allows a packet filtering router to cooperate with another machine to
+provide transparent proxying).</p><p>
+
+
+
+
+
+When a stateful packet filter gets a packet, it decides not only
+whether to forward or drop the packet, but also whether to modify its
+state based on the packet. For instance, if the packet is an outbound
+UDP packet, the packet filter may change state to allow inbound
+packets that appear to be replies. If the packet is the first packet
+in a TCP connection (it has the SYN bit set but no ACK, see <a href="ch04_01.html#ch04-4256">Section 4.1, "What Does a Packet Look Like?"</a>, for more details), the packet filter may
+change state to expect a packet with both the SYN bit and the ACK bit
+set. When it gets that second packet, it will then change state to
+expect packets with the ACK bit but not the SYN bit set. This
+enforces a correct TCP handshake, getting rid of some attacks
+involving interesting settings of header bits.</p><p>
+
+
+
+
+
+Some packet filtering systems will also modify parts of packets
+besides the destination. This is the basis of packet filtering
+systems that provide network address translation; they need to modify
+not only destination information, but also source information and
+sometimes embedded IP addresses further into the packet.<a name="INDEX-542" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.2. Configuring a Packet Filtering Router</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.4. Packet Filtering Tips and Tricks</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:29 GMT -->
+</html>

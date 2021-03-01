@@ -1,0 +1,319 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:11 GMT -->
+<head><title>Serverwide Configuration (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 5. Serverwide Configuration</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch05-93717">The Name of the Server</a><br />
+<a href="ch05_02.html">Running the Server</a><br />
+<a href="ch05_03.html">Server Configuration: An Overview</a><br />
+<a href="ch05_04.html">Getting Ready: Initial Setup</a><br />
+<a href="ch05_05.html">Letting People in: Authentication and Access Control</a><br />
+<a href="ch05_06.html">User Logins and Accounts</a><br />
+<a href="ch05_07.html">Subsystems</a><br />
+<a href="ch05_08.html">History, Logging, and Debugging</a><br />
+<a href="ch05_09.html">Compatibility Between SSH-1 and SSH-2 Servers</a><br />
+<a href="ch05_10.html">Summary</a><br /><p></p></div>
+
+
+
+<a name="INDEX-718" /></a><a name="INDEX-719" /></a><a name="INDEX-720" /></a>After
+installing an SSH server (<tt class="command">sshd </tt> ), it's time
+to make informed decisions about your server's operation. Which
+authentication techniques should be permitted? How many bits should
+the server key contain? Should idle connections be dropped after a
+time limit or left connected indefinitely? These and other questions
+must be considered carefully. <tt class="command">sshd</tt> has reasonable
+defaults, but don't accept them blindly. Your server should
+conform to a carefully planned security policy. Fortunately,
+<tt class="command">sshd</tt> is highly configurable so you can make it do
+all kinds of interesting tricks.<p></p>
+
+
+
+<tt class="command">sshd</tt> may be configured at three levels, and this
+chapter covers the second one: <em class="emphasis">serverwide
+configuration</em>, in which a system administrator controls
+the global runtime behavior of the server. This includes a large,
+rich set of features, such as TCP/IP settings, encryption,
+authentication, access control, and error logging. Some features are
+controlled by modifying a serverwide configuration file, and others
+by command-line options passed to the server at invocation.<p></p>
+
+
+
+The other two levels of configuration are compile-time configuration
+(<a href="ch04_01.html">Chapter 4, "Installation and Compile-Time Configuration"</a>), in which the server is compiled with
+or without certain functionality; and per-account configuration
+(<a href="ch08_01.html">Chapter 8, "Per-Account Server Configuration"</a>), in which the server's behavior
+is modified by end users for their accounts only. We'll discuss
+the distinction between the three levels in more detail later in this
+chapter.<p></p>
+
+
+
+This chapter covers only the servers from SSH1/SSH2 and their
+derivatives OpenSSH and F-Secure SSH Server. Our reference
+implementations, however, are SSH1 and SSH2 for Unix. We've
+tried to indicate which features are found or not found in the
+various flavors of <tt class="command">sshd</tt>, but these will certainly
+change as new versions appear, so read each product's
+documentation for the latest information.<p></p>
+
+
+
+<div class="sect1"><a name="ch05-93717" /></a>
+<h2 class="sect1">5.1. The Name of the Server</h2>
+
+
+
+The <a name="INDEX-721" /></a><a name="INDEX-722" /></a>SSH server is named
+<tt class="command">sshd1</tt> for SSH1, <tt class="command">sshd2</tt> for SSH2,
+and <tt class="command">sshd</tt> for OpenSSH. However, you may also be
+able to invoke <tt class="command">sshd1</tt> or <tt class="command">sshd2</tt>
+as <tt class="command">sshd</tt>, because their Makefiles create a symbolic
+link called <tt class="command">sshd</tt>. [<a href="ch04_01.html#ch04-30116">Section 4.1.3, "Building and Installing SSH1"</a>]
+[<a href="ch04_01.html#ch04-59756">Section 4.1.4, "Building and Installing SSH2"</a>] The link points to
+<tt class="command">sshd2</tt> if it's installed, otherwise
+<tt class="command">sshd1</tt> (the SSH1 Makefile doesn't supersede
+links installed by SSH2).<p></p>
+
+
+
+Some features in this chapter apply to <tt class="command">sshd1</tt> only,
+<tt class="command">sshd2</tt> only, OpenSSH's
+<tt class="command">sshd</tt> only, or various combinations. We indicate
+this in the following ways:<p></p>
+
+
+
+<ul><li>If a command-line option applies to only one package, e.g., SSH1, we
+present the example using <tt class="command">sshd1</tt> and a comment. For
+instance, in SSH1 the <span class="option">-d</span> option (debug mode) may
+appear alone:<p></p>
+<blockquote><pre class="code"># SSH1 only
+$ sshd1 -d</pre></blockquote>
+
+</li>
+
+<li>If a command-line option applies only to SSH2, we use
+<tt class="command">sshd2</tt>. Its <span class="option">-d</span> option requires an
+argument:<p></p>
+<blockquote><pre class="code"># SSH2 only
+$ sshd2 -d 2</pre></blockquote>
+</li>
+
+
+<li>We similarly identify OpenSSH-specific and F-Secure-specific features
+with comments:<p></p>
+<blockquote><pre class="code"># OpenSSH only
+# F-Secure SSH only</pre></blockquote>
+</li>
+
+
+<li>If a command-line option works for several packages, we refer to the
+server as <tt class="command">sshd</tt>. For example, the
+<span class="option">-b</span> option (set the number of bits in the server key)
+is the same for SSH1 and OpenSSH, so you write:<p></p>
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -b 1024</pre></blockquote>
+</li>
+
+
+<li>Likewise, when we discuss configuration keywords, some apply to SSH1,
+SSH2, OpenSSH, or various combinations. We precede examples with a
+comment for clarity. For example, the
+<tt class="literal">MaxConnections</tt> keyword, which limits the number of
+available TCP/IP connections, is supported only by SSH2, so an
+example looks like:<p></p>
+<blockquote><pre class="code"># SSH2 only
+MaxConnections 32</pre></blockquote>
+</li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.6. Summary</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.2. Running the Server</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:12 GMT -->
+</html>

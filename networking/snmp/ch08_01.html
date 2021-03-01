@@ -1,0 +1,431 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:20 GMT -->
+<head><title>Polling and Setting (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h1 class="chapter">Chapter 8. Polling and Setting</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <a href="#ahead-1">Retrieving a Single MIB Value</a><br />
+<a href="ch08_02.html">Retrieving Multiple MIB Values</a><br />
+<a href="ch08_03.html">Setting a MIB Value</a><br />
+<a href="ch08_04.html">Error Responses</a><br /></p><p></div>
+
+We've put a lot of work into getting things set up so that we
+can use SNMP effectively. But now that we've installed a fancy
+node manager and configured agents on all our devices, what can we
+do? How can we interact with the devices that are out there?
+</p><p>
+
+<a name="INDEX-1056" /></a><a name="INDEX-1057" /></a><a name="INDEX-1058" /></a>
+<a name="INDEX-1059" /></a><a name="INDEX-1060" /></a><a name="INDEX-1061" /></a><a name="INDEX-1062" /></a>The three basic SNMP operations are
+<i class="command">snmpget</i>, <i class="command">snmpset</i>, and
+<i class="command">snmpwalk</i>. They are fairly self-explanatory:
+<i class="command">snmpget</i> reads a value from a managed device,
+<i class="command">snmpset</i> sets a value on a device, and
+<i class="command">snmpwalk</i> reads a portion of the MIB tree from a
+device. For example, you can use <i class="command">snmpget</i> to query
+a router and find out its administrative contact (i.e., the person to
+call if the router appears to be broken), <i class="command">snmpset</i>
+to change this contact information, and <i class="command">snmpwalk</i>
+to traverse a MIB to get an idea of which objects the router has
+implemented or to retrieve status information on all the
+router's interfaces.
+</p><p>
+
+This chapter shows you how to use these operations in day-to-day
+network management. First, we will use Perl to demonstrate how you
+can <i class="command">set</i>,<i class="command">get</i>, and
+<i class="command">walk</i>objects in a script (the
+nice thing about using Perl is that you can easily extend the simple
+scripts in this chapter to fit your needs and environment). We will
+then use HP OpenView and Net-SNMP to perform the same operations, but
+from the command line. Finally, as an alternative to the command
+line, we will demonstrate OpenView's graphical MIB Browser,
+which has a nice interface for getting, setting and walking MIB data.
+</p><p>
+
+<div class="sect1"><a name="enettdg-CHP-8-SECT-1" /></a> 
+  <h2 class="sect1"><a name="ahead-1"></a>8.1. Retrieving a Single MIB Value</h2>
+
+<a name="INDEX-1063" /></a> <a name="INDEX-1064" /></a><a name="INDEX-1065" /></a> <a name="INDEX-1066" /></a><a name="INDEX-1067" /></a>Let's start by querying a router
+for the name of its administrative contact. This operation, called
+polling, is accomplished with the SNMP <i class="command">get</i>
+command. The following Perl script, <em class="filename">snmpget.pl</em>,
+uses an SNMP Perl module to retrieve the information we want (<a href="ch05_01.html">Chapter 5, "Network-Management Software"</a> contains the URL for this module):
+</p><p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+#filename: /opt/local/perl_scripts/snmpget.pl
+use BER;
+use SNMP_util;
+use SNMP_Session;
+$MIB1 = ".1.3.6.1.2.1.1.4.0";
+$HOST = "orarouter1";
+($value) = &amp;snmpget("public\@$HOST","$MIB1");
+if ($value) { print "Results :$MIB1: :$value:\n"; }
+else { warn "No response from host :$HOST:\n"; } </pre></blockquote>
+
+<a name="INDEX-1068" /></a><a name="INDEX-1069" /></a><a name="INDEX-1070" /></a> <a name="INDEX-1071" /></a>This
+script is obviously very primitive, but it is also easy to
+understand, even if you're not an experienced Perl user.
+It's importance isn't in what it does, which is very
+little, but as a template you can use to insert SNMP operations into
+other programs. (If you are not used to writing quick Perl programs,
+or are unfamiliar with the language, a good starting point is the
+official Perl web site, <a href="http://www.perl.com/">http://www.perl.com</a>.) The script starts with
+three <tt class="literal">use</tt> statements, which are similar to
+<tt class="literal">#include</tt> statements in C. The
+<tt class="literal">use</tt> statements load Perl modules containing
+functions and definitions for working with SNMP. The three modules we
+use are:
+</p><p>
+
+<dl>
+<dt><b><tt class="literal">BER</tt>  </b></dt>
+<dd>
+<a name="INDEX-1072" /></a>Describes how to encode management data
+into bit patterns for transmission. <em class="firstterm">Basic Encoding
+Rules</em> (BER) is an ISO standard.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">SNMP_util</tt></b></dt>
+<dd>
+<a name="INDEX-1073" /></a>Defines a
+set of functions that use the <tt class="literal">SNMP_Session</tt> module
+to make it much more programmer-friendly.
+<tt class="literal">SNMP_util</tt> itself uses <tt class="literal">BER</tt> and
+<tt class="literal">SNMP_Session</tt>, but in this first script we chose to
+reference these other modules explicitly. In future programs,
+we'll just use <tt class="literal">SNMP_util</tt>.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">SNMP_Session</tt></b></dt>
+<dd>
+<a name="INDEX-1074" /></a>Provides
+Perl with core SNMP functionality.
+</p><p>
+</dd>
+
+</dl>
+
+<a name="INDEX-1075" /></a><a name="INDEX-1076" /></a><a name="INDEX-1077" /></a>The next two lines specify the data we
+want to get. We have hardcoded the object ID of a particular piece of
+data defined by the MIB and the hostname from which we want to
+retrieve this MIB data. In a more flexible program, you might want to
+get these values from the command line, or build a user interface to
+help users specify exactly what they are interested in retrieving.
+For the time being, however, this will get us started. It is easy
+enough to replace <tt class="literal">orarouter1</tt> with the hostname or
+IP address of the device you want to poll. The OID we are requesting
+is stored in the variable <tt class="literal">$MIB1</tt>. The value
+<tt class="literal">.1.3.6.1.2.1.1.4.0</tt> requests the device's
+administrative contact. Again, you can replace this with any OID of
+your choice. We used the numeric form of this object, but you can
+also use the textual form for the OID, which is
+<em class="emphasis">.org.dod.internet.mgmt.mib-2.system.sysContact.0</em>.
+You can abbreviate this further to <em class="emphasis">sysContact</em>
+because <tt class="literal">SNMP_util</tt> defines some parts of the OID
+string for us (for example, <tt class="literal">SNMP_util</tt> defines
+<em class="emphasis">sysContact</em> as
+<em class="emphasis">1.3.6.1.2.1.1.4.0</em>), but it's often safer
+to be explicit and use the entire OID. Don't forget to include
+the <em class="emphasis">.0</em>, which states that we want the first (0)
+and only instance of
+<em class="emphasis">iso.org.dod.internetmgmt.mib-2.system.sysContact.0</em>,
+at the end of your OID.
+</p><p>
+
+The next line polls the device. The <tt class="literal">snmpget</tt>
+function retrieves the data from the device specified by the variable
+<tt class="literal">$HOST</tt>. Notice the two arguments to the function.
+The first is the device we want to poll, preceded by the community
+name <tt class="literal">public</tt>. (If you need to use another community
+name -- you did change the community names when you configured the
+device, didn't you? -- you'll have to modify this line
+and insert your community name in place of it.) The second argument
+to <em class="emphasis">snmpget</em> is the OID in which we are
+interested. If you type the code in yourself, do not forget the
+parentheses around <tt class="literal">$value</tt>. If you omit the
+parentheses, <tt class="literal">$value</tt> will be set to the number of
+items in the array <em class="emphasis">snmpget</em> returns.
+</p><p>
+
+<a name="INDEX-1078" /></a>Once we have polled the device, we print
+either the output or an error message. I put a colon before and after
+any output that I print; this makes it easy to see if there are any
+hidden characters in the output. The decimal integer "16"
+is <em class="emphasis">very</em> different from "16\n", which
+is the decimal integer 16 followed by a newline character.
+</p><p>
+
+Now let's run the program:</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/local/perl_scripts/snmpget.pl</b></tt>
+Results :.1.3.6.1.2.1.1.4.0: :ORA IT Group:</pre></blockquote>
+
+<em class="filename">snmpget.pl</em> prints the OID we requested, followed
+by the actual value of that object, which is <tt class="literal">ORA</tt>
+<tt class="literal">IT</tt> <tt class="literal">Group</tt>. Don't worry if
+the return value for <em class="emphasis">sysContact</em> is wrong or
+blank. (The trick of putting colons before and after the output will
+make it clear if <em class="emphasis">sysContact</em> is blank or empty.)
+This probably means that no one has configured an administrative
+contact, or that it was configured incorrectly. We'll show you
+how to fix that when we discuss the <em class="emphasis">set</em>
+operation. If you get an error, skip to the end of this chapter to
+see a list of some errors and their appropriate fixes.
+</p><p>
+
+We will now modify <em class="filename">snmpget.pl</em> to poll any host
+and any OID we want. This is accomplished by passing the host and OID
+as command-line arguments to the Perl script:
+</p><p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+#filename: /opt/local/perl_scripts/snmpget.pl
+use SNMP_util;
+<b class="emphasis-bold">$MIB1 = shift;</b>
+<b class="emphasis-bold">$HOST = shift;</b>
+($MIB1) &amp;&amp; ($HOST) || die "Usage: $0 MIB_OID HOSTNAME";
+($value) = &amp;snmpget("$HOST","$MIB1");
+if ($value) { print "Results :$MIB1: :$value:\n"; }
+else { warn "No response from host :$HOST:\n"; }</pre></blockquote>
+
+Now that this program is a little more flexible, it is possible to
+look up different kinds of information on different hosts. We even
+left out the community string, which allows us to poll hosts with
+different community names. Here's how to run the new version of
+<em class="filename">snmpget.pl</em>:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/local/perl_scripts/snmpget.pl .1.3.6.1.2.1.1.1.0 public@orarouter1</b></tt>
+Results :.1.3.6.1.2.1.1.1.0: :Cisco Internetwork Operating System Software
+IOS (tm) 3000 Software (IGS-I-L), Version 11.0(16), RELEASE SOFTWARE (fc1)
+Copyright (c) 1986-1997 by cisco Systems, Inc.
+Compiled Tue 24-Jun-97 12:20 by jaturner:</pre></blockquote>
+
+In this example, we asked the router to describe itself by looking up
+the OID <tt class="literal">.1.3.6.1.2.1.1.1.0</tt>
+(<em class="emphasis">system.sysDesc.0</em>). The result tells us that
+<tt class="literal">orarouter1</tt> is a Cisco router running Version
+11.0(16) of the IOS operating system, along with some other useful
+information.<a name="INDEX-1079" /></a><a name="INDEX-1080" /></a> <a name="INDEX-1081" /></a><a name="INDEX-1082" /></a> 
+</p><p>
+
+<a name="enettdg-CHP-8-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">8.1.1. Using HP OpenView to Retrieve Values</h3>
+
+<a name="INDEX-1083" /></a><a name="INDEX-1084" /></a> <a name="INDEX-1085" /></a><a name="INDEX-1086" /></a><a name="INDEX-1087" /></a> <a name="INDEX-1088" /></a><a name="INDEX-1089" /></a>
+<a name="INDEX-1090" /></a>Let's start by looking up our
+router's administrative contact
+(<em class="emphasis">system.sysContact.0</em>) and see if we get the same
+result as we did with our previous Perl script. The arguments to
+OpenView's <em class="emphasis">snmpget</em> <a href="#FOOTNOTE-30">[30]</a> are the
+community name, the hostname of the device we want to poll, and the
+OID of the data we are requesting; we gave the OID in numeric form,
+but again, we could have given it as a text string:
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-30" /></a>[30]Most
+OpenView executable files are located in
+<em class="emphasis">/opt/OV/bin</em>.</p><p> </blockquote>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/bin/snmpget -c public orarouter1 .1.3.6.1.2.1.1.4.0</b></tt>
+system.sysContact.0 : DISPLAY STRING- (ascii):  ORA IT Group</pre></blockquote>
+
+Although this looks a little different from the output of the Perl
+script, it tells us the same thing. <em class="emphasis">snmpget</em>
+prints the OID we requested on the command line, making it easy to
+verify that we polled the right object. Again, note that the trailing
+<em class="emphasis">.0</em> is important. The output also tells us the
+object's datatype: <tt class="literal">DISPLAY</tt>
+<tt class="literal">STRING-</tt> <tt class="literal">(ascii)</tt>. Back in <a href="ch02_01.html">Chapter 2, "A Closer Look at SNMP"</a>, we discussed the datatypes that SNMP uses;
+some of the common types are <tt class="literal">INTEGER</tt>,
+<tt class="literal">OCTET</tt> <tt class="literal">STRING</tt>,
+<tt class="literal">Counter</tt>, and <tt class="literal">IpAddress</tt>.
+Finally, the output gives us the information we asked for: the router
+is administered by the ORA IT Group, which is the value returned from
+the SNMP <em class="emphasis">get</em> request.
+</p><p>
+
+<a name="INDEX-1091" /></a><a name="INDEX-1092" /></a>Now let's do the same thing
+using OpenView's GUI interface. From the Network Node
+Manager's display, select "Misc <img alt="Figure 8.1.1" src="figs/U2192.gif" /> SNMP MIB
+Browser."<a href="#FOOTNOTE-31">[31]</a> If you don't have
+NNM running, you can start the MIB Browser from the command line:
+<em class="filename">/opt/OV/bin/xnmbrowser</em>. <a href="ch08_01.html#enettdg-CHP-8-FIG-1">Figure 8-1</a> shows the GUI. Its input fields are similar to
+the variables we have been setting in our Perl scripts: Name or IP
+Address, Community Name, MIB Object ID, MIB Instance, SNMP Set Value,
+and MIB Values.
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-31" /></a>[31]If you find that the SNMP MIB Browser
+menu item is grayed out and cannot be clicked on, click on an SNMP
+object on your NNM map. You should then be able to click on the menu
+item to start your GUI.</p><p> </blockquote>
+
+Let's use this browser to run an <em class="emphasis">snmpget</em>.
+Start by inserting a Name or IP Address and Community Name in the
+input boxes provided. To enter the object you want to retrieve, use
+the MIB Object ID field and the text box below it. MIB Object ID
+shows us that we are currently in the subtree
+<em class="emphasis">.iso.org.dod.internet</em>. The text area shows the
+objects at the next level of the tree:
+<em class="emphasis">directory</em>, <em class="emphasis">mgmt</em>, etc. (To
+see the numeric OIDs for these objects, click on their names and then
+on the "Describe" button.) Then browse down through the
+MIB by double-clicking <em class="emphasis">mgmt</em>, then
+<em class="emphasis">mib-2</em>, <em class="emphasis">system</em>, and finally
+<em class="emphasis">sysContact</em>. Click on
+<em class="emphasis">sysContact</em> and then on "Start
+Query." The result that appears in the "MIB Values"
+field (as shown in <a href="ch08_01.html#enettdg-CHP-8-FIG-2">Figure 8-2</a>) should look very
+similar to the value that was returned in the command-line
+example.
+</p><p>
+
+<a name="enettdg-CHP-8-FIG-1" /></a><div class="figure"><img height="375" alt="Figure 8-1" src="figs/snmp_0801.gif" width="377" /></div><h4 class="objtitle">Figure 8-1.  OpenView xnmbrowser default</h4>
+
+<a name="enettdg-CHP-8-FIG-2" /></a><div class="figure"><img height="389" alt="Figure 8-2" src="figs/snmp_0802.gif" width="377" /></div><h4 class="objtitle">Figure 8-2.  OpenView xnmbrowser response</h4>
+
+Let's go back to the command line and poll for
+<em class="emphasis">sysDesc</em> again:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/bin/snmpget orarouter1 .1.3.6.1.2.1.1.1.0</b></tt>
+system.sysDescr.0 : DISPLAY STRING- (ascii):  Cisco Internetwork Operating 
+System Software IOS (tm) 3000 Software (IGS-I-L), Version 11.0(16), RELEASE 
+SOFTWARE (fc1)Copyright (c) 1986-1997 by cisco Systems, Inc. Compiled Tue 
+24-Jun-97 12:20 by jaturner</pre></blockquote>
+
+Looks the same, right? Notice that we left out the community string.
+We can do this because the default <em class="emphasis">get</em> community
+string is <em class="emphasis">public</em>, which is the correct community
+string for the target host, <tt class="literal">orarouter1</tt>. You can
+change your default community strings in OpenView's global
+settings. Let's see if we can get an object with a different
+datatype:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/bin/snmpget  orarouter1 .1.3.6.1.2.1.1.3.0</b></tt>
+system.sysUpTime.0 : Timeticks: (159857288) 18 days, 12:02:52.88</pre></blockquote>
+
+<a name="INDEX-1093" /></a>This
+command returns the system uptime, which is of type
+<tt class="literal">TimeTicks</tt>. <tt class="literal">TimeTicks</tt> (RFC 1155)
+represents a nonnegative integer, which counts the time in hundredths
+of a second since some epoch. Ignoring the number in parentheses,
+this shows me that my router has been up and operational for 18 days,
+12 hours, 02 minutes, and so on. The big number in parentheses is the
+exact amount of time the machine has been up, in hundredths of
+seconds. If you do the math, you will see this adds up to 18.501
+days, or 18 days, 12 hours, and a little bit: exactly what we expect.
+<a name="INDEX-1094" /></a><a name="INDEX-1095" /></a> <a name="INDEX-1096" /></a><a name="INDEX-1097" /></a> <a name="INDEX-1098" /></a> 
+</p><p>
+
+</div>
+<a name="enettdg-CHP-8-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">8.1.2. Using Net-SNMP</h3>
+
+<a name="INDEX-1099" /></a><a name="INDEX-1100" /></a><a name="INDEX-1101" /></a>
+<a name="INDEX-1102" /></a>
+<a name="INDEX-1103" /></a>
+<a name="INDEX-1104" /></a>The Net-SNMP tools provide an excellent
+command-line interface to SNMP operations. These tools are also
+commonly known as UCD-SNMP -- you'll still find this older
+name in many references, and even in the code itself.
+</p><p>
+
+<a name="INDEX-1105" /></a><a name="INDEX-1106" /></a><a href="ch07_01.html">Chapter 7, "Configuring SNMP Agents"</a>
+discussed how to compile, install, and configure the Net-SNMP agent.
+If you've done that, you've already compiled and
+installed the SNMP tools. They're shipped in the same package
+as the SNMP agent, and no real configuration is necessary for them.
+There is a configuration program, called
+<em class="emphasis">snmpconf</em>, which can be used to generate an
+<em class="emphasis">snmp.conf</em> file that provides default values for
+some of the options to the commands.<a href="#FOOTNOTE-32">[32]</a> Unless
+you're using SNMPv3, though, it isn't really necessary.
+It might be handy to set up a default community string but, in
+practice, this is of only limited use: you probably have different
+community strings on different devices, anyway. If you decide to use
+<em class="emphasis">snmpconf</em> to create the tool configuration file,
+make sure that you place <em class="emphasis">snmp.conf</em> in the
+<em class="emphasis">.snmp</em> subdirectory of your home directory or (if
+you want the options to apply to all users) in
+<em class="emphasis">/usr/local/share/snmp</em>.
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-32" /></a>[32]This is the same
+command used to create <em class="emphasis">snmpd.conf</em>, which
+configures the Net-SNMP agent. The <em class="emphasis">snmp.conf</em>
+configuration file is similar in form to
+<em class="emphasis">snmpd.conf</em>.</p><p> </blockquote>
+
+We'll assume that you won't do any configuration and will
+simply use the tools "out of the box." Here's a
+simple poll that asks a router for its
+location:<a name="INDEX-1107" /></a>
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget orarouter1 public .1.3.6.1.2.1.1.6.0</b></tt>
+system.sysLocation.0 = Sebastopol CA</pre></blockquote>
+
+It's fairly simple: we provided the hostname of the router we
+wanted to poll, a community string, and the OID of the object we
+wanted to retrieve. Instead of using the numeric OID, you can use the
+lengthy human-readable form. To save typing,
+<em class="emphasis">snmpget</em> assumes everything up to the object name
+and instance ID. Therefore, the following command is exactly
+equivalent to the previous one:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget orarouter1 public sysLocation.0</b></tt>
+system.sysLocation.0 = Sebastopol CA</pre></blockquote>
+
+<a name="INDEX-1108" /></a><a name="INDEX-1109" /></a>We'll take a look at the
+<em class="emphasis">snmpwalk</em> and <em class="emphasis">snmpset</em>
+commands that come with the Net-SNMP package later in this chapter,
+but the package contains many tools and is well worth a more detailed
+explanation. One tool that's particularly useful is
+<em class="emphasis">snmptranslate</em>, which converts between the
+numeric and textual names of MIB objects and can do things such as
+look up the definition of an object in a MIB file. The software
+distribution comes with a number of standard MIBs; you can place
+additional MIB files in
+<em class="emphasis">/usr/local/share/snmp/mibs</em>. <a href="appc_01.html">Appendix C, "Net-SNMP Tools"</a> gives an overview of the Net-SNMP package.
+</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.3. Agent Configuration Walkthroughs</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.2. Retrieving Multiple MIB Values</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:22 GMT -->
+</html>

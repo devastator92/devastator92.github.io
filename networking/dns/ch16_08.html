@@ -1,0 +1,387 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>DNS and Windows 2000 (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="appa_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">16.8. DNS and Windows 2000</h2>
+
+
+<a name="INDEX-2443" /> <a name="INDEX-2444" />Windows 2000 can use standard dynamic
+updates to register hosts in DNS. For a Windows 2000 client,
+<em class="firstterm">registration</em> means adding a name-to-address
+mapping and an address-to-name mapping for that client, information
+Windows clients formerly registered with WINS servers. For a Windows
+2000 server, registration involves adding records to a zone to tell
+clients which services it's running and where (on which host
+and port). For example, a Windows 2000 Domain Controller uses dynamic
+update to add an SRV record telling Windows 2000 clients where the
+Windows 2000 domain's Kerberos service is running.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-8.1" /><div class="sect2">
+<h3 class="sect2">16.8.1. How Windows 2000 Uses Dynamic Update</h3>
+
+
+<a name="INDEX-2445" />So
+what gets added when a client registers? Let's reboot a Windows
+2000 client in the Special Effects Lab and see.</p><p>
+
+
+Our client is called <em class="emphasis">mummy.fx.movie.edu</em>. It has the fixed IP
+address 192.253.254.13 (it doesn't get its address from our
+DHCP server). At boot time, the dynamic update routines on the client
+go through the following steps:</p><p>
+
+
+<ol><li>Look up the SOA record for <em class="emphasis">mummy.fx.movie.edu</em> on the local name
+server. Though there isn't an SOA record for that domain name,
+the authority section of the response includes the SOA record of the
+zone that contains <em class="emphasis">mummy.fx.movie.edu</em>, which is <em class="emphasis">fx.movie.edu</em>.</p></li><li>Look up the address of the name server in the MNAME field of the SOA
+record, <em class="emphasis">bladerunner.fx.movie.edu</em>.</p></li><li>Send a dynamic update to <em class="emphasis">bladerunner.fx.movie.edu</em> with two
+prerequisites: that <em class="emphasis">mummy.fx.movie.edu</em>isn't an alias (i.e., doesn't own a CNAME
+record) and that it doesn't already have an address record
+pointing to 192.253.254.13. The dynamic update contains no update
+section; it's just a probe to see what's out there.</p></li><li>If <em class="emphasis">mummy.fx.movie.edu</em>already points to its address, stop. Otherwise, send
+another dynamic update to <em class="emphasis">bladerunner.fx.movie.edu</em> with the
+prerequisites that <em class="emphasis">mummy.fx.movie.edu</em>isn't an alias and doesn't have an address
+record already. If the prerequisites are satisfied, the update adds
+an address record pointing <em class="emphasis">mummy.fx.movie.edu</em> to 192.253.254.13. If
+<em class="emphasis">mummy.fx.movie.edu</em> already
+has an address record, the client sends an update to delete that
+address record and add its own.</p></li><li>Look up the SOA record for <em class="emphasis">254.253.192.in-addr.arpa</em>.</p></li><li>Look up the address of the name server in the MNAME field of the SOA
+record (though since the MNAME field contains <em class="emphasis">bladerunner.fx.movie.edu</em>, which we
+looked up recently, and Windows 2000 has a caching resolver, this
+shouldn't require another query).</p></li><li>Send a dynamic update to <em class="emphasis">bladerunner.fx.movie.edu</em> with the
+prerequisite that <em class="emphasis">13.254.253.192.in-addr.arpa</em> isn't
+an alias. If the prerequisite is satisfied, the update adds a PTR
+record mapping 192.253.254.13 back to <em class="emphasis">mummy.fx.movie.edu</em>. If <em class="emphasis">13.254.253.192.in-addr.arpa</em> is an alias,
+stop.</p></li></ol>
+If we'd been using the Microsoft DHCP Server from Windows 2000,
+the DHCP server, by default, would have added the PTR record.
+There's also an option in the DHCP server's MMC-based
+management interface that allows the administrator to specify that
+the DHCP server add both the PTR record and the A record. If the DHCP
+server had added the A record, though, it wouldn't have set a
+prerequisite.</p><p>
+
+
+Servers, particularly Windows 2000 Domain Controllers, register lots
+of information in DNS using dynamic update, both when they're
+first set up and periodically thereafter. (The
+<em class="emphasis">netlogon</em> service, for example, registers its SRV
+records <em class="emphasis">hourly</em> !) This allows clients to locate
+services on whichever host and port they're running. Since we
+just set up a Windows 2000 domain called <em class="emphasis">fx.movie.edu</em>, let's take a look at
+the records that our Domain Controller, <em class="emphasis">matrix.fx.movie.edu</em>, added:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN fx.movie.edu.
+@                         600       A       192.253.254.14
+_kerberos._tcp.dc._msdcs  600       SRV     0 100 88   matrix.fx.movie.edu.
+_ldap._tcp.dc._msdcs      600       SRV     0 100 389  matrix.fx.movie.edu.
+_ldap._tcp.e437709a-1862-11d3-8eda-00400536c213.domains._msdcs 600  SRV  0 100 389 matrix.fx.movie.edu.
+e4377099-1862-11d3-8eda-00400536c213._msdcs  600  CNAME  matrix.fx.movie.edu.
+gc._msdcs                 600       A       192.253.253.14
+_ldap._tcp.gc._msdcs      600       SRV     0 100 3268 matrix.fx.movie.edu.
+_ldap._tcp.pdc._msdcs     600       SRV     0 100 389  matrix.fx.movie.edu.
+_gc._tcp                  600       SRV     0 100 3268 matrix.fx.movie.edu.
+_kerberos._tcp            600       SRV     0 100 88   matrix.fx.movie.edu.
+_kpasswd._tcp             600       SRV     0 100 464  matrix.fx.movie.edu.
+_ldap._tcp                600       SRV     0 100 389  matrix.fx.movie.edu.
+_kerberos._udp            600       SRV     0 100 88   matrix.fx.movie.edu.
+_kpasswd._udp             600       SRV     0 100 464  matrix.fx.movie.edu.</pre></blockquote>
+
+
+Whoa! That's a lot of records!</p><p>
+
+
+These records tell Windows 2000 clients where the services offered by
+the Domain Controller, including Kerberos and LDAP, are
+running.<a href="#FOOTNOTE-107">[107]</a> You can see from the SRV records that
+they're all running on <em class="emphasis">matrix.fx.movie.edu</em>, our only Domain
+Controller. If we had another Domain Controller, you'd see
+nearly twice as many SRV records.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-107" />[107]For an explanation of the function of each
+of these records, see Microsoft Knowledge Base article
+Q178169.</p><p>
+
+</blockquote>
+
+
+The owner names of all the SRV records end in <em class="emphasis">fx.movie.edu</em>, the name of the Windows
+2000 domain. If we'd called our Windows 2000 domain <em class="emphasis">effects.movie.edu</em>, the dynamic update
+routines would have updated the zone containing the domain name
+<em class="emphasis">effects.movie.edu</em>,
+<em class="emphasis">movie.edu</em>. Of course, that
+would really clutter up <em class="emphasis">movie.edu</em>, since it has other delegated
+subdomains running Windows 2000. Consequently, we made sure we named
+our Windows 2000 domain after our zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-8.2" /><div class="sect2">
+<h3 class="sect2">16.8.2. Problems with Windows 2000 and BIND</h3>
+
+
+While Microsoft's decision to replace WINS with DNS was noble,
+the implementation poses some problems for folks who run
+<a name="INDEX-2446" />BIND name servers. First, Windows 2000
+clients and DHCP servers have a nasty habit of deleting address
+records owned by the same domain name as the clients or servers. For
+example, if we let the users in the Special Effects Lab configure
+their own computers and choose their computers' names, and one
+user happened to use a name that was already taken, maybe by one of
+our rendering servers, his computer would try to delete the
+conflicting address record (that of the rendering server) and add its
+own. That's not very sociable.</p><p>
+
+
+Luckily, that behavior can be corrected on the client. The client
+does, in fact, check to see whether the domain name it's using
+already owns an address record by setting the prerequisite in step 4.
+(It just deletes it if it does exist, by default.) But you can follow
+the instructions in Microsoft Knowledge Base article Q246804 to tell
+the client not to delete conflicting records. The price? A client
+can't differentiate between an address being used by a
+different host with the same domain name and an address that formerly
+belonged to it, so if the client changes addresses, it can't
+automatically update the zone.</p><p>
+
+
+If you elect to have your DHCP server handle all registration, you
+don't have the option of leaving conflicting addresses alone.
+The DHCP server doesn't use prerequisites to detect collisions;
+it just unceremoniously deletes conflicting address records.</p><p>
+
+
+Given the limitations of having the DHCP server handle all of the
+registering, why would anyone consider it? Because if you allow any
+client to register itself and you can only use primitive, IP
+address-based access lists to authorize dynamic updates, you are
+allowing <em class="emphasis">any client's address</em> to
+dynamically update your zones. Savvier users of those clients could
+easily fire off a few custom-made dynamic updates to change your
+zone's MX records or the address of your web server.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-8.3" /><div class="sect2">
+<h3 class="sect2">16.8.3. Secure Dynamic Update</h3>
+
+
+Surely Microsoft doesn't just live with these problems, right?
+No, not with the Microsoft DNS Server. The Microsoft DNS Server
+supports GSS-TSIG, a dialect of TSIG (which we covered in <a href="ch11_01.html">Chapter 11, "Security"</a>). A client that uses GSS-TSIG retrieves a TSIG
+key from a Kerberos server, then uses it to sign a dynamic update.
+The use of GSS, the Generic Security Service, to retrieve the key
+means that an administrator doesn't need to hardcode a key on
+each of his clients.</p><p>
+
+
+Since the name of the TSIG key the client uses to sign the update is
+just the domain name of the client, the name server can make sure
+that only the client that added an address can delete it later,
+simply by tracking the domain name of the TSIG key used to add a
+given record. Only an updater with the same TSIG key is allowed to
+delete that record.</p><p>
+
+
+Windows 2000 clients try <a name="INDEX-2447" />GSS-<a name="INDEX-2448" />TSIG-signed dynamic updates if their
+unsigned dynamic updates are refused. You can also configure them to
+send signed updates first by following the instructions in Knowledge
+Base article Q246804, mentioned earlier.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-8.3.1" /><div class="sect3">
+<h3 class="sect3">16.8.3.1. BIND and GSS-TSIG</h3>
+
+
+Unfortunately, <a name="INDEX-2449" />BIND name servers don't yet support
+GSS-TSIG, so you can't use Windows 2000's secure dynamic
+update with BIND. A forthcoming version of BIND 9, however, is
+scheduled to support GSS-TSIG. Once BIND does support GSS-TSIG,
+you'll be able to use all of the update policy rules described
+in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a> to control which keys can update
+which records. A simple set of rules that says:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	update-policy {
+		grant *.fx.movie.edu. self *.fx.movie.edu. A;
+		grant matrix.fx.movie.edu. self matrix.fx.movie.edu. ANY;
+		grant matrix.fx.movie.edu. subdomain fx.movie.edu. SRV;
+	};
+};</pre></blockquote>
+
+
+may be enough to let Windows 2000 clients and servers register what
+they need in your zone.<a name="INDEX-2450" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-8.4" /><div class="sect2">
+<h3 class="sect2">16.8.4. What to Do?</h3>
+
+
+In the meantime, how do you handle the proliferation of Windows 2000
+on your network? Well, Microsoft would advise you to
+"upgrade" all of your name servers to the Windows 2000
+version of the Microsoft DNS Server. But if you like BIND -- and
+we do -- you'd probably like some other options.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-8.4.1" /><div class="sect3">
+<h3 class="sect3">16.8.4.1. Handling Windows 2000 clients</h3>
+
+
+The first (and probably most common) option for handling your Windows
+2000 clients is to create a delegated subdomain for all of them to
+live in. We might call ours <em class="emphasis">win.fx.movie.edu</em>. Within <em class="emphasis">win.fx.movie.edu</em>, anything goes: clients
+can stomp on other clients' addresses and someone may send a
+bunch of hand-crafted dynamic updates to add bogus records to the
+zone. The intent is to create a sandbox (or jail, if you prefer) that
+the clients can't break out of and that they can trash if they
+want to. If you have kids, you have an intuitive understanding of
+this concept.</p><p>
+
+
+By default, a Windows 2000 client will try to register itself in a
+forward-mapping zone with the same name as its Windows 2000 domain.
+So we'll have to do some extra configuration to tell our
+clients to register in <em class="emphasis">win.fx.movie.edu</em>instead of in <em class="emphasis">fx.movie.edu</em>. In particular, we'll
+have to go to a window that resides at <em class="emphasis">My
+Computer-&gt;Properties-&gt;Network
+Identification-&gt;Properties-&gt;More</em>, uncheck
+<em class="emphasis">Change primary DNS suffix when domain membership
+changes</em>, and type <em class="emphasis">win.fx.movie.edu</em> in the field labeled
+<em class="emphasis">Primary DNS suffix of this computer</em>. On
+<em class="emphasis">all</em> our clients.</p><p>
+
+
+Another possibility is to leave your clients in your main production
+zone (for our lab, that's <em class="emphasis">fx.movie.edu</em>) but to allow dynamic
+updates only from the address of the DHCP server. Then you configure
+your DHCP server to assume responsibility for maintaining both A
+records and PTR records. (You can add A and PTR records for hosts
+that don't use DHCP manually.)</p><p>
+
+
+In this scenario, it's more difficult for the little imps to
+send their custom dynamic updates to your name server, since it
+involves spoofing the address of the DHCP server. It's still
+possible that someone will bring up a client with a domain name that
+conflicts with an existing domain name in the zone, though.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-16-SECT-8.4.2" /><div class="sect3">
+<h3 class="sect3">16.8.4.2. Handling Windows 2000 servers</h3>
+
+
+The main server you need to accommodate is the Domain Controller (or
+Controllers, if you have more than one). The DC wants to add the
+passel of SRV records we showed earlier. If it can't add them
+at setup time, it'll write the records, in master file format,
+to a file called <em class="filename">System32\Config\netlogon.dns</em>
+under the system root.</p><p>
+
+
+First, you'll need to determine which zone you need to update.
+That's just a matter of finding the zone that would contain the
+Windows 2000 domain name. If your Windows 2000 domain has the same
+name as an existing zone, of course, that's the zone to update.
+Otherwise, just keep stripping off the leading labels of your Windows
+2000 domain until you get to the domain name of a zone.</p><p>
+
+
+Once you've got the zone that you need to update, you need to
+decide how to proceed. If you don't mind letting your Domain
+Controller dynamically update your zone, just add an appropriate
+<em class="emphasis">allow-update</em> substatement to the
+<em class="emphasis">zone</em> statement and you're done. If
+you'd rather not allow your DC complete control of the zone,
+you can leave dynamic updates disabled and let the DC create the
+<em class="filename">netlogon.dns</em> file. Then use an $INCLUDE control
+statement to read the contents of the file into your zone data file:</p><p>
+
+
+<blockquote><pre class="code">$INCLUDE netlogon.dns</pre></blockquote>
+
+
+If neither of these options appeals to you, because you want the DC
+to be able to change its SRV records but don't want it mangling
+your zone, you've still got a trick up your sleeve. You can
+take advantage of the funny format of the owner names in SRV records
+and create delegated subdomains called (in our case) <em class="emphasis">_udp.fx.movie.edu</em>, <em class="emphasis">_tcp.fx.movie.edu</em>, <em class="emphasis">_sites.fx.movie.edu</em>, and <em class="emphasis">_msdcs.fx.movie.edu</em>. We'll have to
+turn off name checking for <em class="emphasis">_msdcs.fx.movie.edu</em>, since the Domain
+Controller wants to add an address record to the zone in addition to
+a slew of SRV records. Then let the DC dynamically update these
+zones, but not your main zone:</p><p>
+
+
+<blockquote><pre class="code">acl dc { 192.253.254.13; };
+
+zone "_udp.fx.movie.edu" {
+	type master;
+	file "db._udp.fx.movie.edu";
+	allow-update { dc; };
+};
+
+zone "_tcp.fx.movie.edu" {
+	type master;
+	file "db._tcp.fx.movie.edu";
+	allow-update { dc; };
+};
+
+zone "_sites.fx.movie.edu" {
+	type master;
+	file "db._udp.fx.movie.edu";
+	allow-update { dc; };
+};
+
+zone "_msdcs.fx.movie.edu" {
+	type master;
+	file "db._udp.fx.movie.edu";
+	allow-update { dc; };
+	check-names ignore;
+};</pre></blockquote>
+
+
+Now you've got the best of both worlds: dynamic registration of
+services with a safe production zone.<a name="INDEX-2451" /> <a name="INDEX-2452" /></p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appa_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.7. DNS and WINS</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">A. DNS Message Format and Resource Records</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

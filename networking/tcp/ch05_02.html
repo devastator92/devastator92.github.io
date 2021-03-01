@@ -1,0 +1,541 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+<head><title>Startup Files  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">5.2. Startup Files </h2>
+
+<p>The kernel <a name="INDEX-1070" />
+<a name="INDEX-1071" /> <a name="INDEX-1072" />configuration brings the basic
+transport and IP datagram services of TCP/IP into Unix. But there is
+much more to the TCP/IP suite than just the basic services. How are
+these other protocols included in the Unix configuration?
+</p>
+
+<p>Some protocols are explicitly started by including them in the boot
+files. This technique is used, for example, to start the Routing
+Information Protocol (RIP) and the Domain Name System (DNS). Network
+services that either have a long startup procedure or are in constant
+demand are normally started by a script at boot time, and run as
+daemon processes the entire time the system is running.
+</p>
+
+<p>Anything that can be run from a shell prompt can be stored in a file
+and run as a shell script. Systems use this capability to automate
+the startup of system services. There are two basic Unix startup
+models that control how startup files are invoked: the BSD model and
+the System V model.
+</p>
+
+<p>The BSD <a name="INDEX-1073" />model is the simplest: a limited number
+of startup scripts are executed in order every time the system boots.
+At its simplest, there are three basic scripts,
+<em class="emphasis">/etc/rc</em>, <em class="emphasis">/etc/rc.boot,</em> and
+<em class="emphasis">/etc/rc.local</em>, executed in that order for system
+initialization, service initialization, and local customization. On
+BSD Unix systems, network services are usually started by the
+<em class="emphasis">/etc/rc.boot</em> file or the <em class="emphasis">/etc/rc.local</em>
+file.
+</p>
+
+<p>On systems that use the BSD startup model, place customized network
+configuration commands in the <em class="emphasis">rc.local</em> script.
+<em class="emphasis">rc.local</em> executes at the end of the startup
+process. Any configuration values set in this file override the
+earlier configuration commands.
+</p>
+
+<p>The BSD startup model is used on BSD systems and SunOS systems. Linux
+and Solaris systems use the <a name="INDEX-1074" />System V startup model. The System V
+startup model employs a much more complex set of startup
+files.<a href="#FOOTNOTE-48">[48]</a> This model uses whole directories of
+scripts executed by the <tt class="literal">init</tt> process, with
+different directories being used depending on the runlevel of the
+system.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-48" /><p>[48]A good description of the maze of System V
+initialization files is provided in <em class="emphasis">Essential System
+Administration</em> by &AElig;leen Frisch (O'Reilly &amp;
+Associates).</p> </blockquote>
+
+<a name="tcp3-CHP-5-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">5.2.1. Startup Runlevels</h3>
+
+<p>To understand <a name="INDEX-1075" />
+<a name="INDEX-1076" />System V startup, you need to
+understand <em class="emphasis">runlevels</em>, which are used to indicate
+the state of the system when the <tt class="literal">init</tt> process is
+complete. There is nothing inherent in the system hardware that
+recognizes runlevels; they are purely a software construct.
+<tt class="literal">init</tt> and
+<em class="emphasis">/etc/inittab --</em> the file used to configure
+<tt class="literal">init</tt> -- are the only reasons why the runlevels
+affect the state of the system. We use Red Hat Linux as an example of
+how runlevels are used.
+</p>
+
+<p>Linux defines
+<a name="INDEX-1077" />several
+runlevels that run the full gamut of possible system states from
+not-running (halted) to running multiple processes for multiple
+users:
+</p>
+
+<ul><li>
+<p>Runlevel 0 shuts down all running processes and halts the system.</p>
+</li><li>
+<p>Runlevel 1 places the system in single-user mode. Single-user mode is
+used by the system administrator to perform maintenance that cannot
+be done when users are logged in. This runlevel may also be indicated
+by the letter S instead of the number 1. Solaris uses S for
+single-user mode.
+</p>
+</li><li>
+<p>Runlevel 2 is a special multiuser mode that does not support file
+sharing.
+</p>
+</li><li>
+<p>Runlevel 3 provides full multiuser support with the full range of
+services, including NFS file sharing. It is the default mode used on
+Solaris systems.
+</p>
+</li><li>
+<p>Runlevel 4 is unused. You can design your own system state and
+implement it through runlevel 4.
+</p>
+</li><li>
+<p>Runlevel 5 initializes the system as a dedicated X Windows terminal.
+Linux systems use this to provide an X Windows console login. When
+Linux systems boot at runlevel 3, they provide a text-based console
+login. Solaris does not use this runlevel. Entering runlevel 5 on a
+Solaris system causes a system shutdown.
+</p>
+</li><li>
+<p>Runlevel 6 shuts down all running processes and reboots the system.</p>
+</li></ul>
+<p>As these notes make clear, different systems use the same runlevels
+in different ways. That is because runlevels are software. They are
+boot command arguments that tell <tt class="literal">init</tt> which
+startup scripts should be run. The scripts that are run can contain
+any valid commands. <tt class="literal">init</tt> maps runlevels to startup
+scripts using the <em class="emphasis">inittab</em> file.
+</p>
+
+<a name="tcp3-CHP-5-SECT-2.1.1" /><div class="sect3">
+<h3 class="sect3">5.2.1.1. Understanding /etc/inittab</h3>
+
+<p>All of the lines in the
+<em class="emphasis">inittab</em><a name="INDEX-1078" />
+<a name="INDEX-1079" /> <a name="INDEX-1080" /> file
+that begin with a sharp sign (#) are
+<a name="INDEX-1081" /> <a name="INDEX-1082" /> <a name="INDEX-1083" />comments.
+A liberal dose of comments is needed because the syntax of
+<em class="emphasis">inittab</em> configuration lines is terse and arcane.
+An <em class="emphasis">inittab</em> entry has this general format:
+</p>
+
+<blockquote><pre class="code"><em class="replaceable">label:runlevel:action:process</em></pre></blockquote>
+
+<p>The <em class="replaceable">label</em><a name="INDEX-1084" /> is a one- to four-character tag
+that identifies the entry. Because some systems support only
+two-character labels, most configurations limit all labels to two
+characters. The labels can be any arbitrary character string; they
+have no intrinsic meaning.
+</p>
+
+<p>The <em class="replaceable">runlevel</em><a name="INDEX-1085" /> field indicates the
+runlevels to which the entry applies. For example, if the field
+contains a 3, the process identified by the entry must be run for the
+system to initialize runlevel 3. More than one runlevel can be
+specified. Entries that have an empty runlevel field are not involved
+in initializing specific runlevels. For example, Linux systems have
+an <em class="emphasis">inittab</em> entry to handle the three-finger
+salute (Ctrl+Alt+Del); it does not have a value in the runlevel
+field.
+</p>
+
+<p>The <em class="replaceable">action</em><a name="INDEX-1086" /> field defines the conditions
+under which the process is run. <a href="ch05_02.html#tcp3-CHP-5-TABLE-1">Table 5-1</a> lists
+the action values used on Red Hat, Mandrake, and Caldera Linux
+systems.
+</p>
+
+<a name="tcp3-CHP-5-TABLE-1" /><h4 class="objtitle">Table 5-1. Linux inittab action values </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Action</p>
+</th>
+<th>
+<p>Meaning</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>Boot</p>
+</td>
+<td>
+<p>Runs when the system boots. Runlevels are ignored.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Bootwait</p>
+</td>
+<td>
+<p>Runs when the system boots, and init waits for the process to
+complete. Runlevels are ignored.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Ctrlaltdel</p>
+</td>
+<td>
+<p>Runs when Ctrl+Alt+Del is pressed, which passes the SIGINT signal to
+init. Runlevels are ignored.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Initdefault</p>
+</td>
+<td>
+<p>Doesn't execute a process. It sets the default runlevel.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Kbrequest</p>
+</td>
+<td>
+<p>Runs when init receives a signal from the keyboard. This requires
+that a key combination be mapped to KeyBoardSignal.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Off</p>
+</td>
+<td>
+<p>Disables the entry so the process is not run.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Once</p>
+</td>
+<td>
+<p>Runs one time for every runlevel.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Ondemand</p>
+</td>
+<td>
+<p>Runs when the system enters one of the special runlevels A, B, or C.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Powerfail</p>
+</td>
+<td>
+<p>Runs when init receives the SIGPWR signal.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Powerokwait</p>
+</td>
+<td>
+<p>Runs when init receives the SIGPWR signal and the file
+<em class="emphasis">/etc/powerstatus</em> contains the word OK.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Powerwait</p>
+</td>
+<td>
+<p>Runs when init receives the SIGPWR signal, and init waits for the
+process to complete.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Respawn</p>
+</td>
+<td>
+<p>Restarts the process whenever it terminates.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>sysinit</p>
+</td>
+<td>
+<p>Runs before any boot or bootwait processes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>wait</p>
+</td>
+<td>
+<p>Runs the process upon entering the run mode, and init waits for the
+process to complete.
+</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>The last field in an <em class="emphasis">inittab</em> entry is
+<em class="replaceable">process</em><a name="INDEX-1087" />. It contains the process that
+<tt class="literal">init</tt> executes. The process appears in the exact
+format that it is executed from the command line. Therefore the
+<em class="replaceable">process</em> field starts with the name of the
+program that is to be executed followed by the arguments that will be
+passed to that process. For example,
+<tt class="literal">/sbin/shutdown</tt> <tt class="literal">-t3</tt>
+<tt class="literal">-r</tt> <tt class="literal">now</tt>, which is the process
+executed by some Linux systems when Ctrl+Alt+Del is pressed, is the
+same command that could be typed at the shell prompt to reboot the
+system. On most <em class="emphasis">inittab</em> entries, the
+<em class="replaceable">process</em> field contains the name of a
+startup script. Two main types of startup scripts are used: the
+system initialization script and the runlevel initialization scripts.
+These sample lines from a Red Hat Linux system show both:
+</p>
+
+<blockquote><pre class="code"># System initialization.
+si::sysinit:/etc/rc.d/rc.sysinit
+
+l0:0:wait:/etc/rc.d/rc 0
+l1:1:wait:/etc/rc.d/rc 1
+l2:2:wait:/etc/rc.d/rc 2
+l3:3:wait:/etc/rc.d/rc 3
+l4:4:wait:/etc/rc.d/rc 4
+l5:5:wait:/etc/rc.d/rc 5
+l6:6:wait:/etc/rc.d/rc 6</pre></blockquote>
+
+<p>These seven lines are the real heart of the
+<em class="emphasis">inittab</em> file -- they invoke the startup
+scripts. The first line tells <tt class="literal">init</tt> to run the boot
+script located at <em class="emphasis">/etc/rc.d/rc.sysinit</em> to
+initialize the system. This entry has no runlevel value. It is run
+every time the system starts. The system initialization script
+performs certain essential tasks. For example, the Red Hat
+<em class="emphasis">rc.sysinit</em><a name="INDEX-1088" />
+<a name="INDEX-1089" /> script:
+</p>
+
+<ul><li>
+<p>Initializes the swap space</p>
+</li><li>
+<p>Runs the filesystem check</p>
+</li><li>
+<p>Mounts the <em class="emphasis">/proc</em> filesystem </p>
+</li><li>
+<p>Mounts the root filesystem as read-write after the
+<tt class="literal">fsck</tt> completes
+</p>
+</li><li>
+<p>Loads the loadable kernel modules</p>
+</li></ul>
+<p>Other initialization scripts may look different than Red Hat's,
+but they perform very similar functions. For example, a Caldera
+system begins by loading the loadable modules. It then activates the
+swap space, does the filesystem check, and remounts the root
+filesystem as read-write. The order is different, but the major
+functions are the same.
+</p>
+
+<p>After the system initialization script is run,
+<tt class="literal">init</tt> runs a <a name="INDEX-1090" /><a name="INDEX-1091" />script for the specific runlevel. The
+remaining six lines in the sample are used to invoke the startup
+scripts for individual runlevels. Except for the runlevel involved,
+each line is identical.
+</p>
+
+<p>Let's use the line with label <tt class="literal">l3</tt> as an
+example. This line starts all of the processes and services needed to
+provide the full multiuser support. The runlevel is 3. The action
+<tt class="literal">wait</tt> directs <tt class="literal">init</tt> to wait until
+the startup script terminates before going on to any other entries in
+the <em class="emphasis">inittab</em> file that relate to runlevel 3.
+<tt class="literal">init</tt> executes the script
+<em class="emphasis">/etc/rc.d/rc</em> and passes that script the
+command-line argument <tt class="literal">3</tt>.
+</p>
+
+<p>The <a name="INDEX-1092" />control script,
+<em class="emphasis">/etc/rc.d/rc</em>, then runs all the scripts that are
+appropriate for the runlevel. It does this by running the scripts
+that are stored in the directory
+<tt class="literal">/etc/rc</tt><em class="replaceable">n</em><tt class="literal">.d</tt>,
+where <em class="replaceable">n</em> is the specified runlevel. In our
+example, the <em class="emphasis">rc</em> script is passed a 3, so it runs
+the scripts found in the directory
+<em class="emphasis">/etc/rc.d/rc3.d</em>. A listing of that directory
+from a Red Hat system shows that there are lots of scripts:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">ls /etc/rc.d</b>
+init.d  rc0.d  rc2.d  rc4.d  rc6.d     rc.sysinit
+rc      rc1.d  rc3.d  rc5.d  rc.local
+$ <b class="emphasis-bold">ls /etc/rc.d/rc3.d</b>
+K03rhnsd      K35smb       K74ntpd    S05kudzu     S25netfs       S85httpd
+K16rarpd      K45arpwatch  K74ypserv  S06reconfig  S26apmd        S90crond
+K20nfs        K45named     K74ypxfrd  S08ipchains  S28autofs      S90xfs
+K20rstatd     K50snmpd     K75gated   S09isdn      S40atd         S95anacron
+K20rusersd    K50tux       K84bgpd    S10network   S55sshd        S99linuxconf
+K20rwalld     K55routed    K84ospf6d  S12syslog    S56rawdevices  S99local
+K20rwhod      K61ldap      K84ospfd   S13portmap   S56xinetd
+K28amd        K65identd    K84ripd    S14nfslock   S60lpd
+K34yppasswdd  K73ypbind    K84ripngd  S17keytable  S80sendmail
+K35dhcpd      K74nscd      K85zebra   S20random    S85gpm</pre></blockquote>
+
+<p>The scripts that begin with a K are used to kill processes when
+exiting a specific runlevel. In the listing above, the K scripts
+would be used when terminating runlevel 3. The scripts that start
+with an S are used when starting runlevel 3. None of the items in
+<em class="emphasis">rc3.d</em>, however, is really a startup script. They
+are logical links to the real scripts, which are located in the
+<em class="emphasis">/etc/rc.d/init.d</em> directory. For example,
+<em class="emphasis">S80sendmail</em> is linked to
+<em class="emphasis">init.d/sendmail</em>. This raises the question of why
+the scripts are executed from the directory
+<em class="emphasis">rc3.d</em> instead of directly from
+<em class="emphasis">init.d</em> where they actually reside. The reasons
+are simple. The same scripts are needed for several different
+runlevels. Using logical links, the scripts can be stored in one
+place and still be accessed by every runlevel from the directory used
+by that runlevel.
+</p>
+
+<p>Scripts are executed in alphabetical order. Thus
+<em class="emphasis">S10network</em> is executed before
+<em class="emphasis">S80sendmail</em>. This allows the system to control
+the order in which scripts are executed through simple naming
+conventions. Different runlevels can execute the scripts in different
+orders while still allowing the real scripts in
+<em class="emphasis">init.d</em> to have simple, descriptive names. A
+listing of the <em class="emphasis">init.d</em> directory shows these
+descriptive names:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">ls /etc/rc.d/init.d</b>
+amd       functions  kdcrotate  network  rarpd       rwalld    xfs
+anacron   gated      keytable   nfs      rawdevices  rwhod     xinetd
+apmd      gpm        killall    nfslock  reconfig    sendmail  ypbind
+arpwatch  halt       kudzu      nscd     rhnsd       single    yppasswdd
+atd       httpd      ldap       ntpd     ripd        smb       ypserv
+autofs    identd     linuxconf  ospf6d   ripngd      snmpd     ypxfrd
+bgpd      ipchains   lpd        ospfd    routed      sshd      zebra
+crond     iptables   named      portmap  rstatd      syslog
+dhcpd     isdn       netfs      random   rusersd     tux</pre></blockquote>
+
+<p>It is possible to place a customized configuration command directly
+in the applicable script in the <em class="emphasis">init.d</em>
+directory. A better alternative on a Red Hat system is to place any
+local changes in <em class="emphasis">rc.local</em>.
+</p>
+
+<p>Like BSD systems, Linux systems provide an
+<em class="emphasis">rc.local</em><a name="INDEX-1093" />
+<a name="INDEX-1094" /> script for local customization. In
+general, you do not directly edit boot scripts. The exception to this
+rule is the <em class="emphasis">rc.local</em> script located in the
+<em class="emphasis">/etc/rc.d</em> directory. It is the one customizable
+startup file, and it is reserved for your use; you can put anything
+you want in there. After the system initialization script executes,
+the runlevel scripts execute in alphabetical order. The last of these
+is <em class="emphasis">S99local</em>, which is a link to
+<em class="emphasis">rc.local</em>. Since it is executed last, the values
+set in the <em class="emphasis">rc.local</em> script override other
+configuration values.
+</p>
+
+<p>Solaris also uses the
+<a name="INDEX-1095" />System V startup model, but it makes
+things a little more difficult than Linux does. First off, it does
+not provide an <em class="emphasis">rc.local</em> script. If you want to
+use one, you need to add your own to the runlevel directories.
+Secondly, Solaris does not use many logical links in the runlevel
+directories. Therefore, there is no guarantee of a central place to
+modify scripts that are used for all runlevels. Additionally, each
+runlevel has a separate controlling script that can introduce
+differences in the startup process for each runlevel. For example,
+<em class="emphasis">/sbin/rc2</em> is the controlling script for runlevel
+2 and <em class="emphasis">/sbin/rc3</em> is the controlling script for
+runlevel 3. All of these differences make the Solaris startup process
+more complex to analyze.
+</p>
+
+<p>On a Solaris
+<a name="INDEX-1096" />8
+system, runlevel 3 is the default runlevel for a multiuser system
+offering network services. The <em class="emphasis">/sbin/rc3</em>
+controlling script runs the scripts in
+<em class="emphasis">/etc/rc2.d</em> and then those in
+<em class="emphasis">/etc/rc3.d</em>. Basic network configuration is
+handled in <em class="emphasis">/etc/rc2.d</em> by the
+<em class="emphasis">S69inet</em> script and the
+<em class="emphasis">S72inetsvc</em> script. Several other scripts in both
+<em class="emphasis">/etc/rc2.d</em> and <em class="emphasis">/etc/rc3.d</em>
+are involved in launching network services.
+</p>
+
+<p>For troubleshooting purposes it is important to understand where and
+how things happen during the system startup. When the network fails
+to initialize properly, it is good to know where to look. However,
+when you configure the network you should stick with the standard
+tools and procedures provided with your system. Directly modifying
+startup scripts can cause problems during the startup and can lead to
+lots of confusion for the other people who help you maintain your
+systems.
+</p>
+
+<p>Of course, not all network services are started by a boot script.
+ost network services are started on demand. The most widely used
+tool for starting network services on demand
+is<a name="INDEX-1097" />
+<tt class="literal">inetd</tt>, the Internet Daemon.
+</p>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5. Basic Configuration </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.3. The Internet Daemon </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+</html>

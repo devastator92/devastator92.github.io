@@ -1,0 +1,598 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch10_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:29 GMT -->
+<head><title>The sendmail.cf File  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch10_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">10.4. The sendmail.cf File </h2>
+
+<p>The <a name="INDEX-2112" />
+<a name="INDEX-2113" />
+<a name="INDEX-2114" />sendmail
+configuration file is <em class="emphasis">sendmail.cf</em>.<a href="#FOOTNOTE-113">[113]</a> It contains most of
+the sendmail configuration, including the information required to
+route mail between the user mail programs and the mail delivery
+programs. The <em class="emphasis">sendmail.cf</em> file has three main
+functions:
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-113" /><p>[113]The default location for the configuration file prior to
+sendmail 8.11 was the <em class="emphasis">/etc</em> directory. Now the
+default is <em class="emphasis">/etc/mail,</em> but the file is often
+placed in other directories, such as
+<em class="emphasis">/usr/lib</em>.</p> </blockquote>
+
+<ul><li>
+<p>It defines the sendmail environment.</p>
+</li><li>
+<p>It rewrites addresses into the appropriate syntax for the receiving
+mailer.
+</p>
+</li><li>
+<p>It maps addresses into the instructions necessary to deliver the mail.</p>
+</li></ul>
+<p>Several commands are necessary to perform all of these functions.
+acro definitions and option commands define the environment. Rewrite
+rules rewrite email addresses. Mailer definitions define the
+instructions necessary to deliver the mail. The terse syntax of these
+commands makes most system administrators reluctant to read a
+<em class="emphasis">sendmail.cf</em> file, let alone write one!
+Fortunately, you can avoid writing your own
+<em class="emphasis">sendmail.cf</em> file, as we'll see next.
+</p>
+
+<a name="tcp3-CHP-10-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">10.4.1. Locating a Sample sendmail.cf File </h3>
+
+<p>There is never
+<a name="INDEX-2115" />
+<a name="INDEX-2116" />
+<a name="INDEX-2117" />any good
+reason to write a <em class="emphasis">sendmail.cf</em> file from scratch.
+Sample configuration files are delivered with most systems'
+software. Some system administrators use the
+<em class="emphasis">sendmail.cf</em> configuration file that comes with
+the system and make small modifications to it to handle site-specific
+configuration requirements. We cover this approach to sendmail
+configuration later in this chapter.
+</p>
+
+<p>Most system administrators prefer to use the <tt class="literal">m4</tt>
+source files to build a <em class="emphasis">sendmail.cf</em> file.
+Building the configuration with <tt class="literal">m4</tt> is recommended
+by the sendmail developers and is the easiest way to build and
+maintain a configuration. Some systems, however, do not ship with the
+<tt class="literal">m4</tt> source files, and even when
+<tt class="literal">m4</tt> source files come with a system, they are
+adequate only if used with the sendmail executable that comes with
+that system. If you update sendmail, use the <tt class="literal">m4</tt>
+source files that are compatible with the updated version of
+sendmail. If you want to use <tt class="literal">m4</tt> or the latest
+version of sendmail, download the
+<a name="INDEX-2118" />sendmail source code
+distribution <a name="INDEX-2119" />from
+<a href="http://www.sendmail.org/">http://www.sendmail.org</a>. See <a href="appe_01.html">Appendix E, "A sendmail Reference"</a> for an example of installing the sendmail
+distribution.
+</p>
+
+<p>The sendmail <em class="emphasis">cf/cf</em><a name="INDEX-2120" />
+directory contains several sample configuration files. Several of
+these are generic files preconfigured for different operating
+systems. The <em class="emphasis">cf/cf</em> directory in the
+<em class="emphasis">sendmail.8.11.3</em> directory contains generic
+configurations for BSD, Solaris, SunOS, HP Unix, Ultrix, OSF1, and
+Next Step. The directory also contains a few prototype files designed
+to be easily modified and used for other operating systems. We will
+modify the <em class="emphasis">tcpproto.mc</em> file, which is for
+systems that have direct TCP/IP network connections and no direct
+UUCP connections, to run on our Linux system.
+</p>
+
+<a name="tcp3-CHP-10-SECT-4.1.1" /><div class="sect3">
+<h3 class="sect3">10.4.1.1. Building a sendmail.cf with m4 macros </h3>
+
+<p>The prototype <a name="INDEX-2121" /> <a name="INDEX-2122" /> <a name="INDEX-2123" /> <a name="INDEX-2124" />files that
+come with the sendmail <tt class="literal">tar</tt> are not "ready to
+run." They must be edited and then processed by the
+<tt class="literal">m4</tt> macro processor to produce the actual
+configuration files. For example, the
+<em class="emphasis">tcpproto.mc</em><a name="INDEX-2125" /> file contains the following macros:
+</p>
+
+<blockquote><pre class="code">divert(0)dnl 
+VERSIONID(`$Id: ch10_04.htm,v 1.3 2002/04/16 22:37:26 ellie Exp $') 
+OSTYPE(`unknown') 
+FEATURE(`nouucp', `reject') 
+AILER(`local')
+AILER(`smtp')</pre></blockquote>
+
+<p>These macros are not sendmail commands; they are input for the
+<tt class="literal">m4</tt> macro processor. The few lines shown above are
+the active lines in the <em class="emphasis">tcpproto.mc</em> file. They
+are preceded by a section of comments, not shown here, that is
+discarded by <tt class="literal">m4</tt> because it follows a
+<tt class="literal">divert(-1)</tt> command, which diverts the output to
+the "bit bucket." This section of the file begins with a
+<tt class="literal">divert(0)</tt> command, which means these commands
+should be processed and that the results should be directed to
+standard output.
+</p>
+
+<p>The <tt class="literal">dnl</tt><a name="INDEX-2126" /> command that appears at the end of the
+<tt class="literal">divert(0)</tt> line is used to prevent unwanted lines
+from appearing in the output file. <tt class="literal">dnl</tt> deletes
+everything up to the next newline. It affects the appearance, but not
+the function, of the output file. <tt class="literal">dnl</tt> can appear
+at the end of any macro command. It can also be used at the beginning
+of a line. When it is, the line is treated as a comment.
+</p>
+
+<p>The <a name="INDEX-2127" />VERSIONID macro is used for version
+control. Usually the value passed in the macro call is a version
+number in RCS (Release Control System) or SCCS (Source Code Control
+System) format. This macro is optional, and we can just ignore it.
+</p>
+
+<p>The <a name="INDEX-2128" />OSTYPE macro defines operating
+system-specific information for the configuration. The
+<em class="emphasis">cf/ostype</em> directory contains almost 50
+predefined operating system macro files. The OSTYPE macro is required
+and the value passed in the OSTYPE macro call must match the name of
+one of the files in the directory. Examples of values are
+<tt class="literal">bsd4.4</tt>, <tt class="literal">solaris8</tt>, and
+<tt class="literal">linux</tt>.
+</p>
+
+<p>The <a name="INDEX-2129" />FEATURE macro defines optional
+features to be included in the <em class="emphasis">sendmail.cf</em> file.
+The <tt class="literal">nouucp</tt> feature in the example shown says that
+UUCP addresses are not used on this system. The argument
+<tt class="literal">reject</tt> says that local addresses that use the UUCP
+bang syntax (i.e., contain an <tt class="literal">!</tt> in the local part)
+will be rejected. Recall that in the previous section we identified
+<em class="emphasis">tcpproto.mc</em> as the prototype file for systems
+that have no UUCP connections. Another prototype file would have
+different FEATURE values.
+</p>
+
+<p>The prototype file ends with the mailer macros. These must be the
+last macros in the input file. The example shown above specifies the
+local mailer macro and the SMTP mailer macro.
+</p>
+
+<p>The <a name="INDEX-2130" />MAILER(local) macro includes the
+<em class="emphasis">local</em> mailer that delivers local mail between
+users of the system and the <em class="emphasis">prog</em> mailer that
+sends mail files to programs running on the system. All the generic
+macro configuration files include the MAILER(local) macro because the
+<em class="emphasis">local</em> and <em class="emphasis">prog</em> mailers
+provide essential local mail delivery services.
+</p>
+
+<p>The MAILER(smtp) macro includes all of the mailers needed to send
+SMTP mail over a TCP/IP network. The mailers
+<a name="INDEX-2131" />included
+in this set are:
+</p>
+
+<dl>
+<a name="INDEX-2132" /><dt><i><em class="emphasis">smtp</em></i></dt>
+<dd>
+<p>This mailer can handle traditional 7-bit ASCII SMTP mail. It is
+outmoded because most modern mail networks handle a variety of data
+types.
+</p>
+</dd>
+
+
+<a name="INDEX-2133" /><dt><i><em class="emphasis">esmtp</em></i></dt>
+<dd>
+<p>This mailer supports Extended SMTP (ESMTP). It understands the ESMTP
+protocol extensions and it can deal with the complex message bodies
+and enhanced data types of MIME mail. This is the default mailer used
+for SMTP mail.
+</p>
+</dd>
+
+
+<a name="INDEX-2134" /><dt><i><em class="emphasis">smtp8</em></i></dt>
+<dd>
+<p>This mailer sends 8-bit data to the remote server, even if the remote
+server does not indicate that it can support 8-bit data. Normally, a
+server that supports 8-bit data also supports ESMTP and thus can
+advertise its support for 8-bit data in the response to the EHLO
+command. (See <a href="ch03_01.html">Chapter 3, "Network Services"</a> for a description of the
+SMTP protocol and the EHLO command.) It is possible, however, to have
+a connection to a remote server that can support 8-bit data but does
+not support ESMTP. In that rare circumstance, this mailer is
+available for use.
+</p>
+</dd>
+
+
+<a name="INDEX-2135" /><dt><i><em class="emphasis">dsmtp</em></i></dt>
+<dd>
+<p>This mailer allows the destination system to retrieve mail queued on
+the server. Normally, the source system sends mail to the destination
+in what might be called a "push" model, where the source
+pushes mail out to the destination. On demand, SMTP allows the
+destination to "pull" mail down from the mail server when
+it is ready to receive the mail. This mailer implements the ETRN
+command that permits on-demand delivery. (The ETRN protocol command
+is described in RFC 1985.)
+</p>
+</dd>
+
+
+<a name="INDEX-2136" /><dt><i><em class="emphasis">relay</em></i></dt>
+<dd>
+<p>This mailer is used when SMTP mail must be relayed through another
+mail server. Several different mail relay hosts can be defined.
+</p>
+</dd>
+
+</dl>
+
+<p>Every server that is connected to or communicates with the Internet
+uses the MAILER(smtp) set of mailers, and most systems on isolated
+networks use these mailers because they use TCP/IP on their
+enterprise network. Despite the fact that the vast majority of
+sendmail systems require these mailers, installing them is not the
+default. To support SMTP mail, <a name="INDEX-2137" />you must have the MAILER(smtp) macro in
+your configuration, which is why it is included in the prototype
+file.
+</p>
+
+<p>In addition to these two important sets of mailers, there are nine
+other sets of mailers available with the MAILER command, all of which
+are covered in <a href="appe_01.html">Appendix E, "A sendmail Reference"</a>. Most of them are of very
+little interest for an average configuration. The two sets of mailers
+included in the <em class="emphasis">tcpproto.mc</em> configuration are
+the only ones that most administrators ever use.
+</p>
+
+<p>To create a sample <em class="emphasis">sendmail.cf</em> from the
+<em class="emphasis">tcpproto.mc</em> prototype file, copy the prototype
+file to a work file. Edit the work file to change the OSTYPE line
+from <tt class="literal">unknown</tt> to the correct value for your
+operating system, e.g., <tt class="literal">solaris8</tt> or
+<tt class="literal">linux</tt>. In the example we use
+<tt class="literal">sed</tt> to change <tt class="literal">unknown</tt> to
+<tt class="literal">linux</tt>. We store the result in a file we call
+<em class="emphasis">linux.mc</em>:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">sed 's/unknown/linux/' &lt; tcpproto.mc &gt; linux.mc</b></pre></blockquote>
+
+<p>Then enter the <tt class="literal">m4</tt> command:</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">m4 ../m4/cf.m4 linux.mc &gt; sendmail.cf</b></pre></blockquote>
+
+<p>The <em class="emphasis">sendmail.cf</em> file output by the
+<tt class="literal">m4</tt> command is in the correct format to be read by
+the sendmail program. With the exception of how UUCP addresses are
+handled, the output file produced above is similar to the sample
+<em class="emphasis">generic-linux.cf</em> configuration file delivered
+with the sendmail distribution.
+</p>
+
+<p>OSTYPE is not the only thing in the macro file that can be modified
+to create a custom configuration. There are a large number of
+configuration
+<a name="INDEX-2138" />options, all of which are explained in
+<a href="appe_01.html">Appendix E, "A sendmail Reference"</a>. As an example we modify a few options
+to create a custom configuration that converts
+<em class="emphasis">user@host</em> email addresses originating from our
+computer into <em class="emphasis">firstname.lastname@domain</em>. To do
+this, we create two new configuration files: a macro file with
+specific values for the domain that we name
+<em class="emphasis">wrotethebook.com.m4,</em> and a modified macro
+control file, <em class="emphasis">linux.mc</em>, that calls the new
+<em class="emphasis">wrotethebook.com.m4</em> file.
+</p>
+
+<p>We create the new macro file <em class="emphasis">wrotethebook.com.m4</em>
+and place it in the <em class="emphasis">cf/domain</em> directory. The new
+file contains the following:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">cat domain/wrotethebook.com.m4</b>
+ASQUERADE_AS(wrotethebook.com) 
+FEATURE(masquerade_envelope)
+FEATURE(genericstable)</pre></blockquote>
+
+<p>These lines say that we want to hide the real hostname and display
+the name <em class="emphasis">wrotethebook.com</em> in its place in
+outbound email addresses. Also, we want to do this on
+"envelope" addresses as well as message header addresses.
+The first two lines handle the conversion of the host part of the
+outbound email address. The last line says that we will use the
+generic <a name="INDEX-2139" />
+<a name="INDEX-2140" />address conversion
+<a name="INDEX-2141" />database, which converts login
+usernames to any value we wish to convert the user part of the
+outbound address. We must build the database by creating a text file
+with the data we want and processing that file through the
+<tt class="literal">makemap</tt> command that comes with sendmail.
+</p>
+
+<p>The format of the database can be very simple: </p>
+
+<blockquote><pre class="code">dan Dan.Scribner 
+tyler Tyler.McCafferty 
+pat Pat.Stover 
+willy Bill.Wright
+craig Craig.Hunt</pre></blockquote>
+
+<p>Each line in the file has two fields: the first field is the key,
+which is the login name, and the second field is the user's
+real first and last names separated by a dot. Fields are separated by
+spaces. Using this database, a query for <tt class="literal">dan</tt> will
+return the value <tt class="literal">Dan.Scribner</tt>. A small database
+such as this one can be easily built by hand. On a system with a
+large number of existing user accounts, you may want to automate this
+process by extracting the user's login name and first and last
+names from the <em class="emphasis">/etc/passwd</em> file. The
+<tt class="literal">gcos</tt> field of the <em class="emphasis">/etc/passwd</em>
+file often contains the user's real name.<a href="#FOOTNOTE-114">[114]</a> </p><blockquote class="footnote"> <a name="FOOTNOTE-114" /><p>[114]See
+<a href="appe_01.html">Appendix E, "A sendmail Reference"</a> for a sample script that builds the
+<em class="emphasis">realnames</em> database from
+<em class="emphasis">/etc/passwd</em>.</p> </blockquote>
+
+<p>Once the data is
+in a text file, convert it to a database with the
+<tt class="literal">makemap</tt> command. The
+<tt class="literal">makemap</tt><a name="INDEX-2142" /> command is included in the sendmail
+distribution. The syntax of the <tt class="literal">makemap</tt> command
+is:
+</p>
+
+<blockquote><pre class="code"><b class="emphasis-bold">makemap</b> <em class="replaceable">type name</em></pre></blockquote>
+
+<p><tt class="literal">makemap</tt> reads the standard input and writes the
+database out to a file it creates using the value provided by
+<em class="replaceable">name</em> as the filename. The
+<em class="replaceable">type</em> field identifies the database type.
+The most commonly supported database types for sendmail are
+<tt class="literal">dbm</tt>, <tt class="literal">btree</tt>, and
+<tt class="literal">hash</tt>.<a href="#FOOTNOTE-115">[115]</a> All
+of these types can be made with the <tt class="literal">makemap</tt>
+command.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-115" /><p>[115]On Solaris systems, NIS maps
+and NIS+ tables are built with standard commands that come with the
+operating system. The syntax for using those maps within sendmail is
+different (see <a href="ch10_06.html#tcp3-CHP-10-TABLE-3">Table 10-3</a>). </p> </blockquote>
+
+<p>Assume that the data shown above has been put in a file named
+<em class="emphasis">realnames</em>. The following command converts that
+file to a database:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">makemap hash genericstable &lt; realnames</b></pre></blockquote>
+
+<p><tt class="literal">makemap</tt> reads the text file and produces a
+database file called
+<em class="emphasis">genericstable</em><a name="INDEX-2143" />. The database maps login names to
+real names, e.g., the key <tt class="literal">willy</tt> returns the value
+<tt class="literal">Bill.Wright</tt>.
+</p>
+
+<p>Now that we have created the database, we create a new sendmail
+configuration file to use it. All of the <tt class="literal">m4</tt> macros
+related to using the database are in the
+<em class="emphasis">wrotethebook.com.m4</em> file. We need to include
+that file in the configuration. To do that, add a
+<tt class="literal">DOMAIN(wrotethebook.com)</tt> line to the macro control
+file (<em class="emphasis">linux.mc</em>) and then process the
+<em class="emphasis">linux.mc</em> through <tt class="literal">m4</tt>. The
+following <tt class="literal">grep</tt> command shows what the macros in
+the file look like after the change:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">grep '^[A-Z]' linux.mc</b> 
+VERSIONID(`$Id: ch10_04.htm,v 1.3 2002/04/16 22:37:26 ellie Exp $') 
+OSTYPE(`linux') 
+DOMAIN(`wrotethebook.com') 
+FEATURE(`nouucp', `reject') 
+AILER(`local') 
+AILER(`smtp')
+<b class="emphasis-bold"># m4 ../m4/cf.m4 linux.mc &gt; sendmail.cf</b></pre></blockquote>
+
+<p>Use a prototype <em class="emphasis">mc</em> file as the starting point of
+your configuration if you install sendmail from the
+<tt class="literal">tar</tt> file. To use the latest version of sendmail
+you must build a compatible <em class="emphasis">sendmail.cf</em> file
+using the <tt class="literal">m4</tt> macros. Don't attempt to use an
+old <em class="emphasis">sendmail.cf</em> file with a new version of
+sendmail; you'll just cause yourself grief. As you can see from
+the sample above, <tt class="literal">m4</tt> configuration files are very
+short and can be constructed from only a few macros. Use
+<tt class="literal">m4</tt> to build a fresh configuration every time you
+upgrade sendmail.
+</p>
+
+<p>Conversely, you should not use a <em class="emphasis">sendmail.cf</em>
+file created from the prototype files found in the sendmail
+distribution with an old version of sendmail. Features in these files
+require that you run a compatible version of sendmail, which means it
+is necessary to recompile sendmail to use the new configuration
+file.<a href="#FOOTNOTE-116">[116]</a> This is not
+something every system administrator will choose to do, because some
+systems don't have the correct libraries; others don't
+even have a C compiler! If you choose not to recompile sendmail, you
+can use the sample <em class="emphasis">sendmail.cf</em> file provided
+with your system as a starting point. However, if you have major
+changes planned for your configuration, it is probably easier to
+recompile sendmail and build a new configuration with
+<tt class="literal">m4</tt> than it is to make major changes directly to
+the <em class="filename">sendmail.cf. </em>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-116" /><p>[116]See <a href="appe_01.html">Appendix E, "A sendmail Reference"</a> for
+information about compiling sendmail.</p> </blockquote>
+
+<p>In the next part of this chapter, we use one of the sample
+<em class="filename">sendmail.cf</em> files provided with Linux. The
+specific file we start with is <em class="filename">generic-linux.cf</em>
+found in the <em class="filename">cf/cf</em> directory of the sendmail
+distribution. All of the things we discuss in the remainder of the
+chapter apply equally well to <em class="filename">sendmail.cf</em> files
+that are produced by <tt class="literal">m4</tt>. The structure of a
+<em class="emphasis">sendmail.cf</em> file, the commands that it contains,
+and the tools used to debug it are <a name="INDEX-2144" /> <a name="INDEX-2145" /> <a name="INDEX-2146" /> <a name="INDEX-2147" />universal. 
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-10-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">10.4.2. General sendmail.cf Structure </h3>
+
+<p>Most <em class="emphasis">sendmail.cf</em> files
+<a name="INDEX-2148" />
+<a name="INDEX-2149" />
+<a name="INDEX-2150" />have more
+or less the same structure because most are built from the standard
+<tt class="literal">m4</tt> macros. Therefore, the files provided with your
+system probably are similar to the ones used in our examples. Some
+systems use a different structure, but the functions of the sections
+described here will be found somewhere in most
+<em class="emphasis">sendmail.cf</em> files.
+</p>
+
+<p>The Linux file, <em class="emphasis">generic-linux.cf</em>, is our example
+of <em class="emphasis">sendmail.cf</em> file structure. The section
+labels from the sample file are used here to provide an overview of
+the <em class="emphasis">sendmail.cf</em> structure. These sections will
+be described in greater detail when we modify a sample configuration.
+The sections are:
+</p>
+
+<dl>
+<a name="INDEX-2151" /><dt><i><em class="emphasis">Local Information</em></i></dt>
+<dd>
+<p>Defines the information that is specific to the individual host. In
+the <em class="emphasis">generic-linux.cf</em> file, Local Information
+defines the hostname, the names of any mail relay hosts, and the mail
+domain. It also contains the name that sendmail uses to identify
+itself when it returns error messages, the message that sendmail
+displays during an SMTP login, and the version number of the
+<em class="emphasis">sendmail.cf</em> file. (Increase the version number
+each time you modify the configuration.) This section is usually
+customized during configuration.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Options</em></i></dt>
+<dd>
+<p>Defines the sendmail options. This section usually requires no
+modifications.
+</p>
+</dd>
+
+
+<a name="INDEX-2152" /><dt><i><em class="emphasis">Message Precedence</em></i></dt>
+<dd>
+<p>Defines the various message precedence values used by sendmail. This
+section is not modified.
+</p>
+</dd>
+
+
+<a name="INDEX-2153" /><dt><i><em class="emphasis">Trusted Users</em></i></dt>
+<dd>
+<p>Defines the users who are trusted to override the sender address when
+they are sending mail. This section is not modified. Adding users to
+this list is a potential security problem.
+</p>
+</dd>
+
+
+<a name="INDEX-2154" /><dt><i><em class="emphasis">Format of Headers</em></i></dt>
+<dd>
+<p>Defines the format of the headers that sendmail inserts into mail.
+This section is not modified.
+</p>
+</dd>
+
+
+<a name="INDEX-2155" /><dt><i><em class="emphasis">Rewriting Rules</em></i></dt>
+<dd>
+<p>Defines the rules used to rewrite mail addresses. Rewriting Rules
+contains the general rules called by sendmail or other rewrite rules.
+This section is not modified during the initial sendmail
+configuration. Rewrite rules are usually modified only to correct a
+problem or to add a new service.
+</p>
+</dd>
+
+
+<a name="INDEX-2156" /><dt><i><em class="emphasis">Mailer Definitions</em></i></dt>
+<dd>
+<p>Defines the instructions used by sendmail to invoke the mail delivery
+programs. The specific rewrite rules associated with each individual
+mailer are also defined in this section. The mailer definitions are
+usually not modified. However, the rewrite rules associated with the
+mailers are sometimes modified to correct a problem or to add a new
+service.
+</p>
+</dd>
+
+</dl>
+
+<p>The section labels in the sample file delivered with your system may
+be different from these. However, the structure of your sample file
+is probably similar to the structure discussed above in these ways:
+</p>
+
+<ul><li>
+<p>The information that is customized for each host is probably at the
+beginning of the file.
+</p>
+</li><li>
+<p>Similar types of commands (option commands, header commands, etc.)
+are usually grouped together.
+</p>
+</li><li>
+<p>The bulk of the file consists of rewrite rules.</p>
+</li><li>
+<p>The last part of the file probably contains mailer definitions
+intermixed with the rewrite rules that are associated with the
+individual mailers.
+</p>
+</li></ul>
+<p>Look at the comments in your <em class="emphasis">sendmail.cf</em> file.
+Sometimes these comments provide valuable insight into the file
+structure and the things that are necessary to configure a system.
+</p>
+
+<p>It's important to realize how little of
+<em class="emphasis">sendmail.cf</em> needs to be modified for a typical
+system. If you pick the right sample file to work from, you may need
+to modify only a few lines in the first section. From this
+perspective, sendmail configuration appears to be a trivial task. So
+why are system administrators intimidated by it? It is largely
+because of the difficult syntax of the
+<em class="emphasis">sendmail.cf</em> configuration language.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.3. sendmail Aliases </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.5. sendmail.cf Configuration Language </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch10_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:29 GMT -->
+</html>

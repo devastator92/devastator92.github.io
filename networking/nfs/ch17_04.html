@@ -1,0 +1,172 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch17_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:43 GMT -->
+<head><title>Impact of partitioning (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch17_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">17.4. Impact of partitioning</h2>
+
+
+Although partitioning is a solution to many network problems,
+it's not entirely transparent. When you partition a network,
+you must think about the effect of partitioning on NIS, and the
+locations of diskless nodes and their boot servers.</p>
+
+
+<a name="nfs2-CHP-17-SECT-4.1" /><div class="sect2">
+<a name="INDEX-2614" /><a name="INDEX-2615" /><h3 class="sect2">17.4.1. NIS in a partitioned network</h3>
+
+
+NIS is a point-to-point protocol once a <a name="INDEX-2616" /> <a name="INDEX-2617" />server binding has been established.
+However, when <em class="emphasis">ypbind</em> searches for a server, it
+broadcasts an RPC request. Switches and bridges do not affect
+<em class="emphasis">ypbind</em>, because switches and bridges forward
+broadcast packets to the other <em class="emphasis">physical</em> network.
+Routers don't forward broadcast packets to other IP networks,
+so you must make configuration exceptions if you have NIS clients but
+no NIS server on one side of a router.</p>
+
+
+It is not uncommon to attach multiple clients to a hub, and multiple
+hubs to a switch. Each switch branch acts as its own segment in the
+same way that bridges create separate "collision
+domains." Unequal distribution of NIS servers on opposite sides
+of a switch branch (or bridge) can lead to server victimization. The
+typical bridge adds a small delay to the transit time of each packet,
+so <em class="emphasis">ypbind</em> requests will almost always be
+answered by a server on the client's side of the switch branch
+or bridge. The relative delays in NIS server response time are shown
+in <a href="ch17_04.html#nfs2-CHP-17-FIG-2">Figure 17-2</a>.</p>
+
+
+<a name="nfs2-CHP-17-FIG-2" /><div class="figure"><img height="243" alt="Figure 17-2" src="figs/nfs2.1702.gif" width="431" /></div><h4 class="objtitle">Figure 17-2. Bridge effects on NIS</h4>
+
+If there is only one server on bridge network A, but several on
+bridge network B, then the "A" network server handles all
+NIS requests on its network segment until it becomes so heavily
+loaded that servers on the "B" network reply to
+<em class="emphasis">ypbind</em> faster, including the bridge-related
+packet delay. An equitable distribution of NIS servers across switch
+branch (or bridge) boundaries eliminates this excessive loading
+problem.</p>
+
+
+Routers and gateways present
+a<a name="INDEX-2618" />
+<a name="INDEX-2619" />
+<a name="INDEX-2620" />
+<a name="INDEX-2621" /> more serious problem for NIS. NIS
+servers and clients must be on the same IP network because a router
+or gateway will not forward the client's
+<em class="emphasis">ypbind</em> broadcast outside the local IP network.
+If there are no NIS servers on the "inside" of a router,
+use <em class="emphasis">ypinit</em> at configuration time as discussed
+<a name="INDEX-2622" />
+<a name="INDEX-2623" />in <a href="ch13_04.html#nfs2-CHP-13-SECT-4.4">Section 13.4.4, "Setting initial client bindings"</a>.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-17-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">17.4.2. Effects on diskless nodes</h3>
+
+
+Diskless nodes should be kept <a name="INDEX-2624" /> <a name="INDEX-2625" />on the same logical network as their servers
+unless tight constraints require their separation. If a router is
+placed between a diskless client and its server, every disk operation
+on the client, including swap device operations, has to go through
+the router. The volume of traffic generated by a diskless client is
+usually much larger  --  sometimes twice as much  --  than that
+of an NFS client getting user files from a server, so it greatly
+reduces the load on the router if clients and servers are kept on the
+same side of the router.<a href="#FOOTNOTE-53">[53]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-53" />[53]Although not directly
+related to network topology, one of the best things you can do for
+your diskless clients is to load them with an adequate amount of
+memory so that they can perform aggressive caching and reduce the
+number of round trips to the server.</p>
+
+</blockquote>
+
+
+Booting a client through a router is less than ideal, since the
+diskless client's root and swap partition traffic unnecessarily
+load the packet forwarding bandwidth of the router. However, if
+necessary, a diskless client can be<a name="INDEX-2626" />
+<a name="INDEX-2627" /> booted through a router as
+follows:</p>
+
+
+<ul><li>Some machine on the client's local network must be able to
+answer Reverse ARP (RARP) requests from the machine. This can be
+accomplished by publishing an ARP entry for the client and running
+<em class="emphasis">in.rarpd</em> on some host on the same network:</p>
+<blockquote><pre class="code">in.rarpd hme 0</pre></blockquote>
+In Solaris, <em class="emphasis">in.rarpd</em> takes the network device
+name and the instance number as arguments. In this example we start
+<em class="emphasis">in.rarpd</em> on <em class="emphasis">/dev/hme0</em>, the
+network interface attached to the diskless client's network.
+<em class="emphasis">in.rarpd</em> uses the <em class="emphasis">ethers</em>,
+<em class="emphasis">hosts,</em> and <em class="emphasis">ipnodes</em>
+databases<a href="#FOOTNOTE-54">[54]</a> to
+map the requested Ethernet address into the corresponding IP address.
+The IP address is then returned to the diskless client in a RARP
+reply message. The diskless client must be listed in both databases
+for <em class="emphasis">in.rarpd</em> to locate its IP address.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-54" />[54]The <em class="emphasis">ethers</em> database is
+stored in the local file <em class="emphasis">/etc/ethers</em> or the
+corresponding NIS map. The <em class="emphasis">hosts</em> and
+<em class="emphasis">ipnodes</em> database is located in the local files
+<em class="emphasis">/etc/inet/hosts</em> and
+<em class="emphasis">/etc/inet/ipnodes</em>, or DNS and NIS maps. The
+search order depends on the contents of the name switch configuration
+file <em class="emphasis">/etc/nsswitch.conf</em>.</p>
+
+</blockquote></li>
+
+<li>A host on the local network must be able to <em class="emphasis">tftp</em>
+the boot code to the client, so that it can start the boot sequence.
+This usually involves adding client information to
+<em class="emphasis">/tftpboot</em> on another diskless client server on
+the local network.</p></li><li>Once the client has loaded the boot code, it looks for boot parameters. Some server on the client's network must be able to
+answer the <em class="emphasis">bootparams</em> request for the client.
+This entails adding the client's root and swap partition
+information to the local <em class="emphasis">bootparams</em> file or NIS
+map. The machine that supplies the <em class="emphasis">bootparam</em>
+information may not have anything to do with actually booting the
+system, but it must give the diskless client enough information for
+it to reach its root and swap filesystem servers through IP routing.
+Therefore, if the proxy <em class="emphasis">bootparam</em> server has a
+default route defined, that route must point to the network with the
+client's NFS server on it.</p></li><li>If the NIS server is located across the router, the diskless client
+will need to be configured at installation time, or later on with the
+use of the <em class="emphasis">ypinit</em> command, in order to boot from
+the explicit NIS server. This is necessary because
+<em class="emphasis">ypbind</em> will be unable to find an NIS server in
+its subnetwork through a <a name="INDEX-2628" /> <a name="INDEX-2629" />broadcast.</p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">17.3. Network infrastructure</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17.5. Protocol filtering</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch17_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:44 GMT -->
+</html>

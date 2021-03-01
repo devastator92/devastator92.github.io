@@ -1,0 +1,1583 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:09 GMT -->
+<head><title>Kerberos and SSH (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.4. Kerberos and SSH</h2>
+
+
+
+<a name="INDEX-1674" />Kerberos
+is an <a name="INDEX-1675" />authentication
+system designed to operate securely in an environment where networks
+may be monitored and user workstations aren't under central
+control. [<a href="ch01_06.html#ch01-19938">Section 1.6.3, "Kerberos"</a>] It was developed as part of
+Project Athena, a wide-ranging research and development effort
+carried out at MIT between 1983 and 1991, funded primarily by IBM and
+Digital Equipment Corporation. Project Athena contributed many other
+pieces of technology to the computing world, including the well-known
+X Window System.</p>
+
+
+
+Kerberos is very different in character and design from SSH; each
+includes features and services the other lacks. In this study, we
+compare the two systems in detail, and then discuss how to combine
+them to obtain the advantages of both. If your site already uses
+Kerberos, you can add SSH while maintaining your existing account
+base and authentication infrastructure. (<a href="ch11_04.html#ch11-94237">Figure 11-11</a>
+shows where Kerberos fits into the scheme of SSH configuration.) If
+you aren't using Kerberos, its advantages may also be
+compelling enough to motivate you to install it, especially for large
+computing environments.</p>
+
+
+
+<a name="ch11-94237" /><div class="figure"><img height="339" alt="Figure 11-11" src="figs/ssh_1111.gif" width="482" /></div><h4 class="objtitle">Figure 11-11. Kerberos configuration (highlighted parts)</h4>
+
+There are two versions of the Kerberos protocol, Kerberos-4 and
+Kerberos-5. Free reference implementations of both are available from
+MIT:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="ftp://athena-dist.mit.edu/pub/kerberos/">ftp://athena-dist.mit.edu/pub/kerberos/</a></p>
+
+</blockquote>
+
+
+
+Kerberos-5 is the current version, and Kerberos-4 is no longer
+actively developed at MIT. Even so, Kerberos-4 is still in use in
+many contexts, especially bundled into commercial systems (e.g., Sun
+Solaris, Transarc AFS). SSH1 supports Kerberos-5, and OpenSSH/1
+supports Kerberos-4. The current draft of the SSH-2 protocol
+doesn't yet define a Kerberos authentication method, but as
+this book went to press SSH 2.3.0 was released with
+"experimental" Kerberos-5 support, which we haven't
+covered here (but which should work substantially as described with
+SSH1).</p>
+
+
+
+<a name="ch11-32-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.1. Comparing SSH and Kerberos</h3>
+
+
+
+<a name="INDEX-1676" /><a name="INDEX-1677" />While they solve many of
+the same problems, Kerberos and SSH are very different systems. SSH
+is a lightweight, easily deployed package, designed to work on
+existing systems with minimal changes. Kerberos, in contrast,
+requires you to establish a significant infrastructure before use.</p>
+
+
+
+<a name="ch11-33-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.1. Infrastructure</h3>
+
+
+
+<a name="INDEX-1678" />Let's consider an
+example: allowing users to create secure sessions between two
+machines. With SSH, you simply install the SSH client on the first
+machine and the server on the second, start the server, and
+you're ready to go. Kerberos, however, requires the following
+administrative tasks:</p>
+
+
+
+<ul><li>Establish at least one Kerberos
+<a name="INDEX-1679" />Key Distribution Center
+(KDC) host. The KDCs are central to the Kerberos system and must be
+heavily secured; typically they run nothing but the KDC, don't
+allow remote login access, and are kept in a physically secure
+location.<a href="#FOOTNOTE-139">[139]</a> Kerberos
+can't operate without a KDC, so it is wise to establish backup
+or "slave" KDCs also, which then must be synchronized
+periodically with the master. A KDC host might also run a remote
+administration server, a credentials-conversion server for Kerberos-4
+compatibility in a Kerberos-5 installation, and other server programs
+depending on your needs.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-139" />[139]Although, if remote login access to a KDC
+is desired, SSH is a good way to do it!</p>
+
+
+</blockquote></li><li>For each Kerberos user, add an account (or "user
+principal") to the KDC database.</p></li><li>For each application server that will use Kerberos to authenticate
+clients, add an account (or "service principal") to the
+KDC database. A separate principal is required for each server on
+each host.</p></li><li>Distribute the service principal cryptographic keys in files on their
+respective hosts.</p></li><li>Write a sitewide Kerberos configuration file (
+<em class="filename">/etc/krb5.conf
+</em><a name="INDEX-1680" /><a name="INDEX-1681" /><a name="INDEX-1682" />) and install it on all hosts.</p></li><li>Install Kerberos-aware applications. Unlike SSH, Kerberos isn't
+transparent to TCP applications. For example, you might install a
+version of <tt class="command">telnet</tt> that uses Kerberos to provide a
+strongly authenticated, encrypted remote login session similar to
+that of <tt class="command">ssh</tt>.</p></li><li>Deploy a clock-synchronization system such as Network Time Protocol
+(NTP). Kerberos relies on timestamps for proper operation.</p></li></ul>
+Clearly, deploying Kerberos requires much more work and more changes
+to existing systems than SSH does.</p>
+</div>
+
+
+
+
+
+<a name="ch11-34-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.2. Integrating with other applications</h3>
+
+
+
+<a name="INDEX-1683" />Another difference between SSH and Kerberos
+is their intended use. SSH is a set of programs that work together
+via the SSH protocol, designed to use in combination with existing
+applications with minimal changes. Consider programs like CVS [<a href="ch08_02.html#ch08-65720">Section 8.2.6.1, "Example: CVS and $LOGNAME "</a>] and Pine [<a href="ch11_03.html#ch11-42819">Section 11.3, "Pine, IMAP, and SSH"</a>] that
+invoke the insecure <tt class="command">rsh</tt> program internally to run
+remote programs. If configured to use <tt class="command">ssh</tt> instead
+of <tt class="command">rsh</tt>, the program's remote connections
+become secure; the introduction of <tt class="command">ssh</tt> is
+transparent to the program and its remote partner. Alternatively, if
+an application makes a direct network connection to a TCP service,
+SSH port forwarding can secure that connection simply by telling the
+application to use a different server address and port.</p>
+
+
+
+Kerberos, on the other hand, is designed as an authentication
+infrastructure, together with a set of programming
+libraries.<a href="#FOOTNOTE-140">[140]</a> The libraries are for adding Kerberos
+authentication and encryption to existing applications; this process
+is called <em class="emphasis">kerberizing</em> the application. The MIT
+Kerberos distribution comes with a set of common, kerberized
+services, including secure versions of <tt class="command">telnet</tt>,
+<tt class="command">ftp</tt>, <tt class="command">rsh</tt>,
+<tt class="command">su,</tt> etc.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-140" />[140]SSH2 has recently moved towards this
+model. It is similarly organized as a set of libraries implementing
+the SSH-2 protocol, accessed via an API by client and server
+programs.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch11-35-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.3. Security of authenticators</h3>
+
+
+
+<a name="INDEX-1684" />The
+extra complexity of Kerberos provides properties and capabilities
+that SSH doesn't. One major win of Kerberos is its transmission
+and storage of authenticators (i.e., passwords, secret keys, etc.).
+To demonstrate this advantage, let's compare Kerberos's
+<em class="emphasis">ticket</em> system with SSH's password and
+public-key authentication.</p>
+
+
+
+SSH password authentication requires your password each time you log
+in, and it is sent across the network each time. The password
+isn't vulnerable during transmission, of course, since SSH
+encrypts the network connection. However, it does arrive at the other
+side and exist in plaintext inside the SSH server long enough for
+authentication to occur, and if the remote host has been compromised,
+an adversary has an opportunity to obtain your password.</p>
+
+
+
+SSH cryptographic authentication, on the other hand, may require you
+to store your private keys on each client host, and you must have
+authorization files in each server account you want to access. This
+presents security and distribution problems. A stored key is
+protected by encryption with a passphrase, but having it stored at
+all on generally accessible hosts is a weakness Kerberos
+doesn't have. An adversary who steals your encrypted key may
+subject it to an offline dictionary attack to try to guess your
+passphrase. If successful, your adversary has access to your accounts
+until you notice and change all your key and authorization files.
+This change may be time-consuming and error-prone if you have several
+accounts on different machines, and if you miss one, you're in
+trouble.</p>
+
+
+
+<a name="INDEX-1685" />Kerberos
+ensures that a user's password<a href="#FOOTNOTE-141">[141]</a> travels as
+little as possible and is never stored outside the KDC. When a user
+identifies herself to the Kerberos system, the identifying program
+(<tt class="command">kinit</tt><a name="INDEX-1686" />)
+uses her password for an exchange with the KDC, then immediately
+erases it, never having sent it over the network in any form nor
+stored it on disk. A client program that subsequently wants to use
+Kerberos for authentication sends a "ticket," a few bytes
+of data cached on disk by <tt class="command">kinit</tt>, which convinces a
+kerberized server of the user's identity. Tickets are cached in
+files readable only by their users, of course, but even if they are
+stolen, they are of limited use: tickets expire after a set amount of
+time, typically a few hours, and they are specific to a particular
+client/server/service combination.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-141" />[141]Actually, the
+secret key derived from the user's password, but the
+distinction isn't relevant here.</p>
+
+
+</blockquote>
+
+
+
+A stolen Kerberos ticket cache can be the target of a dictionary
+attack, but with an important difference: user passwords aren't
+present. The keys in the cache belong to server principals, and
+moreover, they are typically generated randomly and hence less
+vulnerable to a dictionary attack than user passwords. Sensitive keys
+are stored only on the KDCs, under the theory that it is much easier
+to effectively secure a small set of limited-use machines, rather
+than a large set of heterogeneous, multipurpose servers and
+workstations over which the administrator may have little control.
+Much of Kerberos's complexity results from this philosophy.</p>
+</div>
+
+
+
+
+
+<a name="ch11-36-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.4. Account administration</h3>
+
+
+
+<a name="INDEX-1687" />Kerberos also serves other functions
+beyond the scope of SSH. Its centralized user account database can
+unify those of disparate operating systems, so you may administer one
+set of accounts instead of keeping multiple sets synchronized.
+Kerberos supports access control lists and user policies for closely
+defining which principals are allowed to do what; this is
+authorization, as opposed to authentication. Finally, a Kerberos
+service area is divided into realms, each with its own KDC and set of
+user accounts. These realms can be arranged hierarchically, and
+administrators can establish trust relationships between parent/child
+or peer realms, allowing automatic cross-authentication between them.</p>
+</div>
+
+
+
+
+
+<a name="ch11-37-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.5. Performance</h3>
+
+
+
+<a name="INDEX-1688" />Kerberos
+authentication is generally faster than SSH public-key
+authentication. This is because Kerberos usually employs DES or 3DES,
+whereas SSH uses public-key cryptography, which is much slower in
+software than any symmetric cipher. This difference may be
+significant if your application needs to make many short-lived secure
+network connections and isn't running on the fastest hardware.</p>
+
+
+
+To sum up: Kerberos is a system of broader scope than SSH, providing
+authentication, encryption, key distribution, account management, and
+authorization services. It requires substantial expertise and
+infrastructure to deploy and requires significant changes to an
+existing environment for use. SSH addresses fewer needs, but has
+features that Kerberos installations typically don't, such as
+port forwarding. SSH is much more easily and quickly deployed and is
+more useful for securing existing applications with minimal
+impact.<a name="INDEX-1689" /><a name="INDEX-1690" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-38-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.2. Using Kerberos with SSH</h3>
+
+
+
+Kerberos is an authentication and authorization (AA) system. SSH is a
+remote-login tool that performs AA as part of its operation, and one
+AA system it can use is (you guessed it) Kerberos. If your site
+already uses Kerberos, its combination with SSH is compelling, since
+you can apply your existing infrastructure of principals and access
+controls to SSH.</p>
+
+
+
+Even if you're not already using Kerberos, you might want to
+roll it out together with SSH as an integrated solution because of
+the advantages Kerberos provides. By itself, the most flexible SSH
+authentication method is public-key with an agent. Passwords are
+annoying and limited because of the need to type them repeatedly, and
+the trusted-host method isn't appropriate or secure enough for
+many situations. Unfortunately, the public-key method incurs
+substantial administrative overhead: users must generate, distribute,
+and maintain their keys, as well as manage their various SSH
+authorization files. For a large site with many nontechnical users,
+this can be a big problem, perhaps a prohibitive one. Kerberos
+provides the key-management features SSH is missing. SSH with
+Kerberos behaves much like public-key authentication: it provides
+cryptographic authentication that doesn't give away the
+user's password, and the ticket cache gives the same advantages
+as the key agent, allowing for single sign-on. But there are no keys
+to generate, authorization files to set up, or configuration files to
+edit; Kerberos takes care of all this automatically.</p>
+
+
+
+<a name="INDEX-1691" />There are some disadvantages.
+First of all, only the Unix SSH packages have Kerberos support; we
+know of no Windows or Macintosh products containing it. Only the
+SSH-1 protocol currently supports Kerberos, although there is work in
+progress in the SECSH working group to add Kerberos to SSH-2. Second,
+public-key authentication is tied to other important features of SSH,
+such as forced commands in the authorization file, that can't
+be used with Kerberos authentication. This is an unfortunate artifact
+of the way Unix SSH has evolved. Of course, you can still use
+public-key authentication as needed. You may find the access controls
+of Kerberos adequate for most needs and use public-key for a few
+situations in which you need finer-grained control.</p>
+
+
+
+In the following sections, we explain how to use the SSH Kerberos
+support. If your site has a kerberized SSH installed, this should be
+enough to get you going. We can't discuss all the gory detail
+of building a Kerberos infrastructure, but we do give a quick outline
+of how to set up Kerberos from scratch, if you have your own systems
+and want to try it. However, these are just hints, and the
+description is incomplete. If you're going to use, install, and
+manage kerberized SSH, you need a more complete understanding of
+Kerberos than you will get here. A good place to start is:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://web.mit.edu/kerberos/www/">http://web.mit.edu/kerberos/www/</a></p>
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-39-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.3. A Brief Introduction to Kerberos-5</h3>
+
+
+
+<a name="INDEX-1692" />In
+this section, we introduce the important concepts of principals,
+tickets, and ticket-granting-tickets (TGTs), and follow them with a
+practical example.</p>
+
+
+
+<a name="ch11-40-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.3.1. Principals and tickets</h3>
+
+
+
+<a name="INDEX-1693" /><a name="INDEX-1694" />Kerberos
+can authenticate a user or a piece of software providing or
+requesting a service. These entities have names, called
+<em class="emphasis">principals,</em><a name="INDEX-1695" />
+that consist of three parts: a name, an instance, and a realm,
+notated as <em class="emphasis">name/instance@REALM.<a href="#FOOTNOTE-142">[142]</a></em> Specifically:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-142" />[142]This was
+the case in Kerberos-4. In fact, Kerberos-5 principals have a realm,
+plus any number of "components" -- the first two of
+which are conventionally used as the name and instance, as in
+Kerberos-4.</p>
+
+
+</blockquote>
+
+
+
+<ul><li>The
+<em class="emphasis">name</em><a name="INDEX-1696" />
+commonly corresponds to a username for the host operating system.</p></li><li>The
+<em class="emphasis">instance,</em><a name="INDEX-1697" />
+which may be null, typically distinguishes between the same name in
+different roles. For example, the user res might have a normal,
+user-level principal res@REALM (note the null instance), but he could have a second principal with special
+privileges, res/admin@REALM, for
+his role as a system administrator.</p></li><li>The
+<em class="emphasis">realm</em><a name="INDEX-1698" />
+is an administrative division identifying a single instance of the
+Kerberos principal database (that is, a list of principals under
+common administrative control). Each host is assigned a realm, and
+this identification is relevant to authorization decisions, which we
+discuss shortly. Realms are always uppercase, by convention.</p></li></ul>
+As we've discussed, Kerberos is based on
+<a name="INDEX-1699" />tickets<em class="emphasis">.</em>
+If you want to use a network service -- say, the
+<tt class="command">telnet</tt> server on a host, to log in
+remotely -- you must obtain a ticket for that service from the
+<a name="INDEX-1700" />Kerberos Key Distribution
+Center, or KDC. The ticket contains an authenticator, proving your
+identity to the software providing the service. Since both you and
+the service must be identified to the KDC, both must have principals.</p>
+
+
+
+The system administrator establishes principals by adding them to the
+KDC database. Each principal has a secret key, known only to the
+principal owner and to the KDC; the operation of the Kerberos
+protocol is based on this fact. For instance, when you request a
+ticket for a service, the KDC gives you some bits that have been
+encrypted with the secret key of the service. Therefore, only the
+intended service can decrypt and verify the ticket. Moreover, a
+successful decryption proves that the KDC issued the ticket, since
+only the service and the KDC know the service's secret key.</p>
+
+
+
+For a user principal, the secret key is derived from the user's
+Kerberos password. Service principal keys are usually stored in the
+<a name="INDEX-1701" />file
+<em class="filename">/etc/krb5.keytab</em><a name="INDEX-1702" />
+on the host where the service runs, and the service calls a Kerberos
+library routine to read the file and extract its secret key.
+Obviously this file must be protected from general read access, since
+anyone who can read it can impersonate the service.</p>
+</div>
+
+
+
+
+
+<a name="ch11-67249" /><div class="sect3">
+<h3 class="sect3">11.4.3.2. Obtaining credentials with kinit</h3>
+
+
+
+Let's use an example to get a practical look at Kerberos.
+Suppose you are on a Unix host spot in the realm FIDO, and you want
+to use kerberized <tt class="command">telnet</tt> to log into another host,
+<em class="emphasis">rover.</em> First, you obtain Kerberos credentials by
+running the command <em class="emphasis">kinit
+</em><a name="INDEX-1703" />:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ kinit
+Password for res@FIDO
+: *********</pre></blockquote>
+
+
+
+<em class="emphasis">kinit</em> assumes that since your username is res
+and the host spot is in the realm FIDO, you want to obtain
+credentials for the principal res@FIDO. If you had wanted a
+different principal, you could have supplied it as an argument to
+<em class="emphasis">kinit.</em></p>
+</div>
+
+
+
+
+
+<a name="ch11-41-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.3.3. Listing credentials with klist</h3>
+
+
+
+Having successfully gotten your credentials with
+<tt class="command">kinit</tt>, you can examine them with the
+<tt class="command">klist</tt><a name="INDEX-1704" /> command, which lists all tickets you
+have obtained:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ klist
+Ticket cache: /tmp/krb5cc_84629
+Default principal: res@FIDO
+Valid starting     Expires            Service principal
+07/09/00 23:35:03  07/10/00 09:35:03  krbtgt/FIDO@FIDO</pre></blockquote>
+
+
+
+So far, you have only one ticket, for the service
+krbtgt/FIDO@FIDO. This is your
+Kerberos TGT, and it is your initial credential: proof to be
+presented later to the KDC that you have successfully authenticated
+yourself as res@FIDO. Note that the
+TGT has a validity period: it expires in 10 hours. After that, you
+must do another <em class="emphasis">kinit</em> to reauthenticate
+yourself.</p>
+</div>
+
+
+
+
+
+<a name="ch11-29434" /><div class="sect3">
+<h3 class="sect3">11.4.3.4. Running a kerberized application</h3>
+
+
+
+<a name="INDEX-1705" />Having
+gotten your credentials, you now <tt class="command">telnet</tt> to the
+remote host:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ telnet -a rover
+Trying 10.1.2.3...
+Connected to rover (10.1.2.3).
+Escape character is '^]'.
+<i class="lineannotation">[Kerberos V5 accepts you as "res@FIDO"]</i>
+Last login: Sun Jul  9 16:06:45 from spot
+You have new mail.
+[res@rover res]$</pre></blockquote>
+
+
+
+The <span class="option">-a</span> option to this kerberized
+<tt class="command">telnet</tt> client tells it to do auto-login: that is,
+it attempts to negotiate Kerberos authentication with the remote
+side. It succeeds: the remote side accepts your Kerberos
+identification, and allows you to log in without providing a
+password. If you return to spot and do a
+<tt class="command">klist</tt><em class="emphasis">,</em> you will see what
+happened:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ klist
+Ticket cache: /tmp/krb5cc_84629
+Default principal: res@FIDO
+Valid starting     Expires            Service principal
+07/09/00 23:35:03  07/10/00 09:35:03  krbtgt/FIDO@FIDO
+07/09/00 23:48:10  07/10/00 09:35:03  host/rover@FIDO</pre></blockquote>
+
+
+
+Note that you now have a second ticket, for the service "
+host/rover@FIDO". This
+principal is used for remote login and command execution services on
+the host rover, such as kerberized <tt class="command">telnet</tt>,
+<tt class="command">rlogin</tt>, <tt class="command">rsh</tt>, etc. When you ran
+<tt class="command">telnet -a rover</tt>, the <tt class="command">telnet</tt>
+client requested a ticket for host/rover@FIDO from the KDC,
+supplying your TGT with the request. The KDC validated the TGT,
+verifying that you had recently identified yourself as
+res@FIDO , and issued the ticket.
+<tt class="command">telnet</tt> stored the new ticket in your Kerberos
+ticket cache, so that the next time you connect to rover, you can
+just use the cached ticket instead of contacting the KDC again (at
+least, until the ticket expires). It then presented the host/rover@FIDO ticket to the
+<tt class="command">telnet</tt> server, which verified it and in turn
+believed that the client had been identified as res@FIDO to the KDC. <a name="INDEX-1706" /><a name="INDEX-1707" /></p>
+</div>
+
+
+
+
+
+<a name="ch11-42-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.3.5. Authorization</h3>
+
+
+
+So far we've taken care of authentication, but what about
+<a name="INDEX-1708" /><a name="INDEX-1709" />authorization?
+The <tt class="command">telnet</tt> server on rover believes that you are res@FIDO, but why should res@FIDO be allowed to log in? This
+comes back to the host/realm correspondence we've mentioned.
+[<a href="ch11_04.html#ch11-67249">Section 11.4.3.2, "Obtaining credentials with kinit"</a>] Since you didn't specify
+otherwise, the <tt class="command">telnet</tt> client told the server that
+you wanted to log into the account res on rover. (You could have
+changed that with <tt class="command">telnet -l username</tt>.) Since rover
+is also in the realm FIDO, Kerberos applies a default authorization
+rule: if host H is in realm R, the Kerberos principal u@R is allowed
+access to the account u@H. Using this default rule
+implies that the system administrators are managing the
+correspondence between operating system (OS) usernames and Kerberos
+principals. If you had tried to log into your friend Bob's
+account instead, here's what would have happened:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ telnet -a -l bob rover
+Trying 10.1.2.3...
+Connected to rover (10.1.2.3).
+Escape character is '^]'.
+<i class="lineannotation">[Kerberos V5 accepts you as "res@FIDO"]</i></pre></blockquote>
+
+
+
+<blockquote><pre class="code">telnetd: Authorization failed.</pre></blockquote>
+
+
+
+Note that authentication was still successful: the
+<tt class="command">telnet</tt> server accepted you as res@FIDO. The authorization
+decision failed, though: Kerberos decided that the principal res@FIDO was not allowed to access
+the account bob@rover . Bob can allow
+you to log into his account by creating the file
+<em class="filename">rover:~bob/.k5login</em><a name="INDEX-1710" />,
+and placing a line in it containing your principal name, res@FIDO. He would also have to
+place his own principal in there, since if a
+<em class="filename">.k5login</em> file exists, it overrides the default
+authorization rule, and Bob would be unable to log into his own
+account. So Bob's authorization file would look like this:</p>
+
+
+
+<blockquote><pre class="code">rover:~bob/.k5login:
+  bob@FIDO
+  res@FIDO</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-43-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.4. Kerberos-5 in SSH1</h3>
+
+
+
+<a name="INDEX-1711" /><a name="INDEX-1712" />To enable
+<a name="INDEX-1713" />Kerberos support in SSH1, compile it
+<tt class="literal"> -- with-kerberos5</tt><a name="INDEX-1714" />. [<a href="ch04_01.html#ch04-56995">Section 4.1.5.7, "Authentication"</a>] If your Kerberos support files (libraries and
+C header files) aren't in a standard place and
+<tt class="command">configure</tt> can't find them, you can tell it
+where to look using:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ configure ... --with-kerberos5=/path/to/kerberos ...</pre></blockquote>
+
+
+
+Two notes on doing this build:</p>
+
+
+
+<ul><li>The MIT Kerberos-5 Release 1.1 renamed the library
+<em class="filename">libcrypto.a</em> to
+<em class="filename">libk5crypto.a</em>, and the SSH1 build files have not
+been updated to reflect this. You can either alter the SSH1 Makefile,
+or just use:</p>
+
+<blockquote><pre class="code"># cd <em class="replaceable">your_Kerberos_library_directory</em>
+# ln -s libk5crypto.a libcrypto.a</pre></blockquote>
+</li>
+
+
+<li>The routine krb5_xfree( ) , used in
+<em class="filename">auth-kerberos.c</em>, also appears to have
+disappeared in 1.1. Replacing all occurrences of
+krb5_xfree with
+xfree appears to work.</p></li></ul>
+<a name="ch11-44-fm2xml" /><blockquote><b>TIP: </b>
+If you compile in Kerberos support, the resulting SSH programs work
+only on a system with Kerberos installed, even if you aren't
+using Kerberos authentication. The programs will likely refer to
+Kerberos shared libraries that must be present for the programs to
+run. Also, SSH performs Kerberos initialization on startup and
+expects a valid host Kerberos configuration file (
+<em class="filename">/etc/krb5.conf</em> ).</p>
+
+
+</blockquote>
+
+After installation, we recommend setting the serverwide configuration
+keyword
+<tt class="literal">KerberosAuthentication</tt><a name="INDEX-1715" />
+in <em class="filename">/etc/sshd_config</em> to "yes" for
+clarity, even though it is on by default:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+KerberosAuthentication yes</pre></blockquote>
+
+
+
+Additionally, the host/server@REALM principal must be in the KDC database, and its key must be stored in
+<em class="filename">/etc/krb5.keytab</em> on the server.</p>
+
+
+
+Once running with Kerberos support, SSH1 operates essentially as we
+described for kerberized <tt class="command">telnet</tt>; <a href="ch11_04.html#ch11-35340">Figure 11-12</a> illustrates the process. [<a href="ch11_04.html#ch11-29434">Section 11.4.3.4, "Running a kerberized application"</a>] On the client, simply run
+<em class="emphasis">kinit</em> to obtain your Kerberos TGT, and then try
+<tt class="command">ssh -v</tt>. If Kerberos authentication succeeds, you
+will see:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -v server
+...
+server: Trying Kerberos V5 authentication.
+server: Kerberos V5 authentication accepted.
+...</pre></blockquote>
+
+
+
+and in the server log:</p>
+
+
+
+<blockquote><pre class="code">Kerberos authentication accepted joe@<em class="replaceable">REALM</em> for login to account joe from <em class="replaceable">client_host</em></pre></blockquote>
+
+
+
+<a name="ch11-35340" /><div class="figure"><img height="316" alt="Figure 11-12" src="figs/ssh_1112.gif" width="461" /></div><h4 class="objtitle">Figure 11-12. SSH with Kerberos authentication</h4>
+
+As with <tt class="command">telnet</tt>, if you want to allow someone else
+to log into your account using Kerberos and <span class="option">ssh
+</span><tt class="command">-</tt><span class="option">l your_username</span>, you
+must create a <em class="filename">~/.k5login</em> file and place their
+principal name in it, along with your own.</p>
+
+
+
+<a name="ch11-45-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.4.1. Kerberos password authentication</h3>
+
+
+
+<a name="INDEX-1716" />If
+<a name="INDEX-1717" />Kerberos authentication
+is enabled in the SSH server, password authentication changes in
+behavior. Passwords are now validated by Kerberos instead of the host
+operating system. This behavior is usually desired in a fully
+kerberized environment, where local passwords might not be usable at
+all. In a mixed environment, however, it may be useful to have SSH
+fall back on the operating system (OS) password if Kerberos
+validation fails. The SSH server option that controls this feature is
+<tt class="literal">KerberosOrLocalPasswd</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KerberosOrLocalPasswd yes</pre></blockquote>
+
+
+
+This fallback is useful as a fail-safe: if the KDC isn't
+functioning, you can still authenticate by your OS password (although
+public-key would be a stronger failsafe authentication method).</p>
+
+
+
+Another feature of kerberized password authentication is that
+<tt class="command">sshd</tt> stores your TGT upon login, so you
+don't need to run <em class="emphasis">kinit</em> and retype your
+password to get Kerberos credentials on the remote host.</p>
+</div>
+
+
+
+
+
+<a name="ch11-39058" /><div class="sect3">
+<h3 class="sect3">11.4.4.2. Kerberos and NAT </h3>
+
+
+
+<a name="INDEX-1718" />SSH is
+frequently used across
+<a name="INDEX-1719" />firewalls, and these days such a
+boundary often includes network address translation. Unfortunately,
+Kerberos has a serious problem with NAT. Kerberos tickets usually
+include a list of IP addresses from which they are allowed to be
+used; that is, the client presenting the ticket must be transmitting
+from one of those addresses. By default, <tt class="command">kinit</tt>
+requests a TGT limited to the IP addresses of the host it's
+running on. You can see this with the <span class="option">-a</span> option to
+<tt class="command">klist </tt>:</p>
+
+
+
+<blockquote><pre class="code">[res@spot res]$ klist -a -n
+Ticket cache: /tmp/krb5cc_84629
+Default principal: res@FIDO
+
+Valid starting     Expires            Service principal
+07/09/00 23:35:03  07/10/00 09:35:03  krbtgt/FIDO@FIDO
+          Addresses: 10.1.2.1
+07/09/00 23:48:10  07/10/00 09:35:03  host/rover@FIDO
+          Addresses: 10.1.2.1</pre></blockquote>
+
+
+
+(The <span class="option">-n</span> switch tells <tt class="command">klist</tt> to
+display the addresses by number, rather than translating them to
+names.) Host spot 's IP address is 10.1.2.1, and so the KDC
+issues the TGT limited to use from that address. If spot has multiple
+network interfaces or addresses, they are listed here as well. When
+you obtain subsequent service tickets based on this TGT, they are
+also limited to the same set of addresses.</p>
+
+
+
+Now, imagine you connect to an SSH server on the other side of a NAT
+gateway, which is rewriting your (the client's) IP address, but
+the KDC is inside the NAT boundary, with you.</p>
+
+
+
+When you obtain the service ticket from the KDC, it contains your
+real IP address. The SSH server, however, sees your NAT'd
+address as the source of the connection, notes that this
+doesn't match the address encoded in the ticket, and refuses
+authentication. In this case, <tt class="command">ssh -v</tt> reports:</p>
+
+
+
+<blockquote><pre class="code">Trying Kerberos V5 authentication.
+Kerberos V5: failure on credentials (Incorrect net address).</pre></blockquote>
+
+
+
+<a href="ch11_04.html#ch11-15621">Figure 11-13</a> illustrates this problem. It has no good
+solution at the moment. One workaround is the undocumented
+<em class="emphasis">kinit</em> <tt class="command">-</tt><em class="emphasis">A</em>
+switch, which causes <tt class="command">kinit</tt> to request a ticket
+with <em class="emphasis">no</em> addresses in it at all. This trick
+decreases security, because a stolen ticket cache can then easily be
+used from anywhere, but it gets around the problem.</p>
+
+
+
+<a name="ch11-15621" /><div class="figure"><img height="296" alt="Figure 11-13" src="figs/ssh_1113.gif" width="432" /></div><h4 class="objtitle">Figure 11-13. Kerberos and NAT</h4>
+</div>
+
+
+
+
+
+<a name="ch11-46-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.4.3. Cross-realm authentication</h3>
+
+
+
+<a name="INDEX-1720" /> <a name="INDEX-1721" /><a name="INDEX-1722" />Kerberos realms are distinct
+collections of principals under separate administrative control. For
+instance, you might have two departments, Sales and Engineering, that
+don't trust each other (just for the sake of example, of
+course). The Sales people don't want any of those weird
+Engineers to be able to create accounts in their space, and
+Engineering certainly doesn't want any sales-droids mucking
+about with their logins. So you create two Kerberos realms, SALES and
+ENGINEERING, and have their respective administrators deal with
+account management in each realm.</p>
+
+
+
+The catch is, of course, that Sales and Engineering do need to work
+together. Sales guys need to log into Engineering machines to try out
+new products, and Engineering needs access to Sales desktops to fix
+the problems they constantly get into. Suppose Erin the engineer
+needs Sam from Sales to access her account on an Engineering machine,
+erin@bulwark . She can place
+Sam's principal name in her Kerberos authorization file, like
+so:</p>
+
+
+
+<blockquote><pre class="code">bulwark:~erin/.k5login:
+  erin@ENGINEERING
+  sam@SALES</pre></blockquote>
+
+
+
+However, this won't work. To log in, Sam needs a service ticket
+for host/bulwark@ENGINEERING. Only
+a KDC for the ENGINEERING realm can issue such a ticket, but an
+ENGINEERING KDC won't know the principal
+sam@SALES . In general, an ENGINEERING
+host has no way of authenticating a principal from the SALES realm.
+It looks as if Sam will need a principal in the ENGINEERING domain as
+well, but this poor solution violates the whole idea of having
+separate realms. It's also cumbersome, since Sam would have to
+do another <em class="emphasis">kinit</em> each time he wants to access
+resources in a different realm.</p>
+
+
+
+The solution to this problem is called <em class="emphasis">cross-realm
+authentication.</em> First, both realms must be described in
+the <em class="filename">/etc/krb5.conf</em> files on all machines in both
+realms; Kerberos knows only those realms listed in the configuration
+file. Then the administrators of the two realms establish a shared
+secret key between them, called a cross-realm key. The key is
+realized as a common key for two specially named principals, one in
+each realm. The key has a direction, and its existence allows one KDC
+to issue a TGT for the other realm; the other KDC can verify that
+this TGT was issued by its trusted peer realm using the shared key.
+With one cross-realm key in place, authentication in one realm
+provides a verifiable identity in the other realm as well. If the
+trust is symmetric -- that is, if each realm should trust the
+other -- then two cross-realm keys are needed, one for each
+direction.</p>
+
+
+
+<a name="INDEX-1723" />
+<a name="ch11-47-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Hierarchical Realms in Kerberos-5</h4>
+
+
+
+For a large number of realms, the system as described quickly becomes
+unwieldy. If you want cross-realm trust between all of them, you must
+manually establish cross-realm keys for each pair of realms.
+Kerberos-5 supports hierarchical realms to address this problem. A
+realm name containing dots, such as ENGINEERING.BIGCORP.COM, implies
+the (possible) existence of realms BIGCORP.COM and COM. When
+attempting cross-realm authentication from SALES.BIGCORP.COM to
+ENGINEERING.BIGCORP.COM, if Kerberos doesn't find a direct
+cross-realm key, it attempts to navigate up and then down the realm
+hierarchy, following a chain of cross-realm relations to the target
+realm. That is, if there are cross-realm keys from SALES.BIGCORP.COM
+to BIGCORP.COM, and from BIGCORP.COM to ENGINEERING.BIGCORP.COM, the
+cross-realm authentication from SALES to ENGINEERING succeeds without
+needing an explicit cross-realm setup between them. This allows for
+scalable, complete, cross-realm relationships among a large
+collection of realms.</p>
+
+
+</td></tr></table><p></blockquote>
+
+Note that Sam doesn't have a second principal now, sam@ENGINEERING. Rather, an
+ENGINEERING KDC can now verify that Sam was authenticated as sam@SALES by a SALES KDC and can
+therefore use the principal sam@SALES in authorization
+decisions. When Sam tries to log into bulwark using SSH, Kerberos
+notices that the target machine is in a different realm from
+Sam's principal and automatically uses the appropriate
+cross-realm key to obtain another TGT for him in the ENGINEERING
+realm. Kerberos then uses that to obtain a service ticket
+authenticating sam@SALES to
+host/bulwark@ENGINEERING. <tt class="command">sshd</tt> on bulwark reads
+Erin's <em class="filename">~/.k5login</em> file, sees that sam@SALES is allowed access, and
+permits the login.</p>
+
+
+
+That's the basic idea. However, when SSH enters the picture,
+cross-realm authentication can fail due to a confusing catch. Suppose
+Sam uses bulwark so often that he's given an account there. The
+sysadmin puts "sam@SALES" into
+<em class="filename">bulwark:~sam/.k5login</em>, so that Sam can log in there with his SALES credentials. But, it doesn't
+work. Even with everything set up correctly so that cross-realm
+kerberized <tt class="command">telnet</tt> works, SSH Kerberos
+authentication still fails for him. Even more mysteriously, every
+other form of authentication starts failing as well. Sam had
+public-key authentication set up and working before, and you'd
+expect it to try Kerberos, fail, then try public-key and succeed. But
+all the public-key attempts fail, too. Sam won't get much of a
+hint of what the problem is unless password authentication is turned
+on, and SSH eventually tries it:</p>
+
+
+
+<blockquote><pre class="code">[sam@sales sam]$ ssh -v bulwark
+...
+Trying Kerberos V5 authentication.
+Kerberos V5 authentication failed.
+Connection to authentication agent opened.
+Trying RSA authentication via agent with 'Sam's personal key'
+Server refused our key.
+Trying RSA authentication via agent with 'Sam's work key'
+Server refused our key.
+Doing password authentication.
+sam@SALES@bulwarks's password:</pre></blockquote>
+
+
+
+That last prompt doesn't look right at all: "sam@SALES@bulwark"?
+There's another hint from <tt class="command">sshd -d</tt>:</p>
+
+
+
+<blockquote><pre class="code">Connection attempt for sam@SALES from sales</pre></blockquote>
+
+
+
+SSH is mistakenly using the principal name as if it were the account
+name -- as if Sam had typed, <tt class="command">ssh -l sam@SALES
+bulwark</tt>. Of course, there's no account named "sam@SALES"; there's one
+named "sam ". And in fact,
+the quick fix for this problem is for Sam to specify his username
+explicitly, with <tt class="command">ssh -l sam bulwark</tt>, even though
+this seems redundant.</p>
+
+
+
+The reason for this odd problem is a Kerberos-5 feature that SSH
+employs, called <em class="emphasis">aname</em><img align="absmiddle" src="figs/U2192.gif" /><em class="emphasis">lname
+mapping</em> (authentication name to local name mapping).
+Kerberos can be used with a variety of operating systems, some of
+whose notions of a username don't correspond easily with
+Kerberos principal names. Perhaps the usernames allow characters that
+are illegal in principal names, or there are multiple operating
+systems with conflicting username syntaxes. Or perhaps when you merge
+two existing networks, you find username conflicts among existing
+accounts, so that the principal
+<blockquote><pre class="code">res@REALM</pre></blockquote>
+
+
+must translate to the
+account res on some systems, but rsilverman on others. The Kerberos-5
+designers thought it would be good if Kerberos could automate
+handling this problem itself, and so they included the aname <img align="absmiddle" src="figs/U2192.gif" />
+lname facility for translating principals to the correct local
+account names in various contexts.</p>
+
+
+
+SSH1 uses aname <img align="absmiddle" src="figs/U2192.gif" /> lname. When doing Kerberos authentication,
+the SSH1 client supplies the principal name as the target account
+name by default, rather than the current local account name (that is,
+it behaves as if Sam had typed <tt class="command">ssh -l sam@SALES
+bulwark</tt>). The server in turn applies the aname <img align="absmiddle" src="figs/U2192.gif" />
+lname mapping to this, to turn it into a local account name. When the
+principal name and the server host are in the same realm, this works
+automatically, because there is a default aname <img align="absmiddle" src="figs/U2192.gif" /> lname rule
+that maps <blockquote><pre class="code">user@REALM</pre></blockquote>
+
+
+to
+"user" if REALM is the host's REALM. However, Sam
+is doing cross-realm authentication, and so the two realms are
+different: his principal is
+<blockquote><pre class="code">sam@SALES</pre></blockquote>
+
+
+, but the server's
+realm is ENGINEERING. So the aname <img align="absmiddle" src="figs/U2192.gif" /> lname mapping fails, and
+<tt class="command">sshd</tt> goes ahead with using "sam@SALES" as the local
+account name. Since there is no account with that name, every form of
+authentication is guaranteed to fail.</p>
+
+
+
+The system administrators of the ENGINEERING realm can fix this
+problem by configuring an aname <img align="absmiddle" src="figs/U2192.gif" /> lname mapping for SALES. As
+it happens, though, the aname <img align="absmiddle" src="figs/U2192.gif" /> lname facility in MIT
+Kerberos-5 Release 1.1.1 appears to be unfinished. It's almost
+entirely undocumented and includes references to utilities and files
+that don't appear to exist. However, we did manage to uncover
+enough information to give one example solution. From the comments in
+the source file <em class="filename">src/lib/krb5/os/an_to_ln.c</em>, we
+devised the following "auth_to_local" statements that can
+fix Sam's problem:</p>
+
+
+
+<blockquote><pre class="code">bulwark:/etc/krb5.conf:
+    ...
+    [realms]
+        ENGINEERING = {
+                      kdc = kerberos.engineering.bigcorp.com
+             admin_server = kerberos.engineering.bigcorp.com
+           default_domain = engineering.bigcorp.com
+
+            auth_to_local = RULE:[1:$1]
+            auth_to_local = RULE:[2:$1]
+            auth_to_local = DEFAULT
+        }</pre></blockquote>
+
+
+
+These rules cause the aname <img align="absmiddle" src="figs/U2192.gif" /> lname function on this host to
+map principals of the form foo@REALM or foo/bar@REALM
+to the username
+"foo" for all realms, as well as applying the default
+translation rule for the host's realm. <a name="INDEX-1724" /> <a name="INDEX-1725" /><a name="INDEX-1726" /></p>
+</div>
+
+
+
+
+
+<a name="ch11-48-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.4.4. TGT forwarding</h3>
+
+
+
+<a name="INDEX-1727" /><a name="INDEX-1728" />Recall that Kerberos
+tickets are normally issued to be usable only from the requesting
+host. If you do a <em class="emphasis">kinit</em> on spot, then use SSH to
+log into rover, you are now stuck as far as Kerberos is concerned. If
+you want to use some Kerberos service on rover, you must run another
+kinit, because your credentials cache is stored on spot. And it
+won't help to copy the credentials cache file from spot to
+rover because the TGT won't be valid there; you need one issued
+for rover. If you do another <tt class="command">kinit</tt>, your password
+is safe traveling over the network through SSH, but this is still not
+a single sign-on, and it's annoying.</p>
+
+
+
+SSH has an analogous problem with public-key authentication and
+solves it with agent forwarding. [<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>]
+Similarly, Kerberos-5 solves it with <em class="emphasis">TGT
+forwarding</em>. The SSH client asks the KDC to issue a TGT
+valid on the server host, based on the client's holding an
+existing valid TGT. When it receives the new TGT, the client passes
+it to <tt class="command">sshd</tt>, which stores it in the remote
+account's Kerberos credentials cache. If successful,
+you'll see this message in the output from <tt class="command">ssh -v
+</tt>:</p>
+
+
+
+<blockquote><pre class="code">Trying Kerberos V5 TGT passing.
+Kerberos V5 TGT passing was successful.</pre></blockquote>
+
+
+
+and a <tt class="command">klist</tt> on the remote host shows the forwarded
+TGT.</p>
+
+
+
+In order to use TGT forwarding, you must compile SSH with the switch
+<tt class="literal"> -- enable-kerberos-tgt-passing</tt>.
+You must also request a forwardable TGT with <tt class="command">kinit -f
+</tt>; otherwise, you see:</p>
+
+
+
+<blockquote><pre class="code">Kerberos V5 krb5_fwd_tgt_creds failure (KDC can't fulfill requested option)</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch11-96227" /><div class="sect3">
+<h3 class="sect3">11.4.4.5. SSH1 Kerberos ticket-cache bug</h3>
+
+
+
+<a name="INDEX-1729" />Prior to Version 1.2.28, SSH1
+had a serious flaw in its Kerberos ticket cache handling. Under some
+circumstances SSH1 mistakenly set the KRB5CCNAME environment variable
+on the remote side to the string "none". This variable
+controls where the ticket cache is stored. The ticket cache contains
+sensitive information; anyone who steals your ticket cache can
+impersonate you for the lifetime of its tickets. Normally, the ticket
+cache file is kept in <em class="filename">/tmp</em>, which is reliably
+local to each machine. Setting KRB5CCNAME to <tt class="literal">none</tt>
+means that when the user does a <tt class="command">kinit</tt>, the ticket
+cache is established in a file named <em class="filename">none</em> in the
+current working directory. This directory can easily be an NFS
+filesystem, allowing the tickets to be stolen by network snooping. Or
+it can be an inappropriate spot in the filesystem, perhaps one where
+inherited ACLs give someone else the right to read the file,
+regardless of the ownership and permissions set by SSH.</p>
+
+
+
+<a name="ch11-49-fm2xml" /><blockquote><b>WARNING: </b>
+Don't use Kerberos authentication in SSH1 versions earlier than
+1.2.28.</p>
+
+
+</blockquote>
+
+This bug was fixed by SSH Communications Security in Version 1.2.28
+in response to our bug report. Note that this problem occurs if SSH1
+is compiled with Kerberos support, even if Kerberos authentication
+isn't in use for the session at hand. The OpenSSH Kerberos-4
+code has never had this bug.</p>
+</div>
+
+
+
+
+
+<a name="ch11-50-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.4.6. Kerberos-5 setup notes</h3>
+
+
+
+<a name="INDEX-1730" /><a name="INDEX-1731" />Here
+we present an abbreviated "quick-start" menu of steps to
+set up a working, one-host Kerberos system from scratch, using the
+MIT Kerberos-5 distribution Version 1.1.1. This is far from complete
+and might be wrong or misleading for some environments or builds.
+It's just meant to get you started, if you want to give
+Kerberos a try. Suppose the local host's name is <em class="emphasis">shag.carpet.net</em>, and your chosen realm
+name is FOO, and your username is "fred":</p>
+
+
+
+<ol><li>Compile and install krb5-1.1.1. We complied with
+<tt class="literal"> -- localstatedir=/var</tt> so the KDC
+database files go under <em class="filename">/var.</em></p></li>
+
+<li>Run:</p>
+
+<blockquote><pre class="code">$ mkdir /var/krb5kdc</pre></blockquote>
+</li>
+
+
+<li>Install an
+<em class="filename">/etc/krb5.conf</em><a name="INDEX-1732" /> file as follows. Note the log files;
+these will be useful to examine later in case of problems (or just
+for information):</p>
+
+<blockquote><pre class="code">[libdefaults]
+    ticket_lifetime = 600
+    default_realm = FOO
+    default_tkt_enctypes = des-cbc-crc
+    default_tgs_enctypes = des-cbc-crc
+
+[realms]
+    FOO = {
+	kdc = shag.carpet.net
+	admin_server = shag.carpet.net
+	default_domain = carpet.net
+    }
+
+[domain_realm]
+	.carpet.net = FOO
+	 carpet.net = FOO
+
+[logging]
+    kdc = FILE:/var/log/krb5kdc.log
+    admin_server = FILE:/var/log/kadmin.log
+    default = FILE:/var/log/krb5lib.log
+
+Install a file /var/krb5kdc/kdc.conf like this:
+
+[kdcdefaults]
+    kdc_ports = 88,750
+
+[realms]
+    FOO = {
+	database_name      = /var/krb5kdc/principal
+	admin_keytab       = /var/krb5kdc/kadm5.keytab
+	acl_file           = /var/krb5kdc/kadm5.acl
+	dict_file          = /var/krb5kdc/kadm5.dict
+        key_stash_file     = /var/krb5kdc/.k5.FOO
+	kadmind_port       = 749
+	max_life           = 10h 0m 0s
+	max_renewable_life = 7d 0h 0m 0s
+	master_key_type    = des-cbc-crc
+	supported_enctypes = des-cbc-crc:normal des-cbc-crc:v4
+    }</pre></blockquote>
+
+</li>
+
+<li>Run:</p>
+<blockquote><pre class="code">$ kdb5_util create</pre></blockquote>
+
+
+This creates the KDC principal database in
+<em class="filename">/var/krb5kdc.</em> You are prompted for the KDC
+master key, a password the KDC needs to operate. The key is stored in
+<em class="filename">/var/krb5kdc/.k5.FOO</em>, which allows the KDC
+software to start without human intervention but which is obviously
+not wise unless the KDC machine is extremely well
+protected.</p></li><li><a name="INDEX-1733" />Run:</p>
+
+<blockquote><pre class="code">$ kadmin.local
+This program modifies the principal database. Issue the following kadmin commands: 
+kadmin.local: ktadd -k /var/krb5kdc/kadm5.keytab kadmin/admin
+kadmin/changepw   
+Entry for principal kadmin/admin with kvno 4, encryption type DES cbc
+mode with 
+CRC-32 added to keytab WRFILE:/var/krb5kdc/kadm5.keytab.
+Entry for principal kadmin/changepw with kvno 4, encryption type DES cbc mode with 
+CRC-32 added to keytab WRFILE:/var/krb5kdc/kadm5.keytab. 
+
+kadmin.local:  add_principal -randkey host/shag.carpet.net 
+WARNING: no policy specified for host/shag.carpet.net@FOO; defaulting to no policy
+Principal "host/shag.carpet.net@FOO" created.
+
+kadmin.local:  ktadd -k /etc/krb5.keytab host/shag.carpet.net
+Entry for principal host/shag.carpet.net with kvno 3, encryption type DES cbc mode 
+with CRC-32 added to keytab WRFILE:/etc/krb5.keytab.
+
+kadmin.local:  add_principal fred
+WARNING: no policy specified for fred@FOO; defaulting to no policy
+Enter password for principal "fred@FOO": ********
+Re-enter password for principal "fred@FOO": ********
+Principal "fred@FOO" created.
+
+kadmin.local: quit</pre></blockquote>
+</li>
+
+
+<li>Now, start the KDC and the <em class="emphasis">kadmin</em> daemons,
+<tt class="command">krb5kdc</tt> and <tt class="command">kadmind</tt>.</p>
+
+
+
+If all goes well, you should be able to use <tt class="command">kinit</tt>
+to get a TGT using the password you gave to
+<tt class="command">kadmin.local</tt> when creating the "fred"
+principal, <tt class="command">klist</tt> to see the TGT, and
+<tt class="command">kpasswd</tt> to change your Kerberos password.</p></li><li>Try out kerberized SSH.<a name="INDEX-1734" /><a name="INDEX-1735" /> <a name="INDEX-1736" /></p></li></ol>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-51-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.5. Kerberos-4 in OpenSSH</h3>
+
+
+
+<a name="INDEX-1737" />OpenSSH
+<a name="INDEX-1738" />also supports Kerberos but only the
+older Kerberos-4 standard. The mechanics from a user perspective are
+mostly the same: in a functioning Kerberos realm, you use
+<tt class="command">kinit</tt> to obtain a TGT, and then run the SSH client
+with <tt class="literal">KerberosAuthentication</tt> turned on (which it is
+by default). The sysadmin must compile OpenSSH using
+<tt class="literal"> -- with-kerberos4</tt><a name="INDEX-1739" />, ensure there is a Kerberos host principal with its keys installed on the SSH
+server machine, and turn on
+<tt class="literal">KerberosAuthentication</tt><a name="INDEX-1740" />
+in the SSH server configuration. The host principal is
+<em class="emphasis">rcmd.hostname@REALM</em>,<a href="#FOOTNOTE-143">[143]</a> and the keytab file is
+<em class="filename">/etc/srvtab</em><a name="INDEX-1742" />.
+<tt class="literal">Kerberos-Authentication</tt> is on by default in the
+server only if <em class="filename">/etc/srvtab</em> exists when it
+starts.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-143" />[143]<a name="INDEX-1741" />Principals
+in Kerberos-4 also include a name, optional instance, and realm, but
+are written <em class="emphasis">name.instance@REALM</em> instead of
+<em class="emphasis">name/instance@REALM</em> as in Kerberos-5.</p>
+
+
+</blockquote>
+
+
+
+Access control for an account is via the file
+<em class="filename">~/.klogin.</em><a name="INDEX-1743" /><a name="INDEX-1744" /> With Kerberos-4, it
+isn't necessary to include the account's default
+principal in <em class="filename">~/.klogin</em> if that file exists; the
+default principal always has access.</p>
+
+
+
+<a href="ch11_04.html#ch11-27116">Table 11-1</a> summarizes the salient differences
+between Kerberos-4 and Kerberos-5 with respect to SSH.</p>
+
+
+
+<a name="ch11-27116" /><h4 class="objtitle">Table 11-1. Differences Between Kerberos-4 and Kerberos-5 with Respect to SSH </h4><table border="1">
+
+
+
+
+<tr>
+<th />
+<th>
+Kerberos-4</p></th>
+<th>
+Kerberos-5</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+Host principal</p></td>
+<td>
+<em class="emphasis">rcmd.hostname@REALM</em></p></td>
+<td>
+<em class="emphasis">host/hostname@REALM</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+Config files</p></td>
+<td>
+<em class="filename">/etc/krb.conf,
+/etc/krb.realms</em><a name="INDEX-1745" /><a name="INDEX-1746" /></p></td>
+<td>
+<em class="filename">/etc/krb5.conf</em><a name="INDEX-1747" /></p></td>
+</tr>
+
+
+<tr>
+<td>
+Server principal keys</p></td>
+<td>
+<em class="filename">/etc/srvtab</em><a name="INDEX-1748" /></p></td>
+<td>
+<em class="filename">/etc/krb5.keytab</em><a name="INDEX-1749" /></p></td>
+</tr>
+
+
+<tr>
+<td>
+Authorization file</p></td>
+<td>
+<em class="filename">~/.klogin</em></p></td>
+<td>
+<em class="filename">~/.k5login</em><a name="INDEX-1750" /></p></td>
+</tr>
+
+
+
+</table><p>
+
+
+
+<a name="ch11-52-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.5.1. Kerberos-4 compatibility mode in Kerberos-5</h3>
+
+
+
+<a name="INDEX-1751" />If you have a
+<a name="INDEX-1752" />Kerberos-5 realm, you
+don't need to set up a separate Kerberos-4 KDC just to support
+OpenSSH. Kerberos-5 has a version 4 (v4) compatibility mode, in which
+the v5 KDC responds to v4 requests. If v4 compatibility is on, you
+can install v4 <em class="filename">/etc/krb.conf</em> and<em class="filename">
+/etc/krb.realms</em> files that point to your existing v5 KDC,
+and the v4 <tt class="command">kinit</tt> can obtain a v4 TGT. Following
+the example in the previous section, these look like:</p>
+
+
+
+<blockquote><pre class="code">/etc/krb.conf:
+FOO shag.carpet.net
+
+/etc/krb.realms:
+.carpet.net FOO</pre></blockquote>
+
+
+
+The KDC satisfies v4 requests for
+<em class="emphasis">rcmd.hostname@REALM</em> tickets, using the key of
+the corresponding v5 <em class="emphasis">host/hostname@REALM</em>
+principal, so you don't need to create separate
+"rcmd/hostname" principals in your v5 KDC. Since v4-only
+servers still need the principal key, you need to create a v4 version
+of the key file ( <em class="filename">/etc/srvtab</em>) with that key;
+you can do this with the v5 program <tt class="command">kutil</tt> to read
+in an existing <em class="filename">krb5.keytab</em> and write out a v4
+<em class="filename">srvtab</em>. Direct cross-realm authentication also
+automatically works using existing cross-realm keys; however,
+Kerberos-4 doesn't support <a name="INDEX-1753" />hierarchical realms.</p>
+
+
+
+Using the Kerberos-5 credentials conversion service, you can even
+avoid having to do a separate v4 <tt class="command">kinit</tt>. On the
+KDC, the separate server program <tt class="command">krb524d</tt> must be
+running. Then, after doing a v5 <tt class="command">kinit</tt>, the user
+simply runs the program <tt class="command">krb524init</tt>. This obtains a
+v4 TGT using the v5 one, which you can verify with the v4
+<tt class="command">klist</tt> command.</p>
+
+
+
+<a name="INDEX-1754" /><a name="INDEX-1755" />Note that OpenSSH
+and SSH1 can't interoperate using Kerberos authentication. They
+use the same SSH protocol messages in each case but implicitly expect
+encapsulated Kerberos tickets of the appropriate Kerberos version.
+You can't use Kerberos-5 v4 compatibility mode to overcome this
+limitation. We hope OpenSSH will eventually add Kerberos-5 support.</p>
+
+
+
+Also note that Kerberos-4 doesn't have an analog to the
+Kerberos-5 <tt class="command">kinit -A</tt> switch. We don't know of
+any way to overcome the Kerberos/NAT problem using Kerberos-4. [<a href="ch11_04.html#ch11-39058">Section 11.4.4.2, "Kerberos and NAT "</a>] We have heard, however, that the Transarc AFS
+KDC ignores IP addresses in tickets, thus avoiding the problem.</p>
+</div>
+
+
+
+
+
+<a name="ch11-53-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.5.2. Kerberos on Solaris</h3>
+
+
+
+<a name="INDEX-1756" />Sun Microsystems's Solaris
+operating system comes with a limited, special-purpose implementation
+of Kerberos-4, which supports Kerberos authentication for Sun's
+NFS and secure RPC. As far as we can tell, it doesn't suffice
+for compiling or running OpenSSH with Kerberos-4, so you probably
+want to install another Kerberos-4 package such as MIT's.
+Beware of confusion once you do so; the Solaris
+<em class="filename">/bin/kinit</em>, for instance, won't have any
+effect on the MIT Kerberos-4 operation.<a name="INDEX-1757" /> <a name="INDEX-1758" /> <a name="INDEX-1759" /></p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.3. Pine, IMAP, and SSH</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.5. Connecting Through a GatewayHost</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:10 GMT -->
+</html>

@@ -1,0 +1,400 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch07_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Caching (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch07_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.4. Caching</h2>
+
+
+Caching involves keeping frequently<a name="INDEX-1134" /> used
+data "close" to where it is needed, or preloading data in
+anticipation of future operations. Data read from disks may be cached
+until a subsequent write makes it invalid, and data written to disk
+is usually cached so that many consecutive changes to the same file
+may be written out in a single operation. In NFS, data caching means
+not having to send an RPC request over
+the<a name="INDEX-1135" /> network to a server: the data is cached
+on the NFS client and can be read out of local memory instead of from
+a remote disk. Depending upon the filesystem structure and usage,
+some cache schemes may be prohibited for certain operations to
+guarantee data integrity or consistency with multiple processes
+reading or writing the same file. Cache policies in NFS ensure that
+performance is acceptable while also preventing the introduction of
+state into the client-server relationship.</p>
+
+
+<a name="nfs2-CHP-7-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">7.4.1. File attribute caching</h3>
+
+
+Not all filesystem operations touch<a name="INDEX-1136" /> <a name="INDEX-1137" /> <a name="INDEX-1138" /> the data in files; many of them
+either get or set the attributes of the file such as its length,
+owner, modification time, and inode number. Because these
+attribute-only operations are frequent and do not affect the data in
+a file, they are prime candidates for using cached data. Think of
+<em class="emphasis">ls -l</em> as a classic example of an attribute-only
+operation: it gets information about directories and files, but
+doesn't look at the contents of the files.</p>
+
+
+NFS caches file attributes on the client side
+so<a name="INDEX-1139" /> that
+every <em class="emphasis">getattr</em> operation does not have to go all
+the way to the NFS server. When a file's attributes are read,
+they remain valid on the client for some minimum period of time,
+typically three seconds. If the file's attributes remain static
+for some maximum period, normally 60 seconds, they are flushed from
+the cache. When an application on the NFS client modifies an NFS
+attribute, the attribute is immediately written back to the server.
+The only exceptions are implicit changes to the file's size as
+a result of writing to the file. As we will see in the next section,
+data written by the application is not immediately written to the
+server, so neither is the file's size attribute.</p>
+
+
+The same mechanism is used for directory attributes, although they
+are given a longer minimum lifespan. The usual defaults for directory
+attributes are a minimum cache time of 30 seconds and a maximum of 60
+seconds. The longer minimum cache period reflects the typical
+behavior of periods of intense filesystem activity  --  files
+themselves are modified almost continuously but directory updates
+(adding or removing files) happen much less frequently.</p>
+
+
+The attribute cache can get updated by NFS operations that include
+attributes in the results. Nearly all of NFS Version 3's RPC
+procedures include attributes in the results.</p>
+
+
+Attribute caching allows a client to make a steady stream of access
+to a file without having to constantly get attributes from the
+server. Furthermore, frequently accessed files and directories, such
+as the current working directory, have their attributes cached on the
+client so that some NFS operations can be performed without having to
+make an RPC call.</p>
+
+
+In the previous section, we saw how the async thread fills and drains
+the NFS client's buffer or page cache. This presents a cache
+consistency problem: if an async thread performs read-ahead on a
+file, and the client accesses that information at some later time,
+how does the client know that the cached copy of the data is valid?
+What guarantees are there that another client hasn't changed
+the file, making the copy of the file's data in the buffer
+cache invalid?</p>
+
+
+An NFS client needs to maintain cache consistency with the copy of
+the file on the NFS server. It uses file attributes to perform the
+consistency check. The file's modification time is used as a
+cache validity check; if the cached data is newer than the
+modification time then it remains valid. As soon as the file's
+modification time is newer than the time at which the async thread
+read data, the cached data must be flushed. In page-mapped systems,
+the modification time becomes a "valid bit" for cached
+pages. If a client reads a file that never gets modified, it can
+cache the file's pages for as long as needed.</p>
+
+
+This feature explains the "accelerated make"
+phenomenon<a name="INDEX-1140" /> <a name="INDEX-1141" /> seen on NFS clients when
+compiling code. The second and successive times that a software
+module (located on an NFS fileserver) is compiled, the
+<em class="emphasis">make</em> process is faster than the first build. The
+reason is that the first make reads in header files and causes them
+to be cached. Subsequent builds of the same modules or other files
+using the same headers pick up the cached pages instead of having to
+read them from the NFS server. As long as the header files are not
+modified, the client's cached pages remain valid. The first
+compilation requires many more RPC requests to be sent to the server;
+the second and successive compilations only send RPC requests to read
+those files that have changed.</p>
+
+
+The cache consistency checks themselves<a name="INDEX-1142" /> are by the file attribute
+cache. When a cache validity check is done, the kernel compares the
+modification time of the file to the timestamp on its cached pages;
+normally this would require reading the file's attributes from
+the NFS server. Since file attributes are kept in the file's
+inode (which is itself cached on the NFS server), reading file
+attributes is much less "expensive" than going to disk to
+read part of the file. However, if the file attributes are not
+changing frequently, there is no reason to re-read them from the
+server on every cache validity check. The data cache algorithms use
+the file attribute cache to speed modification time comparisons.</p>
+
+
+Keeping previously read data blocks cached on the client does not
+introduce state into the NFS system, since nothing is being modified
+on the client caching the data. Long-lived cache data introduces
+consistency problems if one or more other clients have the file open
+for writing, which is one of the motivations for limiting the
+attribute cache validity period. If the attribute cache data never
+expired, clients that opened files for reading only would never have
+reason to check the server for possible modifications by other
+clients. Stateless NFS operation requires each client to be oblivious
+to all others and to rely on its attribute cache only for ensuring
+consistency. Of course, if clients are using different attribute
+cache aging schemes, then machines with longer cache attribute
+lifetimes will have stale data. Attribute caching and its effects on
+NFS performance <a name="INDEX-1143" /> <a name="INDEX-1144" /> <a name="INDEX-1145" />is revisited in <a href="ch18_06.html#nfs2-CHP-18-SECT-6">Section 18.6, "Attribute caching"</a>.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">7.4.2. Client data caching</h3>
+
+
+In the previous section, we looked <a name="INDEX-1146" /> <a name="INDEX-1147" />at the async thread's management of
+an NFS client's buffer cache. The async threads perform
+read-ahead and write-behind for the NFS client processes. We also saw
+how NFS moves data in NFS buffers, rather than in page- or buffer
+cache-sized chunks. The use of NFS buffers allows NFS operations to
+utilize some of the sequential disk I/O optimizations of Unix disk
+device drivers.</p>
+
+
+Reading in buffers that are multiples <a name="INDEX-1148" />of the local filesystem block size allows
+NFS to reduce the cost of getting file blocks from a server. The
+overhead of performing an RPC call to read just a few bytes from a
+file is significant compared to the cost of reading that data from
+the server's disk, so it is to the client's and
+server's advantage to spread the RPC cost over as many data
+bytes as possible. If an application sequentially reads data from a
+file in 128-byte buffers, the first read operation brings over a full
+(8 kilobytes for NFS Version 2, usually more for NFS Version 3)
+buffer from the filesystem. If the file is less than the buffer size,
+the entire file is read from the NFS server. The next
+<em class="emphasis">read</em>( ) picks up data that is in the buffer (or
+page) cache, and following reads walk through the entire buffer. When
+the application reads data that is not cached, another full NFS
+buffer is read from the server. If there are async threads performing
+read-ahead on the client, the next buffer may already be present on
+the NFS client by the time the process needs data from it. Performing
+reads in NFS buffer-sized operations improves NFS performance
+significantly by decoupling the client application's system
+call buffer size and the VFS implementation's buffer size.</p>
+
+
+Going the other way, small write operations to the same file are
+buffered until they fill a complete page or buffer. When a full
+buffer is written, the operating system gives it to an async thread,
+and async threads try to cluster write buffers together so they can
+be sent in NFS buffer-sized requests. The eventual
+<em class="emphasis">write</em> RPC call is performed synchronous to the
+async thread; that is, the async thread does not continue execution
+(and start another write or read operation) until the RPC call
+completes. What happens on the server depends on what version of NFS
+is being used.</p>
+
+
+<ul><li>For NFS Version 2, the write RPC operation does not return to the
+client's <em class="emphasis">async thread</em> until the file block
+has been committed to stable, nonvolatile storage. All write
+operations are performed synchronously on the server to ensure that
+no state information is left in volatile storage, where it would be
+lost if the server crashed.</p></li><li>For NFS Version 3, the write RPC operation typically is done with the
+<em class="emphasis">stable</em> flag set to off. The server will return
+as soon as the write is stored in volatile or nonvolatile storage.
+Recall from <a href="ch07_02.html#nfs2-CHP-7-SECT-2.6">Section 7.2.6, "NFS Version 3"</a> that
+the client can later force the server to synchronously write the data
+to stable storage via the <em class="emphasis">commit</em> operation.</p></li></ul>
+There are elements of a write-back cache in the async threads.
+Queueing small write operations until they can be done in
+buffer-sized RPC calls leaves the client with data that is not
+present on a disk, and a client failure before the data is written to
+the server would leave the server with an old copy of the file. This
+behavior is similar to that of the Unix buffer cache or the page
+cache in memory-mapped systems. If a client is writing to a local
+file, blocks of the file are cached in memory and are not flushed to
+disk until the <em class="emphasis">operating system</em> schedules them.
+If the machine crashes between the time the data is updated in a file
+cache page and the time that page is flushed to disk, the file on
+disk is not changed by the write. This is also expected of systems
+with local disks  --  applications running at the time of the
+crash may not leave disk files in well-known states.</p>
+
+
+Having file blocks cached on the server during writes poses a problem
+if the server crashes. The client cannot determine which RPC write
+operations completed before the crash, violating the stateless nature
+of NFS. Writes cannot be cached on the server side, as this would
+allow the client to think that the data was properly written when the
+server is still exposed to losing the cached request during a reboot.</p>
+
+
+Ensuring that writes are<a name="INDEX-1149" />
+<a name="INDEX-1150" /> completed before they are acknowledged
+introduces a major bottleneck for NFS write operations, especially
+for NFS Version 2. A single Version 2 file write operation may
+require up to three disk writes on the server to update the
+file's inode, an indirect block pointer, and the data block
+being written. Each of these server write operations must complete
+before the NFS <em class="emphasis">write</em> RPC returns to the client.
+Some vendors eliminate most of this bottleneck by committing the data
+to nonvolatile, nondisk storage at memory speeds, and then moving
+data from the NFS write buffer memory to disk in large (64 kilobyte)
+buffers. Even when using NFS Version 3, the introduction of
+nonvolatile, nondisk storage can improve performance, though much
+less dramatically than with NFS Version 2.</p>
+
+
+Using the buffer cache and allowing async threads to cluster multiple
+buffers introduces some problems when several machines are reading
+from and writing to the same file. To prevent file inconsistency with
+multiple readers and writers of the same file, NFS institutes a
+flush-on-close policy:</p>
+
+
+<ul><li>All partially filled NFS buffers are written to the NFS server when a
+file is closed.</p></li><li>For NFS Version 3 clients, any writes that were done with the stable
+flag set to off are forced onto the server's stable storage via
+the <em class="emphasis">commit</em> operation.</p></li></ul>
+This ensures that a process on another NFS client sees all changes to
+a file that it is opening for reading:</p>
+
+
+<a name="ch07-7-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Client A</p></th>
+<th>
+Client B</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+<tt class="userinput"><b>open(  )</b></tt></p></td>
+<td>&nbsp;</td>
+</tr>
+
+<tr>
+<td>
+<tt class="userinput"><b>write(  )</b></tt></p></td>
+<td>&nbsp;</td>
+</tr>
+
+<tr>
+<td>
+NFS Version 3 only: commit</p></td>
+<td>&nbsp;</td>
+</tr>
+
+<tr>
+<td>
+<tt class="userinput"><b>close(  )</b></tt></p></td>
+<td>&nbsp;</td>
+</tr>
+
+<tr>
+<td>&nbsp;</td>
+<td>
+<tt class="userinput"><b>open(  )</b></tt></p></td>
+</tr>
+
+<tr>
+<td>&nbsp;</td>
+<td>
+<tt class="userinput"><b>read(  )</b></tt></p></td>
+</tr>
+
+
+</table><p>
+
+The <em class="emphasis">read</em>( ) system call on Client B will see all
+of the data in a file just written by Client A, because Client A
+flushed out all of its buffers for that file when the
+<em class="emphasis">close</em>( ) system call was made. Note that file
+consistency is less certain if Client B opens the file before Client
+A has closed it. If overlapping read and write operations will be
+performed on a single file, file locking must be used to prevent
+cache consistency problems. When a file has been locked, the use of
+the buffer cache is disabled for that file, making it more of a
+write-through than a write-back cache. Instead of bundling small NFS
+requests together, each NFS write request for a locked file is sent
+to the NFS server<a name="INDEX-1151" /> <a name="INDEX-1152" /> immediately.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">7.4.3. Server-side caching</h3>
+
+
+The client-side caching <a name="INDEX-1153" /> <a name="INDEX-1154" />mechanisms
+ --  file attribute and buffer caching  --  reduce the number
+of requests that need to be sent to an NFS server. On the server,
+additional cache policies reduce the time required to service these
+requests. NFS servers have three caches:</p>
+
+
+<ul><li>The inode cache, containing <a name="INDEX-1155" />
+<a name="INDEX-1156" />file attributes. Inode entries read from
+disk are kept in-core for as long as possible. Being able to read and
+write these attributes in memory, instead of having to go to disk,
+make the get- and set-attribute NFS requests much faster.</p></li><li>The directory name lookup cache, or DNLC, <a name="INDEX-1157" />
+<a name="INDEX-1158" />containing<a name="INDEX-1159" />
+recently read directory entries. Caching directory entries means that
+the server does not have to open and re-read directories on every
+pathname resolution. Directory searching is a fairly expensive
+operation, since it involves going to disk and searching linearly for
+a particular name in the directory. The DNLC cache works at the VFS
+layer, not at the local filesystem layer, so it caches directory
+entries for all types of filesystems. If you have a CD-ROM drive on
+your NFS server, and mount it on NFS clients, the DNLC becomes even
+more important because reading directory entries from the CD-ROM is
+much slower than reading them from a local hard disk. Server
+configuration effects that affect both the inode and DNLC cache
+systems are discussed in <a href="ch16_05.html#nfs2-CHP-16-SECT-5.5">Section 16.5.5, "Kernel configuration"</a>.</p></li><li>The server's buffer cache, used for data read from files. As
+mentioned before, file blocks that are written to NFS servers cannot
+be cached, and must be written to disk before the client's RPC
+<em class="emphasis">write</em> call can complete. However, the
+server's buffer or page cache acts as an efficient read cache
+for NFS clients. The effects of this caching are more pronounced in
+page-mapped systems, since nearly all of the server's memory
+can be used as a read cache for file blocks.</p>
+
+
+For NFS Version 3 servers, the buffer cache is used also for data
+written to files whenever the <em class="emphasis">write</em> RPC has the
+stable flag set to off. Thus, NFS Version 3 servers that do not use
+nondisk, nonvolatile memory to store writes can perform almost as
+fast as NFS Version 2 servers that do.</p></li></ul>
+Cache mechanisms on NFS clients and servers provide acceptable NFS
+performance while preserving many  --  but not all  --  of the
+semantics of a local filesystem. If you need finer consistency
+control when multiple clients <a name="INDEX-1160" />are accessing the <a name="INDEX-1161" /> <a name="INDEX-1162" />same files, you need
+to use file locking.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.3. NFS components</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.5. File locking</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch07_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

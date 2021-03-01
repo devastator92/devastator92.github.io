@@ -1,0 +1,377 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Dialup Connections (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch16_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">16.4. Dialup Connections</h2>
+
+
+<a name="INDEX-2387" /> <a name="INDEX-2388" /> <a name="INDEX-2389" />Another <a name="INDEX-2390" />relatively <a name="INDEX-2391" />recent development in networking
+that presents a challenge to DNS is the dialup Internet connection.
+When the Internet was young, and DNS was born, there was no such
+thing as a dialup connection. With the enormous explosion in the
+Internet's popularity and the propagation of Internet service
+providers who offer dialup Internet connectivity to the masses, a
+whole new breed of problems with name service has been introduced.</p><p>
+
+
+The basic goal when setting up DNS to work with dialup is to enable
+every host in your network to resolve the domain names of every host
+it needs to access. (Of course, when your connection to the Internet
+is down, your hosts probably don't need to resolve Internet
+domain names.) If you're using dial-on-demand, there's
+the additional goal of minimizing unnecessary dialouts: if
+you're looking up the domain name of a host on your local
+network, that shouldn't require your router to bring up a
+connection to the Internet.</p><p>
+
+
+We'll separate dialup connections into two categories: manual
+dialup, by which we mean a connection to the Internet that must be
+brought up by a user; and dial-on-demand, which implies the use of a
+device -- often a router, but sometimes just a host running Linux
+or another server operating system -- to connect to the Internet
+automatically whenever hosts generate traffic bound for the Internet.
+We'll also describe two scenarios for each category of dialup:
+one in which you have just one host dialing up a connection to the
+Internet, and one in which you have a small network of hosts dialing
+up a connection. Before we talk about these scenarios, though,
+let's discuss what causes dialouts and how to avoid them.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">16.4.1. What Causes Dialouts</h3>
+
+
+Many users, particularly in Europe, where ISDN is popular, connect to
+the Internet via dial-on-demand connections. Nearly all of these
+users want to minimize, if not completely prevent, unnecessary
+connections to the Internet. Connection setup is often more expensive
+than successive minutes, and always takes time.</p><p>
+
+
+BIND name servers, unfortunately, aren't terribly well suited
+to running behind dial-on-demand connections. They periodically send
+system queries to look up the current list of root name servers, even
+when the name server isn't resolving domain names. And the
+operation of the search list can cause the name server to query
+remote name servers. For example, say your local domain name is
+<em class="emphasis">tinyoffice.megacorp.com</em> and
+you have a local name server authoritative for that zone. Your
+default search list, on some resolvers, might include:</p><p>
+
+
+<blockquote><pre class="code">tinyoffice.megacorp.com
+megacorp.com</pre></blockquote>
+
+
+Let's say you try to FTP to one of your local systems,
+<em class="emphasis">deadbeef.tinyoffice.megacorp.com</em>, but
+you misspell it <em class="emphasis">deadbeer</em> :</p><p>
+
+
+<blockquote><pre class="code">% ftp deadbeer</pre></blockquote>
+
+
+Because of your search list, your resolver would first look up
+<em class="emphasis">deadbeer.tinyoffice.megacorp.com</em>. Your
+local name server, authoritative for the <em class="emphasis">tinyoffice.megacorp.com</em> zone, can tell
+that domain name doesn't exist. But then your resolver appends
+the second domain name in the search list and looks up <em class="emphasis">deadbeer.megacorp.com</em>. To figure out
+whether that domain name exists, your name server needs to query a
+<em class="emphasis">megacorp.com</em> server, which
+will require bringing up the dial-on-demand link.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">16.4.2. Avoiding Dialouts</h3>
+
+
+There are several general techniques that will help you minimize
+unnecessary dialouts. The first, and probably simplest, is to run a
+version of BIND that supports negative caching (which means anything
+newer than BIND 4.9.5, but we certainly prefer BIND 8 and 9). That
+way, if you mistakenly put <em class="emphasis">deadbeer</em>into a configuration file, your name server looks up
+<em class="emphasis">deadbeer.megacorp.com</em> once,
+and then caches the fact that the domain name doesn't exist for
+the duration of <em class="emphasis">megacorp.com</em>'s negative caching
+TTL.</p><p>
+
+
+Another technique is to use a minimal search list. If your local
+domain name is <em class="emphasis">tinyoffice.megacorp.com</em>, you could make
+do with a search list of just <em class="emphasis">tinyoffice.megacorp.com</em>. That way, a
+typo won't cause a dialout.</p><p>
+
+
+Using a modern resolver is also important. The default search list
+for a post-BIND 4.9 resolver is just the local domain name, which
+qualifies as "minimal" in our book. And a modern resolver
+knows to try a domain name with dots as-is, even if it doesn't
+end in a dot.</p><p>
+
+
+Finally, you can use other naming services, such as
+<em class="filename">/etc/hosts</em>, for local name resolution and
+configure your resolvers to use DNS only if a name cannot be found in
+<em class="filename">/etc/hosts</em>. As long as you keep the names of all
+your local hosts in <em class="filename">/etc/hosts</em>, you won't
+need to worry about needless connections to the Internet.</p><p>
+
+
+Now let's apply these techniques to our scenarios.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">16.4.3. Manual Dialup with One Host</h3>
+
+
+The easiest way to deal with the simple <a name="INDEX-2392" />dialup
+scenario is to configure your host's resolver to use a name
+server provided by your Internet service provider (ISP). Most ISPs
+run name servers for their subscribers' use. If you're
+not sure whether your ISP provides name servers for your use, or if
+you don't know what their IP addresses are, check their web
+site, send them email, or give them a call.</p><p>
+
+
+Some operating systems, such as Windows 95, 98, and NT, let you
+define a set of name servers for use with a particular dialup
+provider. So, for example, you can configure one set of name servers
+to use when you dial up UUNet and another to use when you dial up
+your office. This is useful if you dial in to multiple ISPs.</p><p>
+
+
+This configuration is usually adequate for most casual dialup users.
+Name resolution will fail unless the dialup connection is up, but
+that's not likely to be a problem, since there's no use
+for Internet name service without Internet connectivity.</p><p>
+
+
+Some of you, however, may want to run a name server when your dialup
+connection is active. It could help your performance by caching
+domain names you look up frequently, for example. This is easy to set
+up with a Unix-like operating system such as Linux: you'll
+typically use a script like <em class="filename">ifup</em> to bring up
+your dialup connection and <em class="filename">ifdown</em> to bring it
+down. If that's the case, there are probably also scripts
+called <em class="filename">ifup-post </em>and <em class="filename">ifdown-post
+</em>that <em class="filename">ifup</em> and
+<em class="filename">ifdown</em> call, respectively, after they've
+done most of their work. You can start <em class="filename">named</em> as
+<em class="filename">named</em> or with <em class="filename">ndc start </em>in
+<em class="filename">ifup-post</em>, and shut it down with <em class="filename">ndc
+stop</em> or <em class="filename">rndc stop</em> in
+<em class="filename">ifdown-post</em>. About the only other thing
+you'd need to do is set your local domain name in
+<em class="filename">resolv.conf</em>. The default resolver behavior,
+querying a name server on the local host, should do fine both when
+the name server's running and when it's not.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">16.4.4. Manual Dialup with Multiple Hosts</h3>
+
+
+The simplest solution to use with the multiple host/manual dialup
+scenario is similar to the resolver-only configuration. You can
+configure your resolvers to use your ISP's name servers, but
+also configure the resolvers to check <em class="filename">/etc/hosts</em>
+(or NIS, if you go for that sort of thing)
+<em class="emphasis">before</em> querying a name server. Then make sure
+your <em class="filename">/etc/hosts</em> file contains the names of all
+the hosts on your local network.</p><p>
+
+
+If you'd like to run a name server locally, you only need to
+modify this configuration slightly: configure the resolvers to use
+your local name server instead of your ISP's. This will give
+you the benefits of local caching, but local name resolution will
+work (via <em class="filename">/etc/hosts</em>) even when your connection
+to the Internet is down. You may as well start and stop the local
+name server from <em class="filename">ifup-post</em> and
+<em class="filename">ifdown-post</em>, as described earlier.</p><p>
+
+
+For those of you who really want to use DNS for <em class="emphasis">all
+</em>name resolution, you can forgo the <em class="filename">/etc/hosts
+</em>file and create forward-mapping and reverse-mapping zones
+on your local name server for your hosts. You should trim your
+resolvers' search lists to the bare minimum, though, to
+minimize the chance that you'll induce your name server to look
+up some wacky remote domain name.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">16.4.5. Dial-on-Demand with One Host </h3>
+
+
+If you have a single host with a dial-on-demand connection to the
+Internet, your simplest solution is still a resolver-only
+configuration. Configure your resolver to use your ISP's name
+servers, and when the resolver needs to look up a domain name,
+it'll query one of those name servers and bring up the link. If
+there are some domain names that your host looks up routinely as part
+of "housekeeping," like <em class="emphasis">localhost</em> or <em class="emphasis">1.0.0.127.in-addr.arpa</em>, you can add
+those to <em class="filename">/etc/hosts</em> and configure your resolver
+to check <em class="filename">/etc/hosts</em> before querying a name
+server.</p><p>
+
+
+If you'd like to run a name server locally, make sure it is
+able to map <em class="emphasis">localhost</em> and
+<em class="emphasis">1.0.0.127.in-addr.arpa</em> to
+127.0.0.1 and <em class="emphasis">localhost</em>,
+respectively, and trim your search list to the minimum.</p><p>
+
+
+If your name server brings up the link more than you think it should,
+try turning on query logging (with <em class="emphasis">options query-log
+</em>on a BIND 4.9 name server, <em class="filename">ndc
+querylog</em> on a BIND 4.9 or 8 name server, or <em class="filename">rndc
+querylog</em> on a BIND 9.1.0 name server) and look for the
+domain names that bring up the link. If many of them are in a single
+zone, you might consider configuring your local name server as a
+slave for that zone. At least that way, you'll bring up the
+link at most only once per refresh interval to resolve domain names
+in the zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.6" /><div class="sect2">
+<h3 class="sect2">16.4.6. Dial-on-Demand with Multiple Hosts</h3>
+
+
+The simplest solution in this scenario is exactly the same as the
+first solution we described in <a href="ch16_04.html#dns4-CHP-16-SECT-4.4">Section 16.4.4, "Manual Dialup with Multiple Hosts"</a>: a resolver-only configuration with the
+resolvers configured to check <em class="filename">/etc/hosts </em>before
+querying a name server. As with all dial-on-demand configurations,
+you'll want to trim your search list down.</p><p>
+
+
+Alternatively, you could try one of the two variants: running a local
+name server and using it as a backup to
+<em class="filename">/etc/hosts</em>, or creating forward- and
+reverse-mapping zones for the local hosts on the local name server.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-4.7" /><div class="sect2">
+<h3 class="sect2">16.4.7. Running Authoritative Name Servers over Dial-on-Demand</h3>
+
+This may sound like a silly subject to some of you -- who would
+run an <a name="INDEX-2393" /> <a name="INDEX-2394" />authoritative name server
+behind a <a name="INDEX-2395" />dial-on-demand connection? -- but
+in some parts of the world, where bandwidth and Internet connectivity
+aren't easy to come by, this is a necessity. And, believe it or
+not, BIND provides a mechanism to accommodate such name servers.</p><p>
+
+
+If you run an authoritative name server behind a dial-on-demand link,
+you want to concentrate zone maintenance activities into as short a
+window as possible. If your name server is authoritative for 100
+zones, you'd rather not have zone refresh timers popping every
+few minutes and the resulting SOA queries bringing up the
+dial-on-demand link over and over again.</p><p>
+
+
+With BIND 8.2 and newer name servers and BIND 9.1.0 and later name
+servers, you can configure a <em class="firstterm">heartbeat
+interval</em><a name="INDEX-2396" /> <a name="INDEX-2397" />.
+The <a name="INDEX-2398" />heartbeat interval is how frequently
+you'd like your name server to bring up its dial-on-demand
+connection, in minutes:</p><p>
+
+
+<blockquote><pre class="code">options {
+	heartbeat-interval 180;      // 3 hours
+};</pre></blockquote>
+
+
+The default is 60 minutes, and you can disable zone maintenance by
+setting the interval to zero.</p><p>
+
+
+If you then mark one or more of your zones as dialup zones, the name
+server will try to concentrate all maintenance of that zone into a
+short period and to perform the maintenance no more often than the
+heartbeat interval. For a slave zone, that means inhibiting the
+normal refresh timer (even ignoring the refresh interval, if
+it's smaller than the heartbeat interval!) and querying the
+master for the zone's SOA record only at the heartbeat
+interval. For a master zone, that means sending out NOTIFY messages,
+which will presumably bring up the dial-on-demand link and trigger a
+refresh on the slaves.</p><p>
+
+
+To mark all of a name server's zones as dialup zones, use the
+<em class="emphasis">dialup</em><a name="INDEX-2399" /> substatement in an
+<em class="emphasis">options</em> statement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	heartbeat-interval 60;
+	dialup yes;
+};</pre></blockquote>
+
+
+To mark a single zone as a dialup zone, use the
+<em class="emphasis">dialup</em> substatement to the <em class="emphasis">zone
+</em>statement:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	dialup yes;
+};</pre></blockquote>
+
+
+Dialup zones are also useful in another, perhaps unintended way: on
+name servers that serve as slaves for thousands of zones. Some ISPs
+provide slave service on a large scale but get bitten by miscreants
+who set their zone's refresh intervals far too low. Their name
+servers end up swamped with sending out SOA queries for those zones.
+By configuring all the zones as dialup zones and setting the
+heartbeat interval to something reasonable, ISPs<a name="INDEX-2400" /> can<a name="INDEX-2401" />
+prevent<a name="INDEX-2402" /> <a name="INDEX-2403" /> <a name="INDEX-2404" /> this.</p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.3. A Limitation of MX Records</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16.5. Network Names and Numbers</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

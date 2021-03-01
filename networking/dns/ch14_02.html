@@ -1,0 +1,600 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Troubleshooting Tools and Techniques (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.2. Troubleshooting Tools and Techniques</h2>
+
+
+<a name="INDEX-2126" />We went over
+<em class="filename">nslookup</em>, <em class="emphasis">dig</em>, and the name
+server's debugging output in the last two chapters. Before we
+go on, let's introduce some new tools that can be useful in
+troubleshooting: <em class="filename">named-xfer</em>, name server
+database dumps, and query logging.</p><p>
+
+
+<a name="dns4-CHP-14-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">14.2.1. How to Use named-xfer</h3>
+
+
+<a name="INDEX-2127" />
+<a name="INDEX-2128" />
+<a name="INDEX-2129" /><a name="INDEX-2130" /><em class="filename">named-xfer</em> is the
+program that BIND 4 and 8 name servers start to perform zone
+transfers. (BIND 9 name servers, you'll remember, are
+multithreaded, so they don't need a separate program to do
+inbound zone transfers: they just start a new thread.)
+<em class="filename">named-xfer </em>checks whether the slave's copy
+of the zone data is up to date and transfers a new zone if necessary.
+(In Versions 4.9 and 8, <em class="filename">named</em> checks if a zone
+is up to date first, to avoid starting up a child process when no
+transfer is necessary.)</p><p>
+
+
+In <a href="ch13_01.html">Chapter 13, "Reading BIND Debugging Output"</a>, we showed you the debugging output a
+BIND 8 slave name server logged as it checked its zone. When the
+slave server transferred the zone, it started a child process
+(<em class="filename">named-xfer</em>) to pull the data to the local
+filesystem. We didn't tell you, however, that you can also
+start <em class="filename">named-xfer</em> manually instead of waiting for
+<em class="filename">named</em> to start it, and that you can tell it to
+produce debugging output independently of <em class="filename">named</em>.</p><p>
+
+
+This can be useful if you're tracking down a problem with zone
+transfers but don't want to wait for <em class="filename">named</em>
+to schedule one. To test a<a name="INDEX-2131" /> zone transfer manually, you need to
+specify a number of command-line options:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>/usr/sbin/named-xfer</b></tt>
+Usage error: no domain
+Usage: named-xfer
+        -z zone_to_transfer
+        -f db_file
+        [-i ixfr_file]
+        [-s serial_no]
+        [-d debug_level]
+        [-l debug_log_file]
+        [-t trace_file]
+        [-p port]
+        [-S] [-Z]
+        [-C class]
+        [-x axfr-src]
+        [-T tsig_info_file]
+        servers [-ixfr|-axfr]...</pre></blockquote>
+
+
+This is the output from a BIND 8.2.3 version of
+<em class="filename">named-xfer</em>. Earlier versions of
+<em class="filename">named-xfer </em>won't have all of these
+options.</p><p>
+
+
+When <em class="filename">named</em> starts
+<em class="filename">named-xfer</em>, it specifies the <span class="option">-z</span>
+option (the zone <em class="filename">named</em> wants to check), the
+<span class="option">-f</span> option (the name of the zone data file that
+corresponds to the zone, from <em class="filename">named.boot</em> or
+<em class="filename">named.conf </em>), the <span class="option">-s</span> option
+(the zone's serial number on the slave from the current SOA
+record), and the addresses of the servers the slave was instructed to
+load from (the IP addresses from the <em class="emphasis">masters</em>
+substatement in the <em class="emphasis">zone</em> statement in
+<em class="filename">named.conf</em>, or from the
+<em class="emphasis">secondary</em> directive in
+<em class="filename">named.boot</em>). If <em class="filename">named</em> is
+running in debug mode, it also specifies the debug level for
+<em class="filename">named-xfer</em> with the <span class="option">-d</span> option.
+The other options aren't usually necessary to troubleshoot
+problems; they have to do with incremental zone transfers, TSIG
+signing zone transfers, and such.</p><p>
+
+
+When you run <em class="filename">named-xfer</em> manually, you can also
+specify the debug level on the command line with <span class="option">-d</span>.
+(Don't forget, though, that debug levels above 3 will produce
+tons of debugging output if the transfer succeeds!) You can also
+specify an alternate filename for the debug file with the
+<span class="option">-l</span> option. The default log file is
+<em class="filename">/var/tmp/xfer.ddt.XXXXXX</em>, where
+<em class="emphasis">XXXXXX</em> is a suffix appended to preserve
+uniqueness or a file by the same name in
+<em class="filename">/usr/tmp</em>. And you can specify the name of the
+host to load from instead of its IP address.</p><p>
+
+
+For example, with the following command line, you can see whether
+zone transfers from <em class="emphasis">terminator.movie.edu</em> are working:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>/usr/sbin/named-xfer -z movie.edu -f /tmp/db.movie -s 0 terminator</b></tt>
+% <tt class="userinput"><b>echo $?</b></tt>
+4</pre></blockquote>
+
+
+In this command, we specified a serial number of zero because we
+wanted to force <em class="filename">named-xfer</em> to attempt a zone
+transfer even if it wasn't needed. Zero is a special serial
+number -- <em class="filename">named-xfer</em> will transfer the zone
+regardless of the actual zone serial number. Also, we told
+<em class="filename">named-xfer</em> to put the new zone data file in
+<em class="filename">/tmp</em> rather than overwriting the zone's
+working zone data file.</p><p>
+
+
+We can tell if the transfer succeeded by looking at
+<em class="filename">named-xfer </em>'s return value. If
+you're running BIND Version 8.1.2 or older, your
+<em class="filename">named-xfer </em>has four possible return values:</p><p>
+
+
+<dl>
+<dt><i>0</i></dt>
+<dd>The zone data is up to date and no transfer was needed.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>1</i></dt>
+<dd>Indicates a successful transfer.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>2</i></dt>
+<dd>The host(s) <em class="filename">named-xfer</em> queried can't be
+reached, or an error occurred and <em class="filename">named-xfer</em> may
+have logged an error message to <em class="emphasis">syslog.</em></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>3</i></dt>
+<dd>An error occurred and <em class="filename">named-xfer</em> logged an error
+message to <em class="emphasis">syslog.</em></p></dd>
+
+</dl>
+
+
+As of BIND 8.2, three new return values have been added to
+accommodate incremental zone transfers:</p><p>
+
+
+<dl>
+<dt><i>4</i></dt>
+<dd>Indicates a successful AXFR (full) zone transfer.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>5</i></dt>
+<dd>Indicates a successful IXFR (incremental) zone transfer.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>6</i></dt>
+<dd>Indicates that the master name server returned an AXFR to
+<em class="filename">named-xfer </em>'s IXFR request.</p></dd>
+
+</dl>
+
+
+It's perfectly legal for a name server -- even one that
+supports IXFR -- to return a full zone transfer to a request for
+an incremental zone transfer. For example, the master name server may
+be missing part of the record of the changes made to the zone.</p><p>
+
+
+Note that BIND 8.2 and later <em class="filename">named-xfer </em>s
+don't use return value 1 anymore. Return value 1 has been
+replaced by return values 4 through 6.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">14.2.2. What If I Don't Have named-xfer?</h3>
+
+
+If you've upgraded to BIND 9 and don't have a
+<em class="filename">named-xfer </em>binary, you can still use
+<em class="filename">nslookup </em>or <em class="filename">dig</em> to do a
+zone transfer. Either query tool will give you some of the
+information that <em class="filename">named-xfer </em>would have given
+you.</p><p>
+
+
+For example, to use <em class="filename">dig</em> to do the same zone
+transfer we showed you earlier, you could run:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig @terminator.movie.edu movie.edu axfr</b></tt></pre></blockquote>
+
+
+With <em class="filename">nslookup</em>, you could change your name server
+and use the <em class="emphasis">ls -d</em> command from interactive mode.</p><p>
+
+
+Unfortunately, both <em class="filename">dig</em> and <em class="filename">nslookup
+</em>are more subtle than <em class="filename">named-xfer </em>is in
+reporting errors. If <em class="filename">nslookup</em> can't
+transfer a zone, it usually reports an "unspecified
+error":</p><p>
+
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>ls movie.edu</b></tt>
+[terminator.movie.edu]
+*** Can't list domain movie.edu: Unspecified error</pre></blockquote>
+
+
+This could be caused by an <em class="emphasis">allow-transfer</em> access
+list, the fact that <em class="emphasis">terminator.movie.edu</em> isn't
+actually authoritative for <em class="emphasis">movie.edu</em>, or a number of other
+problems. To tell which, you may just have to send other, related
+queries or check the <em class="emphasis">syslog</em> output on the master
+name server.<a name="INDEX-2132" /> <a name="INDEX-2133" /> <a name="INDEX-2134" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">14.2.3. How to Read a Database Dump</h3>
+
+
+<a name="INDEX-2135" />Poring over a dump of the name
+server's internal database -- including cached
+information -- can also help you track down problems. The
+<em class="filename">ndc dumpdb </em>or<em class="filename"> rndc dumpdb
+</em>command causes <em class="filename">named</em> to dump its
+authoritative data, cached data, and hints data to
+<a name="INDEX-2136" /><em class="filename">named_dump.db</em> in
+BIND's working directory (or in
+<em class="filename">/usr/tmp/named_dump.db</em> or
+<em class="filename">/var/tmp/named_dump.db</em>, for BIND 4).<a href="#FOOTNOTE-100">[100]</a> An example of a
+<em class="filename">named_dump.db</em> file follows. The authoritative
+data and cached entries, mixed together, appear first in the file. At
+the end of the file is the hints data:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-100" />[100]BIND 9.1.0 is the first version of BIND 9 to support dumping
+the database.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">; Dumped at Tue Jan  6 10:49:08 1998
+;; ++zone table++
+; 0.0.127.in-addr.arpa (type 1, class 1, source db.127.0.0)
+;   time=0, lastupdate=0, serial=1,
+;   refresh=0, retry=3600, expire=608400, minimum=86400
+;   ftime=884015430, xaddr=[0.0.0.0], state=0041, pid=0
+;; --zone table--
+; Note: Cr=(auth,answer,addtnl,cache) tag only shown for non-auth RR's
+; Note: NT=milliseconds for any A RR which we've used as a nameserver
+; --- Cache &amp; Data ---
+$ORIGIN .
+.   518375  IN      NS  G.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  J.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  K.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  L.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  M.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  A.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  H.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  B.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  C.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  D.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  E.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  I.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+    518375  IN      NS  F.ROOT-SERVERS.NET.   ;Cr=auth [128.8.10.90]
+EDU  86393  IN      SOA A.ROOT-SERVERS.NET.  hostmaster.INTERNIC.NET. (
+         1998010500 1800 900 604800 86400 )   ;Cr=addtnl [128.63.2.53]
+$ORIGIN  0.127.in-addr.arpa.
+0        IN    SOA cujo.movie.edu. root.cujo.movie.edu. (
+         1998010600 10800 3600 608400 86400 )        ;Cl=5
+         IN    NS  cujo.movie.edu.   ;Cl=5
+$ORIGIN  0.0.127.in-addr.arpa.
+1        IN    PTR localhost.    ;Cl=5
+$ORIGIN EDU.
+PURDUE   172787  IN  NS  NS.PURDUE.EDU.           ;Cr=addtnl [192.36.148.17]
+         172787  IN  NS  MOE.RICE.EDU.            ;Cr=addtnl [192.36.148.17]
+         172787  IN  NS  PENDRAGON.CS.PURDUE.EDU.  ;Cr=addtnl [192.36.148.17]
+         172787  IN  NS  HARBOR.ECN.PURDUE.EDU.    ;Cr=addtnl [192.36.148.17]
+$ORIGIN  movie.EDU.
+;cujo    593     IN  SOA  A.ROOT-SERVERS.NET. hostmaster.INTERNIC. NET. (
+;        1998010500 1800 900 604800 86400 );EDU.; NXDOMAIN  ;-$
+   ;Cr=auth [128.63.2.53]
+$ORIGIN   RICE.EDU.
+MOE      172787  IN  A   128.42.5.4        ;NT=84 Cr=addtnl [192.36.148.17]
+$ORIGIN   PURDUE.EDU.
+CS       86387   IN  NS  pendragon.cs.PURDUE.edu.    ;Cr=addtnl [128.42.5.4]
+         86387   IN  NS  ns.PURDUE.edu.              ;Cr=addtnl [128.42.5.4]
+         86387   IN  NS  harbor.ecn.PURDUE.edu.      ;Cr=addtnl [128.42.5.4]
+         86387   IN  NS  moe.rice.edu.               ;Cr=addtnl [128.42.5.4]
+NS       172787   IN  A  128.210.11.5        ;NT=4 Cr=addtnl [192.36.148.17]
+$ORIGIN   ECN.PURDUE.EDU.
+HARBOR   172787  IN   A  128.46.199.76       ;NT=6 Cr=addtnl [192.36.148.17]
+$ORIGIN   CS.PURDUE.EDU.
+galt     86387   IN   A  128.10.2.39                 ;Cr=auth [128.42.5.4]
+PENDRAGON  172787  IN  A  128.10.2.5         ;NT=20 Cr=addtnl [192.36.148.17]
+$ORIGIN   ROOT-SERVERS.NET.
+K        604775    IN  A  193.0.14.129       ;NT=10 Cr=answer [128.8.10.90]
+A        604775    IN  A  198.41.0.4         ;NT=20 Cr=answer [128.8.10.90]
+L        604775    IN  A  198.32.64.12       ;NT=8 Cr=answer [128.8.10.90]
+B        604775    IN  A  128.9.0.107        ;NT=9 Cr=answer [128.8.10.90]
+M        604775    IN  A  202.12.27.33       ;NT=20 Cr=answer [128.8.10.90]
+C        604775    IN  A  192.33.4.12        ;NT=17 Cr=answer [128.8.10.90]
+D        604775    IN  A  128.8.10.90        ;NT=11 Cr=answer [128.8.10.90]
+E        604775    IN  A  192.203.230.10     ;NT=9 Cr=answer [128.8.10.90]
+F        604775    IN  A  192.5.5.241        ;NT=73 Cr=answer [128.8.10.90]
+G        604775    IN  A  192.112.36.4       ;NT=14 Cr=answer [128.8.10.90]
+H        604775    IN  A  128.63.2.53        ;NT=160 Cr=answer [128.8.10.90]
+I        604775    IN  A  192.36.148.17      ;NT=102 Cr=answer [128.8.10.90]
+J        604775    IN  A  198.41.0.10        ;NT=21 Cr=answer [128.8.10.90]
+; --- Hints ---
+$ORIGIN .
+.   3600           IN  NS  A.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  B.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  C.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  D.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  E.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  F.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  G.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  H.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  I.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  J.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  K.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  L.ROOT-SERVERS.NET.     ;Cl=0
+    3600           IN  NS  M.ROOT-SERVERS.NET.     ;Cl=0
+$ORIGIN   ROOT-SERVERS.NET.
+K     3600         IN   A  193.0.14.129      ;NT=11 Cl=0
+L     3600         IN   A  198.32.64.12      ;NT=9 Cl=0
+A     3600         IN   A  198.41.0.4        ;NT=10 Cl=0
+M     3600         IN   A  202.12.27.33      ;NT=11 Cl=0
+B     3600         IN   A  128.9.0.107       ;NT=1288 Cl=0
+C     3600         IN   A  192.33.4.12       ;NT=21 Cl=0
+D     3600         IN   A  128.8.10.90       ;NT=1288 Cl=0
+E     3600         IN   A  192.203.230.10    ;NT=19 Cl=0
+F     3600         IN   A  192.5.5.241       ;NT=23 Cl=0
+G     3600         IN   A  192.112.36.4      ;NT=18 Cl=0
+H     3600         IN   A  128.63.2.53       ;NT=11 Cl=0
+I     3600         IN   A  192.36.148.17     ;NT=21 Cl=0
+J     3600         IN   A  198.41.0.10       ;NT=13 Cl=0</pre></blockquote>
+
+
+The name server that created this <em class="filename">named_dump.db</em>
+file was authoritative only for <em class="emphasis">0.0.127.in-addr.arpa</em>. Only two names
+have been looked up by this server: <em class="emphasis">galt.cs.purdue.edu</em> and <em class="emphasis">cujo.movie.edu</em>. In the process of
+looking up <em class="emphasis">galt.cs.purdue.edu</em>, this server cached
+not only the address of <em class="emphasis">galt</em>, but also the list of name servers
+for <em class="emphasis">purdue.edu</em> and the
+addresses for those servers. The name <em class="emphasis">cujo.movie.edu</em>, however, doesn't
+really exist (nor does the zone <em class="emphasis">movie.edu</em>, except in our examples), so
+the server cached the negative response. In the dump file, the
+negative response is commented out (the line starts with a
+semicolon), and the reason is listed (NXDOMAIN) instead of real data.
+You'll notice the TTL is quite low (593). On BIND 8.2 and later
+name servers, negative responses are cached according to the last
+field in the SOA record, which is usually much smaller than the
+default TTL for the zone.</p><p>
+
+
+The hints section at the bottom of the file contains the data from
+the <em class="filename">db.cache</em> file. The TTL of the hints data is
+decremented, and it may go to zero, but the hints are never
+discarded.</p><p>
+
+
+Note that some of the resource records are followed by a semicolon
+and <em class="emphasis">NT=</em>. You will only see these on the address
+records of name servers. The number is the roundtrip time calculation
+that the name server keeps so that it knows which name servers have
+responded most quickly in the past; the name server with the lowest
+roundtrip time will be tried first the next time.</p><p>
+
+
+The cached data is easy to pick out -- those entries have a
+<a name="INDEX-2137" /><em class="firstterm">credibility</em> tag
+(<em class="emphasis">Cr =</em>) and (sometimes) the IP address of the
+server the data came from.<a href="#FOOTNOTE-101">[101]</a> The zone data and hint data are tagged
+with <em class="emphasis">Cl=</em>, which is just a count of the level in
+the domain tree (the root is level 0, <em class="emphasis">foo</em> would be level 1, <em class="emphasis">foo.foo</em> would be level 2, etc.).
+Let's digress a moment to explain the concept of credibility.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-101" />[101]The name server prints the
+IP address of the remote name server if it's available. On BIND
+8.2 and later name servers, the IP address is available only if
+you've turned on <em class="emphasis">host-statistics</em>, which we
+introduced in <a href="ch08_01.html">Chapter 8, "Growing Your Domain"</a>. On earlier BIND 4.9 and
+BIND 8 name servers, it's on by default.
+<em class="emphasis">host-statistics</em> keeps impressive statistics on
+every name server and resolver you've ever communicated with,
+which is very useful for some purposes (like figuring out which name
+server your server got a record from), but consumes a fair amount of
+memory.</p><p>
+
+</blockquote>
+
+
+One of the advances between Versions 4.8.3 and 4.9 was the addition
+of a credibility measure. This allows a name server to make more
+intelligent decisions about what to do with new data from a remote
+server.</p><p>
+
+
+A 4.8.3 name server had only two credibility levels -- locally
+authoritative data and everything else. The locally authoritative
+data was data from your zone data files -- your name server knew
+better than to update its internal copy of what came from your zone
+file. But all data from remote name servers was considered equal.</p><p>
+
+
+Here is a situation that could happen and the way a 4.8.3 server
+would deal with it. Suppose that your server looked up an address for
+<em class="emphasis">terminator.movie.edu</em> and
+received an authoritative answer from the <em class="emphasis">movie.edu</em> name server. (Remember, an
+authoritative answer is the best you can get.) Sometime later, while
+looking up <em class="emphasis">foo.oreilly.com</em>,
+your server receives another address record for <em class="emphasis">terminator.movie.edu</em>, but this time as
+part of the delegation info for <em class="emphasis">oreilly.com</em> (which <em class="emphasis">terminator.movie.edu</em> is a slave for).
+The 4.8.3 name server would update the cached address record for
+<em class="emphasis">terminator.movie.edu</em>, even
+though the data came from the <em class="emphasis">com</em> name server instead of the
+authoritative <em class="emphasis">movie.edu</em> name
+server. Of course, the <em class="emphasis">com</em>
+and <em class="emphasis">movie.edu</em> name servers
+will have exactly the same data for <em class="emphasis">terminator.movie.edu</em>, so this
+won't be a problem, right? Yeah, and it never rains in southern
+California, either.</p><p>
+
+
+A 4.9 or newer name server is more intelligent. Like a 4.8.3 name
+server, it still considers your zone data unassailable -- beyond
+any doubt. But a 4.9 or newer name server distinguishes among the
+different data from remote name servers. Here is the hierarchy of
+remote data credibility from most credible to least:</p><p>
+
+
+<dl>
+<dt><i>auth</i></dt>
+<dd><a name="INDEX-2138" />These records are data from authoritative
+answers -- the answer section of a response message with the
+authoritative answer bit set.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>answer</i></dt>
+<dd><a name="INDEX-2139" />These records are data from
+nonauthoritative, or cached, answers -- the answer section of a
+response message without the authoritative answer bit set.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>addtnl</i></dt>
+<dd><a name="INDEX-2140" />These records are data from the rest of
+the response message -- the <em class="firstterm">authority</em> and
+<em class="firstterm">additional</em> sections. The
+<em class="emphasis">authority</em> section of the response contains NS
+records that delegate a zone to an authoritative name server. The
+<em class="emphasis">additional</em> section contains address records that
+may complete information in other sections (e.g., address records
+that go with NS records in the <em class="emphasis">authority</em>
+section).</p></dd>
+
+</dl>
+
+
+There is one exception to this rule: when the name server is priming
+its root name server cache, the records that would be at credibility
+<em class="emphasis">addtnl</em> are bumped up to
+<em class="emphasis">answer</em> to make them harder to change
+accidentally. Notice in the dump that the address records for root
+name servers are at credibility <em class="emphasis">answer</em>, but the
+address records for the <em class="emphasis">purdue.edu</em> name servers are at
+credibility <em class="emphasis">addtnl</em>.</p><p>
+
+
+In the situation just described, a 4.9 or newer name server would not
+replace the authoritative data (credibility =
+<em class="emphasis">auth</em>) for <em class="emphasis">terminator.movie.edu</em> with the delegation
+data (credibility = <em class="emphasis">addtnl</em> ) because the
+authoritative answer has higher credibility.<a name="INDEX-2141" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">14.2.4. Logging Queries</h3>
+
+
+<a name="INDEX-2142" />
+<a name="INDEX-2143" />BIND Version
+4.9 added a feature called <em class="emphasis">query logging</em> that
+can be used to help diagnose certain problems. When query logging is
+turned on, a running name server will log every query to
+<em class="emphasis">syslog</em>. This feature could help you find
+resolver configuration errors because you can verify that the name
+you think is being looked up really is the name being looked up.</p><p>
+
+
+First you must make sure that LOG_INFO messages are being logged by
+<em class="emphasis">syslog</em> for the facility
+<em class="emphasis">daemon</em>. Next, you need to turn on query logging.
+This can be done in several ways: for BIND 4.9, set<a name="INDEX-2144" /><em class="emphasis">options
+query-log</em> in your name server boot file; for BIND 4.9 or
+BIND 8, start the name server with <span class="option">-q</span> on the command
+line or send an <em class="filename">ndc querylog </em>command to a
+running name server. For BIND 9.1.0 or later (earlier versions
+don't support query logging), use <em class="filename">rndc
+querylog</em>. You'll start seeing
+<em class="emphasis">syslog</em> messages like this:</p><p>
+
+
+<blockquote><pre class="code">Feb 20 21:43:25 terminator named[3830]:
+                     XX+ /192.253.253.2/carrie.movie.edu/A
+Feb 20 21:43:32 terminator named[3830]:
+                     XX+ /192.253.253.2/4.253.253.192.in-addr.arpa/PTR</pre></blockquote>
+
+
+Or, if you're running BIND 9, like this:</p><p>
+
+
+<blockquote><pre class="code">Jan 13 18:32:25 terminator named[13976]: info: client 192.253.253.2#1702: query: 
+carrie.movie.edu IN A
+Jan 13 18:32:42 terminator named[13976]: info: client 192.253.253.2#1702: query: 
+4.253.253.192.in-addr.arpa IN PTR</pre></blockquote>
+
+
+These messages include the IP address of the host that made the
+query, as well as the query itself. Since the first example comes
+from a BIND 8.2.3 name server and these queries are recursive, they
+begin with XX+. Iterative queries begin with just XX. (Name servers
+older than BIND 8.2.1 don't distinguish recursive from
+nonrecursive queries.) Inverse queries have a dash before the query
+type (e.g., an inverse query for an address record is logged as
+"-A" instead of just "A"). After enough
+queries have been logged, you can turn off query logging by sending
+another <em class="filename">ndc querylog </em>or<em class="filename"> rndc querylog
+</em>command to your name server.</p><p>
+
+
+If you're stuck running an older BIND 9 name server, you can
+still see the queries received in <em class="filename">named</em> 's
+debugging output at level 1.<a name="INDEX-2145" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14. Troubleshooting DNS and BIND</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.3. Potential Problem List</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

@@ -1,0 +1,656 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:22 GMT -->
+<head><title>Polling and Thresholds (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h1 class="chapter">Chapter 9. Polling and Thresholds</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <a href="#ahead-1">Internal Polling</a><br />
+<a href="ch09_02.html">External Polling</a><br /></p><p></div>
+
+<a name="INDEX-1166" /></a><a name="INDEX-1167" /></a><a name="INDEX-1168" /></a><a name="INDEX-1169" /></a>SNMP gives you the ability to poll your
+devices regularly, collecting their management information.
+Furthermore, you can tell the NMS that there are certain thresholds
+that, if crossed, require some sort of action. For example, you might
+want to be notified if the traffic at an interface jumps to an
+extremely high (or low) value; that event might signal a problem with
+the interface, or insufficient capacity, or even a hostile attack on
+your network. When such a condition occurs, the NMS can forward an
+alarm to an event-correlation engine or have an icon on an OpenView
+map flash. To make this more concrete, let's say that the NMS
+is polling the status of an interface on a router. If the interface
+goes down, the NMS reports what has happened so the problem can be
+quickly resolved.
+</p><p>
+
+<a name="INDEX-1170" /></a><a name="INDEX-1171" /></a><a name="INDEX-1172" /></a><a name="INDEX-1173" /></a><a name="INDEX-1174" /></a><a name="INDEX-1175" /></a>SNMP can perform either internal or
+external polling. <em class="firstterm">Internal</em> polling is
+typically used in conjunction with an application that runs as a
+daemon or a facility such as <i class="command">cron</i> that
+periodically runs a local application.
+<em class="firstterm">External</em> polling is done by the NMS. The
+OpenView NMS provides a great implementation of external polling; it
+can graph and save your data for later retrieval or notify you if it
+looks like something has gone wrong. Many software packages make good
+NMSs, and if you're clever about scripting you can throw
+together an NMS that's fine-tuned to your needs. In this
+chapter, we will look at a few of the available packages.
+</p><p>
+
+Polling is like checking the oil in a car; this analogy may help you
+to think about appropriate polling strategies. Three distinct items
+concern us when checking the oil: the physical process (opening the
+hood, pulling out the dipstick, and putting it back in); the preset
+gauge that tells us if we have a problem (is the level too high, too
+low, or just right?); and the frequency with which we check it (once
+an hour, week, month, or year?).
+</p><p>
+
+Let's assume that you ask your mechanic to go to the car and
+check the oil level. This is like an NMS sending a packet to a router
+to perform an <i class="command">snmpget</i> on some piece of
+information. When the mechanic is finished, you pay him $30 and go on
+your way. Because a low oil level may result in real engine damage,
+you want to check the oil regularly. So how long should you wait
+until you send the mechanic out to the car again? Checking the oil
+has a cost: in this scenario, you paid $30. In networks, you pay with
+bandwidth. Like money, you have only so much bandwidth, and you
+can't spend it frivolously. So the real question is, how long
+can you wait before checking the oil again without killing your
+budget?
+</p><p>
+
+The answer lies within the car itself. A finely tuned racing car
+needs to have its fluids at perfect levels. A VW Beetle,<a href="#FOOTNOTE-36">[36]</a> unlike a racecar, can have plus or minus a quart at any
+time without seriously hindering its performance. You're
+probably not driving a Beetle, but you're probably not driving
+a racecar either. So you decide that you can check the oil level
+about every three weeks. But how will you know what is low, high, or
+just right?
+</p><p><blockquote class="footnote">
+<a name="FOOTNOTE-36" /></a>[36]The old ones from the 1960s, not the fancy modern ones.</p><p>
+</blockquote>
+
+The car's dipstick tells you. Your mechanic doesn't need
+to know the car model, engine type, or even the amount of oil in the
+car; he only needs to know what value he gets when he reads the
+dipstick. On a network, a device's dipstick is called an agent,
+and the dipstick reading is the SNMP response packet. All
+SNMP-compatible devices contain standardized agents (dipsticks) that
+can be read by any mechanic (NMS). It is important to keep in mind
+that the data gathered is only as good as the agent, or mechanic,
+that generated it.
+</p><p>
+
+In both cases, some predefined threshold determines the appropriate
+action. In the oil example, the threshold is "low oil,"
+which triggers an automatic response: add oil. (Crossing the
+"high oil" threshold might trigger a different kind of
+response.) If we're talking about a router interface, the
+possible values we might receive are "up" and
+"down." Imagine that your company's gateway to the
+Internet, a port on a router, must stay up 24 hours a day, 7 days a
+week. If that port goes down, you could lose $10,000 for each second
+it stays down. Would you check that port often? Most organizations
+won't pay someone to check router interfaces every hour, let
+alone every second. Even if you had the time, that wouldn't be
+fun, right? This is where SNMP polling comes in. It allows network
+managers to guarantee that mission-critical devices are up and
+functioning properly, without having to pay someone to constantly
+monitor routers, servers, etc.
+</p><p>
+
+<a name="INDEX-1176" /></a><a name="INDEX-1177" /></a>Once
+you determine your monitoring needs, you can specify at what interval
+you would like to poll a device or set of devices. This is typically
+referred to as the <em class="firstterm">poll interval</em>, and can be
+as granular as you like (e.g., every second, every hour, etc.). The
+threshold value at which you take action doesn't need to be
+binary: you might decide that something's obviously wrong if
+the number of packets leaving your Internet connection falls below a
+certain level.
+<a name="INDEX-1178" /></a><a name="INDEX-1179" /></a><a name="INDEX-1180" /></a>
+</p><p>
+
+
+<a name="ch09-3-fm2xml" /></a><blockquote><b>TIP: </b> 
+Whenever you are figuring out how often to
+poll a device, remember to keep three things in mind: the
+device's agent/CPU, bandwidth consumption, and the types of
+values you are requesting. Some values you receive may be 10-minute
+averages. If this is the case, it is a waste to poll every few
+seconds. Review the MIBs surrounding the data for which you are
+polling. My preference is to start polling fairly often. Once I see
+the trends and peak values, I back off. This can add congestion to
+the network but ensures that I don't miss any important
+information.
+</p><p>
+</blockquote>
+
+<a name="INDEX-1181" /></a><a name="INDEX-1182" /></a><a name="INDEX-1183" /></a>Whatever the frequency at which
+you poll, keep in mind other things that may be happening on the
+network. Be sure to stagger your polling times to avoid other events
+if possible. Keep in mind backups, data loads, routing updates, and
+other events that can cause stress on your networks or CPUs.
+</p><p>
+
+<div class="sect1"><a name="enettdg-CHP-9-SECT-1" /></a> 
+  <h2 class="sect1"><a name="ahead-1"></a>9.1. Internal Polling</h2>
+
+<a name="INDEX-1184" /></a><a name="INDEX-1185" /></a> <a name="INDEX-1186" /></a>
+<a name="INDEX-1187" /></a>It may seem like a waste of bandwidth
+to poll a device just to find out that everything is okay. On a
+typical day, you may poll dozens of devices hundreds or thousands of
+times without discovering any failures or outages. Of course,
+that's really what you want to find out -- and you'll
+probably conclude that SNMP has served its purpose the first time you
+discover a failed device and get the device back online before users
+have had a chance to start complaining. However, in the best of all
+possible worlds, you'd get the benefits of polling without the
+cost: that is, without devoting a significant chunk of your
+network's bandwidth to monitoring its health.
+</p><p>
+
+This <a name="INDEX-1188" /></a><a name="INDEX-1189" /></a><a name="INDEX-1190" /></a><a name="INDEX-1191" /></a><a name="INDEX-1192" /></a>is where internal polling comes
+in. As its name implies, internal polling is performed by an agent
+that is internal, or built in, to the device you want to manage.
+Since polling is internal to the device, it doesn't require
+traffic between the agent and your NMS. Furthermore, the agent doing
+the polling does not have to be an actual SNMP agent, which can allow
+you to monitor systems (either machines or software) that do not
+support SNMP. For example, some industrial-strength
+air-conditioning-equipment vendors provide operational status
+information via a serial port. If the air-conditioning unit is
+attached to a terminal server or similar device, it becomes easy to
+use scripting languages to monitor the unit and generate traps if the
+temperature exceeds a certain threshold. This internal program can be
+written in your favorite scripting language, and it can check any
+status information to which you can get access. All you need is a way
+to get data from the script to the management station.
+</p><p>
+
+<a name="INDEX-1193" /></a><a name="INDEX-1194" /></a><a name="INDEX-1195" /></a><a name="INDEX-1196" /></a><a name="INDEX-1197" /></a><a name="INDEX-1198" /></a><a name="INDEX-1199" /></a>One strategy for writing a
+polling program is to use "hooks" within a program to
+extract information that can then be fed into an SNMP trap and sent
+to the NMS. We will cover traps more in <a href="ch10_01.html">Chapter 10, "Traps"</a>. Another way to do internal polling is
+to use a program (e.g., <em class="emphasis">sh</em>, Perl, or C) that is
+run at set intervals. (On Unix, you would use <i class="command">cron</i>
+to run a program at fixed intervals; there are similar services on
+other operating systems.) Hooks and <i class="command">cron</i>-driven
+scripts both allow you to check internal variables and report errors
+as they are found. Here is a Perl script that checks for the
+existence of a file and sends a trap if the file is not found:
+</p><p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+# Filename: /opt/local/perl_scripts/check4file.pl
+
+use SNMP_util "0.54";  # This will load the BER and SNMP_Session modules for us
+
+$FILENAME = "/etc/passwd";
+
+#
+# if the /etc/passwd file does not exist, send a trap!
+#
+if(!(-e $FILENAME)) { 
+    snmptrap("public\@nms:162", ".1.3.6.1.4.1.2789", "sunserver1", 6, 1547, \
+             ".1.3.6.1.4.1.2789.1547.1", "string", "File \:$FILENAME\: Could\
+             NOT Be Found");
+}</pre></blockquote>
+
+<a name="INDEX-1200" /></a>Here is what
+the Sun-style <em class="filename">crontab</em> looks like:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>crontab -l </b></tt>
+
+# Check for this file every 15 minutes and report trap if not found
+4,19,34,49 * * * * /opt/local/perl_scripts/check4file.pl</pre></blockquote>
+
+Notice that we poll four minutes after each quarter hour, rather than
+on the quarter hour. The next poll we insert into the
+<em class="filename">crontab</em> file may run five minutes after the
+quarter hour (5,20,35,50). This practice prevents us from starting a
+huge number of programs at the same time. It's a particularly
+good idea to avoid polling on the hour -- that's a popular
+time for random programs and <i class="command">cron</i> jobs to start
+up. Consult the <i class="command">cron</i> manpage if you are unfamiliar
+with its operation.
+</p><p>
+
+<a name="enettdg-CHP-9-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">9.1.1. Remote Monitoring (RMON)</h3>
+
+<a name="INDEX-1201" /></a> <a name="INDEX-1202" /></a> <a name="INDEX-1203" /></a><a name="INDEX-1204" /></a><a name="INDEX-1205" /></a><a name="INDEX-1206" /></a>
+<a name="INDEX-1207" /></a><a name="INDEX-1208" /></a><a name="INDEX-1209" /></a><a name="INDEX-1210" /></a>RMON
+is a supplement to the MIB-II group. This group, if supported by the
+device's SNMP agent, allows us to do both internal and external
+polling. We can poll devices through a remote NMS (external polling)
+or have the local RMON agent check itself periodically and report any
+errors (internal polling). The RMON agent will send traps when error
+conditions are found.
+</p><p>
+
+<a name="INDEX-1211" /></a>Many
+devices support RMON, making it an effective mechanism for internal
+polling. For example, Cisco supports the Events and Alarms RMON
+categories. You can configure the Alarms category to poll MIBs
+internally and react in different ways when a rising or falling
+threshold occurs. Each threshold has the option of calling an
+internal Event. <a href="ch09_01.html#enettdg-CHP-9-FIG-1">Figure 9-1</a> shows the flow that
+these two RMON categories take.
+</p><p>
+
+<a name="enettdg-CHP-9-FIG-1" /></a><div class="figure"><img height="123" alt="Figure 9-1" src="figs/snmp_0902.gif" width="393" /></div><h4 class="objtitle">Figure 9-1.  RMON process flow</h4>
+
+<a name="INDEX-1212" /></a><a name="INDEX-1213" /></a><a name="INDEX-1214" /></a>
+<a name="INDEX-1215" /></a><a name="INDEX-1216" /></a>
+<a name="INDEX-1217" /></a><a name="INDEX-1218" /></a><a name="INDEX-1219" /></a><a name="INDEX-1220" /></a>The distinction between alarms and
+events is important. Each alarm is tied to a specific event, which
+defines what action to perform when the alarm goes off. Once a
+threshold is met, triggering an alarm, the alarm calls the event,
+which can perform additional functions, including sending traps to
+the NMS and writing a record in a log. Standard SNMP traps are
+preconfigured by the agent's vendor, which gives network
+managers no control over setting any kind of thresholds; however,
+RMON allows a network manager to set rising and falling thresholds.
+<a href="ch09_01.html#enettdg-CHP-9-FIG-2">Figure 9-2</a> represents the interaction between a
+router's RMON agent and an NMS.
+</p><p>
+
+<a name="enettdg-CHP-9-FIG-2" /></a><div class="figure"><img height="121" alt="Figure 9-2" src="figs/snmp_0903.gif" width="403" /></div><h4 class="objtitle">Figure 9-2.  RMON and NMS interaction</h4>
+
+<a name="INDEX-1221" /></a><a name="INDEX-1222" /></a>In <a href="ch09_01.html#enettdg-CHP-9-FIG-2">Figure 9-2</a>,
+the Cisco router's SNMP agent forwards a trap to the NMS.
+Notice the direction of communication: RMON trap transmission is
+unidirectional. The NMS receives the trap from the Cisco router and
+decides what action to take, if any.
+</p><p>
+
+<a name="INDEX-1223" /></a><a name="INDEX-1224" /></a><a name="INDEX-1225" /></a>In
+addition to sending traps, we can also log events; if we so choose,
+we can even log the event without generating a trap. Logging can be
+particularly useful when you are initially configuring RMON alarms
+and events. If you make your alarm conditions too sensitive, you can
+clog your NMS with trigger-happy RMON events. Logging can help you
+fine-tune your RMON alarms before they are released into production.
+</p><p>
+
+<a name="enettdg-CHP-9-SECT-1.1.1" /></a><div class="sect3">
+<h3 class="sect3">9.1.1.1. RMON configuration</h3>
+
+As a practical example of how to configure RMON, we will use
+Cisco's RMON implementation, starting with events. The
+following IOS command defines an RMON event:<a name="INDEX-1226" /></a>
+<a name="INDEX-1227" /></a><a name="INDEX-1228" /></a><a name="INDEX-1229" /></a>
+<a name="INDEX-1230" /></a>
+</p><p>
+
+<blockquote><pre class="code">rmon event number [log] [trap community] [description string] [owner string]</pre></blockquote>
+
+<a name="INDEX-1231" /></a>If
+you're familiar with IOS, you should be expecting a
+corresponding <i class="command">no</i> command that discards an RMON
+event:
+</p><p>
+
+<blockquote><pre class="code">no rmon event number </pre></blockquote>
+
+The parameters to these IOS commands are:</p><p>
+
+<dl>
+<dt><b>number</b></dt>
+<dd>
+Specifies the unique identification number for the event. This value
+must be greater than 0; a value of 0 is not allowed.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">log</tt></b></dt>
+<dd>
+Tells the agent to log the entry when triggered. This argument is
+optional.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">trap</tt> community</b></dt>
+<dd>
+<a name="INDEX-1232" /></a><a name="INDEX-1233" /></a>
+<a name="INDEX-1234" /></a>Specifies
+the trap community string; i.e., a community string to be included
+with the trap. Many network-management programs can be configured to
+respond only to traps with a particular community string.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">description</tt> string</b></dt>
+<dd>
+Describes the event.</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">owner</tt> string</b></dt>
+<dd>
+Ties the event or item to a particular person.</p><p>
+</dd>
+
+</dl>
+
+<a name="INDEX-1235" /></a>
+<a name="INDEX-1236" /></a><a name="INDEX-1237" /></a><a name="INDEX-1238" /></a>
+<a name="INDEX-1239" /></a><a name="INDEX-1240" /></a>Here are two examples of how to
+create Cisco RMON events. The first line creates a rising alarm,
+which facilitates sending a trap to the NMS. The second creates a
+falling alarm that might indicate that traffic has returned to an
+acceptable level (this alarm is logged, but doesn't generate a
+trap):
+</p><p>
+
+<blockquote><pre class="code">(config)#<tt class="userinput"><b>rmon event 1 log trap public description "High ifInOctets" owner dmauro</b></tt>
+(config)#<tt class="userinput"><b>rmon event 2 log description "Low ifInOctets" owner dmauro</b></tt></pre></blockquote>
+
+<a name="INDEX-1241" /></a><a name="INDEX-1242" /></a><a name="INDEX-1243" /></a>You
+can also use logging to keep track of when the events were called.
+Though you can configure traps without logging, what happens if the
+line to your NMS goes down? Logging ensures that you don't lose
+information when the NMS is disabled. We suggest using both
+<tt class="literal">log</tt> and <tt class="literal">trap</tt> on all your
+events. You can view the logs of your RMON events by issuing the
+following command on the router:
+</p><p>
+
+<blockquote><pre class="code">orarouter1# <tt class="userinput"><b>show rmon event</b></tt>
+
+Event 1 is active, owned by dmauro
+ Description is High ifInOctets
+ Event firing causes log and trap to community public, last fired 00:05:04
+ Current log entries:
+      index       time   description
+          1   00:00:31   High ifInOctets
+          2   00:05:04   High ifInOctets
+Event 2 is active, owned by dmauro
+ Description is Low ifInOctets
+ Event firing causes log, last fired 00:00:11
+ Current log entries:
+      index       time   description
+          1   00:00:11   Low ifInOctets</pre></blockquote>
+
+<a name="INDEX-1244" /></a><a name="INDEX-1245" /></a>The following command walks the
+<em class="emphasis">rmon</em> event table, which displays the values we
+just set:
+</p><p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk orarouter1 .iso.org.dod.internet.mgmt.mib-2.rmon.event.eventTable</b></tt>
+rmon.event.eventTable.eventEntry.eventIndex.1 : INTEGER: 1
+rmon.event.eventTable.eventEntry.eventIndex.2 : INTEGER: 2
+rmon.event.eventTable.eventEntry.eventDescription.1 
+                           : DISPLAY STRING- (ascii): High ifInOctets
+rmon.event.eventTable.eventEntry.eventDescription.2 
+                           : DISPLAY STRING- (ascii): Low ifInOctets
+rmon.event.eventTable.eventEntry.eventType.1 : INTEGER: log-and-trap
+rmon.event.eventTable.eventEntry.eventType.2 : INTEGER: log
+rmon.event.eventTable.eventEntry.eventCommunity.1 : OCTET STRING- (ascii): public
+rmon.event.eventTable.eventEntry.eventCommunity.2 : OCTET STRING- (ascii):
+rmon.event.eventTable.eventEntry.eventLastTimeSent.1 : Timeticks: (0) 0:00:00.00
+rmon.event.eventTable.eventEntry.eventLastTimeSent.2 : Timeticks: (0) 0:00:00.00
+rmon.event.eventTable.eventEntry.eventOwner.1 : DISPLAY STRING- (ascii):  dmauro
+rmon.event.eventTable.eventEntry.eventOwner.2 : DISPLAY STRING- (ascii):  dmauro
+rmon.event.eventTable.eventEntry.eventStatus.1 : INTEGER: valid
+rmon.event.eventTable.eventEntry.eventStatus.2 : INTEGER: valid</pre></blockquote>
+
+<a name="INDEX-1246" /></a>Most of the information we set on the
+command line is available through SNMP. We see two events, with
+indexes <tt class="literal">1</tt> and <tt class="literal">2</tt>. The first
+event has the description <tt class="literal">High</tt>
+<tt class="literal">ifInOctets</tt>; it is logged and a trap is generated;
+the community string for the event is <tt class="literal">public</tt>; the
+event's owner is <tt class="literal">dmauro</tt>; the event is
+<tt class="literal">valid</tt>, which essentially means that it is enabled;
+and we also see that the event has not yet occurred. Instead of using
+the command line to define these events, we could have used
+<i class="command">snmpset</i> either to create new events or to modify
+events we already have. If you take this route, keep in mind that you
+must set the <em class="emphasis">eventEntry.eventStatus</em> to
+<tt class="literal">1</tt>, for "valid," for the event to work
+properly.
+<a name="INDEX-1247" /></a><a name="INDEX-1248" /></a><a name="INDEX-1249" /></a><a name="INDEX-1250" /></a><a name="INDEX-1251" /></a><a name="INDEX-1252" /></a><a name="INDEX-1253" /></a><a name="INDEX-1254" /></a>
+</p><p>
+
+<a name="ch09-8-fm2xml" /></a><blockquote><b>TIP: </b> 
+You can poll the objects
+<em class="emphasis">ifDescr</em> and <em class="emphasis">ifType</em> in the
+<em class="emphasis">mgmt.interfaces.ifEntry</em> subtree to help you
+identify which instance number you should use for your devices. If
+you are using a device with multiple ports, you may need to search
+the <em class="emphasis">ifType</em>, <em class="emphasis">ifAdminStatus</em>,
+and <em class="emphasis">ifOperStatus</em> to help you identify
+what's what. In <a href="ch09_02.html#enettdg-CHP-9-SECT-2">Section 9.2, "External Polling"</a>, we will see that it is not necessary
+to keep track of these MIB variables (the external polling software
+takes care of this for us).
+</p><p>
+</blockquote>
+
+<a name="INDEX-1255" /></a><a name="INDEX-1256" /></a><a name="INDEX-1257" /></a><a name="INDEX-1258" /></a><a name="INDEX-1259" /></a>Now
+that we have our events configured, let's start configuring
+alarms to do some internal polling. We need to know what we are going
+to poll, what type of data is returned, and how often we should poll.
+Assume that the router is our default gateway to the Internet. We
+want to poll the router's second interface, which is a serial
+interface. Therefore, we want to poll
+<em class="emphasis">mgmt.interfaces.ifEntry.ifInOctets.2</em> to get the
+number of outbound octets on that interface, which is an
+<tt class="literal">INTEGER</tt> type.<a href="#FOOTNOTE-37">[37]</a> To be precise, the <em class="emphasis">ifInOctets</em> MIB
+object is defined as "The total number of octets received on
+the interface, including framing characters." (The
+<em class="emphasis">.2</em> at the end of the OID indicates the second
+entry in the <em class="emphasis">ifEntry</em> table. On our router, this
+denotes the second interface, which is the one we want to poll.) We
+want to be notified if the traffic on this interface exceeds 90,000
+octets/second; we'll assume things are back to normal when the
+traffic falls back under 85,000 octets/second. This gives us the
+rising and falling thresholds for our alarm. Next, we need to figure
+out the interval at which we are going to poll this object.
+Let's start by polling every 60 seconds.
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-37" /></a>[37]From RFC 1757, the
+<em class="emphasis">alarmVariable</em> (the object/MIB we are going to
+poll) needs to resolve to an ASN.1 primitive type of
+<tt class="literal">INTEGER</tt>, <tt class="literal">Counter</tt>,
+<tt class="literal">Gauge</tt>, or <tt class="literal">TimeTicks</tt>. </p><p>
+</blockquote>
+
+<a name="INDEX-1260" /></a>
+<a name="INDEX-1261" /></a>
+<a name="INDEX-1262" /></a>Now
+we need to put all this information into a Cisco RMON
+<i class="command">alarm</i> command. Here is the command to create an
+alarm:
+</p><p>
+
+<blockquote><pre class="code">rmon alarm number variable interval {delta | absolute} 
+    rising-threshold value [event-number] 
+    falling-threshold value [event-number] 
+    [owner string] </pre></blockquote>
+
+<a name="INDEX-1263" /></a>The
+following command discards the alarm:
+</p><p>
+
+<blockquote><pre class="code">no rmon alarm number </pre></blockquote>
+
+The parameters to these commands are:</p><p>
+
+<dl>
+<dt><b>number</b></dt>
+<dd>
+Specifies the unique identification number assigned to the alarm.</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>variable</b></dt>
+<dd>
+Specifies which MIB object to monitor.</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>interval</b></dt>
+<dd>
+<a name="INDEX-1264" /></a><a name="INDEX-1265" /></a><a name="INDEX-1266" /></a>Specifies
+the frequency at which the alarm monitors the MIB variable.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">delta</tt></b></dt>
+<dd>
+<a name="INDEX-1267" /></a><a name="INDEX-1268" /></a>Indicates that the threshold values
+given in the command should be interpreted in terms of the difference
+between successive readings.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">absolute</tt></b></dt>
+<dd>
+<a name="INDEX-1269" /></a>Indicates that the threshold values
+given in the command should be interpreted as absolute values; i.e.,
+the difference between the current value and preceding values is
+irrelevant.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">rising-threshold</tt> value event-number</b></dt>
+<dd>
+<a name="INDEX-1270" /></a>
+<a name="INDEX-1271" /></a>Specifies the value at which
+the alarm should be triggered, calling the event, when the value is
+rising. <em class="emphasis">event-number</em> is the event that should be
+called when the alarm occurs. The event number is optional because
+the threshold doesn't have to be assigned an event. If either
+of the two thresholds is left blank the event number will be set to
+0, which does nothing.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">falling-threshold</tt> value event-number</b></dt>
+<dd>
+<a name="INDEX-1272" /></a>
+<a name="INDEX-1273" /></a><a name="INDEX-1274" /></a><a name="INDEX-1275" /></a>Specifies the value at which the
+alarm should be triggered, calling the event, when the value is
+falling. <em class="emphasis">event-number</em> is the event that should
+be called when the alarm occurs. The event number is optional because
+the threshold doesn't have to be assigned an event. If either
+of the two thresholds is left blank the event number will be set to
+0, which does nothing.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b><tt class="literal">owner</tt> string</b></dt>
+<dd>
+Ties this alarm to a particular person.</p><p>
+</dd>
+
+</dl>
+
+<a name="INDEX-1276" /></a>To configure the alarm settings we just
+described, enter the following command, in
+<em class="emphasis">configuration</em> mode, on a Cisco console:
+</p><p>
+
+<blockquote><pre class="code">orarouter1(config)#<tt class="userinput"><b>rmon alarm 25 ifEntry.10.2 60 absolute \</b></tt>
+<tt class="userinput"><b>rising-threshold 90000 1 falling-threshold 85000 2 owner dmauro</b></tt></pre></blockquote>
+
+This command configures alarm number 25, which monitors the object in
+<em class="emphasis">ifEntry.10.2</em> (instance 2 of
+<em class="emphasis">ifEntry</em>.<em class="emphasis">ifInOctets</em>, or the
+input octets on interface 2) every 60 seconds. It has a rising
+threshold of 90,000 octets, which has event number 1 tied to it:
+event 1 is called when traffic on this interface exceeds 90,000
+octets/second. The falling threshold is set to 85,000 octets and has
+event number 2 tied to it. Here's how the alarm looks in the
+router's internal tables:
+</p><p>
+
+<blockquote><pre class="code">orarouter1#<tt class="userinput"><b>show rmon alarm</b></tt>
+
+Alarm 1 is active, owned by dmauro
+ Monitors ifEntry.10.2 every 60 second(s)
+ Taking absolute samples, last value was 87051
+ Rising threshold is 90000, assigned to event 1
+ Falling threshold is 85000, assigned to event 2
+ On startup enable rising or falling alarm</pre></blockquote>
+
+The last line of output says that the router will enable the alarm
+upon reboot. As you'd expect, you can also look at the alarm
+settings through the RMON MIB, beginning with the subtree
+<em class="emphasis">1.3.6.1.2.1.16</em>. As with the events themselves,
+we can create, change, edit, and delete entries using
+<i class="command">snmpset</i>.
+</p><p>
+
+<a name="INDEX-1277" /></a>
+<a name="INDEX-1278" /></a><a name="INDEX-1279" /></a><a name="INDEX-1280" /></a>One problem with internal polling is that
+getting trends and seeing the data in a graph or table is difficult.
+Even if you develop the backend systems to gather MIB objects and
+display them graphically, retrieving data is sometimes painful. The
+Multi Router Traffic Grapher (MRTG) is a great program that allows
+you to do both internal and external polling. Furthermore, it is
+designed to generate graphs of your data in HTML format. MRTG is
+covered in <a href="ch13_01.html">Chapter 13, "MRTG"</a>.<a name="INDEX-1281" /></a> <a name="INDEX-1282" /></a> <a name="INDEX-1283" /></a><a name="INDEX-1284" /></a> <a name="INDEX-1285" /></a><a name="INDEX-1286" /></a><a name="INDEX-1287" /></a><a name="INDEX-1288" /></a> <a name="INDEX-1289" /></a> <a name="INDEX-1290" /></a><a name="INDEX-1291" /></a><a name="INDEX-1292" /></a> 
+</p><p>
+
+</div>
+</div>
+</div>
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.4. Error Responses</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.2. External Polling</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:23 GMT -->
+</html>

@@ -1,0 +1,167 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+<head><title>Trace of a key match (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch04_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.4. Trace of a key match</h2>
+
+
+Now we've seen how all of the pieces <a name="INDEX-606" /> <a name="INDEX-607" />of NIS work by themselves. In reality,
+of course, the clients and servers must work together with a
+well-defined sequence of events. To fit all of the client- and
+server-side functionality into a time-sequenced picture, here is a
+walk-through the <em class="emphasis">getpwuid</em>( ) library
+<a name="INDEX-608" />call. The
+interaction of library routines and NIS daemons is shown in <a href="ch03_04.html#nfs2-CHP-3-FIG-2">Figure 3-2</a>.</p>
+
+
+<ol><li>A user runs <em class="emphasis">ls -l</em>, and the
+<em class="emphasis">ls</em> process needs to find the username
+corresponding to the UID of each file's owner. In this case,
+<em class="emphasis">ls -l</em> calls
+<em class="emphasis">getpwuid</em>(<em class="emphasis">11461</em>) to find the
+password file entry  --  and therefore username  --  for UID
+11461.</p></li><li>The local password file looks
+like this:</p>
+
+
+<blockquote><pre class="code">root:passwd:0:1:Operator:/:/bin/csh
+daemon:*:1:1::/:
+sys:*:2:2::/:/bin/csh
+bin:*:3:3::/bin:
+uucp:*:4:8::/var/spool/uucppublic:</pre></blockquote>
+
+
+The local file is checked first, but there is no UID 11461 in it.
+However, /etc/nsswitch.conf has this entry:</p>
+
+<blockquote><pre class="code">passwd:     files nis</pre></blockquote>
+
+
+which effectively appends the entire NIS password map.
+<em class="emphasis">getpwuid</em>( ) decides it needs to go to NIS for
+the password file entry.</p></li>
+
+
+<li><em class="emphasis">getpwuid</em>( ) grabs the default domain name, and
+binds the current process to a server for this domain. The bind can
+be done explicitly by calling an NIS library routine, or it may be
+done implicitly when the first NIS lookup request is issued. In
+either case, <em class="emphasis">ypbind</em> provides a server binding
+for the named domain. If the
+default<a name="INDEX-609" /> domain is
+used, <em class="emphasis">ypbind</em> returns the current binding after
+pinging the bound server. However, the calling process may have
+specified another domain, forcing <em class="emphasis">ypbind</em> to
+locate a server for it. The client may have bindings to several
+domains at any time, all of which are managed by the single
+<em class="emphasis">ypbind</em> process.</p></li>
+
+<li>The client process calls the NIS lookup RPC with
+<em class="emphasis">key=11461</em> and
+<em class="emphasis">map=passwd.byuid</em>. The request is bundled up and
+sent to the <em class="emphasis">ypserv</em> process on the bound server.</p></li><li>The server does a DBM key lookup and returns a password file entry,
+if one is found. The record is passed back to the
+<em class="emphasis">getpwuid</em>( ) routine, where it is returned to the
+calling application.</p>
+</li></ol>
+
+<a name="nfs2-CHP-3-FIG-2" /><div class="figure"><img height="471" alt="Figure 3-2" src="figs/nfs2.0302.gif" width="432" /></div><h4 class="objtitle">Figure 3-2. Trace of the getpwuid(  ) library call</h4>
+The server can return a number of errors on a lookup request.
+Obviously, the specified key might not exist in the DBM file, or the
+map file itself might not be present on the server. At a lower level,
+the RPC might generate an error if it times out before the server
+responds with an error or data; this would indicate that the server
+did not
+receive<a name="INDEX-610" />
+the request or could not process it quickly enough. Whenever an RPC
+call returns a timeout error, the low-level NIS RPC routine instructs
+<em class="emphasis">ypbind</em> to dissolve the process's binding
+for the domain.</p>
+
+
+NIS RPC calls continue trying the remote server after a timeout
+error. This happens transparently to the user-level application
+calling the NIS RPC routine; for example, <em class="emphasis">ls</em> has
+no idea that one of its calls to <em class="emphasis">getpwuid</em>( )
+resulted in an RPC timeout. The <em class="emphasis">ls</em> command just
+patiently waits for the <em class="emphasis">getpwuid</em>( ) call to
+return, and the RPC code called by <em class="emphasis">getpwuid</em>( )
+negotiates with <em class="emphasis">ypbind</em> to get the domain rebound
+and to retry the request.</p>
+
+
+Before retrying the NIS RPC that timed out, the client process
+(again, within some low-level library code) must get the domain
+rebound. Remember that <em class="emphasis">ypbind</em> keeps track of its
+current domain binding, and returns the currently bound server for a
+domain whenever a process asks to be bound. This theory of operation
+is a little too simplistic, since it would result in a client being
+immediately rebound to a server that just caused an RPC timeout.
+Instead, <em class="emphasis">ypbind</em> does a health check by pinging
+the NIS server before returning its name for the current domain
+binding. This ensures that the server has not crashed or is not the
+cause of the RPC failure. An RPC timeout could have been caused when
+the NIS packet was lost on the network or if the server was too
+heavily loaded to promptly handle the request. NIS RPC calls use the
+UDP protocol, so the network transport layer makes no guarantees
+about delivering NIS requests to the server  --  it's
+possible that some requests never reach the NIS server on their first
+transmission. Any condition that causes an RPC to time out is
+hopefully temporary, and <em class="emphasis">ypbind</em> should find the
+server responsive again on the next ping. <em class="emphasis">ypbind</em>
+will try to reach the currently bound server for several minutes
+before it decides that the server has died.</p>
+
+
+When the server health check fails, <em class="emphasis">ypbind</em>
+broadcasts a new request for NIS service for the domain. When a
+binding is dissolved because a host is overloaded or crashes, the
+rebinding generally locates a different NIS server, effecting a
+simple load balancing scheme. If no replies are received for the
+rebinding request, messages of the form:</p>
+
+
+<blockquote><pre class="code">NIS server not responding for domain "nesales"; still trying</pre></blockquote>
+
+
+appear on the console as <em class="emphasis">ypbind</em> continues
+looking for a server. At this point, the NIS client is only partially
+functional; any process that needs information from an NIS map will
+wait on the return of a valid domain binding.</p>
+
+
+Most processes need to check permissions using UIDs, find a hostname
+associated with an IP address, or make some other reference to
+NIS-managed data if they are doing anything other than purely
+CPU-bound work. A machine using NIS will not run for long once it
+loses its binding to an NIS server. It remains partially dead until a
+server appears on the network and answers <em class="emphasis">ypbind</em>
+'s broadcast requests for service. The need for
+reliable NIS service cannot be stressed enough. In the next chapter,
+we'll look at ways of using and configuring the service
+<a name="INDEX-611" />
+<a name="INDEX-612" />efficiently.</p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.3. Files managed under NIS</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4. System Management Using NIS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

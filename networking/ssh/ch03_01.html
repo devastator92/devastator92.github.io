@@ -1,0 +1,540 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:00 GMT -->
+<head><title>Inside SSH (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 3. Inside SSH</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch03-28929">Overview of Features</a><br />
+<a href="ch03_02.html">A Cryptography Primer</a><br />
+<a href="ch03_03.html">The Architecture of an SSH System</a><br />
+<a href="ch03_04.html">Inside SSH-1</a><br />
+<a href="ch03_05.html">Inside SSH-2</a><br />
+<a href="ch03_06.html">As-User Access (userfile)</a><br />
+<a href="ch03_07.html">Randomness</a><br />
+<a href="ch03_08.html">SSH and File Transfers (scp and sftp)</a><br />
+<a href="ch03_09.html">Algorithms Used by SSH</a><br />
+<a href="ch03_10.html">Threats SSH Can Counter</a><br />
+<a href="ch03_11.html">Threats SSH Doesn't Prevent</a><br />
+<a href="ch03_12.html">Summary</a><br /><p></p></div>
+
+
+
+SSH secures your data while it passes over a network, but how exactly
+does it <em class="emphasis">work</em> ? In this chapter, we move firmly
+onto technical ground and explain the inner workings of SSH.
+Let's roll up our sleeves and dive into the bits and bytes.<p></p>
+
+
+
+This chapter is written for system administrators, network
+administrators, and security professionals. Our goal is to teach you
+enough about SSH to make an intelligent, technically sound decision
+about using it. We cover the SSH-1 and SSH-2 protocols separately
+since they have important differences.<p></p>
+
+
+
+Of course, the ultimate references on <a name="INDEX-223" /></a>SSH
+are the protocol standards and the source code of an implementation.
+We don't completely analyze the protocols or recapitulate every
+step taken by the software. Rather, we summarize them to provide a
+solid, technical overview of their operation. If you need more
+specifics, you should refer to the standards documents. The SSH
+Version 2 protocol is in draft status on the IETF standards track; it
+is available at:<p></p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.ipsec.com/tech/archive/secsh.html">http://www.ipsec.com/tech/archive/secsh.html</a><p></p>
+
+<a href="http://www.ietf.org/">http://www.ietf.org/</a><p></p>
+
+</blockquote>
+
+
+
+The older protocol implemented in SSH1 and OpenSSH/1 is Version 1.5
+and is documented in a file named <em class="filename">RFC</em> included
+in the SSH1 source package.<p></p>
+
+
+
+<div class="sect1"><a name="ch03-28929" /></a>
+<h2 class="sect1">3.1. Overview of Features</h2>
+
+
+
+The <a name="INDEX-224" /></a>major
+features and guarantees of the SSH protocol are:<p></p>
+
+
+
+<ul><li><em class="emphasis">Privacy</em> of your data, via strong encryption<p></p></li><li><em class="emphasis">Integrity</em> of communications, guaranteeing they
+haven't been altered<p></p></li><li><em class="emphasis">Authentication,</em> i.e., proof of identity of
+senders and receivers<p></p></li><li><em class="emphasis">Authorization,</em> i.e., access control to accounts<p></p></li><li><em class="emphasis">Forwarding</em> or <em class="emphasis">tunneling</em> to
+encrypt other TCP/IP-based sessions<p></p></li></ul>
+<a name="ch03-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">3.1.1. Privacy (Encryption)</h3>
+
+
+
+<a name="INDEX-225" /></a>Privacy means
+protecting data from disclosure. Typical computer networks
+don't guarantee privacy; anyone with access to the network
+hardware, or to hosts connected to the network may be able to read
+(or <em class="emphasis">sniff</em> ) all data passing over the network.
+Although modern switched networks have reduced this problem in local
+area networks, it is still a serious issue; passwords are regularly
+stolen by such sniffing attacks.<p></p>
+
+
+
+SSH provides privacy by encrypting data that passes over the network.
+This end-to-end encryption is based on random keys that are securely
+negotiated for that session and then destroyed when the session is
+over. <a name="INDEX-226" /></a><a name="INDEX-227" /></a>SSH supports a variety of
+encryption algorithms for session data, including such standard
+ciphers as ARCFOUR, Blowfish, DES, IDEA, and triple-DES (3DES).<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-80506" /></a><div class="sect2">
+<h3 class="sect2">3.1.2. Integrity </h3>
+
+
+
+<a name="INDEX-228" /></a><a name="INDEX-229" /></a>Integrity means assuring that data
+transmitted from one end of a network connection arrives unaltered on
+the other side. The underlying transport of SSH, TCP/IP, does have
+integrity checking to detect alteration due to network problems
+(electrical noise, lost packets due to excessive traffic, etc.).
+Nevertheless, these methods are ineffective against deliberate
+tampering and can be fooled by a clever attacker. Even though SSH
+encrypts the data stream so an attacker can't easily change
+selected parts to achieve a specific result, TCP/IP's integrity
+checking alone can't prevent, say, an attacker's
+deliberate injection of garbage into your session.<p></p>
+
+
+
+A more complex example is a <em class="emphasis">replay
+attack.</em><a name="INDEX-230" /></a><a name="INDEX-231" /></a> Imagine that Attila the Attacker is
+monitoring your SSH session and also simultaneously watching over
+your shoulder (either physically, or by monitoring your keystrokes at
+your terminal). In the course of your work, Attila sees you type the
+command <tt class="literal">rm -rf *</tt> within a small directory. He
+can't read the encrypted SSH session data, of course, but he
+could correlate a burst of activity on that connection with your
+typing the command and capture the packets containing the encrypted
+version of your command. Later, when you're working in your
+home directory, Attila inserts the captured bits into your SSH
+session, and your terminal mysteriously erases all your files!<p></p>
+
+
+
+Attila's replay attack succeeds because the packets he inserted
+are valid; he could not have produced them himself (due to the
+encryption), but he can copy and replay them later. TCP/IP's
+integrity check is performed only on a per-packet basis, so it
+can't detect Attila's attack. Clearly, the integrity
+check must apply to the data stream as a whole, ensuring that the
+bits arrive as they were sent: in order and with no duplication.<p></p>
+
+
+
+The SSH-2 protocol uses cryptographic integrity checking, which
+verifies both that transmitted data hasn't been altered and
+that it truly comes from the other end of the connection. SSH-2 uses
+keyed hash algorithms based on MD5 and SHA-1 for this purpose: well
+known and widely trusted algorithms. SSH-1, on the other hand, uses a
+comparatively weak method: a 32-bit cyclic redundancy check (CRC-32)
+on the unencrypted data in each packet. [<a href="ch03_09.html#ch03-39382">Section 3.9.3, "Hash Functions"</a>]<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-14161" /></a><div class="sect2">
+<h3 class="sect2">3.1.3. Authentication </h3>
+
+
+
+<a name="INDEX-232" /></a>Authentication
+means verifying someone's identity. Suppose I claim to be
+Richard Silverman, and you want to authenticate that claim. If not
+much is at stake, you might just take my word for it. If you're
+a little concerned, you might ask for my driver's license or
+other photo ID. If you're a bank officer deciding whether to
+open a safe-deposit box for me, you might also require that I possess
+a physical key, and so on. It all depends on how sure you want to be.
+The arsenal of high-tech authentication techniques is growing
+constantly and includes DNA-testing microchips, retina and hand
+scanners, and voice-print analyzers.<p></p>
+
+
+
+Every SSH connection involves two authentications: the client
+verifies the identity of the SSH server (<em class="emphasis">server
+authentication</em><a name="INDEX-233" /></a><a name="INDEX-234" /></a>), and the server verifies the
+identity of the user requesting access (<em class="emphasis">user
+authentication</em><a name="INDEX-235" /></a>).
+Server authentication ensures that the SSH server is genuine, not an
+impostor, guarding against an attacker's redirecting your
+network connection to a different machine. Server authentication also
+protects against <a name="INDEX-236" /></a>man-in-the-middle attacks, wherein the
+attacker sits invisibly between you and the server, pretending to be
+the client on one side and the server on the other, fooling both
+sides and reading all your traffic in the process!<p></p>
+
+
+
+There is difference of opinion as to the granularity of server
+authentication: should it be distinguish between different server
+hosts, or between individual instances of the SSH server? That is,
+must all SSH servers running on a particular host have the same
+<a name="INDEX-237" /></a>host key, or might they
+have different ones? The term "host key," of course,
+reflects a bias towards the first interpretation, which SSH1 and
+OpenSSH follow: their known-hosts lists can only associate a single
+key with any particular hostname. SSH2, on the other hand, uses the
+second approach: "host keys" are actually associated with
+individual listening sockets, allowing multiple keys per host. This
+may reflect a pragmatic need rather than a considered change in
+principle. When SSH2 first appeared, it supported only DSA host keys,
+whereas SSH-1 supports only RSA keys. It was therefore impossible, as
+a matter of implementation, for a single host to run both SSH-1 and
+SSH2 servers and have them share a host key.<p></p>
+
+
+
+User authentication is traditionally done with
+<a name="INDEX-238" /></a>passwords, which unfortunately are a
+weak authentication scheme. To prove your identity you have to reveal
+the password, exposing it to possible theft. Additionally, in order
+to remember a password, people are likely to keep it short and
+meaningful, which makes the password easier for third parties to
+guess. For longer passwords, some people choose words or sentences in
+their native languages, and these passwords are likely to be
+crackable. From the standpoint of information theory, grammatical
+sentences contain little real information (technically known as
+<em class="emphasis">entropy</em><a name="INDEX-239" /></a>):
+generally less than two bits per character in English text, far less
+than the 8 -16 bits per character found in computer encodings.<p></p>
+
+
+
+SSH supports authentication by password, encrypting the password as
+it travels over the network. This is a vast improvement over other
+common remote-access protocols (Telnet, FTP) which generally send
+your password in the clear (i.e., unencrypted) over the network,
+where anyone with sufficient network access can steal it!
+Nevertheless, it's still only simple password authentication,
+so SSH provides other stronger and more manageable mechanisms:
+per-user public-key signatures, and an improved
+<tt class="command">rlogin</tt>-style authentication, with host identity
+verified by public key. In addition, various SSH implementations
+support some other systems, including Kerberos, RSA Security's
+SecurID tokens, S/Key one-time passwords, and the
+<a name="INDEX-240" /></a><a name="INDEX-241" /></a>Pluggable Authentication
+Modules (PAM) system. An SSH client and server negotiate to determine
+which authentication mechanism to use, based on their configurations.
+SSH2 can even require multiple forms of authentication.<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-4-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">3.1.4. Authorization</h3>
+
+
+
+<a name="INDEX-242" /></a>Authorization
+means deciding what someone may or may not do. It occurs after
+authentication, since you can't grant someone privileges until
+you know who she is. SSH servers have various ways of restricting
+clients' actions. Access to interactive login sessions, TCP
+port and X window forwarding, key agent forwarding, etc., can all be
+controlled, though not all these features are available in all SSH
+implementations, and they aren't always as general or flexible
+as you might want. Authorization may be controlled at a serverwide
+level (e.g., the <em class="filename">/etc/sshd_config</em> file for
+SSH1), or per account, depending on the authentication method used
+(e.g., each user's files
+<em class="filename">~/.ssh/authorized_keys</em>,
+<em class="filename">~/.ssh2/authorization</em>,
+<em class="filename">~/.shosts</em>, <em class="filename">~/.k5login</em>,
+etc.).<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-5-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">3.1.5. Forwarding ( Tunneling)</h3>
+
+
+
+<a name="INDEX-243" /></a><a name="INDEX-244" /></a>Forwarding
+or tunneling means encapsulating another TCP-based service, such as
+Telnet or IMAP, within an SSH session. This brings the security
+benefits of SSH (privacy, integrity, authentication, authorization)
+to other TCP-based services. For example, an ordinary Telnet
+connection transmits your username, password, and the rest of your
+login session in the clear. By forwarding <tt class="command">telnet</tt>
+through SSH, all of this data is automatically encrypted and
+integrity-checked, and you may authenticate using SSH credentials.<p></p>
+
+
+
+SSH supports three types of forwarding. General TCP
+<a name="INDEX-245" /></a>port
+forwarding operates as described earlier for any TCP-based service.
+[<a href="ch09_02.html#ch09-59902">Section 9.2, "Port Forwarding"</a>] <a name="INDEX-246" /></a>X forwarding comprises additional
+features for securing the X protocol (i.e., X windows). [<a href="ch09_03.html#ch09-93428">Section 9.3, "X Forwarding"</a>] The third type, <a name="INDEX-247" /></a>agent forwarding, permits SSH clients
+to access SSH public keys on remote machines. [<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>]<p></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.8. Summary</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.2. A Cryptography Primer</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:05 GMT -->
+</html>

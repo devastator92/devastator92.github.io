@@ -1,0 +1,635 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Remote procedure call tools (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.3. Remote procedure call tools</h2>
+
+
+Network failures on a grand scale are generally<a name="INDEX-2048" />
+caused by problems at the MAC or IP level, and are immediately
+noticed by users. Problems involving higher layers of the network
+protocol stack manifest themselves in more subtle ways, affecting
+only a few machines or particular pairs of clients and servers. The
+utilities discussed in the following sections analyze functionality
+from the remote procedure call (RPC) layer up through the NFS or NIS
+application layer. The next section contains a detailed examination
+of the RPC mechanism at the heart of NFS and NIS.</p>
+
+
+<a name="nfs2-CHP-13-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">13.3.1. RPC mechanics</h3>
+
+
+The Remote Procedure Call (RPC) mechanism <a name="INDEX-2049" />imposes
+a client/server relationship on machines in a network. A server is a
+host that physically owns some shared resource, such as a disk
+exported for NFS service or an NIS map. Clients operate on resources
+owned by servers by making RPC requests; these operations appear (to
+the client) to have been executed locally. For example, when
+performing a read RPC on an NFS-mounted disk, the reading application
+has no knowledge of where the read is actually executed. Many
+client-server relationships may be defined for each machine on a
+network; a server for one resource is often a client for many others
+in the same network.</p>
+
+
+<a name="nfs2-CHP-13-SECT-3.1.1" /><div class="sect3">
+<h3 class="sect3">13.3.1.1. Identifying RPC services</h3>
+
+
+Services available through RPC are
+<a name="INDEX-2050" />identified
+by four values:</p>
+
+
+<ul><li>Program number</p></li><li>Version number</p></li><li>Procedure number</p></li><li>Protocol (UDP or TCP)</p></li></ul>
+The program number uniquely identifies the RPC service. Each RPC
+service, such as the <em class="emphasis">mountd</em> or NIS server
+daemons, is assigned a <a name="INDEX-2051" />program number. The file
+<em class="emphasis">/etc/rpc</em> and the <em class="emphasis">rpc</em> NIS
+map contain an enumeration of RPC program numbers, formal names, and
+nicknames for each service:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from /etc/rpc:</i>
+nfs             100003  nfsprog
+ypserv          100004  ypprog
+mountd          100005  mount showmount
+ypbind          100007</pre></blockquote>
+
+
+Note that program 100005, <em class="emphasis">mountd</em>, has two names,
+reflecting the fact that the <em class="emphasis">mountd</em> daemon
+services both <em class="emphasis">mount</em> requests and the
+<a name="INDEX-2052" /><em class="emphasis">showmount</em> utility.</p>
+
+
+Program numbers can also be expressed in hexadecimal. Well-known RPC
+services such as NFS and NIS are assigned reserved program numbers in
+the range 0x0 to 0x199999. Numbers above this range may be assigned
+to local applications such as license servers. The well-known
+programs are commonly expressed in decimal, though.</p>
+
+
+A version number is <a name="INDEX-2053" />used
+to differentiate between various flavors of the same service, and is
+mostly utilized to evolve the service over time, while providing
+backwards compatibility if so desired. For example, there are two
+versions of the NFS service: Versions 2 and 3 (there is no Version
+1). Each version of the program may be composed of many procedures.
+Each version of the NFS service, program number 100003, consists of
+several procedures, each of which is assigned a procedure number.
+These procedures perform client requests on the NFS server. For
+example: read a directory, create a file, read a block from a file,
+write to a file, get the file's attributes, or get statistics
+about a filesystem. The procedure number is passed in an RPC request
+as an "op code" for the RPC server. Procedure numbers
+start with 1; procedure 0 is reserved for a "null"
+function. While RPC program numbers are well-advertised, version and
+procedure numbers are particular to the service and often are
+contained in a header file that gets compiled into the client
+program. NFS procedure numbers, for example, are defined in the
+header files <em class="emphasis">/usr/include/nfs/nfs.h</em>.</p>
+
+
+RPC clients and servers deal exclusively with RPC program numbers. At
+the session layer in the protocol stack, the code doesn't
+really care what protocols are used to provide the session services.
+The UDP and TCP transport protocols need port numbers to identify the
+local and remote ends of a connection. The portmapper is used to
+perform translation between the RPC program number-based view of the
+world and the TCP/UDP port numbers.</p>
+</div>
+
+
+
+<a name="nfs2-CHP-13-SECT-3.1.2" /><div class="sect3">
+<h3 class="sect3">13.3.1.2. RPC portmapper  --  rpcbind</h3>
+
+
+The <em class="emphasis">rpcbind</em> daemon (also known as the
+portmapper),<a href="#FOOTNOTE-32">[32]</a> exists<a name="INDEX-2054" /> <a name="INDEX-2055" /> <a name="INDEX-2056" />
+<a name="INDEX-2057" />
+to register RPC services and to provide their IP port numbers when
+given an RPC program number. <em class="emphasis">rpcbind</em> itself is
+an RPC service, but it resides at a well-known IP port (port 111) so
+that it may be contacted directly by remote hosts. For example, if
+host <em class="emphasis">fred</em> needs to mount a filesystem from host
+<em class="emphasis">barney</em>, it must send an RPC request to the
+<em class="emphasis">mountd</em> daemon on <em class="emphasis">barney</em>.
+The mechanics of making the RPC request are as follows:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-32" />[32]The <em class="emphasis">rpcbind</em> daemon
+and the old portmapper provide the same RPC service. The portmapper
+implements Version 2 of the portmap protocol (RPC program number
+100000), where the <em class="emphasis">rpcbind</em> daemon implements
+Versions 3 and 4 of the protocol, in addition to Version 2. This
+means that the <em class="emphasis">rpcbind</em> daemon already implements
+the functionality provided by the old portmapper. Due to this overlap
+in functionality and to add to the confusion, many people refer to
+the <em class="emphasis">rpcbind</em> daemon as the portmapper.</p>
+
+</blockquote>
+
+
+<ul><li><em class="emphasis">fred</em> gets the IP address for
+<em class="emphasis">barney</em>, using the <em class="emphasis">ipnodes</em>
+NIS map. <em class="emphasis">fred</em> also looks up the RPC program
+number for <em class="emphasis">mountd</em> in the
+<em class="emphasis">rpc</em> NIS map. The RPC program number for
+<em class="emphasis">mountd</em> is 100005.</p></li><li>Knowing that the portmapper lives at port 111,
+<em class="emphasis">fred</em> sends an RPC request to the portmapper on
+<em class="emphasis">barney</em>, asking for the IP port (on
+<em class="emphasis">barney</em>) of RPC program 100005.
+<em class="emphasis">fred</em> also specifies the particular protocol and
+version number for the RPC service. <em class="emphasis">barney</em>
+'s portmapper responds to the request with port 704,
+the IP port at which <em class="emphasis">mountd</em> is listening for
+incoming mount RPC requests over the specified protocol. Note that it
+is possible for the portmapper to return an error, if the specified
+program does not exist or if it hasn't been registered on the
+remote host. <em class="emphasis">barney</em>, for example, might not be
+an NFS server and would therefore have no reason to run the
+<em class="emphasis">mountd</em> daemon.</p></li><li><em class="emphasis">fred</em> sends a <em class="emphasis">mount</em> RPC
+request to <em class="emphasis">barney</em>, using the IP port number
+returned by the portmapper. This RPC request contains an RPC
+procedure number, which tells the <em class="emphasis">mountd</em> daemon
+what to do with the request. The RPC request also contains the
+parameters for the procedure, in this case, the name of the
+filesystem <em class="emphasis">fred</em> needs to mount.</p></li></ul>
+The portmapper is also used to handle an <em class="emphasis">RPC
+broadcast</em>. Recall that a network broadcast is a packet
+that is sent to all hosts on the network; an RPC broadcast is a
+request that is sent to all servers for a particular RPC service. For
+example, the NIS client <em class="emphasis">ypbind</em> daemon uses an
+RPC broadcast to locate an NIS server for its domain. There's
+one small problem with RPC broadcasts: to send a broadcast packet, a
+host must fill in the remote port number, so all hosts receiving the
+packet know where to deliver the broadcast packet. RPC doesn't
+have any knowledge of port numbers, and the RPC server daemons on
+some hosts may be registered at different port numbers. This problem
+is resolved by sending RPC broadcasts to the portmapper, and asking
+the portmapper to make the RPC call indirectly on behalf of the
+sender. In the case of the <em class="emphasis">ypbind</em> daemon, it
+sends a broadcast to all <em class="emphasis">rpcbind</em> daemons; they
+in turn call the <em class="emphasis">ypserv</em> RPC server on <a name="INDEX-2058" /> <a name="INDEX-2059" /> <a name="INDEX-2060" /> <a name="INDEX-2061" />each host.</p>
+</div>
+
+
+
+<a name="nfs2-CHP-13-SECT-3.1.3" /><div class="sect3">
+<h3 class="sect3">13.3.1.3. RPC version numbers</h3>
+
+
+As mentioned before, each new implementation of<a name="INDEX-2062" /> <a name="INDEX-2063" /> an RPC server
+has its own version number. Different version numbers are used to
+coordinate multiple implementations of the same service, each of
+which may have a different interface. As an RPC service matures, the
+service's author may find it necessary to add new procedures or
+add arguments to existing procedures. Changing the interface in this
+way requires incrementing the version number. The first (and
+earliest) version of an RPC program is version 1; subsequent releases
+of the server should use consecutive version numbers. For example,
+the mount service has several versions, each one supporting more
+options than its predecessors.</p>
+
+
+Multiple versions are implemented in a single server process; there
+doesn't need to be a separate instance of the RPC server daemon
+for each version supported. Each RPC server daemon registers its RPC
+program number and all versions it supports with the portmapper. It
+is helpful to think of dispatching a request through an RPC server as
+a two-level switch: the first level discriminates on the version
+number, and chooses a set of procedure routines comprising that
+version of the RPC service. The second level dispatch invokes one of
+the routines in that set based on the program number in the RPC
+request.</p>
+
+
+When contacting the portmapper
+on<a name="INDEX-2064" />
+<a name="INDEX-2065" /> a
+remote host, the local and remote sides must agree on the version
+number of the RPC service that will be used. The rule of thumb is to
+use the highest-numbered version that both parties understand. In
+cases where version numbers are not consecutively numbered, or no
+mutually agreeable version number can be found, the portmapper
+returns a <em class="emphasis">version mismatch</em> error looking like:</p>
+
+
+<blockquote><pre class="code">mount: RPC: Program version mismatch</pre></blockquote>
+
+
+Even though Solaris supports Transport-Independent RPC (TI-RPC),
+in<a name="INDEX-2066" /> reality most RPC services use the TCP, UDP
+and loopback transport protocols. Servers may register themselves for
+any of the protocols, depending upon the varieties of connections
+they need to support. UDP packets are unreliable and unsequenced and
+are often used for broadcast or stateless services. The RPC server
+for the <em class="emphasis">spray</em> utility, which
+"catches" packets thrown at the remote host, uses the UDP
+protocol to accept as many requests as it can without requiring
+retransmission of any missed packets. In contrast to UDP, TCP packets
+are reliably delivered and are presented in the order in which they
+were transmitted, making them a requirement when requests must be
+processed by the server in the order in which they were transmitted
+by the client. The loopback transports are used for communication
+within the local host and can be connection-less or
+connection-oriented. For example, the automounter daemon uses RPC
+over a connection-oriented loopback transport to communicate with the
+local kernel.</p>
+
+
+RPC servers listen on the ports they have registered with the
+portmapper, and are used repeatedly for short-lived sessions.
+Connections to an RPC server may exist for the duration of the RPC
+call only, or may remain across calls. They do not usually fork new
+processes for each request, since the overhead of doing so would
+significantly impair the performance of RPC-intensive services such
+as NFS. Many RPC servers are multithreaded, such as NFS in Solaris,
+which allows the server to have multiple NFS requests being processed
+in parallel. A multithreaded NFS server can take advantage of
+multiple disks and disk controllers, it also allows
+"fast" NFS requests such as attribute or<a name="INDEX-2067" /> name lookups to not
+get trapped behind slower disk<a name="INDEX-2068" /> <a name="INDEX-2069" /> requests.</p>
+</div>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">13.3.2. RPC registration</h3>
+
+
+Making RPC calls is a reasonably complex affair <a name="INDEX-2070" />
+<a name="INDEX-2071" />because there are several places for the
+procedure to break down. The <em class="emphasis">rpcinfo</em> utility is
+an analog of <em class="emphasis">ping</em> that queries RPC servers and
+their registration with the portmapper. Like
+<em class="emphasis">ping</em>, <em class="emphasis">rpcinfo</em> provides a
+measure of basic connectivity, albeit at the session layer in the
+network protocol stack. Pinging a remote machine ensures that the
+underlying physical network and IP address handling are correct;
+using <em class="emphasis">rpcinfo</em> to perform a similar test verifies
+that the remote machine is capable of accepting and replying to an
+RPC request.</p>
+
+
+<em class="emphasis">rpcinfo</em> can be used to detect and debug
+a<a name="INDEX-2072" /> <a name="INDEX-2073" />
+<a name="INDEX-2074" />
+variety of failures:</p>
+
+
+<ul><li>"Dead" or hung servers caused by improper configuration
+or a failed daemon</p></li><li>RPC program version number mismatches between client and server</p></li><li>Bogus or renegade RPC servers, such as an NIS server that does not
+have valid maps for the domain it pretends to serve</p></li><li>Broadcast-related problems</p></li></ul>
+In its simplest usage, <em class="emphasis">rpcinfo -p</em> takes a remote
+hostname (or uses the local hostname if none is specified) and
+queries the portmapper on that host for all registered RPC services:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rpcinfo -p corvette</b></tt> 
+   program vers proto   port  service
+    100000    4   tcp    111  portmapper
+    100000    3   tcp    111  portmapper
+    100000    2   tcp    111  portmapper
+    100000    4   udp    111  portmapper
+    100000    3   udp    111  portmapper
+    100000    2   udp    111  portmapper
+    100024    1   udp  32781  status
+    100024    1   tcp  32775  status
+    100011    1   udp  32787  rquotad
+    100002    2   udp  32789  rusersd
+    100002    3   udp  32789  rusersd
+    100002    2   tcp  32777  rusersd
+    100002    3   tcp  32777  rusersd
+    100021    1   udp   4045  nlockmgr
+    100021    2   udp   4045  nlockmgr
+    100021    3   udp   4045  nlockmgr
+    100021    4   udp   4045  nlockmgr
+    100021    1   tcp   4045  nlockmgr
+    100021    2   tcp   4045  nlockmgr
+    100021    3   tcp   4045  nlockmgr
+    100021    4   tcp   4045  nlockmgr
+    100012    1   udp  32791  sprayd
+    100008    1   udp  32793  walld
+    100001    2   udp  32795  rstatd
+    100001    3   udp  32795  rstatd
+    100001    4   udp  32795  rstatd
+    100068    2   udp  32796  cmsd
+    100068    3   udp  32796  cmsd
+    100068    4   udp  32796  cmsd
+    100068    5   udp  32796  cmsd
+    100005    1   udp  32810  mountd
+    100005    2   udp  32810  mountd
+    100005    3   udp  32810  mountd
+    100005    1   tcp  32795  mountd
+    100005    2   tcp  32795  mountd
+    100005    3   tcp  32795  mountd
+    100003    2   udp   2049  nfs
+    100003    3   udp   2049  nfs
+    100227    2   udp   2049
+    100227    3   udp   2049
+    100003    2   tcp   2049  nfs
+    100003    3   tcp   2049  nfs
+    100227    2   tcp   2049
+    100227    3   tcp   2049</pre></blockquote>
+
+
+The output from <em class="emphasis">rpcinfo</em> shows the RPC program
+and version numbers, the protocols supported, the IP port used by the
+RPC server, and the name of the RPC service. Service names come from
+the <em class="emphasis">rpc.bynumber</em> NIS map; if no name is printed
+next to the registration information then the RPC program number does
+not appear in the map. This may be expected for third-party packages
+that run RPC server daemons, since the hardware vendor creating the
+<em class="emphasis">/etc/rpc</em> file doesn't necessarily list all
+of the software vendors' RPC numbers. However, a well-known RPC
+service should be listed properly. Missing RPC service names could
+indicate a corrupted or incomplete <em class="emphasis">rpc.bynumber</em>
+NIS map. One exception is the NFS ACL service, defined as RPC program
+100227. Solaris does not list it in <em class="emphasis">/etc/rpc</em>,
+and therefore its name is not printed in the previous output. The NFS
+ACL service implements the protocol used between Solaris hosts to
+exchange ACL (Access Control List) information, though it is
+currently only interoperable between Solaris hosts. If the client or
+server do not implement the service, then traditional Unix file
+access control based on permission bits is used.</p>
+
+
+If the portmapper on the remote machine has died or is not accepting
+connections for some reason, <em class="emphasis">rpcinfo</em> times out
+attempting to reach it and reports the error. This is a good first
+step toward diagnosing any RPC-related problem: verify that the
+remote portmapper is alive and returning valid RPC service
+registrations.</p>
+
+
+<em class="emphasis">rpcinfo</em> can also be used like
+<em class="emphasis">ping</em> for a particular RPC server:</p>
+
+
+<blockquote><pre class="code">rpcinfo -u host program version           UDP-based services 
+rpcinfo -t host program version           TCP-based services</pre></blockquote>
+
+
+The <em class="emphasis">-u</em> or <em class="emphasis">-t</em> parameter
+specifies the transport protocol to be used  --  UDP or TCP,
+respectively. The hostname must be specified, even if the local host
+is being queried. Finally, the RPC program and version number are
+given; the program may be supplied by name (one reported by
+<em class="emphasis">rpcinfo -p</em>) or by explicit numerical value.</p>
+
+
+As a practical example, consider trying to mount an NFS filesystem
+from server <em class="emphasis">mahimahi</em>. You can mount it
+successfully, but attempts to operate on its files hang the client.
+You can use <em class="emphasis">rpcinfo</em> to check on the status of
+the NFS RPC daemons on <em class="emphasis">mahimahi</em>:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rpcinfo -u mahimahi nfs 2</b></tt> 
+program 100003 version 2 ready and waiting</pre></blockquote>
+
+
+In this example, the NFS v2 RPC service is queried on remote host
+<em class="emphasis">mahimahi</em>. Since the service is specified by
+name, <em class="emphasis">rpcinfo</em> looks it up in the
+<em class="emphasis">rpc</em> NIS map. The <em class="emphasis">-u</em> flag
+tells <em class="emphasis">rpcinfo</em> to use the UDP protocol. If the
+<em class="emphasis">-t</em> option had been specified instead,
+<em class="emphasis">rpcinfo</em> would have reported the status of the
+NFS over TCP service. At the time of this writing, a handful of
+vendors still do not support NFS over TCP, therefore a
+<em class="emphasis">-t</em> query to one of their servers would report
+that <em class="emphasis">rpcinfo</em> could not find a registration for
+the service using such a protocol.</p>
+
+
+<em class="emphasis">rpcinfo -u</em> and <em class="emphasis">rpcinfo -t</em>
+call the null procedure (procedure 0) of the RPC server. The null
+procedure normally does nothing more than return a zero-length reply.
+If you cannot contact the null procedure of a server, then the health
+of the server daemon process is suspect. If the daemon never started
+running, <em class="emphasis">rpcinfo</em> would have reported that it
+couldn't find the server daemon at all. If
+<em class="emphasis">rpcinfo</em> finds the RPC server daemon but
+can't get a null procedure reply from it, then the <a name="INDEX-2075" /> <a name="INDEX-2076" /> <a name="INDEX-2077" />daemon is <a name="INDEX-2078" /> <a name="INDEX-2079" />probably hung.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">13.3.3. Debugging RPC problems</h3>
+
+
+In the previous examples, we used <em class="emphasis">rpcinfo</em> to see
+if a particular service<a name="INDEX-2080" />
+<a name="INDEX-2081" /> was registered or not. If the RPC
+service is not registered, or if you can't reach the RPC server
+daemon, it's likely there is a low-level problem in the
+network. However, sometimes you reach an RPC server, but you find the
+wrong one or it gives you the wrong answer. If you have a
+heterogeneous environment and are running multiple versions of each
+RPC service, it's possible to get RPC version number mismatch
+errors.</p>
+
+
+These problems affect NIS and diskless client booting; they are best
+sorted out by using <em class="emphasis">rpcinfo</em> to emulate an RPC
+call and by observing server responses. Networks with multiple,
+heterogeneous servers may produce multiple, conflicting responses to
+the same broadcast request. Debugging problems that arise from this
+behavior often require knowing the order in which the responses are
+received.</p>
+
+
+Here's an example: we'll perform a broadcast and then
+watch the order in which responses are received. When a diskless
+client boots, it may receive several replies to a request for boot
+parameters. The boot fails if the first reply contains incorrect or
+invalid boot parameter information. <em class="emphasis">rpcinfo -b</em>
+sends a broadcast request to the specified RPC program and version
+number. The RPC program can either be specified in numeric (100026)
+form, or in its name equivalent (bootparam):</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rpcinfo -b bootparam 1</b></tt>
+fe80::a00:20ff:feb5:1fba.128.67           unknown
+fe80::a00:20ff:feb9:2ad1.128.78           unknown
+131.40.52.238.128.67                      mora
+131.40.52.81.128.68                       kanawha
+131.40.52.221.128.79                      holydev
+<i class="lineannotation">Next Broadcast</i>
+% <tt class="userinput"><b>rpcinfo -b bootparam 1</b></tt>
+131.40.52.81.128.68                       kanawha
+fe80::a00:20ff:feb5:1fba.128.67           unknown
+131.40.52.238.128.67                      mora
+fe80::a00:20ff:feb9:2ad1.128.78           unknown
+
+131.40.52.221.128.79                      holydev
+<i class="lineannotation">Next Broadcast</i></pre></blockquote>
+
+
+In this example, a broadcast packet is sent to the boot parameter
+server (bootparam). <em class="emphasis">rpcinfo</em> obtains the RPC
+program number (100026) from <em class="emphasis">/etc/rpc</em> or the
+<em class="emphasis">rpc.bynumber</em> NIS map (depending on
+<em class="emphasis">/etc/nsswitch.conf</em> ). Any host that is running
+the boot parameter server replies to the broadcast with the standard
+null procedure "empty" reply. The <em class="emphasis">universal
+address</em> for the RPC service is printed by the requesting
+host in the order in which replies are received from these hosts (see
+the sidebar). After a short interval, another broadcast is sent.</p>
+
+
+<a name="ch13-5-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Universal addresses</h4>
+
+
+A universal address identifies the location of a transport endpoint.
+For UDP and TCP, it is composed of the dotted IP address with the
+port number of the service appended. In this example, the host
+<em class="emphasis">kanawha</em> has a universal address of
+131.40.52.81.128.68.</p>
+
+
+The first four elements in the dotted string form the IP address of
+the server <em class="email">kanawha</em>:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypmatch 131.40.52.81
+hosts.byaddr</b></tt>
+131.40.52.81   kanawha</pre></blockquote>
+
+
+The last two elements, "128.68", are the high and low
+octets of the port on which the service is registered (32836). This
+number is obtained by multiplying the high octet value by 2^8 and
+adding it to the low octet value:</p>
+
+
+<blockquote><pre class="code">128 * 2^8 = 32768   <i class="lineannotation">(high
+octet)</i>
++                68   <i class="lineannotation">(low octet)</i>
+-----
+32836   <i class="lineannotation">(decimal representation of port)</i></pre></blockquote>
+
+
+<em class="emphasis">rpcinfo</em> helps us verify that
+<em class="emphasis">bootparam</em> is indeed registered on port 32836:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rpcinfo -p kanawha | grep
+bootparam</b></tt>
+100026 1 udp 32836 bootparam</pre></blockquote>
+
+</td></tr></table><p></blockquote>
+
+Server loading may cause the order of replies between successive
+broadcasts to vary significantly. A busy server takes longer to
+schedule the RPC server and process the request. Differing reply
+sequences from RPC servers are not themselves indicative of a
+problem, if the servers all return the correct information. If one or
+more servers has incorrect information, though, you will see
+irregular failures. A machine returning correct information may not
+always be the first to deliver a response to a client broadcast, so
+sometimes the client gets the wrong response.</p>
+
+
+In the last example (diskless client booting), a client that gets the
+wrong response won't boot. The boot failures may be very
+intermittent due to variations in server loading: when the server
+returning an invalid reply is heavily loaded, the client will boot
+without problem. However, when the servers with the correct
+information are loaded, then the client gets an invalid set of boot
+parameters and cannot start booting a kernel.</p>
+
+
+Binding to the wrong NIS server causes another kind of problem. A
+renegade NIS server may be the first to answer a
+<em class="emphasis">ypbind</em> broadcast for NIS service, and its lack
+of information about the domain makes the client machine unusable.
+Sometimes, just looking at the list of servers that respond to a
+request may flag a problem, if you notice that one of the servers
+should not be answering the broadcast:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rpcinfo -b ypserv 1</b></tt> 
+131.40.52.138.3.255      poi 
+131.40.52.27.3.166       onaga 
+131.40.52.28.3.163       mahimahi</pre></blockquote>
+
+
+In this example, all NIS servers on the local network answer the
+<em class="emphasis">rpcinfo</em> broadcast request to the null procedure
+of the <em class="emphasis">ypserv</em> daemon. If
+<em class="emphasis">poi</em> should not be an NIS server, then the
+network will be prone to periods of intermittent failure if clients
+bind to it. Failure to fully decommission a host as an NIS server
+ --  leaving empty NIS map directories, for example  --  may
+cause this problem.</p>
+
+
+There's another possibility for NIS failure that
+<em class="emphasis">rpcinfo</em> cannot detect: there may be NIS servers
+on the network, but no servers for the client's NIS domain. In
+the previous example, <em class="emphasis">poi</em> may be a valid NIS
+server in another domain, in which case it is operating properly by
+responding to the <em class="emphasis">rpcinfo</em> broadcast. You might
+not be able to get <em class="emphasis">ypbind</em> started on an NIS
+client because all of the servers are in the wrong domain, and
+therefore the client's broadcasts are not answered. The
+<em class="emphasis">rpcinfo -b</em> test is a little misleading because
+it doesn't ask the NIS RPC daemons what domains they are
+serving, although the client's requests will be
+domain-specific. Check the servers that reply to an <em class="emphasis">rpcinfo
+-b</em> and ensure that they serve the NIS domain used by the
+clients experiencing NIS failures.</p>
+
+
+If a client cannot find an NIS server, <em class="emphasis">ypbind</em>
+hangs the boot sequence with errors of the form:</p>
+
+
+<blockquote><pre class="code">WARNING: Timed out waiting for NIS to come up</pre></blockquote>
+
+
+Using <em class="emphasis">rpcinfo</em> as shown helps to determine why a
+particular client cannot start the NIS service: if no host replies to
+the <em class="emphasis">rpcinfo</em> request, then the broadcast packet
+is failing to reach any NIS servers. If the NIS domain name and the
+broadcast address are correct, then it may be necessary to override
+the broadcast-based search and hand <em class="emphasis">ypbind</em> the
+name and address of a valid NIS server. Tools for examining and
+altering<a name="INDEX-2082" />
+<a name="INDEX-2083" /> NIS
+bindings <a name="INDEX-2084" />are the subject of the next section.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.2. MAC and IP layer tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.4. NIS tools</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

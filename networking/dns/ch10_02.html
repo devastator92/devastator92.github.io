@@ -1,0 +1,581 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>DNS Dynamic Update (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.2. DNS Dynamic Update</h2>
+
+
+<a name="INDEX-1529" />
+<a name="INDEX-1530" />The
+<a name="INDEX-1531" />world of the Internet -- and of TCP/IP
+networking in general -- has become a much more dynamic place.
+Most large corporations use <a name="INDEX-1532" />DHCP to assign IP addresses
+dynamically. Nearly all ISPs assign addresses to dialup and cable
+modem customers using DHCP. To keep up, DNS needed to support the
+dynamic addition and deletion of records. <a name="INDEX-1533" />RFC 2136 introduced this mechanism, called
+DNS Dynamic Update.</p><p>
+
+
+BIND 8 and 9 support the dynamic update facility described in RFC
+2136. This permits authorized updaters to add and delete
+<a name="INDEX-1534" />resource records from a zone for
+which a name server is authoritative. An updater can find the
+authoritative name servers for a zone by retrieving the zone's
+NS records. If the name server receiving an authorized update message
+is not the primary master for the zone, it forwards the update
+"upstream" to its master server, a process referred to as
+"<a name="INDEX-1535" />update forwarding." If this
+next server, in turn, is a slave for the zone, it also forwards the
+update upstream. Only the primary master name server for a zone,
+after all, has a "writable" copy of the zone data; all of
+the slaves get their copies of the zone data from the primary master,
+either directly or indirectly (through other slaves). Once the
+primary master has processed the dynamic update and modified the
+zone, the slaves can get a new copy of it via zone transfers.</p><p>
+
+
+Dynamic update permits more than the simple addition and deletion of
+records. Updaters can add or delete individual resource records,
+delete <a name="INDEX-1536" />RRsets (a set of resource records with the
+same domain name, class, and type, such as all the addresses of
+<em class="emphasis">www.movie.edu</em>), or even delete all records
+associated with a given domain name. An update can also stipulate
+that certain records exist or not exist in the zone as a prerequisite
+to the update's taking effect. For example, an update can add
+the address record:</p><p>
+
+
+<blockquote><pre class="code">armageddon.fx.movie.edu.  300  IN  A  192.253.253.15</pre></blockquote>
+
+
+only if the domain name <em class="emphasis">armageddon.fx.movie.edu</em>
+isn't currently being used or only if
+<em class="emphasis">armageddon.fx.movie.edu</em> currently has no address
+records.</p><p>
+
+
+
+<a name="ch10-4-fm2xml" /><blockquote><b>TIP: </b>
+A note on update forwarding: BIND name servers didn't implement
+update forwarding before 9.1.0, so it's particularly important
+when using BIND name servers older than 9.1.0 that you make sure the
+update is sent directly to the primary master name server for the
+zone you're trying to update. You can do this by ensuring that
+the primary master name server for the zone is listed in the MNAME
+field of the zone's SOA record. Most dynamic update routines
+use the MNAME field as a hint to tell them which of the authoritative
+name servers to send the update to.</p><p>
+
+</blockquote>
+
+For the most part, dynamic update functionality is used by programs
+like DHCP servers that assign IP addresses automatically to computers
+and then need to register the resulting <a name="INDEX-1537" />name-to-address and <a name="INDEX-1538" />address-to-name mappings. Some of these
+programs use the new <em class="emphasis">ns_update( )
+</em><a name="INDEX-1539" />resolver routine to create update
+messages and send them to an authoritative server for the zone that
+contains the domain name.</p><p>
+
+
+<a name="INDEX-1540" /> <a name="INDEX-1541" />It's
+also possible to create updates manually with the command-line
+program <em class="emphasis">nsupdate</em>, which is part of the standard
+BIND distribution. <em class="emphasis">nsupdate</em> reads one-line
+commands and translates them into an update message. Commands can be
+specified on standard input (the default) or in a file, whose name
+must be given as an argument to <em class="emphasis">nsupdate</em>.
+Commands not separated by a blank line are incorporated into the same
+update message, as long as there's room.</p><p>
+
+
+<a name="INDEX-1542" /><em class="emphasis">nsupdate</em>
+understands the following commands:</p><p>
+
+
+<dl>
+<dt><i>prereq yxrrset domain name type [rdata]</i></dt>
+<dd>Makes the existence of an RRset of type <em class="emphasis">type</em>
+owned by <em class="emphasis">domain name</em> a prerequisite for
+performing the update specified in successive
+<em class="emphasis">update</em> commands. If <em class="emphasis">rdata</em>
+is specified, it must also exist.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>prereq nxrrset</i></dt>
+<dd>Makes the nonexistence of an RRset of type <em class="emphasis">type</em>
+owned by <em class="emphasis">domain name</em> a prerequisite for
+performing the update specified.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>prereq yxdomain domain name</i></dt>
+<dd>Makes the existence of the specified domain name a prerequisite for
+performing the update.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>prereq nxdomain</i></dt>
+<dd>Makes the nonexistence of the specified domain name a prerequisite
+for performing the update.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>update delete domain name [type] [rdata]</i></dt>
+<dd><a name="INDEX-1543" />Deletes the domain name specified or,
+if <em class="emphasis">type</em> is also specified, deletes the RRset
+specified or, if <em class="emphasis">rdata</em> is also specified,
+deletes the record matching <em class="emphasis">domainname</em>, <em class="emphasis">type</em>, and
+<em class="emphasis">rdata.</em></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>update add domain name ttl [class] type rdata</i></dt>
+<dd>Adds the record specified to the zone. Note that the TTL, in addition
+to the type and resource record-specific data, must be included, but
+the class is optional and defaults to IN.</p></dd>
+
+</dl>
+
+
+So, for example, the command:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate</b></tt>
+&gt; <tt class="userinput"><b>prereq nxdomain mib.fx.movie.edu.</b></tt>
+&gt; <tt class="userinput"><b>update add mib.fx.movie.edu. 300 A 192.253.253.16</b></tt>
+&gt;</pre></blockquote>
+
+
+tells the server to add an address for
+<em class="emphasis">mib.fx.movie.edu</em> only if the domain name does
+not already exist. Note that the last blank line is
+<em class="emphasis">nsupdate</em> 's cue to send the update.
+Subtle, eh?</p><p>
+
+
+The command:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate</b></tt>
+&gt; <tt class="userinput"><b>prereq yxrrset mib.fx.movie.edu. MX</b></tt>
+&gt; <tt class="userinput"><b>update delete mib.fx.movie.edu. MX</b></tt>
+&gt; <tt class="userinput"><b>update add mib.fx.movie.edu. 600 MX 10 mib.fx.movie.edu.</b></tt>
+&gt; <tt class="userinput"><b>update add mib.fx.movie.edu. 600 MX 50 postmanrings2x.movie.edu.</b></tt>
+&gt;</pre></blockquote>
+
+
+checks to see whether <em class="emphasis">mib.fx.movie.edu</em> already
+has MX records and, if it does, deletes them and adds two in their
+place.</p><p>
+
+
+There are some limitations to what you can do with dynamic update:
+you can't delete a zone entirely (though you can delete
+everything in it except the SOA record and one NS record), and you
+can't add new zones.<a name="INDEX-1544" /> <a name="INDEX-1545" /></p><p>
+
+
+<a name="dns4-CHP-10-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">10.2.1. Dynamic Update and Serial Numbers</h3>
+
+
+When a name server processes a dynamic update, it's changing a
+zone and must increment that zone's <a name="INDEX-1546" />serial number to signal the change to the
+zone's slaves. This is done automatically. However, the name
+server doesn't necessarily increment the serial number for each
+dynamic update.</p><p>
+
+
+BIND 8 name servers defer updating a zone's serial number for
+as long as five minutes or 100 updates, whichever comes first. The
+deferral is intended to deal with a mismatch between a name
+server's ability to process dynamic updates and its ability to
+transfer zones: the latter may take significantly longer for large
+zones. When the name server does finally increment the zone's
+serial number, it sends a NOTIFY announcement (described later in
+this chapter) to tell the zone's slaves that the serial number
+has changed.</p><p>
+
+
+BIND 9 name servers update the serial number once for each dynamic
+update that is processed.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">10.2.2. Dynamic Update and Zone Data Files</h3>
+
+
+Since a dynamic update makes a permanent change to a zone, a record
+of it needs to be kept on disk. But rewriting a
+<a name="INDEX-1547" />zone data file each time a record
+is added to or deleted from the zone could be prohibitively onerous
+for a name server. Writing a zone data file takes time, and the name
+server could conceivably receive tens or hundreds of dynamic updates
+each second.</p><p>
+
+
+Instead, when they receive dynamic updates, both BIND 8 and 9 name
+servers simply append a short record of the update to a log
+file.<a href="#FOOTNOTE-71">[71]</a> The
+change takes effect immediately in the copy of the zone the name
+servers maintain in memory, of course. But the name servers can wait
+and write the entire zone to disk only at a designated interval
+(hourly, usually). BIND 8 name servers then delete the log file, as
+it's no longer needed. (At that point, the copy of the zone in
+memory is the same as that on disk.) BIND 9 name servers, however,
+leave the log file because they also use it for incremental zone
+transfers, which we'll cover later in this chapter. (BIND 8
+name servers keep incremental zone transfer information in another
+file.)</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-71" />[71]This idea will seem familiar to anyone
+who's ever used a journaling filesystem.</p><p>
+
+</blockquote>
+
+
+On BIND 8 name servers, the name of the log file is constructed by
+appending <em class="emphasis">.log</em> to the name of the zone data
+file. On BIND 9 name servers, the name of the <a name="INDEX-1548" />log file -- also called a
+<em class="emphasis">journal file -- </em><a name="INDEX-1549" />is the name of the zone data
+file concatenated with <em class="emphasis">.jnl</em>. So when you start
+using dynamic update, don't be surprised to see these files
+appear alongside your zone data files -- it's totally
+normal.</p><p>
+
+
+On a BIND 8 name server, the log files should disappear hourly
+(though they may reappear very quickly if your name server receives
+lots of updates) as well as when the name server exits gracefully. On
+a BIND 9 name server, the log files won't disappear at all.
+Both name servers incorporate the record of the changes in the log
+file into the zone if the log file exists when the name server
+starts.</p><p>
+
+
+In case you're interested, BIND 8's log files are
+human-readable and contain entries like this:</p><p>
+
+
+<blockquote><pre class="code">;BIND LOG V8
+[DYNAMIC_UPDATE] id 8761 from [192.249.249.3].1148 at 971389102 (named pid 17602):
+zone:   origin movie.edu class IN serial 2000010957
+update: {add} almostfamous.movie.edu. 600 IN A 192.249.249.215</pre></blockquote>
+
+
+BIND 9's log files, unfortunately, aren't human-readable.
+Well, not to these humans, anyway.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">10.2.3. Update Access Control Lists</h3>
+
+
+Given the fearsome control that dynamic updates obviously give an
+updater over a zone, you clearly need to restrict them, if you use
+them at all. By default, neither BIND 8 nor BIND 9 name servers allow
+dynamic updates to authoritative zones. In order to use dynamic
+updates, you add an <a name="INDEX-1550" /><em class="emphasis">allow-update</em>
+or <em class="emphasis">update-policy</em> substatement to the
+<em class="emphasis">zone</em> statement of the zone that you'd like
+to allow updates to.</p><p>
+
+
+<em class="emphasis">allow-update</em> takes an
+<a name="INDEX-1551" />address match list as an argument. The
+address or addresses matched by the list are the only addresses
+allowed to update the zone. It's prudent to make this
+<a name="INDEX-1552" />access control list as restrictive as
+possible:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	allow-update { 192.253.253.100; }; // just our DHCP server
+};</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">10.2.4. TSIG-Signed Updates</h3>
+
+
+<a name="INDEX-1553" />Given that BIND 9.1.0 and later slave
+name servers can forward updates, what's the use of an IP
+address-based access control list? If the primary master name server
+allows updates from its slaves' addresses, then any forwarded
+update will be allowed, regardless of the original sender.
+That's not good.<a href="#FOOTNOTE-72">[72]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-72" />[72]BIND 9.1.0 goes so far as to
+warn you that IP address-based access control lists are insecure if
+you try to use them.</p><p>
+
+</blockquote>
+
+
+Well, first, you can control <em class="emphasis">which</em> updates are
+forwarded. The <em class="emphasis">allow-update-forwarding
+</em><a name="INDEX-1554" />substatement takes an address match
+list as an argument. Only updates from IP addresses that match the
+address match list will be forwarded. So the following <em class="emphasis">zone
+</em>statement forwards only those updates from the Special
+Effects Department's subnet:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type slave;
+	file "bak.fx.movie.edu";
+	allow-update-forwarding { 192.253.254/24; };
+};</pre></blockquote>
+
+
+Still, when you use update forwarding, you should also use
+TSIG-signed dynamic updates. We won't cover TSIG in depth until
+<a href="ch11_01.html">Chapter 11, "Security"</a>, but all you need to know for now is
+that TSIG-signed dynamic updates bear the cryptographic signature of
+the signer. If they're forwarded, the signature is forwarded
+with them. The signature, when verified, tells you the name of the
+key used to sign the update. The name of the key looks like a domain
+name, and it's often just the domain name of the host the key
+is installed on.</p><p>
+
+
+With BIND 8.2 and later name servers, an address match list can
+include the name of one or more TSIG keys:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu"
+	type master;
+	file "db.fx.movie.edu";
+	allow-update { key dhcp-server.fx.movie.edu.; }; // allow only updates
+                                                     // signed by the DHCP
+                                                     // server's TSIG key
+};</pre></blockquote>
+
+
+This allows an updater who signs an update with the TSIG key
+<em class="emphasis">dhcp-server.fx.movie.edu</em> to make any change to
+the <em class="emphasis">fx.movie.edu</em> zone. Unfortunately,
+there's no way to further restrict the updater with that TSIG
+key to a list of source IP addresses.</p><p>
+
+
+<a name="INDEX-1555" />BIND 9 supports a finer-grained
+access control mechanism than <em class="emphasis">allow-update</em>, also
+based on TSIG signatures. This mechanism uses the new
+<em class="emphasis">update-policy</em> <em class="emphasis">zone
+</em>substatement. <em class="emphasis">update-policy</em> lets you
+specify which keys are allowed to update which records in the zone.
+It's meaningful only for primary master zones, since the slaves
+are expected to forward the updates.</p><p>
+
+
+The update is specified by the name of the key used to sign it and by
+the domain name and type of records it attempts to update.
+<em class="emphasis">update-policy</em> 's syntax looks like the
+following:</p><p>
+
+
+<blockquote><pre class="code">(grant | deny) identity nametype name [types]</pre></blockquote>
+
+
+<em class="emphasis">grant</em> and <em class="emphasis">deny</em> have the
+obvious meanings: allow or disallow the specified dynamic update.
+<em class="emphasis">identity</em> refers to the <em class="emphasis">name
+</em>of the key used to sign the update.
+<em class="emphasis">nametype</em><a name="INDEX-1556" />
+is one of:</p><p>
+
+
+<dl>
+<dt><i>name</i></dt>
+<dd>Matches when the domain name being updated is the same as the name in
+the <em class="emphasis">name</em> field.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>subdomain</i></dt>
+<dd>Matches when the domain name being updated is a subdomain of (i.e.,
+ends in) the name in the <em class="emphasis">name</em> field. (The domain
+name must still be in the zone, of course.)</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>wildcard</i></dt>
+<dd>Matches when the domain name being updated matches the wildcard
+expression in the <em class="emphasis">name</em> field.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>self</i></dt>
+<dd>Matches when the domain name being updated is the same as the name in
+the <em class="emphasis">identity</em> (not <em class="emphasis">name</em>)
+field, that is, when the domain name being updated is the same as the
+name of the key used to sign the update. If
+<em class="emphasis">nametype</em> is <em class="emphasis">self</em>, then the
+<em class="emphasis">name</em> field is ignored. And even though it looks
+redundant (as we'll see in the example in a moment), you still
+have to include the <em class="emphasis">name</em> field when using a
+<em class="emphasis">nametype</em> of <em class="emphasis">self</em>.</p></dd>
+
+</dl>
+
+
+<em class="emphasis">name</em>, naturally, is a domain name appropriate to
+the <em class="emphasis">nametype</em> specified. For example, if you
+specify <em class="emphasis">wildcard</em> as the
+<em class="emphasis">nametype</em>, the <em class="emphasis">name</em> field
+should contain a wildcard label.</p><p>
+
+
+The <em class="emphasis">types</em> field is optional and can contain any
+valid record type (or multiple types, separated by spaces) except
+NXT. (ANY is a convenient shorthand for "all types but
+NXT.") If you leave <em class="emphasis">types</em> out, it matches
+all record types except SOA, NS, SIG, and NXT.</p><p>
+
+
+
+<a name="ch10-10-fm2xml" /><blockquote><b>TIP: </b>
+A note on the precedence of <em class="emphasis">update-policy</em> rules:
+the first match (not the closest match) in an <em class="emphasis">update-policy
+</em>substatement is the one that applies to a dynamic update.</p><p>
+
+</blockquote>
+
+So, if <em class="emphasis">mummy.fx.movie.edu</em>uses a key called <em class="emphasis">mummy.fx.movie.edu</em>to sign its dynamic updates, we could restrict <em class="emphasis">mummy.fx.movie.edu</em>to updating its own records with the following:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	update-policy { grant mummy.fx.movie.edu. self mummy.fx.movie.edu.; };
+};</pre></blockquote>
+
+
+or just its own address records with this:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	update-policy { grant mummy.fx.movie.edu. self mummy.fx.movie.edu. A; };
+};</pre></blockquote>
+
+
+More generally, we could restrict all of our clients to updating only
+their own address records by using:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	update-policy { grant *.fx.movie.edu. self fx.movie.edu. A; }; 
+};</pre></blockquote>
+
+
+Here's a more complicated example: to allow all clients the
+ability to change any records, except SRV records, that are owned by
+the same domain name as their key name, but to allow
+<em class="emphasis">matrix.fx.movie.edu</em> to update SRV records
+associated with Windows 2000 (in the
+<em class="emphasis">_udp.fx.movie.edu</em>,
+<em class="emphasis">_tcp.fx.movie.edu</em>,
+<em class="emphasis">_sites.fx.movie.edu</em>, and
+<em class="emphasis">_msdcs.fx.movie.edu</em> subdomains), you could use:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	update-policy {
+		deny *.fx.movie.edu. self *.fx.movie.edu. SRV;
+		grant *.fx.movie.edu. self *.fx.movie.edu. ANY;
+		grant matrix.fx.movie.edu. subdomain _udp.fx.movie.edu. SRV;
+		grant matrix.fx.movie.edu. subdomain _tcp.fx.movie.edu. SRV;
+		grant matrix.fx.movie.edu. subdomain _sites.fx.movie.edu. SRV;
+		grant matrix.fx.movie.edu. subdomain _msdcs.fx.movie.edu. SRV;
+	};
+};</pre></blockquote>
+
+
+Since the rules in the <em class="emphasis">update-policy
+</em>substatement are evaluated in the order in which they
+appear, clients can't update their SRV records, though they can
+update any other record types they own.</p><p>
+
+
+In case you're wondering, the difference between:</p><p>
+
+
+<blockquote><pre class="code">grant identity subdomain fx.movie.edu</pre></blockquote>
+
+
+and:</p><p>
+
+
+<blockquote><pre class="code">grant identity wildcard fx.movie.edu:</pre></blockquote>
+
+
+is that the former allows the key specified by
+<em class="emphasis">identity</em> to modify records attached to
+<em class="emphasis">fx.movie.edu</em> (say, the zone's NS records)
+while the latter doesn't.</p><p>
+
+
+If you'd like to take advantage of TSIG-signed dynamic updates
+but don't have any software that can send them, you can use
+newer versions of <em class="emphasis">nsupdate</em> ; see the next
+chapter<a name="INDEX-1557" /> for<a name="INDEX-1558" /> that.<a name="INDEX-1559" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10. Advanced Features</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.3. DNS NOTIFY </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

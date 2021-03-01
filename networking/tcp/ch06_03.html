@@ -1,0 +1,1230 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+<head><title>Installing PPP  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">6.3. Installing PPP </h2>
+
+<p>The procedures <a name="INDEX-1270" />
+<a name="INDEX-1271" />for
+installing and configuring PPP vary from implementation to
+implementation.<a href="#FOOTNOTE-61">[61]</a> In this section, we use the PPP daemon implementation
+(<tt class="literal">pppd</tt>) included with Linux and the supporting
+configuration commands that come with it. PPP is an Internet
+standard, and most Unix systems include support for it in the kernel
+as part of the standard operating system installation. Usually this
+does not require any action on your part. Refer to <a href="ch05_01.html">Chapter 5, "Basic Configuration "</a> for examples of how PPP is configured in the
+Linux kernel. The Linux system installs the PPP physical and data
+link layer software (the HDLC protocol) in the kernel.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-61" /><p>[61]Check your system documentation to
+find out exactly how to configure PPP on your system.</p>
+</blockquote>
+
+<p>Installing PPP in the kernel is only the beginning. In this section,
+we look at how <tt class="literal">pppd</tt> is used to provide PPP
+services on a Linux system.
+</p>
+
+<a name="tcp3-CHP-6-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">6.3.1. The PPP Daemon </h3>
+
+<p>Point-to-Point Protocol <a name="INDEX-1272" />
+<a name="INDEX-1273" />is implemented
+on the Linux system in the PPP daemon (<tt class="literal">pppd</tt>),
+which was derived from a freeware PPP implementation for BSD systems.
+<tt class="literal">pppd</tt> can be configured to run in all modes: as a
+client, as a server, over dial-up connections, and over dedicated
+connections. (Clients and servers are familiar concepts from <a href="ch03_01.html">Chapter 3, "Network Services"</a>.) A <a name="INDEX-1274" />
+<a name="INDEX-1275" />
+<a name="INDEX-1276" />dedicated connection
+is a direct cable connection or a leased line, neither of which
+requires a telephone to establish the connection. A
+<a name="INDEX-1277" />dial-up
+connection is a modem link established by dialing a telephone number.
+</p>
+
+<p>Configuring <tt class="literal">pppd</tt> for a dedicated line is the
+simplest configuration. A dial-up script is not needed for a leased
+line or direct connection. There is no point in dynamically assigning
+addresses because a dedicated line always connects the same two
+systems. Authentication is of limited
+<a name="INDEX-1278" />
+<a name="INDEX-1279" />use because the dedicated line
+physically runs between two points. There is no way for an intruder
+to access the link, short of "breaking and entering" or a
+wiretap. A single <tt class="literal">pppd</tt> command placed in a startup
+file configures a dedicated PPP link for our Linux system:
+</p>
+
+<blockquote><pre class="code">pppd /dev/cua3 56000 crtscts defaultroute</pre></blockquote>
+
+<p>The <tt class="literal">/dev/cua3</tt><a name="INDEX-1280" /> argument selects the device to
+which PPP is attached. It is, of course, the same port to which the
+dedicated line is attached. Next, the line speed is specified in bits
+per second (56000). The remainder of the command line is a series of
+keyword options. The
+<tt class="literal">crtscts</tt><a name="INDEX-1281" /> option turns on hardware flow control.
+The final option,
+<tt class="literal">defaultroute</tt><a name="INDEX-1282" />, creates a default route using
+the remote server as the default gateway.<a href="#FOOTNOTE-62">[62]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-62" /><p>[62] If a
+default route already exists in the routing table, the
+<tt class="literal">defaultroute</tt> option is ignored.</p> </blockquote>
+
+<p>PPP exchanges IP addresses <a name="INDEX-1283" />during the initial link connection
+process. If no address is specified on the <tt class="literal">pppd</tt>
+command line, the daemon sends the address of the local host, which
+it learns from DNS or the host table, to the remote host. Likewise,
+the remote system sends its address to the local host. The addresses
+are then used as the source and destination addresses of the link.
+You can override this by specifying the addresses on the command line
+in the form
+<em class="replaceable">local-address</em><tt class="literal">:</tt><em class="replaceable">remote-address</em>.
+For example:
+</p>
+
+<blockquote><pre class="code"> pppd /dev/cua3 56000 crtscts defaultroute 172.16.24.1:</pre></blockquote>
+
+<p>Here we define the local address as 172.16.24.1 and leave the remote
+address blank. In this case <tt class="literal">pppd</tt> sends the address
+from the command line and waits for the remote server to send its
+address. The local address is specified on the command line when it
+is different from the address associated with the local hostname in
+the host table or the DNS server. For example, the system might have
+an Ethernet interface that already has an address assigned. If we
+want to use a different address for the PPP connection, we must
+specify it on the <tt class="literal">pppd</tt> command line; otherwise,
+the PPP link will be assigned the same address as the Ethernet
+interface.
+</p>
+
+<p>The <tt class="literal">pppd</tt><a name="INDEX-1284" /> command
+has many more options than those used in these examples (see <a href="appa_01.html">Appendix A, "PPP Tools"</a> for a full list of options). In fact, there
+are so many <tt class="literal">pppd</tt> command-line options that it is
+sometimes easier to put them in a file than to enter them all on the
+command line. <tt class="literal">pppd</tt> reads its options from the
+<em class="filename">/etc/ppp/options</em><a name="INDEX-1285" /> file, then the
+<em class="filename">~/.ppprc</em> file, then the
+<em class="filename">/etc/ppp/options.device</em><a name="INDEX-1286" /> file (where <em class="filename">device</em> is
+a device name like cua3), and finally from the command line. The
+order in which they are processed creates a hierarchy such that
+options on the command line can override those in the
+<em class="filename">~/.ppprc</em><a name="INDEX-1287" /> file, which can in turn override those in
+the <em class="filename">/etc/ppp/options</em> file. This permits the
+system administrator to establish certain systemwide defaults in the
+<em class="filename">/etc/ppp/options</em> file while still permitting the
+end user to customize the PPP configuration. The
+<em class="filename">/etc/ppp/options</em> file is a convenient and
+flexible way to pass parameters to <tt class="literal">pppd.</tt>
+</p>
+
+<p>A single <tt class="literal">pppd</tt> command is all that is needed to set
+up and configure the software for a dedicated PPP link. Dial-up
+connections are more challenging.
+</p>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">6.3.2. Dial-Up PPP </h3>
+
+<p>A direct-connect <a name="INDEX-1288" /> <a name="INDEX-1289" /> <a name="INDEX-1290" />cable can connect just two
+systems. When a third system is purchased, it cannot be added to the
+network. For that reason, most people use expandable network
+technologies, such as Ethernet, for connecting systems in a local
+area. Additionally, leased lines are expensive. They are primarily
+used by large organizations to connect networks of systems. For these
+reasons, using PPP for dedicated network connections is less common
+than using it for dial-up connections.
+</p>
+
+<p>Several different utilities provide dial-up support for PPP.
+<a name="INDEX-1291" />Dial-up IP
+(<tt class="literal">dip</tt><a name="INDEX-1292" />
+<a name="INDEX-1293" />) is a popular package for simplifying the
+process of dialing the remote server, performing the login, and
+attaching PPP to the resulting connection. We discuss
+<tt class="literal">dip</tt> in this section because it is popular and
+freely available for a wide variety of Unix systems, and because it
+comes with Red Hat Linux, which is the system we have been using for
+our PPP examples.
+</p>
+
+<p>One of the most important features of <tt class="literal">dip</tt> is a
+scripting language that lets you automate all the steps necessary to
+set up an operational PPP link. <a href="appa_01.html">Appendix A, "PPP Tools"</a> covers
+all the scripting commands supported by the 3.3.7o-uri version of
+<tt class="literal">dip</tt>, which is the version included with Red Hat.
+You can list the commands supported by your system by running
+<tt class="literal">dip</tt> in <a name="INDEX-1294" />test mode (<tt class="literal">-t</tt>) and then
+entering the
+<a name="INDEX-1295" /><tt class="literal">help</tt>
+command:
+</p>
+
+<blockquote><pre class="code">&gt; <b class="emphasis-bold">dip -t</b> 
+DIP: Dialup IP Protocol Driver version 3.3.7o-uri (8 Feb 96) 
+Written by Fred N. van Kempen, MicroWalt Corporation. 
+ 
+DIP&gt; <b class="emphasis-bold">help</b> 
+DIP knows about the following commands: 
+ 
+        beep     bootp    break    chatkey  config    
+        databits dec      default  dial     echo      
+        flush    get      goto     help     if        
+        inc      init     mode     modem    netmask   
+        onexit   parity   password proxyarp print     
+        psend    port     quit     reset    send      
+        shell    sleep    speed    stopbits term      
+        timeout  wait      
+ DIP&gt; <b class="emphasis-bold">quit</b></pre></blockquote>
+
+<p>These commands can configure the interface, control the execution of
+the script, and process errors. Only a subset of the commands is
+required for a minimal script:
+</p>
+
+<blockquote><pre class="code"># Ask PPP to provide the local IP address 
+get $local 0.0.0.0 
+# Select the port and set the line speed 
+port cua1 
+speed 38400 
+# Reset the modem and flush the terminal 
+reset 
+flush 
+# Dial the PPP server and wait for the CONNECT response 
+dial *70,301-555-1234 
+wait CONNECT 
+# Give the server 2 seconds to get ready 
+sleep 2 
+# Send a carriage-return to wake up the server 
+send \r 
+# Wait for the Login&gt; prompt and send the username 
+wait ogin&gt; 
+send kristin\r 
+# Wait for the Password&gt; prompt and send the password 
+wait word&gt; 
+password 
+# Wait for the PPP server's command-line prompt 
+wait &gt; 
+# Send the command required by the PPP server 
+send ppp enabled\r 
+# Set the interface to PPP mode 
+mode PPP 
+# Exit the script 
+exit</pre></blockquote>
+
+<p>The <tt class="literal">get</tt><a name="INDEX-1296" /> command at the beginning of the script
+allows PPP to provide the local and remote addresses.
+<tt class="literal">$local</tt> is a script variable. There are several
+available script variables, all of which are covered in <a href="appa_01.html">Appendix A, "PPP Tools"</a>. <tt class="literal">$local</tt> normally stores the
+local address, which can be set statically in the script. A PPP
+server, however, is capable of assigning an address to the local
+system dynamically. We take advantage of this capability by giving a
+local address of all 0s. This peculiar syntax tells
+<tt class="literal">dip</tt> to let <tt class="literal">pppd</tt> handle the
+address assignments. A <tt class="literal">pppd</tt> client can get
+addresses in three ways:
+</p>
+
+<ul><li>
+<p>The PPP systems can exchange their local addresses as determined from
+DNS. This was discussed previously for the dedicated line
+configuration.
+</p>
+</li><li>
+<p>The addresses can be specified on the <tt class="literal">pppd</tt> command
+line, also discussed previously.
+</p>
+</li><li>
+<p>The client can allow the server to assign both addresses. This
+feature is most commonly used on dial-up lines. It is very popular
+with servers that must handle a large number of short-lived
+connections. A dial-up Internet Service Provider (ISP) is a good
+example.
+</p>
+</li></ul>
+<p>The next two lines select the physical device to which the modem is
+connected, and set the speed at which the device operates. The
+<tt class="literal">port</tt><a name="INDEX-1297" /> command assumes the path
+<em class="emphasis">/dev</em>, so the full device path is not used. On
+most PC Unix systems, the value provided to the
+<tt class="literal">port</tt> command is cua0, cua1, cua2, or cua3. These
+values correspond to MS-DOS ports COM1 to COM4. The
+<tt class="literal">speed</tt><a name="INDEX-1298" /> command sets the maximum speed used to
+send data to the modem on this port. The default speed is 38400.
+Change it if your modem accepts data at a different speed.
+</p>
+
+<p>The <tt class="literal">reset</tt><a name="INDEX-1299" /> command resets the modem by sending it
+the Hayes modem interrupt (+++) followed by the Hayes modem reset
+command (ATZ). This version of <tt class="literal">dip</tt> uses the Hayes
+modem AT command set and works only with Hayes-compatible
+modems.<a href="#FOOTNOTE-63">[63]</a> Fortunately, that includes most brands of modems. After
+being reset, the modem responds with a message indicating that the
+modem is ready to accept input. The
+<tt class="literal">flush</tt><a name="INDEX-1300" /> command removes this message, and any
+others that might have been displayed by the modem, from the input
+queue. Use <tt class="literal">flush</tt> to avoid the problems that can be
+caused by unexpected data in the queue.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-63" /><p>[63]If your modem doesn't use the full
+Hayes modem command set, avoid using <tt class="literal">dip</tt> commands,
+such as <tt class="literal">rest</tt> and <tt class="literal">dial</tt>, that
+generate Hayes commands. Use <tt class="literal">send</tt> instead. This
+allows you to send any string you want to the modem.</p>
+</blockquote>
+
+<p>The next command dials the remote server. The
+<tt class="literal">dial</tt><a name="INDEX-1301" /> command sends a standard Hayes ATD
+<tt class="literal">dial</tt> command to the modem. It passes the entire
+string provided on the command line to the modem as part of the ATD
+command. The sample <tt class="literal">dial</tt> command generates
+ATD*70,301-555-1234. This causes the modem to dial *70 (which turns
+off call waiting<a href="#FOOTNOTE-64">[64]</a>), and then area code 301, exchange 555,
+and number 1234.When this modem successfully connects to the remote
+modem, it displays the message CONNECT. The
+<tt class="literal">wait</tt><a name="INDEX-1302" /> command waits for that message from the
+modem.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-64" /><p>[64]If you have call waiting, turn it
+off before you attempt to make a PPP connection. Different local
+telephone companies may use different codes to disable call
+waiting.</p> </blockquote>
+
+<p><tt class="literal">The sleep 2</tt><a name="INDEX-1303" /> command inserts a two-second delay into
+the script. It is often useful to delay at the beginning of the
+connection to allow the remote server to initialize. Remember that
+the CONNECT message is displayed by the modem, not by the remote
+server. The remote server may have several steps to execute before it
+is ready to accept input. A small delay can sometimes avoid
+unexplained intermittent problems.
+</p>
+
+<p>The <tt class="literal">send</tt><a name="INDEX-1304" /> command sends a carriage return (\r) to
+the remote system. Once the modems are connected, anything sent from
+the local system goes all the way to the remote system. The
+<tt class="literal">send</tt> command can send any string. In the sample
+script, the remote server requires a carriage return before it issues
+its first prompt. The carriage return is entered as \r and the
+newline is entered as \n.
+</p>
+
+<p>The remote server then prompts for the username with
+<tt class="literal">Login&gt;</tt>. The <tt class="literal">wait
+ogin&gt;</tt><a name="INDEX-1305" /> command detects this prompt, and the
+<tt class="literal">send</tt> <tt class="literal">kristin</tt> command sends the
+username <tt class="literal">kristin</tt> as a response. The server then
+prompts for the password with <tt class="literal">Password&gt;</tt>. The
+<tt class="literal">password</tt><a name="INDEX-1306" /> command causes the script to prompt the
+local user to manually enter the password. It is possible to store
+the password in a <tt class="literal">send</tt> command inside the script.
+However, this is a potential security problem if an unauthorized
+person gains access to the script and reads the password. The
+<tt class="literal">password</tt> command improves security.
+</p>
+
+<p>If the password is accepted, our remote server prompts for input with
+the greater-than symbol (&gt;). Many servers require a command to set
+the correct protocol mode. The server in our example supports several
+different protocols. We must tell it to use PPP by using
+<tt class="literal">send</tt> to pass it the correct command.
+</p>
+
+<p>The script finishes with a few commands that set the correct
+environment on the local host. The
+<tt class="literal">mode</tt><a name="INDEX-1307" /> command tells the local host to use the
+PPP protocol on this link. The protocol selected must match the
+protocol running on the remote server. Protocol values that are valid
+for the <tt class="literal">dip</tt> <tt class="literal">mode</tt> command are
+SLIP, CSLIP, PPP, and TERM. SLIP and CSLIP are variations of the SLIP
+protocol, which was discussed earlier. TERM is terminal emulation
+mode. PPP is the Point-to-Point Protocol. Finally, the
+<tt class="literal">exit</tt><a name="INDEX-1308" /> command ends the script, while
+<tt class="literal">dip</tt> keeps running in the background servicing the
+link.
+</p>
+
+<p>This simple script does work and it should give you a good idea of
+the wait/send structure of a <tt class="literal">dip</tt> script. However,
+your scripts will probably be more complicated. The sample script is
+not robust because it does not do any error checking. If an expected
+response does not materialize, the sample script hangs. To address
+this problem, use a timeout on each <tt class="literal">wait</tt> command.
+For example, the <tt class="literal">wait OK 10</tt> command tells the
+system to wait 10 seconds for the OK response. When the OK response
+is detected, the <tt class="literal">$errlvl</tt> script variable is set to
+zero and the script falls through to the next command. If the OK
+response is not returned before the 10-second timer expires,
+<tt class="literal">$errlvl</tt> is set to a nonzero value and the script
+continues on to the next command. The <tt class="literal">$errlvl</tt>
+variable is combined with the <tt class="literal">if</tt> and
+<tt class="literal">goto</tt> commands to provide error handling in
+<tt class="literal">dip</tt> scripts. Refer to <a href="appa_01.html">Appendix A, "PPP Tools"</a>
+for more details.
+</p>
+
+<p>Once the script is created, it is executed with the
+<tt class="literal">dip</tt><a name="INDEX-1309" /> command. Assume that the sample script
+shown above was saved to a file named
+<em class="emphasis">start-ppp.dip</em>. The following command executes
+the script, creating a PPP link between the local system and the
+remote server:
+</p>
+
+<blockquote><pre class="code">&gt; <b class="emphasis-bold">dip start-ppp</b></pre></blockquote>
+
+<p>Terminate the PPP connection with the command <tt class="literal">dip
+-k</tt>. This closes the connection and kills the background
+<tt class="literal">dip</tt> process.
+</p>
+
+<p><tt class="literal">pppd</tt> options are not configured in the
+<tt class="literal">dip</tt> script. <tt class="literal">dip</tt> creates the PPP
+connection; it doesn't customize <tt class="literal">pppd</tt>.
+<tt class="literal">pppd</tt> options are stored in the
+<em class="emphasis">/etc/ppp/options</em> file.
+</p>
+
+<p>Assuming the <tt class="literal">dip</tt> script shown above, we might use
+the following <tt class="literal">pppd</tt> options:
+</p>
+
+<blockquote><pre class="code">noipdefault 
+ipcp-accept-local 
+ipcp-accept-remote defaultroute</pre></blockquote>
+
+<p>The <tt class="literal">noipdefault</tt> option tells the client not to
+look up the local address. <tt class="literal">ipcp-accept-local</tt> tells
+the client to obtain its local address from the remote server. The
+<tt class="literal">ipcp-accept-remote</tt> option tells the system to
+accept the remote address from the remote server. Finally,
+<tt class="literal">pppd</tt> sets the PPP link as the default route. This
+is the same <tt class="literal">defaultroute</tt> option we saw on the
+<tt class="literal">pppd</tt> command line in an earlier example. Any
+<tt class="literal">pppd</tt> option that can be invoked on the command
+line can be put in the <em class="emphasis">/etc/ppp/options</em> file and
+thus be invoked when <tt class="literal">pppd</tt> is started by a
+<tt class="literal">dip</tt> script.
+</p>
+
+<p>I use <tt class="literal">dip</tt> on my home computer to set up my dial-up
+PPP connection.<a href="#FOOTNOTE-65">[65]</a> Personally, I find
+<tt class="literal">dip</tt> simple and straightforward to use, in part
+because I am familiar with the <tt class="literal">dip</tt> scripting
+language. You may prefer to use the <tt class="literal">chat</tt> command
+that comes with <a name="INDEX-1310" /> <a name="INDEX-1311" /> <a name="INDEX-1312" />the <tt class="literal">pppd</tt>
+software package.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-65" /><p>[65]For me, the PPP dial-up is just a
+backup; like many other people I use a high-speed connection.
+However, DSL and cable modem connections do not require a special
+configuration because the interface to most DSL and cable modems is
+Ethernet.</p> </blockquote>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">6.3.3. chat </h3>
+
+<p>A <tt class="literal">chat</tt> <a name="INDEX-1313" /> <a name="INDEX-1314" />
+<a name="INDEX-1315" />script is a simple expect/send script
+consisting of the strings the system expects and the strings it sends
+in response. The script is organized as a list of expect/send pairs.
+<tt class="literal">chat</tt> does not really have a scripting language,
+but it does have some special characters that can be used to create
+more complex scripts. The <tt class="literal">chat</tt> script to perform
+the same dial-up and login functions as the sample
+<tt class="literal">dip</tt> script would contain:
+</p>
+
+<blockquote><pre class="code">'' ATZ 
+OK ATDT*70,301-555-1234 
+CONNECT \d\d\r 
+ogin&gt; kristin 
+word&gt; Wats?Wat?
+&gt; 'set port ppp enabled'</pre></blockquote>
+
+<p>Each line in the script begins with an expected string and ends with
+the string sent as a response. The modem does not send a string until
+it receives a command. The first line in the script says, in effect,
+"expect nothing and send the modem a reset command." The
+pair of single quotes (<tt class="literal">''</tt>) at the beginning of the
+line tells <tt class="literal">chat</tt> to expect nothing. The script then
+waits for the modem's OK prompt and dials the remote server.
+When the modem displays the CONNECT message, the script delays two
+seconds (\d\d) and then sends a carriage return (\r). Each \d special
+character causes a one-second delay. The \r special character is the
+carriage return. <tt class="literal">chat</tt> has many special characters
+that can be used in the expect strings and the send
+strings.<a href="#FOOTNOTE-66">[66]</a> Finally, the script ends by sending the
+username, password, and remote server configuration command in
+response to the server's prompts.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-66" /><p>[66]See <a href="appa_01.html">Appendix A, "PPP Tools"</a> for more
+details.</p> </blockquote>
+
+<p>Create the script with your favorite editor and save it in a file
+such as <em class="emphasis">dial-server</em>. Test the script
+<a name="INDEX-1316" />using <tt class="literal">chat</tt> with the
+<tt class="literal">-V</tt> option, which logs the script execution through
+stderr:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">chat -V -f dial-server</b></pre></blockquote>
+
+<p>Invoking the <tt class="literal">chat</tt> script is not sufficient to
+configure the PPP line. It must be combined with
+<tt class="literal">pppd</tt> to <a name="INDEX-1317" />do the whole job. The
+<tt class="literal">connect</tt><a name="INDEX-1318" /> command-line option allows you to
+start <tt class="literal">pppd</tt> and invoke a dial-up script all in one
+command:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">pppd /dev/cua1 56700 connect "chat -V -f dial-server" \</b>
+<b class="emphasis-bold">     nodetach crtscts modem defaultroute</b></pre></blockquote>
+
+<p>The <tt class="literal">chat</tt><a name="INDEX-1319" /> command following the
+<tt class="literal">connect</tt> option is used to perform the dial-up and
+login. Any package capable of doing the job could be called here; it
+doesn't have to be <tt class="literal">chat</tt>.
+</p>
+
+<p>The <tt class="literal">pppd</tt> command has some other options that are
+used when PPP is run as a dial-up client. The
+<tt class="literal">modem</tt><a name="INDEX-1320" /> option causes <tt class="literal">pppd</tt> to
+monitor the carrier-detect (DCD) indicator of the modem. This
+indicator tells <tt class="literal">pppd</tt> when the connection is made
+and when the connection is broken. <tt class="literal">pppd</tt> monitors
+DCD to know when the remote server hangs up the line. The
+<tt class="literal">nodetach</tt><a name="INDEX-1321" /> option prevents <tt class="literal">pppd</tt>
+from detaching from the terminal to run as a background process. This
+is necessary only when running <tt class="literal">chat</tt> with the
+<tt class="literal">-V</tt> option. When you are done debugging the
+<tt class="literal">chat</tt> script, you can remove the
+<tt class="literal">-V</tt> option from the <tt class="literal">chat</tt>
+subcommand and the <tt class="literal">nodetach</tt> option from the
+<tt class="literal">pppd</tt> command. An alternative is to use
+<tt class="literal">-v</tt> on the <tt class="literal">chat</tt> command.
+<tt class="literal">-v</tt> does not require <tt class="literal">pppd</tt> to
+remain attached to a terminal because it sends the
+<tt class="literal">chat</tt> logging information to
+<tt class="literal">syslogd</tt> instead of to stderr. We have seen all of
+the other options on this command line before.
+</p>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">6.3.4. PPP Daemon Security </h3>
+
+<p>A major <a name="INDEX-1322" />
+<a name="INDEX-1323" />
+<a name="INDEX-1324" />benefit
+of PPP over SLIP is the enhanced security PPP provides. Put the
+following <tt class="literal">pppd</tt> options in the
+<em class="emphasis">/etc/ppp/options</em> file to enhance security:
+</p>
+
+<blockquote><pre class="code">lock 
+auth 
+usehostname domain wrotethebook.com</pre></blockquote>
+
+<p>The first option, <a name="INDEX-1325" /><tt class="literal">lock</tt>, makes
+<tt class="literal">pppd</tt> use UUCP-style lock files. This prevents
+other applications, such as UUCP or a terminal emulator, from
+interfering with the PPP connection. The
+<tt class="literal">auth</tt><a name="INDEX-1326" /> option requires the remote system to be
+authenticated before the PPP link is established. This option causes
+the local system to request authentication data from the remote
+system. It does not cause the remote system to request similar data
+from the local system. If the remote system administrator wants to
+authenticate your system before allowing a connection, she must put
+the <tt class="literal">auth</tt> keyword in the configuration of her
+system. The
+<tt class="literal">usehostname</tt><a name="INDEX-1327" /> option requires that the
+hostname is used in the authentication process and prevents the user
+from setting an arbitrary name for the local system with the
+<tt class="literal">name</tt> option. (More on authentication in a minute.)
+The final option makes sure that the local hostname is fully
+qualified with the specified domain before it is used in any
+authentication procedure.
+</p>
+
+<p>Recall that the <em class="emphasis">~/.ppprc</em> file and the
+<tt class="literal">pppd</tt> command-line options can override options set
+in the <em class="emphasis">/etc/ppp/options</em> file, which could be a
+security problem. For this reason, several options, once configured
+in the <em class="emphasis">/etc/ppp/options</em> file, cannot be
+overridden. That includes the options just listed.
+</p>
+
+<p><tt class="literal">pppd</tt> supports two
+<a name="INDEX-1328" /> <a name="INDEX-1329" />authentication protocols:
+<a name="INDEX-1330" />Challenge Handshake Authentication
+Protocol (CHAP) and <a name="INDEX-1331" /> <a name="INDEX-1332" />Password
+Authentication Protocol (PAP). PAP is a simple password security
+system that is vulnerable to all of the attacks of any reusable
+password system. CHAP, however, is an advanced authentication system
+that does not use reusable passwords and that repeatedly
+reauthenticates the remote system.
+</p>
+
+<p>Two files are used in the authentication process, the
+<em class="emphasis">/etc/ppp/chap-secrets</em><a name="INDEX-1333" /> file and the
+<em class="emphasis">/etc/ppp/pap-secrets</em><a name="INDEX-1334" /> file. Given the options file shown above,
+<tt class="literal">pppd</tt> first attempts to authenticate the remote
+system with CHAP. To do this, there must be data in the
+<em class="emphasis">chap-secrets</em> file, and the remote system must
+respond to the CHAP challenge. If either of these conditions is not
+true, <tt class="literal">pppd</tt> attempts to authenticate the remote
+system with PAP. If there is no applicable entry in the
+<em class="emphasis">pap-secrets</em> file or the remote system does not
+respond to the PAP challenge, the PPP connection is not established.
+This process allows you to authenticate remote systems with CHAP (the
+preferred protocol), if they support it, and to fall back to PAP for
+systems that support only PAP. For this to work, however, you must
+have the correct entries in both files.
+</p>
+
+<p>Each entry in the <em class="emphasis">chap-secrets</em> file contains up
+to four fields:
+</p>
+
+<dl>
+<a name="INDEX-1335" /><dt><i><em class="emphasis">client</em></i></dt>
+<dd>
+<p>The name of the computer that must answer the challenge, i.e., the
+computer that must be authenticated before the connection is made.
+This is not necessarily a client that is seeking access to a PPP
+server; although <em class="emphasis">client</em> is the term used in most
+of the documentation, it is really the respondent -- the system
+that responds to the challenge. Both ends of a PPP link can be forced
+to undergo authentication. In your <em class="emphasis">chap-secrets</em>
+file you will probably have two entries for each remote system: one
+entry to authenticate the remote system, and a corresponding entry to
+authenticate your system when it is challenged by the remote system.
+</p>
+</dd>
+
+
+<a name="INDEX-1336" /><dt><i><em class="emphasis">server</em></i></dt>
+<dd>
+<p>The name of the system that issues the CHAP challenge, i.e., the
+computer that requires the authentication before the PPP link is
+established. This is not necessarily a PPP server. The client system
+can require the server to authenticate itself.
+<em class="emphasis">Server</em> is the term used in most documentation,
+but really this is the authenticator -- the system that
+authenticates the response.
+</p>
+</dd>
+
+
+<a name="INDEX-1337" /><dt><i><em class="emphasis">secret</em></i></dt>
+<dd>
+<p>The secret key that is used to encrypt the challenge string before it
+is sent back to the system that issued the challenge.
+</p>
+</dd>
+
+
+<a name="INDEX-1338" /><dt><i><em class="emphasis">address</em></i></dt>
+<dd>
+<p>An address, written as a hostname or an IP address, that is
+acceptable for the host named in the first field. If the host listed
+in the first field attempts to use an address other than the address
+listed here, the connection is terminated even if the remote host
+properly encrypts the challenge response. This field is optional.
+</p>
+</dd>
+
+</dl>
+
+<p>A sample <em class="emphasis">chap-secrets</em> file for the host
+<em class="emphasis">ring</em> might contain:
+</p>
+
+<blockquote><pre class="code">limulus     ring        Peopledon'tknowyou    172.16.15.3
+ring        limulus     andtrustisajoke.      172.16.15.1</pre></blockquote>
+
+<p>The first entry is used to validate <em class="emphasis">limulus</em>, the
+remote PPP server. <em class="emphasis">limulus</em> is being
+authenticated and the system performing the authentication is
+<em class="emphasis">ring</em>. The secret key is
+"Peopledon'tknowyou". The allowable address is
+172.16.15.3, which is the address assigned to
+<em class="emphasis">limulus</em> in the host table. The second entry is
+used to validate <em class="emphasis">ring</em> when
+<em class="emphasis">limulus</em> issues the challenge. The secret key is
+"andtrustisajoke.". The only address
+<em class="emphasis">ring</em> is allowed to use is 172.16.15.1. A pair of
+entries, one for each end of the link, is normal. The
+<em class="emphasis">chap-secret</em> file usually contains two entries
+for every PPP link: one for validating the remote system and one for
+answering the challenge of that remote system.
+</p>
+
+<p>Use PAP only when you must. If you deal with a system that does not
+support CHAP, make an entry for that system in the
+<em class="emphasis">pap-secrets</em> file. The format of
+<em class="emphasis">pap-secrets</em> entries is the same as those used in
+the <em class="emphasis">chap-secrets</em> file. A system that does not
+support CHAP might have the following entry in the
+<em class="emphasis">pap-secrets</em> file:
+</p>
+
+<blockquote><pre class="code">24seven  ring       Wherearethestrong?  24seven.wrotethebook.com
+ring     24seven    Whoarethetrusted?   ring.wrotethebook.com</pre></blockquote>
+
+<p>Again we have a pair of entries: one for the remote system and one
+for our system. We support CHAP but the remote system does not. Thus
+we must be able to respond using the PAP protocol in case the remote
+system requests authentication.
+</p>
+
+<p>PPP authentication improves security in a dial-up environment. It is
+most important when you run the PPP server into which remote systems
+dial. In the next section, we look at PPP server <a name="INDEX-1339" /> <a name="INDEX-1340" /> <a name="INDEX-1341" />configuration.
+</p>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">6.3.5. PPP Server Configuration </h3>
+
+<p>The PPP <a name="INDEX-1342" /> <a name="INDEX-1343" />
+<a name="INDEX-1344" />server can be started in several
+different ways. One way is to use <a name="INDEX-1345" /><tt class="literal">pppd</tt> as a login
+shell for dial-in PPP users. Replace the login shell entry in the
+<em class="emphasis">/etc/passwd</em><a name="INDEX-1346" /> file with the path of
+<tt class="literal">pppd</tt> to start the server. A modified
+<em class="emphasis">/etc/passwd</em> entry might contain:
+</p>
+
+<blockquote><pre class="code"> craig:wJxX.iPuPzg:101:100:Craig Hunt:/etc/ppp:/usr/sbin/pppd</pre></blockquote>
+
+<p>The fields are exactly the same as in any
+<em class="emphasis">/etc/passwd</em> entry: username, password, uid, gid,
+gcos information, home directory, and login shell. For a remote PPP
+user, the home directory is <em class="emphasis">/etc/ppp</em> and the
+login shell is the full path of the <tt class="literal">pppd</tt> program.
+The encrypted password must be set using the
+<tt class="literal">passwd</tt> program, just as for any user, and the
+login process is the same as it is for any user. When
+<tt class="literal">getty</tt> detects incoming traffic on the serial port
+it invokes <tt class="literal">login</tt> to authenticate the user.
+<tt class="literal">login</tt> verifies the username and the password
+entered by the user and starts the login shell. In this case, the
+login shell is actually the PPP daemon.
+</p>
+
+<p>When the server is started in this manner, server options are
+generally placed in the <em class="emphasis">/etc/ppp/.ppprc</em> file.
+<tt class="literal">login</tt> validates the user, and
+<tt class="literal">pppd</tt> authenticates the client. Therefore the
+<em class="emphasis">chap-secrets</em> or <em class="emphasis">pap-secrets</em>
+file must be set up to handle the client system from which this user
+logs in.
+</p>
+
+<p>A traditional alternative to using <tt class="literal">pppd</tt> as the
+<a name="INDEX-1347" />login script is to create a real
+script in which <tt class="literal">pppd</tt> is only one of the commands.
+For example, you might create an
+<em class="emphasis">/etc/ppp/ppplogin</em> script such as the following:
+</p>
+
+<blockquote><pre class="code">#!/bin/sh 
+mesg -n 
+stty -echo
+exec /sbin/pppd auth passive crtscts modem</pre></blockquote>
+
+<p>You can see that the script can contain more than just the
+<tt class="literal">pppd</tt> command. The <tt class="literal">mesg -n</tt>
+command makes sure that other users cannot write to this terminal
+with <tt class="literal">talk</tt>, <tt class="literal">write</tt>, or similar
+programs. The <tt class="literal">stty</tt> command turns off character
+echoing. On some systems, characters typed at the terminal are echoed
+from the remote host instead of being locally echoed by the terminal;
+this behavior is called <em class="emphasis">full duplex</em>. We
+don't want to echo anything back on a PPP link, so we turn full
+duplex off. Controlling the characteristics of the physical line is
+the main reason that <tt class="literal">pppd</tt> is often placed inside a
+script file.
+</p>
+
+<p>The key line in the script is, of course, the line that starts
+<tt class="literal">pppd</tt>. We start the daemon with several options,
+but one thing that is not included on the command line is the
+<em class="emphasis">tty</em> device name. In all of the previous
+<tt class="literal">pppd</tt> examples, we provided a device name. When it
+is not provided, as is this case, <tt class="literal">pppd</tt> uses the
+controlling terminal as its device and doesn't put itself in
+background mode. This is just what we want. We want to use the device
+that <tt class="literal">login</tt> was servicing when it invoked the
+<em class="emphasis">ppplogin</em> script.
+</p>
+
+<p>The <tt class="literal">auth</tt><a name="INDEX-1348" /> command-line option tells
+<tt class="literal">pppd</tt> to authenticate the remote system, which of
+course requires us to place an entry for that system in the
+<em class="emphasis">chap-secrets</em> or the
+<em class="emphasis">pap-secrets</em> file. The
+<tt class="literal">crtscts</tt><a name="INDEX-1349" /> option turns on hardware flow
+control, and the <tt class="literal">modem</tt><a name="INDEX-1350" /> option tells PPP to monitor the
+modem's DCD indicator so that it can detect when the remote
+system drops the line. We have seen all of these options before. The
+one new option is <tt class="literal">passive</tt>. With
+<tt class="literal">passive</tt><a name="INDEX-1351" /> set, the local system waits until it
+receives a valid LCP packet from the remote system, even if the
+remote system fails to respond to its first packet. Normally, the
+local system would drop the connection if the remote system fails to
+respond in a timely manner. This option gives the remote system time
+to initialize its own PPP daemon.
+</p>
+
+<p>A final option for running PPP as a server is to allow the user to
+start the server from the shell prompt. To do this,
+<tt class="literal">pppd</tt> must be installed as setuid root, which is
+not the default installation. Once <tt class="literal">pppd</tt> is setuid
+root, a user with a standard login account can log in and then issue
+the following command:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">pppd proxyarp</b></pre></blockquote>
+
+<p>This command starts the PPP daemon. Assuming that the
+<tt class="literal">auth</tt> parameter is set in the
+<em class="emphasis">/etc/ppp/options</em> file, <tt class="literal">pppd</tt>
+authenticates the remote client using CHAP or PAP. Once the client is
+authenticated, a proxy ARP entry for the client is placed in the
+server's ARP table so that the client appears to other systems
+to be located on the local network.
+</p>
+
+<p>Of these three approaches, I prefer to create a shell script that is
+invoked by <tt class="literal">login</tt> as the user's login shell.
+With this approach, I don't have to install
+<tt class="literal">pppd</tt> setuid root. I don't have to place the
+burden of running <tt class="literal">pppd</tt> on the user. And I get all
+the power of the <tt class="literal">pppd</tt> command plus all the power
+<a name="INDEX-1352" />
+<a name="INDEX-1353" />of a
+shell script.
+</p>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">6.3.6. Solaris PPP </h3>
+
+<p><tt class="literal">dip</tt> and <tt class="literal">pppd</tt>
+<a name="INDEX-1354" />
+<a name="INDEX-1355" />
+<a name="INDEX-1356" />are available for Linux, BSD, AIX,
+Ultrix, OSF/1, and SunOS. If you have a different operating system,
+you probably won't use these packages. Solaris is a good
+example of a system that uses a different set of commands to
+configure PPP.
+</p>
+
+<p>PPP is implemented under Solaris as the
+<a name="INDEX-1357" />Asynchronous PPP Daemon
+(<tt class="literal">aspppd</tt>).
+<tt class="literal">aspppd</tt><a name="INDEX-1358" /> is configured by the
+<em class="emphasis">/etc/asppp.cf</em> file. The
+<em class="emphasis">asppp.cf</em> file is divided into two sections: an
+<tt class="literal">ifconfig</tt> section and a <tt class="literal">path</tt>
+section.
+</p>
+
+<blockquote><pre class="code">ifconfig ipdptp0 plumb ring limulus up 
+ 
+path 
+   interface ipdptp0 
+   peer_system_name limulus    inactivity_timeout 300</pre></blockquote>
+
+<p>The <tt class="literal">ifconfig</tt><a name="INDEX-1359" /> command configures the PPP interface
+(<tt class="literal">ipdptp0</tt>) as a point-to-point link with a local
+address of <em class="emphasis">ring</em> and a destination address of
+<em class="emphasis">limulus</em>. The <tt class="literal">ifconfig</tt> command
+does not have to define the destination address of the link. However,
+if you always connect to the same remote server, it will probably be
+defined here as the destination address. We saw all of these options
+in the discussion of the <tt class="literal">ifconfig</tt> command earlier
+in this chapter.
+</p>
+
+<p>The more interesting part of this file is the
+<tt class="literal">path</tt><a name="INDEX-1360" /> section, which defines the PPP
+environment. The <tt class="literal">interface</tt> statement identifies
+the interface used for the connection. It must be one of the PPP
+interfaces defined in the <tt class="literal">ifconfig</tt> section. In the
+example, only one is defined, so it must be
+<tt class="literal">ipdptp0</tt>. The <tt class="literal">peer_system_name</tt>
+statement identifies the system at the remote end of the connection.
+This may be the same address as the destination address from the
+<tt class="literal">ifconfig</tt> statement, but it doesn't have to
+be. It is possible to have no destination address on the
+<tt class="literal">ifconfig</tt> command and several
+<tt class="literal">path</tt> sections if you connect to several different
+remote hosts. The hostname on the <tt class="literal">peer_system_name</tt>
+statement is used in the dialing process, as described later.
+</p>
+
+<p>The <tt class="literal">path</tt> section ends with an
+<tt class="literal">inactivity_timeout</tt><a name="INDEX-1361" />
+<a name="INDEX-1362" />
+statement. The command in the sample sets the timeout to 300 seconds.
+This points out a nice feature of the Solaris system. Solaris
+automatically dials the remote system when it detects data that needs
+to be delivered through that system. Further, it automatically
+disconnects the PPP link when it is inactive for the specified time.
+With this feature you can use a PPP link without manually initiating
+the dial program and without tying up phone lines when the link is
+not in use.
+</p>
+
+<p>Like <tt class="literal">pppd</tt>, <tt class="literal">aspppd</tt> does not have
+a built-in dial facility. It relies on an external program to do the
+dialing. In the case of <tt class="literal">aspppd</tt>, it utilizes the
+dial-up facility that comes with UUCP. Here's how.
+</p>
+
+<p>First, the serial port, the modem attached to it, and the speed at
+which they operate are defined in the
+<em class="emphasis">/etc/uucp/Devices</em> file. For example, here we
+define an Automatic Call Unit (ACU is another name for a modem)
+attached to serial port B (cua/b) that operates at any speed defined
+in the <em class="emphasis">Systems</em> file, and that has the modem
+characteristics defined by the "hayes" entry in the
+<em class="emphasis">Dialers</em> file:
+</p>
+
+<blockquote><pre class="code">ACU cua/b - Any hayes</pre></blockquote>
+
+<p>Next, the modem characteristics, such as its initialization setting
+and dial command, are defined in the
+<em class="emphasis">/etc/uucp/Dialers</em> file. The initialization and
+dial commands are defined as a <tt class="literal">chat</tt> script using
+the standard expect/send format and the standard set of
+<tt class="literal">chat</tt> special characters. For example:
+</p>
+
+<blockquote><pre class="code">hayes =,-, "" \dA\pTE1V1X1Q0S2=255S12=255\r\c OK\r \EATDT\T\r\c CONNECT</pre></blockquote>
+
+<p>The system comes with <em class="emphasis">Devices</em> and
+<em class="emphasis">Dialers</em> preconfigured. The preconfigured entries
+are probably compatible with the modem on your system. The
+<em class="emphasis">/etc/uucp/Systems</em> file may be the only
+configuration file that you modify. In the
+<em class="emphasis">Systems</em> file, you need to enter the name of the
+remote system, select the modem you'll use, enter the telephone
+number, and enter a <tt class="literal">chat</tt> script to handle the
+login. For example:
+</p>
+
+<blockquote><pre class="code">limulus Any ACU 56700 5551234 "" \r ogin&gt; kristin word&gt; Wats?Watt? &gt;      set ppp on</pre></blockquote>
+
+<p>In this one line, we identify <em class="emphasis">limulus</em> as the
+remote system, declare that we allow connections to and from that
+host at any time of the day (Any), select the ACU entry in the
+<em class="emphasis">Devices</em> file to specify the port and modem, set
+the line speed to 56700, send the dialer the telephone number, and
+define the login <tt class="literal">chat</tt> script.
+</p>
+
+<p>This is not a book about UUCP, so we won't go into further
+details about these files. I'd suggest looking at the Solaris
+AnswerBook and the Solaris <em class="emphasis">TCP/IP Network Administration
+Guide</em> (where did they come up with such a great name?) for
+more information about UUCP and <tt class="literal">aspppd</tt>.
+</p>
+
+</div>
+<a name="tcp3-CHP-6-SECT-3.7" /><div class="sect2">
+<h3 class="sect2">6.3.7. Troubleshooting Serial Connections </h3>
+
+<p>There are several <a name="INDEX-1363" /> <a name="INDEX-1364" />layers of complexity that make
+PPP connections difficult to debug. To set up PPP, we must set up the
+serial port, configure the modem, configure PPP, and configure
+TCP/IP. A mistake in any one of these layers can cause a problem in
+another layer. All of these layers can obscure the true cause of a
+problem. The best way to approach troubleshooting on a serial line is
+by debugging each layer, one layer at a time. It is usually best to
+troubleshoot each layer before you move on to configure the next
+layer.
+</p>
+
+<p>The physical <a name="INDEX-1365" />serial ports should be
+configured by the system during the system boot. Check the
+<em class="emphasis">/dev</em> directory to make sure they are configured.
+On a <a name="INDEX-1366" />Linux system with four serial
+ports, the inbound serial ports are <em class="emphasis">/dev/ttyS0</em>
+through <em class="emphasis">/dev/ttyS3</em> and the outbound serial ports
+are <em class="emphasis">/dev/cua0</em> through
+<em class="emphasis">/dev/cua3</em>. There are many more tty and cua
+device names. However, the other devices are associated with real
+physical devices only if you have a multi-port serial card installed
+in your Linux system. Most
+<a name="INDEX-1367" />Unix systems use the names tty
+and cua, even if those names are just symbolic links to the real
+devices. <a name="INDEX-1368" />Solaris is a good
+example:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">ls -l /dev/tty?</b> 
+lrwxrwxrwx 1 root root 6 Sep 23  2001 /dev/ttya -&gt; term/a 
+lrwxrwxrwx 1 root root 6 Sep 23  2001 /dev/ttyb -&gt; term/b 
+% <b class="emphasis-bold">ls -l /dev/cua/*</b> 
+lrwxrwxrwx 1 root root 35 Sep 23 2001 /dev/cua/a -&gt; 
+     /devices/obio/zs@0,100000:a,cu 
+lrwxrwxrwx 1 root root 35 Sep 23 2001 /dev/cua/b -&gt;   /devices/obio/zs@0,100000:b,cu</pre></blockquote>
+
+<p>If the serial devices do not show up in the <em class="emphasis">/dev</em>
+directory, they can be manually added with a <tt class="literal">mknod</tt>
+command. For example, the following commands create the serial
+devices for the first serial port on a Linux system:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">mknod -m 666 /dev/cua0 c 5 64</b>
+# <b class="emphasis-bold">mknod -m 666 /dev/ttyS0 c 4 64</b></pre></blockquote>
+
+<p>However, if you need to add the serial devices manually, there may be
+a problem with the kernel configuration. The serial devices should be
+installed in your system by default during the boot when the hardware
+is detected. The following boot message shows the detection of a
+single serial interface on a Linux system:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">dmesg | grep tty</b>
+ttyS00 at 0x03f8 (irq = 4) is a 16550</pre></blockquote>
+
+<p>You should see similar messages from your system boot for each
+interface that is detected. If you don't, you may have a
+hardware problem with the serial interface board.
+</p>
+
+<p>The modem used for the connection is attached to one of the serial
+ports. Before attempting to build a dial-up script, make sure the
+<a name="INDEX-1369" />modem works and that you can
+communicate with it through the port. Use a simple serial
+communications package, such as <tt class="literal">minicom</tt>,
+<tt class="literal">kermit</tt>, or <tt class="literal">seyon</tt>. First, make
+sure the program is configured to use your modem. It must be set to
+the correct port, speed, parity, number of databits, etc. Check your
+modem's documentation to determine these settings.
+</p>
+
+<p>We'll use <tt class="literal">minicom</tt> on a Linux system for our
+examples. To configure
+<tt class="literal">minicom</tt><a name="INDEX-1370" />
+<a name="INDEX-1371" />,
+<tt class="literal">su</tt> to <em class="emphasis">root</em> and run it with
+the <tt class="literal">-s</tt> option, which displays a configuration
+menu. Walk through the menu and make sure everything is properly set.
+One thing you might notice is that the port is set to
+<em class="emphasis">/dev/modem</em>. That device name is sometimes
+symbolically linked to the port to which the modem is connected. If
+you're not sure that the link exists on your system, enter the
+correct port name in the <tt class="literal">minicom</tt> configuration,
+e.g., <em class="emphasis">/dev/cua1</em>. After checking the
+configuration, exit the menu and use the <tt class="literal">minicom</tt>
+terminal emulator to make sure you can communicate with the modem:
+</p>
+
+<blockquote><pre class="code">Welcome to minicom 1.83.1
+
+OPTIONS: History Buffer, F-key Macros, Search History Buffer, I18n
+Compiled on Feb 23 2001, 07:31:40.
+
+Press CTRL-A Z for help on special keys
+
+AT S7=45 S0=0 L1 V1 X4 &amp;c1 E1 Q0
+OK 
+<b class="emphasis-bold">atz</b>                                                  
+OK                                                    
+<b class="emphasis-bold">atdt555-1234</b>                                          
+CONNECT 26400/LAPM-V 
+<b class="emphasis-bold">^M</b>                                  
+Enter login&gt; <b class="emphasis-bold">kristin</b> 
+Enter user password&gt; <b class="emphasis-bold">Wats?Watt?</b> 
+ 
+   Welcome to the PPP MODEM POOL 
+ 
+PORT-9&gt; <b class="emphasis-bold">set port ppp enabled</b>  
++++ 
+OK 
+<b class="emphasis-bold">ath</b> 
+OK 
+<b class="emphasis-bold">atz</b> 
+OK 
+<b class="emphasis-bold">^A</b> 
+CTRL-A Z for help | 57600 8N1 | NOR | Minicom 1.83.1 | VT102 | Offline
+<b class="emphasis-bold">X</b></pre></blockquote>
+
+<p>In the sample, <tt class="literal">minicom</tt> displays a few header lines
+and then sends a Hayes command (<tt class="literal">AT</tt>) to the modem.
+We didn't set this command; it was part of the default
+<tt class="literal">minicom</tt> configuration. (If it causes problems,
+edit it out of the configuration using the menus discussed
+previously.) We then reset the modem (<tt class="literal">atz</tt>) and
+dial the remote server (<tt class="literal">atdt</tt>). When the modems
+connect, we log into the server and configure it. (The login process
+is different for every remote server; this is just an example.)
+Everything appears to be running fine, so we end the connection by
+getting the modem's attention (<tt class="literal">+++</tt>), hanging
+up the line (<tt class="literal">ath</tt>), and resetting the modem. Exit
+<tt class="literal">minicom</tt> by pressing Ctrl-A followed by X. On our
+sample system the port and modem are working. If you cannot send
+simple commands to your modem, ensure that:
+</p>
+
+<ul><li>
+<p>The modem is properly connected to the port</p>
+</li><li>
+<p>You have the correct cables</p>
+</li><li>
+<p>The modem is powered up</p>
+</li><li>
+<p>The modem is properly configured for dial-out and for echoing commands</p>
+</li></ul>
+<p>When the modem responds to simple commands, use it to dial the remote
+server as we did in the example above. If the modem fails to dial the
+number or displays the message NO DIALTONE, check that the telephone
+line is connected to the correct port of the modem and to the wall
+jack. You may need to use an analog phone to test the telephone wall
+jack and replace the line between the modem and the wall to make sure
+that the cable is good. If the modem dials but fails to successfully
+connect to the remote modem, check that the local modem configuration
+matches the configuration required by the remote system. You must
+know the requirements of that remote system to successfully debug a
+connection. See the following list of script debugging tips for some
+hints on what to check. If you can successfully connect to the remote
+system, note everything you entered to do so, and note everything
+that the modem and the remote server display. Then set the remote
+server to PPP or SLIP mode and note how you accomplished this. You
+will need to duplicate all of these steps in your
+<tt class="literal">dip</tt> script.
+</p>
+
+<p>Start with a bare-bones <a name="INDEX-1372" />script, like the sample
+<em class="emphasis">start-ppp.dip</em> script, so that you can debug the
+basic connection before adding the complexity of error processing to
+the script. Run the script through <tt class="literal">dip</tt> using the
+verbose option (<tt class="literal">-v</tt>) option. This displays each
+line of the script as it is processed. Look for the following
+problems:
+</p>
+
+<ul><li>
+<p>The modem does not respond to the script. Check that you are using
+the correct device on the <tt class="literal">port</tt> command. Make sure
+that if the script contains <tt class="literal">databits</tt>,
+<tt class="literal">parity</tt>, <tt class="literal">speed</tt>, or
+<tt class="literal">stopbits</tt> commands, they are set to values
+compatible with your modem. Double-check that the modem is
+Hayes-compatible, particularly if you attempt to do modem
+configuration using <tt class="literal">dip</tt> keywords instead of using
+<tt class="literal">send</tt>.
+</p>
+</li><li>
+<p>The modem fails to connect to the remote host. Make sure the modem is
+configured exactly as it was during the manual login. The
+modem's databits, parity, and other options need to match the
+configuration of the remote system. It is possible that you will need
+a special configuration, for example, 7-bit/even-parity, to perform
+the login before you can switch to the 8-bit/no-parity configuration
+required by PPP and SLIP. Don't forget to check that the phone
+number entered in the <tt class="literal">dial</tt> command is correct,
+particularly if the modem displays VOICE, RING - NO ANSWER, or BUSY
+when you expect to see CONNECT.
+</p>
+</li><li>
+<p>The script hangs. It is probably waiting for a response. Make sure
+that the string in each <tt class="literal">wait</tt> command is correct.
+Remember that the string only needs to be a subset of the response.
+It is better to use the string "&gt;" than it is to use
+"Port9&gt;" if you are not sure whether the remote system
+always displays the same port number. Use a substring from the end of
+the expected response so that the script does not send to the server
+before the server is ready for input. Also try putting a delay into
+the script just before the script sends the first command to the
+server, e.g., <tt class="literal">sleep 2</tt> to delay two seconds. A
+delay is sometimes needed to allow the server to initialize the port
+after the modems connect.
+</p>
+</li><li>
+<p>The remote server displays an error message. The script probably sent
+an incorrect value. Check the string in each <tt class="literal">send</tt>
+command. Make sure they terminate with the correct carriage-return or
+line-feed combination expected by the remote server.
+</p>
+</li></ul>
+<p>If you have trouble with the script, try running
+<tt class="literal">dip</tt> in test mode (<tt class="literal">-t</tt>), which
+allows you to enter each command manually one at a time. Do this
+repeatedly until you are positive that you know all the commands
+needed to log into the remote server. Then go back to debugging the
+script. You'll probably have fresh insight into the login
+process that will help you find the flaw in the script.
+</p>
+
+<p>Once the script is running and the connection is successfully made,
+things should run smoothly. You should be able to
+<tt class="literal">ping</tt> the remote server without difficulty. If you
+have problems, they may be in the IP interface configuration or in
+the default route. The script should have created the serial
+interface. The <tt class="literal">netstat -ni</tt> command shows which
+interfaces have been configured:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">netstat -ni</b> 
+Name  Mtu  Net/Dest     Address     Ipkts Ierrs Opkts Oerrs Collis Queue 
+dnet0 1500 172.16.15.0  172.16.15.1      1     0    4     0      0     0 
+lo0   1536 127.0.0.0    127.0.0.1     1712     0 1712     0      0     0 
+ppp0  1006 172.16.15.26 172.16.15.3      0     0    0     0      0     0</pre></blockquote>
+
+<p>The interface, ppp0 in the example, has been installed. The
+<tt class="literal">default</tt> command in the script creates a default
+route. Use <tt class="literal">netstat</tt> to see the contents of the
+routing table:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">netstat -nr</b> 
+Routing tables 
+Destination      Gateway          Flags  Refcnt  Use Interface 
+127.0.0.1        127.0.0.1           UH      1    28      lo0 
+default          172.16.25.3          U      0     0      ppp0
+172.16.15.0      172.16.15.1          U      21 1687      le0</pre></blockquote>
+
+<p>The contents of routing tables are explained in detail in the next
+chapter. For now, just notice that the interface used for the default
+route is ppp0 and that the default route is a route to the remote PPP
+server (172.16.25.3 in the example).
+</p>
+
+<p>If the script creates the connection, the interface is installed, and
+the routing table contains the default route, everything should work
+fine. If you still have problems they may be related to other parts
+of the TCP/IP installation. Refer to <a href="ch13_01.html">Chapter 13, "
+Troubleshooting TCP/IP"</a> for
+more troubleshooting <a name="INDEX-1373" /> <a name="INDEX-1374" />information. 
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.2. TCP/IP Over a Serial Line </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.4. Summary </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+</html>

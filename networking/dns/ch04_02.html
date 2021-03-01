@@ -1,0 +1,840 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:24 GMT -->
+<head><title>Setting Up Zone Data (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.2. Setting Up Zone Data</h2>
+
+
+<a name="INDEX-391" />
+<a name="INDEX-392" /><a name="INDEX-393" />Our
+first step in setting up the Movie U. name servers is to translate
+the host table into equivalent DNS zone data. The DNS version of the
+data has multiple files. One file maps all the host names to
+addresses. Other files map the addresses back to host names. The
+<a name="INDEX-394" />name-to-address lookup is sometimes
+called <em class="emphasis">forward
+mapping</em><a name="INDEX-395" /> <a name="INDEX-396" />, and
+the <a name="INDEX-397" />address-to-name
+lookup <em class="emphasis">reverse
+mapping</em><a name="INDEX-398" />. Each network has its own file for
+reverse-mapping data.</p><p>
+
+
+As a convention in this book, a file that maps host names to
+addresses is called
+<em class="filename">db.DOMAIN</em><a name="INDEX-399" />. For <em class="emphasis">movie.edu</em>, this file is called
+<em class="emphasis">db.movie.edu</em>. The files mapping addresses to
+host names are called
+<em class="filename">db.ADDR</em><a name="INDEX-400" />, where ADDR is the network number without
+trailing zeros or the specification of a netmask. In our example, the
+files are called <em class="filename">db.192.249.249</em> and
+<em class="filename">db.192.253.253</em>; there's one for each
+network. The <em class="filename">db </em>is short for database.
+We'll refer to the collection of <em class="filename">db.DOMAIN</em>
+and <em class="filename">db.ADDR </em>files as <em class="emphasis">zone data
+files</em><a name="INDEX-401" />. There are a few other zone data files:
+<em class="filename">db.cache </em>and <em class="filename">db.127.0.0</em>.
+These files are overhead. Each name server must have them, and they
+are more or less the same for each server.</p><p>
+
+
+To tie all the zone data files together, a name server needs a
+<a name="INDEX-402" />configuration file -- for BIND Version
+4, this file is usually called <a name="INDEX-403" /><em class="filename">/etc/named.boot</em>. For
+BIND Versions 8 and 9, it is usually called
+<em class="filename">/etc/named.conf</em><a name="INDEX-404" />. The format of the zone data files is
+common to all DNS implementations: it's called the
+<em class="emphasis">master file format</em>. The format of the
+configuration files, on the other hand, is specific to the name
+server implementation -- in this case, BIND.</p><p>
+
+
+<a name="dns4-CHP-4-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">4.2.1. The Zone Data Files</h3>
+
+
+Most entries in zone data files are called <em class="emphasis">DNS
+</em><a name="INDEX-405" />
+<a name="INDEX-406" /><em class="emphasis">resource records</em>.
+DNS lookups are <a name="INDEX-407" />case-insensitive, so you can enter names
+in your zone data files in uppercase, lowercase, or mixed case. We
+tend to use all lowercase. However, even though lookups are
+case-insensitive, case is preserved. That way, if you add records for
+<em class="emphasis">Tootsie.movie.edu</em> to your
+zone data, people looking up <em class="emphasis">tootsie.movie.edu</em> will find the records,
+but with a capital "T" in the domain name.</p><p>
+
+
+Resource records must start in the first column of a line. The
+resource records in the example files in this book do start in the
+first column, but they may look indented because of the way the book
+is formatted. In the DNS RFCs, the examples present the resource
+records in a certain order. Most people have chosen to follow that
+order, as we have here, but the order is not a requirement. The order
+of resource records in the zone data files is as follows:</p><p>
+
+
+<dl>
+<dt><i>SOA record</i></dt>
+<dd><a name="INDEX-408" />Indicates
+<em class="emphasis">authority</em> for this zone</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>NS record</i></dt>
+<dd><a name="INDEX-409" />Lists a <em class="emphasis">name
+server</em> for this zone</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Other records</i></dt>
+<dd>Data about hosts in this zone</p></dd>
+
+</dl>
+
+
+Of the other records, this chapter covers:</p><p>
+
+
+<dl>
+<dt><i>A</i></dt>
+<dd><a name="INDEX-410" />Name-to-address mapping</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>PTR</i></dt>
+<dd><a name="INDEX-411" />Address-to-name mapping</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>CNAME</i></dt>
+<dd><a name="INDEX-412" />Canonical name (for aliases)</p></dd>
+
+</dl>
+
+
+Those of you who have some experience with the master file format
+will no doubt look at our data and say to yourselves, "It would
+have been shorter to specify it this other way...." We're
+not using abbreviations or shortcuts in our zone data, at least not
+initially, so that you'll understand the full syntax of each
+resource record. Once you understand the long version, we'll go
+back and "tighten up" the files.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">4.2.2. Comments</h3>
+
+
+The zone data files are easier to read if they contain
+<a name="INDEX-413" />comments and
+<a name="INDEX-414" />blank lines. Comments start with a
+<a name="INDEX-415" />
+<a name="INDEX-416" />semicolon and finish at the end of the
+line. As you might guess, the name server ignores comments and blank
+lines.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">4.2.3. Setting the Zone's Default TTL</h3>
+
+
+Before we start writing our zone data file, we have to find out what
+version of BIND we're running. The version makes a difference
+because the way you set the default time to live for a zone changed
+in <a name="INDEX-417" /> <a name="INDEX-418" />BIND 8.2. Prior to BIND 8.2, the last field
+in the SOA record set the default TTL for a zone. But just before
+BIND 8.2 came out, RFC 2308 was published, which changed the meaning
+of the final field in the SOA record to the <em class="emphasis">negative
+caching TTL</em>. This is how long a remote name server can
+cache <em class="emphasis">negative responses</em> about the zone, answers
+that say that a particular domain name or the type of data sought for
+a particular domain name doesn't exist.</p><p>
+
+
+So how do you set a default TTL for a zone in BIND 8.2 and later?
+With the new $TTL <em class="emphasis">control</em> statement. $TTL
+specifies the time to live for all records in the file that follow
+the statement (but precede any other $TTL<tt class="function">
+</tt>statements) and don't have an explicit TTL.</p><p>
+
+
+The name server supplies this TTL in query responses, allowing other
+servers to cache the data for the TTL interval. If your data
+doesn't change much, you might consider using a default TTL of
+several days. One week is about the longest value that makes sense.
+You can use a value as short as one hour, but we typically
+don't recommend TTLs lower than that because of the amount of
+DNS traffic they cause.</p><p>
+
+
+Since we're running a new version of BIND, we need to set a
+default TTL for our zones with a $TTL statement. Three hours seems
+about right to us, so we start our zone data files with:</p><p>
+
+
+<blockquote><pre class="code">$TTL 3h</pre></blockquote>
+
+
+If you're running a name server older than BIND 8.2,
+don't try adding a $TTL statement -- the name server
+won't understand it and will treat it as a syntax error.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">4.2.4. SOA Records</h3>
+
+
+The next entry (the first for pre-8.2 BIND servers) in each of these
+files is the SOA (start of authority) resource record. The
+<a name="INDEX-419" />SOA record
+indicates that this name server is the best source of information for
+the data within this zone. Our name server is
+<em class="emphasis">authoritative</em> for the zone <em class="emphasis">movie.edu</em> because of the SOA record. An
+SOA record is required in each
+<em class="filename">db.DOMAIN</em><a name="INDEX-420" /> and
+<em class="filename">db.ADDR</em><a name="INDEX-421" /> file. There can be one, and only one, SOA
+record in a zone data file.</p><p>
+
+
+We added the following SOA record to the
+<em class="filename">db.movie.edu</em> file:</p><p>
+
+
+<blockquote><pre class="code">movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 day</pre></blockquote>
+
+
+The name <em class="emphasis">movie.edu</em>. must
+start in the first column of the file. Make sure the name ends with a
+<a name="INDEX-422" />
+<a name="INDEX-423" />
+<a name="INDEX-424" />trailing
+dot, as ours does here, or you'll be surprised at the result!
+(We'll explain later in this chapter.)</p><p>
+
+
+The IN stands for Internet. This is one <em class="emphasis">class</em> of
+data -- other classes exist, but none of them is currently in
+widespread use. Our examples use only the <a name="INDEX-425" />IN class. The class field is optional. If
+the class is omitted, the name server determines the class from the
+statement in the configuration file that instructs it to read this
+file. We'll see this later in the chapter, too.</p><p>
+
+
+The first name after SOA (<em class="emphasis">terminator.movie.edu</em>.) is the name of
+the primary master name server for the <em class="emphasis">movie.edu
+</em>zone. The second name (<em class="emphasis">al.robocop.movie.edu</em>.) is the mail
+address of the person in charge of the zone if you replace the first
+"." with an "@". Often you'll see
+<em class="emphasis">root</em><a name="INDEX-426" />,
+<em class="emphasis">postmaster</em><a name="INDEX-427" />, or
+<em class="emphasis">hostmaster</em><a name="INDEX-428" /> as the <a name="INDEX-429" />email address. Name servers
+won't use this address -- it's meant for human
+consumption. If you have a problem with a
+<a name="INDEX-430" />
+<a name="INDEX-431" />zone, you can send a message to
+the listed email address. BIND 4.9 and later versions provide another
+resource record type, RP (responsible person), for this purpose also.
+The <a name="INDEX-432" />RP record is
+discussed in <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a>.</p><p>
+
+
+The <a name="INDEX-433" />
+<a name="INDEX-434" />parentheses allow the
+SOA record to span more than one line. Most of the fields within the
+parentheses of the SOA record are for use by slave name servers and
+are discussed when we introduce slave name servers later in this
+chapter. For now, assume these are reasonable values.</p><p>
+
+
+We add similar SOA records to the beginning of the
+<em class="filename">db.192.249.249</em> and
+<em class="filename">db.192.253.253</em> files. In these files, we change
+the first name in the SOA record from <em class="emphasis">movie.edu</em>. to the name of the
+appropriate <em class="emphasis">in-addr.arpa</em>
+zone: <em class="emphasis">249.249.192.in-addr.arpa</em>. and
+<em class="emphasis">253.253.192.in-addr.arpa</em>.,
+respectively.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">4.2.5. NS Records</h3>
+
+
+The next entries we add to each file are <a name="INDEX-435" /> <a name="INDEX-436" />NS (name server)
+resource records. We add one NS record for each name server
+authoritative for our zone. Here are the NS records from the
+<em class="filename">db.movie.edu</em> file:</p><p>
+
+
+<blockquote><pre class="code">movie.edu.  IN NS  terminator.movie.edu.
+movie.edu.  IN NS  wormhole.movie.edu.</pre></blockquote>
+
+
+These records indicate that there are two name servers for the zone
+<em class="emphasis">movie.edu</em>. The name servers
+are on the hosts <em class="emphasis">terminator.movie.edu</em> and <em class="emphasis">wormhole.movie.edu</em>.
+<a name="INDEX-437" />Multihomed
+hosts, like <em class="emphasis">wormhole.movie.edu</em>, are excellent
+choices for name servers because they are
+"well-connected." They are directly accessible by hosts
+on more than one network and, if they also serve as routers, are not
+often down because they are closely monitored. We'll cover more
+on where to place your name servers in <a href="ch08_01.html">Chapter 8, "Growing Your Domain"</a>.</p><p>
+
+
+As with the SOA record, we add NS records to the
+<em class="filename">db.192.249.249</em> and
+<em class="filename">db.192.253.253</em> files, too.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">4.2.6. Address and Alias Records</h3>
+
+
+<a name="INDEX-438" />
+<a name="INDEX-439" />Next, <a name="INDEX-440" />
+<a name="INDEX-441" />
+<a name="INDEX-442" />we create the <a name="INDEX-443" />name-to-address
+mappings. We add the following resource records to the
+<em class="filename">db.movie.edu</em> file:</p><p>
+
+
+<blockquote><pre class="code">;
+; Host addresses
+;
+localhost.movie.edu.  IN A     127.0.0.1
+robocop.movie.edu.    IN A     192.249.249.2
+terminator.movie.edu. IN A     192.249.249.3
+diehard.movie.edu.    IN A     192.249.249.4
+misery.movie.edu.     IN A     192.253.253.2
+shining.movie.edu.    IN A     192.253.253.3
+carrie.movie.edu.     IN A     192.253.253.4
+;
+; Multi-homed hosts
+;
+wormhole.movie.edu.   IN A     192.249.249.1
+wormhole.movie.edu.   IN A     192.253.253.1
+;
+; Aliases
+;
+bigt.movie.edu.       IN CNAME terminator.movie.edu.
+dh.movie.edu.         IN CNAME diehard.movie.edu.
+wh.movie.edu.         IN CNAME wormhole.movie.edu.
+wh249.movie.edu.      IN A     192.249.249.1
+wh253.movie.edu.      IN A     192.253.253.1</pre></blockquote>
+
+
+The first two blocks are probably not a surprise. The
+<a name="INDEX-444" />A stands for address, and each resource
+record maps a name to an address. <em class="emphasis">wormhole.movie.edu</em> acts as a router. It
+has two addresses associated with its name and therefore two address
+records. Unlike host table lookups, a DNS lookup can return more than
+one address for a name; a lookup of <em class="emphasis">wormhole.movie.edu</em> returns two. If the
+requestor and name server are on the same network, some name servers
+place the "closest" address first in the response for
+better performance. This feature is
+called<a name="INDEX-445" />
+<em class="emphasis">address sorting</em><a name="INDEX-446" /> and is covered in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>. If address sorting does not apply, the
+addresses are
+<em class="emphasis">rotated</em><a name="INDEX-447" />
+<a name="INDEX-448" /> between
+queries so subsequent responses list them in a different order. This
+<a name="INDEX-449" />"round robin" feature
+first shows up in BIND 4.9.</p><p>
+
+
+The third block has the <a name="INDEX-450" />host table aliases. For the first three
+aliases, we created <a name="INDEX-451" />CNAME (canonical
+name) resource records. However, we created address records for the
+other two aliases (more on this in a moment). A CNAME record maps an
+alias to its canonical name. The name server handles CNAME records
+differently from the way aliases are handled in the host table. When
+a name server looks up a name and finds a CNAME record, it replaces
+the name with the canonical name and looks up the new name. For
+example, when the name server looks up <em class="emphasis">wh.movie.edu</em>, it finds a CNAME record
+pointing to <em class="emphasis">wormhole.movie.edu</em>. It then looks up
+<em class="emphasis">wormhole.movie.edu</em> and
+returns both addresses.</p><p>
+
+
+There is one thing to remember about aliases like <em class="emphasis">bigt.movie.edu</em> -- they should never
+appear on the right-hand side of a resource record. Stated
+differently, you should always use the canonical name (e.g.,
+<em class="emphasis">terminator.movie.edu</em>) in the
+data portion of the resource record. Notice that the NS records we
+just created use the canonical name.</p><p>
+
+
+The final two entries solve a special problem. Suppose you have a
+router, like <em class="emphasis">wormhole.movie.edu</em>, and you want to
+check one of the interfaces. One common troubleshooting technique is
+to <em class="filename">ping</em> the interface to verify that it is
+responding. If you <a name="INDEX-452" /><em class="filename">ping</em> the name
+<em class="emphasis">wormhole.movie.edu</em>, the name
+server returns both addresses for the name. <em class="filename">ping</em>
+uses the first address in the list. But which address is first?</p><p>
+
+
+With the host table, we choose the address we want by using either
+<em class="emphasis">wh249.movie.edu</em> or
+<em class="emphasis">wh253.movie.edu</em>; each name
+referred to <em class="emphasis">one</em> of the host's addresses.
+To provide an equivalent capability with DNS, we don't make
+<em class="emphasis">wh249.movie.edu</em> and
+<em class="emphasis">wh253.movie.edu</em> into aliases
+(CNAME records). That would result in both addresses for <em class="emphasis">wormhole.movie.edu</em> being returned when
+the alias was looked up. Instead, we use address records. Now, to
+check the operation of the 192.253.253.1 interface on <em class="emphasis">wormhole.movie.edu</em>, we <em class="filename">ping
+wh253.movie.edu</em> since it refers to only one address. The
+same applies to <em class="emphasis">wh249.movie.edu</em>.</p><p>
+
+
+To state this as a general rule: if a host is
+<a name="INDEX-453" />multihomed
+(has more than one network interface), create an address (A) record
+for each alias unique to one address. Create a CNAME record for each
+alias common to all the addresses.</p><p>
+
+
+Now, don't tell your users about names like <em class="emphasis">wh249.movie.edu</em> and <em class="emphasis">wh253.movie.edu</em>. Those names are meant
+for system-administration purposes only. If users learn to use names
+like <em class="emphasis">wh249.movie.edu</em>,
+they'll be confused when the name doesn't work for them
+in some places, like <em class="filename">.rhosts </em>files. That's
+because these places need the name that results from looking up the
+address: the canonical name, <em class="emphasis">wormhole.movie.edu</em>.</p><p>
+
+
+Since we use A (address) records for the <em class="emphasis">wh249.movie.edu</em> and <em class="emphasis">wh253.movie.edu</em> aliases, you might ask,
+"Is it okay to use <a name="INDEX-454" /> <a name="INDEX-455" />address records instead of CNAME
+records in <em class="emphasis">all</em> cases?" Well, using address
+records instead of CNAME records doesn't cause problems with
+most applications, since most applications care only about finding IP
+addresses. There is one
+application -- <a name="INDEX-456" /><em class="filename">sendmail -- </em>whose
+behavior changes, though. <em class="filename">sendmail</em> usually
+replaces aliases in mail headers with their canonical names; this
+<a name="INDEX-457" /><em class="emphasis">canonicalization</em>
+happens only if the names in the mail header have CNAME data
+associated with them. If you don't use CNAME records for
+aliases, your <em class="filename">sendmail</em> will have to understand
+all the possible aliases your host might be known by, which will
+require extra <em class="filename">sendmail</em> configuration on your
+part.</p><p>
+
+
+In addition to the problem with <em class="filename">sendmail</em>, users
+might be confused when they try to figure out the canonical name to
+enter in their <em class="filename">.rhosts</em> file. Looking up a name
+that has CNAME data leads them to the canonical name, whereas address
+data won't. In this case, users <em class="emphasis">should
+</em>instead be looking up the IP address to get the canonical
+name, as <em class="filename">rlogind</em> does, but users like these
+never seem to be on systems we<a name="INDEX-458" /> <a name="INDEX-459" /> <a name="INDEX-460" /> administer.<a name="INDEX-461" /> <a name="INDEX-462" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.7" /><div class="sect2">
+<h3 class="sect2">4.2.7. PTR Records</h3>
+
+
+Next we create the
+<a name="INDEX-463" />
+<a name="INDEX-464" />address-to-name mappings. The file
+<em class="filename">db.192.249.249</em> maps addresses to host names for
+the 192.249.249/24 network. The DNS resource records used for this
+mapping are <a name="INDEX-465" />
+<a name="INDEX-466" />PTR (pointer) records. There is one record
+for each network interface on this network. (Recall that addresses
+are looked up as names in DNS. The address is reversed and
+<em class="emphasis">in-addr.arpa</em> is appended.)</p><p>
+
+
+Here are the PTR records we added for network 192.249.249/24:</p><p>
+
+
+<blockquote><pre class="code">1.249.249.192.in-addr.arpa.  IN PTR wormhole.movie.edu.
+2.249.249.192.in-addr.arpa.  IN PTR robocop.movie.edu.
+3.249.249.192.in-addr.arpa.  IN PTR terminator.movie.edu.
+4.249.249.192.in-addr.arpa.  IN PTR diehard.movie.edu.</pre></blockquote>
+
+
+There are a couple of things you should notice about this data.
+First, addresses should point to only a single name: the canonical
+name. Thus, 192.249.249.1 maps to <em class="emphasis">wormhole.movie.edu</em>, not to <em class="emphasis">wh249.movie.edu</em>. You
+<em class="emphasis">can</em> create two PTR records, one for <em class="emphasis">wormhole.movie.edu</em> and one for
+<em class="emphasis">wh249.movie.edu</em>, but most
+systems are not prepared to see more than one name for an address.
+Second, even though <em class="emphasis">wormhole.movie.edu</em> has two addresses,
+you see only one of them here. That's because this file shows
+only the direct connections to network 192.249.249/24, and
+<em class="emphasis">wormhole.movie.edu</em> has only
+one connection there.</p><p>
+
+
+We created similar data for the 192.253.253/24 network.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.8" /><div class="sect2">
+<h3 class="sect2">4.2.8. The Completed Zone Data Files</h3>
+
+
+<a name="INDEX-467" />Now that we've explained the
+various resource records in the zone data files, we'll show you
+what they look like with all the data in one place. Again, the actual
+order of these resource records does not matter.</p><p>
+
+
+Here are the contents of the file <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">$TTL 3h
+movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 hour
+
+;
+; Name servers
+;
+movie.edu.  IN NS  terminator.movie.edu.
+movie.edu.  IN NS  wormhole.movie.edu.
+
+;
+; Addresses for the canonical names
+;
+localhost.movie.edu.  IN A     127.0.0.1
+robocop.movie.edu.    IN A     192.249.249.2
+terminator.movie.edu. IN A     192.249.249.3
+diehard.movie.edu.    IN A     192.249.249.4
+misery.movie.edu.     IN A     192.253.253.2
+shining.movie.edu.    IN A     192.253.253.3
+carrie.movie.edu.     IN A     192.253.253.4
+wormhole.movie.edu.   IN A     192.249.249.1
+wormhole.movie.edu.   IN A     192.253.253.1
+
+;
+; Aliases
+;
+bigt.movie.edu.       IN CNAME terminator.movie.edu.
+dh.movie.edu.         IN CNAME diehard.movie.edu.
+wh.movie.edu.         IN CNAME wormhole.movie.edu.
+
+;
+; Interface specific names
+;
+wh249.movie.edu.      IN A     192.249.249.1
+wh253.movie.edu.      IN A     192.253.253.1</pre></blockquote>
+
+
+Here are the contents of the file <em class="filename">db.192.249.249
+</em>:</p><p>
+
+
+<blockquote><pre class="code">$TTL 3h
+249.249.192.in-addr.arpa. IN SOA terminator.movie.edu. al.robocop.movie.edu.(
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 hour
+
+;
+; Name servers
+;
+249.249.192.in-addr.arpa.  IN NS  terminator.movie.edu.
+249.249.192.in-addr.arpa.  IN NS  wormhole.movie.edu.
+
+;
+; Addresses point to canonical name
+;
+1.249.249.192.in-addr.arpa.  IN PTR wormhole.movie.edu.
+2.249.249.192.in-addr.arpa.  IN PTR robocop.movie.edu.
+3.249.249.192.in-addr.arpa.  IN PTR terminator.movie.edu.
+4.249.249.192.in-addr.arpa.  IN PTR diehard.movie.edu.</pre></blockquote>
+
+
+And here are the contents of the file
+<em class="filename">db.192.253.253</em>:</p><p>
+
+
+<a name="INDEX-468" /><blockquote><pre class="code">$TTL 3h
+253.253.192.in-addr.arpa. IN SOA terminator.movie.edu. al.robocop.movie.edu.(
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 hour
+;
+; Name servers
+;
+253.253.192.in-addr.arpa.  IN NS  terminator.movie.edu.
+253.253.192.in-addr.arpa.  IN NS  wormhole.movie.edu.
+
+;
+; Addresses point to canonical name
+;
+1.253.253.192.in-addr.arpa.  IN PTR wormhole.movie.edu.
+2.253.253.192.in-addr.arpa.  IN PTR misery.movie.edu.
+3.253.253.192.in-addr.arpa.  IN PTR shining.movie.edu.
+4.253.253.192.in-addr.arpa.  IN PTR carrie.movie.edu.</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.9" /><div class="sect2">
+<h3 class="sect2">4.2.9. The Loopback Address</h3>
+
+
+<a name="INDEX-469" />A name
+server needs one additional <em class="filename">db.ADDR</em> file to
+cover the <em class="emphasis">loopback</em><a name="INDEX-470" /> network: the special address that hosts
+use to direct traffic to themselves. This network is (almost) always
+127.0.0/24, and the host number is (almost) always 127.0.0.1.
+Therefore, the name of this file is <em class="filename">db.127.0.0</em>.
+No surprise here; it looks like the other
+<em class="filename">db.ADDR</em> files.</p><p>
+
+
+Here are the contents of the file <em class="filename">db.127.0.0 </em>:</p><p>
+
+
+<blockquote><pre class="code">$TTL 3h
+0.0.127.in-addr.arpa. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 hour
+
+0.0.127.in-addr.arpa.  IN NS  terminator.movie.edu.
+0.0.127.in-addr.arpa.  IN NS  wormhole.movie.edu.
+
+1.0.0.127.in-addr.arpa.  IN PTR localhost.</pre></blockquote>
+
+
+Why do name servers need this silly little file? Think about it for a
+second. No one was given responsibility for network 127.0.0/24, yet
+systems use it for a loopback address. Since no one has direct
+responsibility, everyone who uses it is responsible for it
+individually. You could omit this file and your name server would
+operate. However, a lookup of 127.0.0.1 might fail because the root
+name server contacted wasn't itself configured to map 127.0.0.1
+to a name. You should provide the mapping yourself so there are no
+surprises.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-2.10" /><div class="sect2">
+<h3 class="sect2">4.2.10. The Root Hints Data</h3>
+
+
+<a name="INDEX-471" /> <a name="INDEX-472" />Besides <a name="INDEX-473" /> <a name="INDEX-474" />your local
+information, the name server also needs to know where the name
+servers for the root zone are. You must retrieve this information
+from the Internet host ftp.rs.internic.net (198.41.0.6). Use
+anonymous FTP to retrieve the file <em class="filename">named.root</em>
+from the <em class="filename">domain</em> subdirectory.
+(<em class="filename">named.root</em> is the same file we've been
+calling <em class="filename">db.cache</em><a name="INDEX-475" /> <a name="INDEX-476" />. Just rename it
+<em class="filename">db.cache</em> after you've retrieved it.)</p><p>
+
+
+<blockquote><pre class="code">;       This file holds the information on root name servers needed to
+;       initialize cache of Internet domain name servers
+;       (e.g. reference this file in the "cache  .  &lt;file&gt;"
+;       configuration file of BIND domain name servers).
+;
+;       This file is made available by InterNIC registration services
+;       under anonymous FTP as
+;           file                /domain/named.root
+;           on server           FTP.RS.INTERNIC.NET
+;       -OR- under Gopher at    RS.INTERNIC.NET
+;           under menu          InterNIC Registration Services (NSI)
+;              submenu          InterNIC Registration Archives
+;           file                named.root
+;
+;       last update:    Aug 22, 1997
+;       related version of root zone:   1997082200
+;
+;
+; formerly NS.INTERNIC.NET
+;
+.                        3600000  IN  NS    A.ROOT-SERVERS.NET.
+A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
+;
+; formerly NS1.ISI.EDU
+;
+.                        3600000      NS    B.ROOT-SERVERS.NET.
+B.ROOT-SERVERS.NET.      3600000      A     128.9.0.107
+;
+; formerly C.PSI.NET
+;
+.                        3600000      NS    C.ROOT-SERVERS.NET.
+C.ROOT-SERVERS.NET.      3600000      A     192.33.4.12
+;
+; formerly TERP.UMD.EDU
+;
+.                        3600000      NS    D.ROOT-SERVERS.NET.
+D.ROOT-SERVERS.NET.      3600000      A     128.8.10.90
+;
+; formerly NS.NASA.GOV
+;
+.                        3600000      NS    E.ROOT-SERVERS.NET.
+E.ROOT-SERVERS.NET.      3600000      A     192.203.230.10
+;
+; formerly NS.ISC.ORG
+;
+.                        3600000      NS    F.ROOT-SERVERS.NET.
+F.ROOT-SERVERS.NET.      3600000      A     192.5.5.241
+;
+; formerly NS.NIC.DDN.MIL
+;
+.                        3600000      NS    G.ROOT-SERVERS.NET.
+G.ROOT-SERVERS.NET.      3600000      A     192.112.36.4
+;
+; formerly AOS.ARL.ARMY.MIL
+;
+.                        3600000      NS    H.ROOT-SERVERS.NET.
+H.ROOT-SERVERS.NET.      3600000      A     128.63.2.53
+;
+; formerly NIC.NORDU.NET
+;
+.                        3600000      NS    I.ROOT-SERVERS.NET.
+I.ROOT-SERVERS.NET.      3600000      A     192.36.148.17
+;
+; temporarily housed at NSI (InterNIC)
+;
+.                        3600000      NS    J.ROOT-SERVERS.NET.
+J.ROOT-SERVERS.NET.      3600000      A     198.41.0.10
+;
+; housed in LINX, operated by RIPE NCC
+;
+.                        3600000      NS    K.ROOT-SERVERS.NET.
+K.ROOT-SERVERS.NET.      3600000      A     193.0.14.129
+;
+; temporarily housed at ISI (IANA)
+;
+.                        3600000      NS    L.ROOT-SERVERS.NET.
+L.ROOT-SERVERS.NET.      3600000      A     198.32.64.12
+;
+; housed in Japan, operated by WIDE
+;
+.                        3600000      NS    M.ROOT-SERVERS.NET.
+M.ROOT-SERVERS.NET.      3600000      A     202.12.27.33
+; End of File</pre></blockquote>
+
+
+The domain name "." refers to the root zone. Since the
+root zone's name servers change over time, don't assume
+this list is current. Download a new version of
+<em class="filename">named.root</em>.</p><p>
+
+
+How is this file kept up to date? As the network
+<a name="INDEX-477" />administrator, that's
+your responsibility. Some old versions of BIND did update this file
+periodically. That feature was disabled, though; apparently, it
+didn't work as well as the authors had hoped. Sometimes the
+changed <em class="filename">db.cache </em>file is mailed to the
+<a name="INDEX-478" /> <a name="INDEX-479" /><em class="emphasis">bind-users</em>
+or <a name="INDEX-480" /><em class="emphasis">namedroppers</em> mailing
+list. If you are on one of these lists, you are likely to hear about
+changes.</p><p>
+
+
+Can you put data other than root name server data in this file? You
+can, but it won't be used. Originally, the name server
+installed this data in its cache. However, the use of the file has
+changed (subtly) though the name <a name="INDEX-481" />"cache file" stuck. The name
+server stores the data in this file in a special place in memory as
+the <em class="emphasis">root hints</em><em class="emphasis">.</em> It does not
+discard the hints if their <a name="INDEX-482" />TTLs drop to <a name="INDEX-483" />zero, as it would with cached data.
+The name server uses the <a name="INDEX-484" />hint data
+to query the root name servers for the current list of root name
+servers, which it caches. When the cached list of root name servers
+times out, the name server again uses the hints to get a new list.</p><p>
+
+
+Why does the name server bother querying a name server in the root
+hints file -- probably itself a root name server -- for a list
+of root name servers when it already has a list? Because that name
+server almost certainly knows the <em class="emphasis">current</em> list
+of root name servers, while the file may be out of date.</p><p>
+
+
+What are the 3600000s for? That's an explicit time to live for
+the records in the file. In older versions of this file, this number
+was 99999999. Since the contents of this file were originally cached,
+the name server needed to know how long to keep those records active.
+99999999 seconds was just a very long time -- the root name server
+data was to be kept in cache for as long as the server ran. Since the
+name server now stores this data in a special place and doesn't
+discard it if it times out, the TTL is unnecessary. But it's
+not harmful to have the 3600000s, and it makes for interesting BIND
+folklore when you pass responsibility to the next<a name="INDEX-485" /> name<a name="INDEX-486" /> <a name="INDEX-487" /> server
+administrator.<a name="INDEX-488" /> <a name="INDEX-489" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4. Setting Up BIND</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.3. Setting Up a BIND Configuration File</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:24 GMT -->
+</html>

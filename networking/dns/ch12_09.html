@@ -1,0 +1,367 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+<head><title>Using dig (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch13_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">12.9. Using dig</h2>
+
+
+<a name="INDEX-2067" /> <a name="INDEX-2068" />
+<a name="INDEX-2069" />That's one way to deal with
+what's arguably a shortcoming in
+<em class="filename">nslookup</em><a name="INDEX-2070" /> <a name="INDEX-2071" />. Another is just to chuck
+<em class="filename">nslookup </em>and use <em class="filename">dig</em>, the
+Domain Information Groper (a reverse-engineered acronym if
+we've ever heard one).</p><p>
+
+
+We said earlier that <em class="filename">dig</em> isn't as
+pervasive as <em class="filename">nslookup</em>, so we'd better
+begin by telling you where to get it. You can pick up source for
+<em class="filename">dig</em> from the <em class="filename">tools</em>
+directory (BIND 4), <em class="filename">src/bin/dig</em> directory (BIND
+8), or <em class="filename">bin/dig</em> directory (BIND 9) of the BIND
+distribution. If you build the whole distribution, you'll build
+a nice, new copy of <em class="filename">dig</em>, too.</p><p>
+
+
+With <em class="filename">dig</em>, you specify all aspects of the query
+you'd like to send on the command line; there's no
+interactive mode. You specify the domain name you want to look up as
+an argument, and the type of query you want to send (e.g.,
+<em class="emphasis">a</em> for address records, <em class="emphasis">mx</em>
+for MX records) as another argument; the default is to look up
+address records. You specify the name server you'd like to
+query after an "@." You can use either a domain name or
+an IP address to designate a name server. The default is to query the
+name servers in <em class="filename">resolv.conf</em>.</p><p>
+
+
+<em class="filename">dig</em> is smart about arguments, too. You can
+specify the arguments in any order you like, and
+<em class="filename">dig</em> will figure out that <em class="emphasis">mx</em>
+is probably the type of records, not the domain name, you want to
+look up.<a href="#FOOTNOTE-98">[98]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-98" />[98]Actually, early BIND 9 versions of
+<em class="filename">dig </em>(before 9.1.0) are order-impaired and
+require that you specify the domain name argument before the type.
+You can specify the server to query anywhere, though.</p><p>
+
+</blockquote>
+
+
+One major difference between <em class="filename">nslookup</em> and
+<em class="filename">dig</em> is that <em class="filename">dig</em>
+doesn't apply the search list, so always use fully qualified
+domain names as arguments to <em class="filename">dig</em>. So:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig plan9.fx.movie.edu</b></tt></pre></blockquote>
+
+
+looks up address records for <em class="emphasis">plan9.fx.movie.edu</em> using the first name
+server in <em class="filename">resolv.conf</em>, while:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig acmebw.com mx</b></tt></pre></blockquote>
+
+
+looks up MX records for <em class="emphasis">acmebw.com</em> on the same name server, and:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig @wormhole.movie.edu. movie.edu. soa</b></tt></pre></blockquote>
+
+
+queries <em class="emphasis">wormhole.movie.edu</em>for the SOA record of <em class="emphasis">movie.edu</em>.</p><p>
+
+
+<a name="dns4-CHP-12-SECT-9.1" /><div class="sect2">
+<h3 class="sect2">12.9.1. dig's Output Format</h3>
+
+
+<em class="filename">dig</em><a name="INDEX-2072" /> shows you the complete DNS response
+message in all its glory, with the various sections (header,
+question, answer, authority, and additional) clearly called out, and
+with resource records in those sections printed in master file
+format. This can come in handy if you need to use some of your
+troubleshooting tool's output in a zone data file or in your
+root hints file. For example, the output produced by:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig @a.root-servers.net ns .</b></tt></pre></blockquote>
+
+
+looks like this:</p><p>
+
+
+<blockquote><pre class="code">; &lt;&lt;&gt;&gt; DiG 8.3 &lt;&lt;&gt;&gt; @a.root-servers.net . ns 
+; (1 server found)
+;; res options: init recurs defnam dnsrch
+;; got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 6
+;; flags: qr aa rd; QUERY: 1, ANSWER: 13, AUTHORITY: 0, ADDITIONAL: 13
+;; QUERY SECTION:
+;;      ., type = NS, class = IN
+
+;; ANSWER SECTION:
+.                       6D IN NS        A.ROOT-SERVERS.NET.
+.                       6D IN NS        H.ROOT-SERVERS.NET.
+.                       6D IN NS        C.ROOT-SERVERS.NET.
+.                       6D IN NS        G.ROOT-SERVERS.NET.
+.                       6D IN NS        F.ROOT-SERVERS.NET.
+.                       6D IN NS        B.ROOT-SERVERS.NET.
+.                       6D IN NS        J.ROOT-SERVERS.NET.
+.                       6D IN NS        K.ROOT-SERVERS.NET.
+.                       6D IN NS        L.ROOT-SERVERS.NET.
+.                       6D IN NS        M.ROOT-SERVERS.NET.
+.                       6D IN NS        I.ROOT-SERVERS.NET.
+.                       6D IN NS        E.ROOT-SERVERS.NET.
+.                       6D IN NS        D.ROOT-SERVERS.NET.
+
+;; ADDITIONAL SECTION:
+A.ROOT-SERVERS.NET.     6D IN A         198.41.0.4
+H.ROOT-SERVERS.NET.     6D IN A         128.63.2.53
+C.ROOT-SERVERS.NET.     6D IN A         192.33.4.12
+G.ROOT-SERVERS.NET.     6D IN A         192.112.36.4
+F.ROOT-SERVERS.NET.     6D IN A         192.5.5.241
+B.ROOT-SERVERS.NET.     6D IN A         128.9.0.107
+J.ROOT-SERVERS.NET.     5w6d16h IN A    198.41.0.10
+K.ROOT-SERVERS.NET.     5w6d16h IN A    193.0.14.129
+L.ROOT-SERVERS.NET.     5w6d16h IN A    198.32.64.12
+M.ROOT-SERVERS.NET.     5w6d16h IN A    202.12.27.33
+I.ROOT-SERVERS.NET.     6D IN A         192.36.148.17
+E.ROOT-SERVERS.NET.     6D IN A         192.203.230.10
+D.ROOT-SERVERS.NET.     6D IN A         128.8.10.90
+
+;; Total query time: 116 msec
+;; FROM: terminator.movie.edu to SERVER: a.root-servers.net  198.41.0.4
+;; WHEN: Fri Sep 15 09:47:26 2000
+;; MSG SIZE  sent: 17  rcvd: 436</pre></blockquote>
+
+
+Let's examine this output section by section.</p><p>
+
+
+The first line, beginning with the master file comment character (;)
+and <em class="emphasis">&lt;&lt;&gt;&gt; DiG 8.3 &lt;&lt;&gt;&gt;</em>,
+simply parrots the options we specified in the command line, namely,
+that we were interested in the NS records that <em class="emphasis">a.root-servers.net</em> had for the root
+zone.</p><p>
+
+
+The next line, <em class="emphasis">(1 server found)</em>, tells us that
+when <em class="filename">dig</em> looked up the addresses associated with
+the domain name we specified after the "@", <em class="emphasis">a.root-servers.net</em>, it found one. (If
+<em class="filename">dig</em> finds more than three, the maximum number of
+name servers most resolvers can query, it'll report three.)</p><p>
+
+
+The line beginning with <em class="emphasis">-&gt;&gt; HEADER
+&lt;&lt;-</em> is the first part of the header of the reply
+message that <em class="filename">dig</em> received from the remote name
+server. The opcode in the header is always QUERY, just as it is with
+<em class="filename">nslookup</em>. The status is NOERROR; it can be any
+of the statuses mentioned earlier in this chapter under <a href="ch12_06.html#dns4-CHP-12-SECT-6.1">Section 12.6.1, "Showing the Query and Response Messages"</a>. The ID is the message ID, a 16-bit
+number used to match responses to queries.</p><p>
+
+
+The flags tell us a bit more about the response.
+<em class="emphasis">qr</em> indicates that the message was a response,
+not a query. <em class="filename">dig</em> decodes responses, not queries,
+so <em class="emphasis">qr</em> will always be present. Not so with
+<em class="emphasis">aa</em> or <em class="emphasis">rd</em>, though.
+<em class="emphasis">aa</em> indicates that the response was
+authoritative, and <em class="emphasis">rd</em> indicates that the
+recursion desired bit was set in the query (since the responding name
+server just copies the bit from the query to the response). Most of
+the time <em class="emphasis">rd</em> is set in the query, you'll
+also see <em class="emphasis">ra</em> set in the response, indicating that
+recursion was available from the remote name server. However,
+<em class="emphasis">a.root-servers.net</em> is a root
+name server and has recursion disabled, like we showed you in <a href="ch11_01.html">Chapter 11, "Security"</a>, so it handles recursive queries the same as
+it does iterative queries. So it ignores the <em class="emphasis">rd</em>
+bit and correctly indicates that recursion wasn't available by
+leaving <em class="emphasis">ra</em> unset.</p><p>
+
+
+The last fields in the header indicate that <em class="filename">dig</em>
+asked one question and received 13 records in the answer section,
+zero records in the authority section, and 13 records in the
+additional data section.</p><p>
+
+
+The line after the line that contains <em class="emphasis">QUERY
+SECTION:</em> shows us the query <em class="filename">dig </em>sent:
+for the NS records in the IN class for the root zone. After
+<em class="emphasis">ANSWER SECTION:</em>, we see the 13 NS records for
+the root name servers, and after <em class="emphasis">ADDITIONAL
+SECTION:</em>, we have the 13 A records that correspond to
+those 13 root name servers. If the response had included an authority
+section, we'd have seen that, too, after <em class="emphasis">AUTHORITY
+SECTION:.</em></p><p>
+
+
+At the very end, <em class="filename">dig </em>includes summary
+information about the query and response. The first line shows you
+how long it took the remote name server to return the response after
+<em class="filename">dig</em> sent the query. The second line shows you
+from which host you sent the query and to which name server you sent
+it. The third line is a timestamp showing when the response was
+received. And the fourth line shows you the size of the query and the
+response, in bytes.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-9.2" /><div class="sect2">
+<h3 class="sect2">12.9.2. Zone Transfers with dig</h3>
+
+
+<a name="INDEX-2073" />
+<a name="INDEX-2074" />As with
+<em class="filename">nslookup</em>, you can use <em class="filename">dig</em>
+to initiate zone transfers. Unlike <em class="filename">nslookup</em>,
+though, <em class="filename">dig</em> has no special command to request a
+zone transfer. Instead, you simply specify <em class="emphasis">axfr</em>
+(as the query type) and the domain name of the zone as arguments.
+Remember that you can only transfer a zone from a name server
+that's authoritative for the zone.</p><p>
+
+
+So to transfer the <em class="emphasis">movie.edu</em>
+zone from <em class="emphasis">wormhole.movie.edu</em>, you could use:</p><p>
+
+
+<blockquote><pre class="code">$ dig @wormhole.movie.edu movie.edu axfr
+
+; &lt;&lt;&gt;&gt; DiG 8.3 &lt;&lt;&gt;&gt; @wormhole.movie.edu movie.edu axfr 
+; (1 server found)
+$ORIGIN movie.edu.
+@                       1D IN SOA       terminator al.robocop (
+                                        2000091402      ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        1W              ; expiry
+                                        1H )            ; minimum
+
+                        1D IN NS        terminator
+                        1D IN NS        wormhole
+                        1D IN NS        outland.fx
+outland.fx              1D IN A         192.253.254.3
+wormhole                1D IN A         192.249.249.1
+                        1D IN A         192.253.253.1
+wh249                   1D IN A         192.249.249.1
+robocop                 1D IN A         192.249.249.2
+bigt                    1D IN CNAME     terminator
+cujo                    1D IN TXT       "Location:" "machine" "room" "dog" "house"
+wh253                   1D IN A         192.253.253.1
+wh                      1D IN CNAME     wormhole
+shining                 1D IN A         192.253.253.3
+terminator              1D IN A         192.249.249.3
+localhost               1D IN A         127.0.0.1
+fx                      1D IN NS        bladerunner.fx
+bladerunner.fx          1D IN A         192.253.254.2
+fx                      1D IN NS        outland.fx
+outland.fx              1D IN A         192.253.254.3
+dh                      1D IN CNAME     diehard
+carrie                  1D IN A         192.253.253.4
+diehard                 1D IN A         192.249.249.4
+misery                  1D IN A         192.253.253.2
+@                       1D IN SOA       terminator al.robocop (
+                                        2000091402      ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        1W              ; expiry
+                                        1H )            ; minimum
+
+;; Received 25 answers (25 records).
+;; FROM: terminator.movie.edu to SERVER: wormhole.movie.edu
+;; WHEN: Fri Sep 22 11:02:45 2000</pre></blockquote>
+
+
+Note that as with <em class="filename">nslookup</em>, the SOA record
+appears twice, at the beginning and the end of the zone. And as with
+all <em class="filename">dig</em> output, the results of the zone transfer
+are printed in master file format, so you can use the output as a
+zone data file if you need to.<a href="#FOOTNOTE-99">[99]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-99" />[99]Though you'd
+need to delete the extra SOA record first.</p><p>
+
+</blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-9.3" /><div class="sect2">
+<h3 class="sect2">12.9.3. dig Options</h3>
+
+
+There are too many command-line options to
+<em class="filename">dig</em><a name="INDEX-2075" /> to
+show here, so look at <em class="filename">dig </em>'s manual page
+for an exhaustive list. Here's a list of the most important
+ones, though, and what they do:</p><p>
+
+
+<dl>
+<dt><i>-x address</i></dt>
+<dd><em class="filename">nslookup</em> is smart enough to recognize an IP
+address and look up the appropriate domain name in <em class="emphasis">in-addr.arpa</em>, so why not
+<em class="filename">dig</em>? If you use the -<span class="option">x</span> option,
+<em class="filename">dig</em> assumes that the domain name argument
+you've specified is really an IP address, so it inverts the
+octets and tacks on <em class="filename">in-addr.arpa</em>. Using
+-<span class="option">x</span> also changes the default record type looked up to
+ANY, so you can reverse map an IP address with <em class="filename">dig -x
+10.0.0.1</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-p port</i></dt>
+<dd>Send queries to the specified port instead of port 53, the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>+norec[urse]</i></dt>
+<dd>Turn off recursion (recursion is on by default).</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>+vc</i></dt>
+<dd>Send TCP-based queries (queries are UDP by default).<a name="INDEX-2076" /> <a name="INDEX-2077" /> <a name="INDEX-2078" /></p></dd>
+
+</dl>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.8. Best of the Net</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13. Reading BIND Debugging Output</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+</html>

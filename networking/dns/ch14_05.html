@@ -1,0 +1,316 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Interoperability and Version Problems (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.5. Interoperability and Version Problems</h2>
+
+
+<a name="INDEX-2215" /> <a name="INDEX-2216" />With the move to BIND 9 and the
+introduction of Microsoft DNS Server, more interoperability problems
+are cropping up between name servers. There are also a handful of
+problems unique to one version or another of BIND or the underlying
+operating system. Many of these are easy to spot and correct, and we
+would be remiss if we didn't cover them.</p><p>
+
+
+<a name="dns4-CHP-14-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">14.5.1. Zone Transfer Fails Because of Proprietary WINS Record</h3>
+
+
+<a name="INDEX-2217" /><a name="INDEX-2218" /><a name="INDEX-2219" />When a Microsoft DNS Server is
+configured to consult a WINS server for names it can't find in
+a given zone, it inserts a special record into the zone data file.
+The record looks like this:</p><p>
+
+
+<blockquote><pre class="code">@   IN   WINS   &amp;IP address of WINS server</pre></blockquote>
+
+
+Unfortunately, WINS is not a standard record type in the IN class.
+Consequently, if there are BIND slaves that transfer this zone,
+they'll choke on the WINS record and refuse to load the zone:</p><p>
+
+
+<blockquote><pre class="code">May 23 15:58:43 terminator named-xfer[386]: "fx.movie.edu IN 65281" - unknown type (65281)</pre></blockquote>
+
+
+The workaround for this is to configure the Microsoft DNS Server to
+filter out the proprietary record before transferring the zone. You
+do this by selecting the zone in the left-hand side of the DNS
+Manager screen, right-clicking on it, and selecting
+<em class="emphasis">Properties</em>. Click on the <em class="emphasis">WINS
+Lookup</em> tab in the resulting <em class="emphasis">Zone
+Properties</em> window, shown in <a href="ch14_05.html#dns4-CHP-14-FIG-1">Figure 14-1</a>.</p><p>
+
+
+<a name="dns4-CHP-14-FIG-1" /><div class="figure"><img height="286" alt="Figure 14-1" src="figs/dns4_1401.gif" width="348" /></div><h4 class="objtitle">Figure 14-1. Zone Properties window</h4>
+
+Checking <em class="emphasis">Settings only affect local server</em> will
+filter out the WINS record for that zone. However, if there are any
+Microsoft DNS Server slaves, they won't see the record either,
+even though they could use it.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">14.5.2. Name Server Reports "No NS Record for SOA MNAME"</h3>
+
+
+<a name="INDEX-2220" /><a name="INDEX-2221" /><a name="INDEX-2222" />You'll see this error only on BIND
+8.1 servers:</p><p>
+
+
+<blockquote><pre class="code">May 8 03:44:38 terminator named[11680]: no NS RR for SOA MNAME "movie.edu" in
+     zone "movie.edu"</pre></blockquote>
+
+
+The 8.1 server was a real stickler about the first field in the SOA
+record. Remember that one? In <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, we said
+that it was, by convention, the domain name of the primary master
+name server for the zone. BIND 8.1 assumes it is and checks for a
+corresponding NS record pointing the zone's domain name to the
+server in that field. If there's no such NS record, BIND emits
+that error message. It will also prevent NOTIFY messages from working
+correctly. The solution is either to change your MNAME field to the
+domain name of a name server listed in an NS record or to upgrade to
+a newer version of BIND 8. Upgrading is the better option since BIND
+8.1 is so old. The check was removed at BIND 8.1.1.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">14.5.3. Name Server Reports "Too Many Open Files"</h3>
+
+
+<a name="INDEX-2223" /><a name="INDEX-2224" />On hosts with many IP addresses or a low
+limit on the maximum number of files a user can open, BIND will
+report:</p><p>
+
+
+<blockquote><pre class="code">Dec 12 11:52:06 terminator named[7770]: socket(SOCK_RAW): Too many open files</pre></blockquote>
+
+
+and die.</p><p>
+
+
+Since BIND tries to <em class="emphasis">bind( )</em> to
+and listen on every network interface on the host, it may run out of
+file descriptors. This is especially common on hosts that use lots of
+virtual interfaces, often in support of web hosting. The possible
+solutions are:</p><p>
+
+
+<ul><li>Use name-based virtual hosting, which doesn't require
+additional IP addresses.</p></li><li>Configure your BIND 8 or 9 name server to listen on only one or a few
+of the host's network interfaces using the
+<em class="emphasis">listen-on</em> substatement. If <em class="emphasis">terminator.movie.edu</em> is the host
+we're having this problem with, the following:</p><p>
+
+<blockquote><pre class="code">options {
+listen-on { 192.249.249.3; };
+};</pre></blockquote>
+</li></ul>
+
+<ul><li>will tell<em class="filename"> </em><em class="emphasis">named</em> on
+<em class="emphasis">terminator.movie.edu</em> to
+<em class="emphasis">bind( )</em> only to the IP address 192.249.249.3.</p></li><li>Reconfigure your operating system to allow a process to open more
+file descriptors concurrently.</p></li></ul>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">14.5.4. Resolver Reports "Looked for PTR, Found CNAME"</h3>
+
+
+<a name="INDEX-2225" /><a name="INDEX-2226" /><a name="INDEX-2227" /><a name="INDEX-2228" />This is another problem related
+to BIND's strictness. On some lookups, the resolver logs:</p><p>
+
+
+<blockquote><pre class="code">Sep 24 10:40:11 terminator syslog: gethostby*.getanswer: asked for
+     "37.103.74.204.in-addr.arpa IN PTR", got type "CNAME"
+Sep 24 10:40:11 terminator syslog: gethostby*.getanswer: asked for
+     "37.103.74.204.in-addr.arpa", got "37.32/27.103.74.204.in-addr.arpa"</pre></blockquote>
+
+
+What happened here is that the resolver asked the name server to
+reverse map the IP address 204.74.103.37 to a domain name. The server
+did, but in the process found that <em class="emphasis">37.103.74.204.in-addr.arpa</em> was actually
+an alias for <em class="emphasis">37.32/27.103.74.204.in-addr.arpa</em>.
+That's almost certainly because the folks who run <em class="emphasis">103.74.204.in-addr.arpa</em> are using the
+scheme we described in <a href="ch09_01.html">Chapter 9, "Parenting"</a>, to delegate part
+of their namespace. The BIND 4.9.3-BETA resolver, however,
+doesn't understand that and flags it as an error, thinking it
+didn't get the domain name or the type it was after. And,
+believe it or not, some operating systems ship with the BIND
+4.9.3-BETA resolver as their system resolver.</p><p>
+
+
+The only solution to this problem is to upgrade to a newer version of
+the BIND resolver.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.5" /><div class="sect2">
+<h3 class="sect2">14.5.5. Name Server Startup Fails Because UDP Checksums Disabled</h3>
+
+
+<a name="INDEX-2229" /><a name="INDEX-2230" /><a name="INDEX-2231" />On some hosts running SunOS 4.1.x,
+you'll see this error:</p><p>
+
+
+<blockquote><pre class="code">Sep 24 10:40:11 terminator named[7770]: ns_udp checksums NOT turned on: exiting</pre></blockquote>
+
+
+<em class="filename">named</em> checked to make sure UDP checksumming was
+turned on on this system, and it wasn't, so
+<em class="filename">named</em> exited. <em class="filename">named</em> is
+insistent on UDP checksumming for good reason: it makes copious use
+of UDP and needs those UDP datagrams to arrive unmolested.</p><p>
+
+
+The solution to this problem is to enable UDP checksums on your
+system. The BIND distribution has documentation on that in
+<em class="filename">shres/sunos/INSTALL</em> and
+<em class="filename">shres/sunos/ISSUES </em>(in the BIND 4 distribution)
+or <em class="filename">src/port/sunos/shres/ISSUES </em>(in the BIND 8
+distribution).</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.6" /><div class="sect2">
+<h3 class="sect2">14.5.6. SunOS Resolver Is Configured, but Host Doesn't Use DNS</h3>
+
+
+<a name="INDEX-2232" />This problem is
+implementation-specific. Some administrators on SunOS 4 hosts
+configure their resolvers with <em class="filename">resolv.conf </em>and
+naively assume that <em class="filename">ping</em>,
+<em class="filename">telnet</em>, and their brethren should work right
+away. However, in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a> we discussed how SunOS
+4 implements the resolver (in <em class="filename">ypserv</em>, you may
+recall). If the host isn't running NIS, configuring the
+resolver won't do it. The administrator will either have to set
+up at least an empty <em class="emphasis">hosts</em> map or replace the
+resolver routines. For details on both of these options, see <a href="ch06_01.html#dns4-CHP-6-SECT-1">Section 6.1, "The Resolver"</a> in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a>.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.7" /><div class="sect2">
+<h3 class="sect2">14.5.7. Other Name Servers Don't Cache Your Negative Answers</h3>
+
+
+<a name="INDEX-2233" /><a name="INDEX-2234" />You'd
+need a keen eye to notice this problem, and, if you're running
+BIND 8, you'd also have to have turned off an important feature
+to have caused the problem. If you're running BIND 9, though,
+the feature is turned off by default. If you're running a BIND
+8 or 9 name server and other resolvers and servers seem to ignore
+your server's cached negative responses,
+<a name="INDEX-2235" /><em class="emphasis">auth-nxdomain</em>
+is probably off.<a name="INDEX-2236" /></p><p>
+
+
+<em class="emphasis">auth-nxdomain</em> is an <em class="emphasis">options</em>
+substatement that tells a BIND 8 or 9 name server to flag cached
+negative responses as authoritative, even though they're not.
+That is, if your name server has cached the fact that <em class="emphasis">titanic.movie.edu</em> does not exist from
+the authoritative <em class="emphasis">movie.edu</em>
+name servers, <em class="emphasis">auth-nxdomain</em> tells your server to
+pass along that cached response to resolvers and servers that query
+it as though it were the authoritative name server for <em class="emphasis">movie.edu</em>.</p><p>
+
+
+The reason this feature is sometimes necessary is that some name
+servers check to make sure that negative responses (like an NXDOMAIN
+return code or no records with a NOERROR return code) are marked
+authoritative. In the days before negative caching, negative
+responses <em class="emphasis">had</em> to be authoritative, so this was a
+sensible sanity check. With the advent of negative caching, however,
+a negative response could come from the cache. To make sure that
+older servers don't ignore such answers, though, or consider
+them errors, BIND 8 and 9 let you falsely flag those responses as
+authoritative. In fact, that's the default behavior for a BIND
+8 name server, so you shouldn't see remote queriers ignoring
+your BIND 8 server's negative responses unless you've
+explicitly turned off <em class="emphasis">auth-nxdomain</em>. BIND 9 name
+servers, on the other hand, have <em class="emphasis">auth-nxdomain</em>
+offby default, so queriers may ignore their
+responses even if you haven't touched the config file.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-5.8" /><div class="sect2">
+<h3 class="sect2">14.5.8. TTL Not Set</h3>
+
+
+<a name="INDEX-2237" />As we mentioned in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, <a name="INDEX-2238" />RFC 2308 was published just before BIND 8.2
+was released. RFC 2308 changed the semantics of the last field in the
+SOA record to be the negative caching TTL and introduced a new
+control statement, $TTL, to set the default TTL for a zone data file.</p><p>
+
+
+If you upgrade to a BIND 8 name server newer than 8.2 without adding
+the necessary $TTL control statements to your zone data files,
+you'll see messages like this one in your name server's
+<em class="emphasis">syslog</em> output:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 19:34:39 terminator named[22116]: Zone "movie.edu" (file db.movie.edu): No 
+default TTL ($TTL &lt;value&gt;) set, using SOA minimum instead</pre></blockquote>
+
+
+BIND 8 generously assumes that you just haven't read RFC 2308
+yet and is content to use the last field of the SOA record as both
+the zone's default TTL and its negative caching TTL. BIND 9,
+however, isn't so forgiving:</p><p>
+
+
+<blockquote><pre class="code">Sep 26 19:35:54 terminator named[22124]: dns_master_load: db.movie.edu:7: no TTL 
+specified
+Sep 26 19:35:54 terminator named[22124]: dns_zone_load: zone movie.edu/IN: 
+database db.movie.edu: dns_db_load failed: no ttl
+Sep 26 19:35:54 terminator named[22124]: loading zones: no ttl
+Sep 26 19:35:54 terminator named[22124]: exiting (due to fatal error)</pre></blockquote>
+
+
+So before upgrading to BIND 9, be sure that you add the necessary
+$TTL control statements.<a name="INDEX-2239" /> <a name="INDEX-2240" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.4. Transition Problems</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.6. TSIG Errors</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

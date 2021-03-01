@@ -1,0 +1,233 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch13_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:00 GMT -->
+<head><title>Graphing Other Objects (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">13.3. Graphing Other Objects</h2>
+
+<a name="INDEX-2054" />MRTG
+polls and graphs the MIB variables <em class="emphasis">ifInOctets</em>
+and <em class="emphasis">ifOutOctets</em> by default, but it is possible
+to poll and graph the values of other objects, in addition to polling
+different kinds of devices. Let's first get MRTG collecting
+input and output octets from a server. To do this, run the following
+command:
+</p>
+
+<blockquote><pre class="code">[root][linuxserver] ~/mrtg-2.9.10&gt; <tt class="userinput"><b>cfgmaker public@linuxserver &gt;&gt; \</b></tt>
+<tt class="userinput"><b>/mrtg2/run/mrtg.cfg</b></tt></pre></blockquote>
+
+This is almost identical to the command we ran earlier in the
+chapter, except for the community string and target<a href="#FOOTNOTE-71">[71]</a>
+(<em class="emphasis">public@linuxserver</em>). We appended the output to
+the <em class="filename">mrtg.cfg</em> file, as opposed to specifying an
+output file with the <i class="command">- -output</i> option; this lets
+us add a new host to the existing configuration file, rather than
+starting a new file. Because the existing file already specifies a
+working directory, we also omitted the working directory option
+(<i class="command">- -global 'WorkDir: .. ' </i>). This
+<i class="command">cfgmaker</i> command adds a number of lines like the
+following to the configuration file:
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-71" />[71]Make sure that your target is running an SNMP agent. See <a href="ch07_01.html">Chapter 7, "Configuring SNMP Agents"</a> for a discussion of how to configure
+several SNMP agents for Unix and Windows NT.</p> </blockquote>
+
+<blockquote><pre class="code">Target[linuxserver]: 2:public@localhost
+MaxBytes[linuxserver]: 1250000
+Title[linuxserver]: linuxserver(linuxserver): eth0
+PageTop[linuxserver]: &lt;H1&gt;Traffic Analysis for eth0
+ &lt;/H1&gt;
+ &lt;TABLE&gt;
+   &lt;TR&gt;&lt;TD&gt;System:&lt;/TD&gt;&lt;TD&gt;linuxserver&lt;/TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;Maintainer:&lt;/TD&gt;&lt;TD&gt;&lt;/TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;Interface:&lt;/TD&gt;&lt;TD&gt;eth0 (2)&lt;/TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;IP:&lt;/TD&gt;&lt;TD&gt;linuxserver(  )&lt;/TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;Max Speed:&lt;/TD&gt;
+       &lt;TD&gt;1250.0 kBytes/s (ethernetCsmacd)&lt;/TD&gt;&lt;/TR&gt;
+  &lt;/TABLE&gt;</pre></blockquote>
+
+<a name="INDEX-2055" />These lines tell MRTG how to poll
+the server's Ethernet interface. The key used for this
+interface is <tt class="literal">linuxserver</tt>, and the target number is
+<tt class="literal">2</tt>. Why <tt class="literal">2</tt>? Remember that
+<i class="command">cfgmaker</i> walks the interface table to determine
+what entries to add to the configuration file. Therefore,
+you'll see a set of lines like this for each interface on the
+device, including the loopback interface. The target numbers are
+actually indexes into the interface table; on this server, the
+loopback interface has the index <tt class="literal">1</tt>.
+</p>
+
+<a name="INDEX-2056" /><a name="INDEX-2057" /><a name="INDEX-2058" />
+<a name="INDEX-2059" />
+<a name="INDEX-2060" />Now
+let's create an entry to graph the number of users logged onto
+the server and the total number of processes running. MRTG is capable
+of graphing these parameters, but you have to specify explicitly
+which MIB variables to graph. Furthermore, you have to specify two
+variables -- MRTG won't graph just one. (This is a rather
+strange limitation, but at least it's consistent: remember that
+the default graphs show both input and output octets.)
+</p>
+
+First, let's look at the MIB variables we plan to graph. The
+two variables, <em class="emphasis">hrSystemNumUsers</em> and
+<em class="emphasis">hrSystemProcesses</em>, are defined as OIDs
+<em class="emphasis">1.3.6.1.2.1.25.1.5.6.0</em> and
+<em class="emphasis">1.3.6.1.2.1.25.1.6.0</em>, respectively. The
+<em class="emphasis">.0</em> at the end of each OID indicates that these
+two objects are both scalar variables, not part of a table. Both come
+from the Host Resources MIB (RFC 2790), which defines a set of
+managed objects for system administration. (Some agents that run on
+server systems implement this MIB but, unfortunately, the Microsoft
+and Solaris agents do not.) The definitions for these objects are:
+</p>
+
+<blockquote><pre class="code">hrSystemNumUsers OBJECT-TYPE
+    SYNTAX Gauge
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "The number of user sessions for which this host is storing state
+         information. A session is a collection of processes requiring a 
+         single act of user authentication and possibly subject to collective
+         job control."
+    ::= { hrSystem 5 }
+
+hrSystemProcesses OBJECT-TYPE
+    SYNTAX Gauge
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "The number of process contexts currently loaded or running on
+         this system."
+    ::= { hrSystem 6 }</pre></blockquote>
+
+The entry we added to our configuration file looks like this:</p>
+
+<blockquote><pre class="code">Target[<tt class="userinput"><b>linuxserver.users</b></tt>]:<tt class="userinput"><b>1.3.6.1.2.1.25.1.5.0&amp;1.3.6.1.2.1.25.1.6.0:</b></tt>public@linuxserver
+MaxBytes[<tt class="userinput"><b>linuxserver.users</b></tt>]: <tt class="userinput"><b>512</b></tt>
+<tt class="userinput"><b>Options[linuxserver.users]:</b></tt> <tt class="userinput"><b>gauge</b></tt>
+Title[<tt class="userinput"><b>linuxserver.users</b></tt>]: linuxserver (linuxserver): <tt class="userinput"><b>Number of users and processes</b></tt>
+<tt class="userinput"><b>YLegend[linuxserver.users]: Users/Processes</b></tt>
+<tt class="userinput"><b>LegendI[linuxserver.users]: &amp;nbsp;Users:</b></tt>
+<tt class="userinput"><b>LegendO[linuxserver.users]: &amp;nbsp;Processes:</b></tt>
+PageTop[<tt class="userinput"><b>linuxserver.users</b></tt>]: &lt;H1&gt;<tt class="userinput"><b>Number of users and processes</b></tt>&lt;/H1&gt;
+ &lt;TABLE&gt;
+   &lt;TR&gt;&lt;TD&gt;System:&lt;/TD&gt;&lt;TD&gt;<tt class="userinput"><b>linuxserver</b></tt>&lt;TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;Maintainer:&lt;/TD&gt;&lt;TD&gt;&lt;/TD&gt;&lt;/TR&gt;
+   &lt;TR&gt;&lt;TD&gt;IP:&lt;/TD&gt;&lt;TD&gt;linuxserver(  )&lt;/TD&gt;&lt;/TR&gt;
+  &lt;/TABLE&gt;</pre></blockquote>
+
+<a name="INDEX-2061" /><a name="INDEX-2062" />We've highlighted the
+changes and additions to the configuration file in bold. The first
+line specifies the device we want MRTG to poll, along with the two
+OIDs (<em class="emphasis">hrSystemNumUsers</em> and
+<em class="emphasis">hrSystemProcessess</em>) we want to graph. This
+statement is obviously more complex than the
+<tt class="literal">Target</tt> statement we looked at earlier; its syntax
+is <em class="emphasis">OID1&amp;OID2:community_string@device</em>. The
+OIDs must be separated by an ampersand character
+(<tt class="literal">&amp;</tt>). Using this syntax, you can convince MRTG
+to graph any two scalar-valued MIB variables.
+</p>
+
+In the next line, we set <tt class="literal">MaxBytes</tt> to
+<tt class="literal">512</tt>. This is the maximum value for the graph;
+values greater than 512 are set to <tt class="literal">512</tt>. (Forget
+about bytes; <tt class="literal">MaxBytes</tt> simply defines a maximum
+value.) For the number of users logged in, this is a high number;
+there should never be this many people logged onto our system at
+once. The same goes for the total number of processes running on the
+system. You can choose values that make sense for your particular
+environment. If you need separate maximum values for each object,
+replace <tt class="literal">MaxBytes</tt> with two lines setting
+<tt class="literal">MaxBytes1</tt> and <tt class="literal">MaxBytes2</tt>.
+</p>
+
+The <tt class="literal">Options</tt> command is a new one; it allows you to
+change how MRTG treats the data it gathers. The only option we have
+specified is <tt class="literal">gauge</tt>. This instructs MRTG to treat
+the gathered data as <tt class="literal">Gauge</tt> data, not
+<tt class="literal">Counter</tt> data. Recall that
+<tt class="literal">Counter</tt> data is monotonically increasing, while
+<tt class="literal">Gauge</tt> data is not. Since the MIB definitions for
+both objects specify the <tt class="literal">Gauge</tt> datatype, this
+option makes sense.
+</p>
+
+<a name="INDEX-2063" /><a name="INDEX-2064" /> <a name="INDEX-2065" />
+<a name="INDEX-2066" />
+<a name="INDEX-2067" />The
+<tt class="literal">YLegend</tt>, <tt class="literal">LegendI</tt>, and
+<tt class="literal">LegendO</tt> options are also new.
+<tt class="literal">YLegend</tt> simply changes the label that is placed on
+the Y-axis of the graph itself. Since we're graphing the number
+of users and processes, we set the legend to
+<tt class="literal">Users/Processes</tt>. It's important for the
+legend to be short; if it's too long, MRTG silently ignores it
+and doesn't print anything for the label.
+<tt class="literal">LegendI</tt> changes the legend used below the graph
+for the so-called "input variable" (in this case the
+number of users logged into the system -- remember that MRTG
+expects to be graphing input and output octets).
+<tt class="literal">LegendO</tt> changes the legend for the "output
+variable" (the total number of processes running on the
+system). The terminology is unfortunate; just remember that MRTG
+always graphs a pair of objects and that the input legend always
+refers to the first object, while the output legend refers to the
+second.
+</p>
+
+<a name="INDEX-2068" />
+<a name="INDEX-2069" /> <a name="INDEX-2070" />
+<a name="INDEX-2071" />Once you have added this entry to your
+configuration file and saved it, MRTG will start gathering data from
+the device every time it runs. If you have added the appropriate
+entry in your <em class="filename">crontab</em> file, you're all
+set. Now we'll use <i class="command">indexmaker</i> to create
+intuitive index files for the server graphs, just as we did for the
+router graphs. The command to create a new index file is similar to
+the one we used to create the Cisco index file:
+</p>
+
+<blockquote><pre class="code">[root][linuxserver] ~/mrtg-2.9.10&gt;  <tt class="userinput"><b>indexmaker --title "Linux Server" \ </b></tt>
+<tt class="userinput"><b>--filter name=~'linuxserver' --output /mrtg/images/linux.html /mrtg/run/mrtg.cfg</b></tt></pre></blockquote>
+
+<a href="ch13_03.html#enettdg-CHP-13-FIG-3">Figure 13-3</a> shows the index page for the server
+graphs. It contains only two graphs: one shows traffic on the
+Ethernet interface and the other shows the number of running
+processes versus the number of users logged onto the system.
+</p>
+
+<a name="enettdg-CHP-13-FIG-3" /><div class="figure"><img height="228" alt="Figure 13-3" src="figs/snmp_1303.gif" width="481" /></div><h4 class="objtitle">Figure 13-3.  Linux Server overview graphs</h4>
+
+<a href="ch13_03.html#enettdg-CHP-13-FIG-4">Figure 13-4</a> shows the daily, weekly, monthly, and
+yearly graphs for the number of users and processes logged into the
+system.<a name="INDEX-2072" /> <a name="INDEX-2073" /> 
+</p>
+
+<a name="enettdg-CHP-13-FIG-4" /><div class="figure"><img height="577" alt="Figure 13-4" src="figs/snmp_1304.gif" width="400" /></div><h4 class="objtitle">Figure 13-4.  Daily, monthly, weekly, and yearly graphs for number of users and processes</h4>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.2. Viewing Graphs</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.4. Other Data-Gathering Applications</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch13_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:00 GMT -->
+</html>

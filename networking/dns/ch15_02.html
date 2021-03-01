@@ -1,0 +1,1580 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch15_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>C Programming with the Resolver Library Routines (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch15_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">15.2. C Programming with the Resolver Library Routines</h2>
+
+
+<a name="INDEX-2286" /> <a name="INDEX-2287" />Before writing any code, though, you
+need to be familiar with the DNS message format and the resolver
+library routines. In the shell script we just wrote,
+<em class="filename">nslookup</em> parsed the DNS message. In a C program,
+though, you have to do the parsing. Let's start this section on
+programming by looking at the DNS message format.</p><p>
+
+
+<a name="dns4-CHP-15-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">15.2.1. DNS Message Format</h3>
+
+
+<a name="INDEX-2288" /><a name="INDEX-2289" />You've seen the DNS message format
+before, in <a href="ch12_01.html">Chapter 12, "nslookup and dig"</a>. It looks like this:</p><p>
+
+
+<ul><li>Header section</p></li><li>Question section</p></li><li>Answer section</p></li><li><p>Authority section</p></li><li><p>Additional section</p></li></ul>
+The format of the<a name="INDEX-2290" /> header section is described in RFC
+1035 on pages 26-28, and also in <a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a> of this
+book. It looks like this:</p><p>
+
+
+<blockquote><pre class="code">query identification number (2 octets)
+query response (1 bit)
+opcode (4 bits)
+authoritative answer (1 bit)
+truncation (1 bit)
+recursion desired (1 bit)
+recursion available (1 bit)
+reserved (3 bits)
+response code (4 bits)
+question count (2 octets)
+answer record count (2 octets)
+name server record count (2 octets)
+additional record count (2 octets)</pre></blockquote>
+
+
+You'll also find opcode, response code, type, and class values
+defined in <em class="filename">arpa/nameser.h</em> as well as routines to
+extract this information from a message. We'll discuss these
+routines, part of the <em class="emphasis">name server library</em>,
+shortly.</p><p>
+
+
+The<a name="INDEX-2291" /> question section is described on
+pages 28-29 of RFC 1035. It looks like this:</p><p>
+
+
+<blockquote><pre class="code">domain name (variable length)
+query type (2 octets)
+query class (2 octets)</pre></blockquote>
+
+
+The<a name="INDEX-2292" /><a name="INDEX-2293" /><a name="INDEX-2294" /> answer, authority, and
+additional sections are described on pages 29-30 of RFC 1035. These
+sections comprise some number of resource records that look like
+this:</p><p>
+
+
+<blockquote><pre class="code">domain name (variable length)
+type (2 octets)
+class (2 octets)
+TTL (4 octets)
+resource data length (2 octets)
+resource data (variable length)</pre></blockquote>
+
+
+The header section contains a count of how many of these resource
+records are in each section.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">15.2.2. Domain Name Storage</h3>
+
+
+<a name="INDEX-2295" /><a name="INDEX-2296" />As you can see, the names
+stored in the DNS message are of variable length. Unlike C, DNS does
+not store the names as null-terminated strings. Domain names are
+stored as a series of length/value pairs ending with an octet of
+zero. Each label in a domain name is composed of a length octet and a
+label. A name like <em class="emphasis">venera.isi.edu</em> is stored as:</p><p>
+
+
+<blockquote><pre class="code">6 venera  3  isi  3 edu 0</pre></blockquote>
+
+
+You can imagine how much of a DNS message could be devoted to storing
+names. The developers of DNS recognized this and came up with a
+simple way to compress domain names.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">15.2.3. Domain Name Compression</h3>
+
+
+<a name="INDEX-2297" /><a name="INDEX-2298" /><a name="INDEX-2299" />Often, an entire domain name or, at
+least, the trailing labels of a domain name match a name already
+stored in the message. Domain name compression eliminates the
+repetition of domain names by storing a pointer to the earlier
+occurrence of the name instead of inserting the name again. Here is
+how it works. Suppose a response message already contains the name
+<em class="emphasis">venera.isi.edu</em>. If the name
+<em class="emphasis">vaxa.isi.edu</em> is added to the
+response, the label <em class="emphasis">vaxa</em> is
+stored, and then a pointer to the earlier occurrence of <em class="emphasis">isi.edu</em> is added. So how are these
+pointers implemented?</p><p>
+
+
+The first two bits of the
+length<a name="INDEX-2300" /> octet indicate whether a
+length/label pair or a pointer to a length/label pair follows. If the
+first two bits are zero, then the length and label follow. As you may
+remember from way back in <a href="ch02_01.html">Chapter 2, "How Does DNS Work?"</a>, a label is
+limited to 63 characters. That's because the length field has
+only the remaining six bits for the length of the label -- enough
+to represent the lengths 0-63. If the first two bits of the length
+octet are ones, then what follows is not a length but a pointer. The
+pointer is the last six bits of the length octet
+<em class="emphasis">and</em> the next octet -- 14 bits in total. The
+pointer is an offset from the start of the DNS message. Now, when
+<em class="emphasis">vaxa.isi.edu</em> is compressed
+into a buffer containing only <em class="emphasis">venera.isi.edu</em>, this is what results:</p><p>
+
+
+<blockquote><pre class="code">byte offset: 0 123456 7 890 1 234 5 6 7890 1    2
+               -------------+--------------+--------
+pkt contents: 6 venera 3 isi 3 edu 0 4 vaxa 0xC0 7</pre></blockquote>
+
+
+The <em class="emphasis">0xC0</em> is a byte with the high two bits ones
+and the rest of the bits zeros. Since the high two bits are ones,
+this is a pointer instead of a length. The pointer value is
+seven -- the last six bits of the first octet are zeros and the
+second octet is seven. At offset seven in this buffer, you find the
+rest of the domain name that begins with <em class="emphasis">vaxa</em>, which is <em class="emphasis">isi.edu</em>.</p><p>
+
+
+In this example, we only showed compressing two domain names in a
+buffer, not a whole DNS message. A DNS message would have had a
+header as well as other fields. This example is intended only to give
+you an idea of how the domain name compression works. Now the good
+news: you don't really need to care how names are compressed as
+long as the library routines do it properly. What you do need to know
+is how parsing a DNS response message can get messed up if you are
+off by one byte. For example, try to expand the name starting with
+byte two instead of byte one. You'll discover that
+"v" doesn't make a very good length octet or
+pointer.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">15.2.4. The Resolver Library Routines</h3>
+
+
+<a name="INDEX-2301" />The resolver library contains the
+routines that you need to write your application. You'll use
+these routines to generate queries. You'll use the
+<em class="emphasis">name server library</em> routines, explained next, to
+parse the response.</p><p>
+
+
+In case you're wondering why we're not using the BIND 9
+resolver routines in our code, well, they haven't been written
+yet. BIND 9 includes library routines to perform lots of powerful DNS
+functions, but they're oriented toward the BIND 9's name
+server's needs and are very complicated to use, we're
+told. The developers tell us that a simpler resolver library is
+coming and that in the meantime, we should use the BIND 8 resolver
+library. A program linked against the BIND 8 library routines will
+work just fine with a BIND 9 name server.</p><p>
+
+
+Here are the header files you must include:</p><p>
+
+
+<blockquote><pre class="code">#include &lt;sys/types.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;arpa/nameser.h&gt;
+#include &lt;resolv.h&gt;</pre></blockquote>
+
+
+Now let's look at the resolver library routines.</p><p>
+
+
+<a name="INDEX-2302" /><a name="INDEX-2303" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>res_search</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int res_search(const char *dname,
+               int class,
+               int type,
+               u_char *answer,
+               int anslen)</pre></blockquote><em class="emphasis">res_search</em><a name="INDEX-2302" /> is the "highest level"
+resolver routine, and is called by
+<em class="emphasis">gethostbyname</em>. <em class="emphasis">res_search</em><b class="function"> </b> applies the
+search algorithm to the domain name passed to it. That is, it takes
+the domain name it receives (<a name="INDEX-2303" /><em class="emphasis">dname</em>),
+"completes" the name (if it's not fully qualified)
+by adding the various domain names from the resolver search list, and
+calls <em class="emphasis">res_query</em> until it receives
+a successful response, indicating that it found a valid, fully
+qualified domain name. In addition to implementing the search
+algorithm, <em class="emphasis">res_search</em> looks in
+the file referenced by your HOSTALIASES environment variable. (The
+HOSTALIASES variable was described in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a>.)
+So it also takes care of any "private" host aliases you
+might have. <em class="emphasis">res_search</em> returns
+the size of the response or fills in <em class="emphasis">h_errno</em> and
+returns -1 if there was an error or the answer count is zero.
+(<em class="emphasis">h_errno</em> is like <em class="emphasis">errno</em>, but
+for DNS lookups.)</p>Therefore, the only parameter that's really of interest to
+<em class="emphasis">res_search</em> is <em class="emphasis">dname
+</em>; the others are just passed through to <em class="emphasis">res_query</em> and the other resolver routines.
+The other arguments are:</p><dl>
+<dt><i>class</i></dt>
+<dd>The class of the data you're looking up. This is almost always
+the constant C_IN, the Internet class. The class constants are
+defined in <em class="filename">arpa/nameser.h</em>.</p></dd>
+
+</dl><dl>
+<dt><i>type</i></dt>
+<dd>The type of data you're looking up. Again, this is a constant
+defined in <em class="filename">arpa/ nameser.h</em>. A typical value
+would be T_NS to retrieve a name server record, or T_MX to retrieve
+an MX record.</p></dd>
+
+</dl><dl>
+<dt><i>answer</i></dt>
+<dd>A buffer in which <em class="emphasis">res_search</em> will
+place the response message. Its size should be at least PACKETSZ
+(from <em class="filename">arpa/nameser.h</em>) bytes.</p></dd>
+
+</dl><dl>
+<dt><i>anslen</i></dt>
+<dd>The size of the <em class="emphasis">answer</em> buffer (e.g., PACKETSZ).</p></dd>
+
+</dl><em class="emphasis">res_search</em> returns the size of
+the response or -1 if there was an error.</p></div>
+
+<a name="INDEX-2304" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>res_query</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int res_query(const char *dname,
+              int class,
+              int type,
+              u_char *answer,
+              int anslen)</pre></blockquote><a name="INDEX-2304" /><em class="emphasis">res_query</em> is one of the
+"midlevel" resolver routines. It does all the real work
+in looking up the domain name: it makes a query message by calling
+<em class="emphasis">res_mkquery</em>, sends the query by
+calling <em class="emphasis">res_send</em>, and looks at
+enough of the response to determine whether your question was
+answered. In many cases, <em class="emphasis">res_query</em> is called by <em class="emphasis">res_search</em>, which just feeds it the
+different domain names to look up. As you'd expect, these two
+functions have the same arguments. <em class="emphasis">res_query</em> returns the size of the response,
+or it fills in <em class="emphasis">h_errno</em> and returns -1 if there
+was an error or the answer count was zero.</p></div>
+
+<a name="INDEX-2305" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>res_mkquery</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int res_mkquery(int op,
+                const char *dname,
+                int class,
+                int type,
+                const u_char *data,
+                int datalen,
+                const u_char *newrr,
+                u_char *buf,
+                int buflen)</pre></blockquote><a name="INDEX-2305" /><em class="emphasis">res_mkquery</em> creates the query message. It
+fills in all the header fields, compresses the domain name into the
+question section, and fills in the other question fields.</p>The <em class="emphasis">dname</em>, <em class="emphasis">class</em>, and
+<em class="emphasis">type</em> arguments are the same as for <em class="emphasis">res_search</em> and <em class="emphasis">res_query</em>. The remaining arguments are:</p><dl>
+<dt><i>op</i></dt>
+<dd>The "operation" to be performed. This is normally QUERY,
+but it can be IQUERY (inverse query). However, as we've
+explained before, IQUERY is seldom used. BIND Versions 4.9.4 and
+later, by default, do not even support IQUERY.</p></dd>
+
+</dl><dl>
+<dt><i>data</i></dt>
+<dd>A buffer containing the data for inverse queries. It is NULL when
+<em class="emphasis">op</em> is QUERY.</p></dd>
+
+</dl><dl>
+<dt><i>datalen</i></dt>
+<dd>The size of the <em class="emphasis">data</em> buffer. If <em class="emphasis">data
+</em>is NULL, then <em class="emphasis">datalen</em> is zero.</p></dd>
+
+</dl><dl>
+<dt><i>newrr</i></dt>
+<dd>A buffer used for the dynamic update code (covered in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>). Unless you are playing with this feature, it
+is always NULL.</p></dd>
+
+</dl><dl>
+<dt><i>buf</i></dt>
+<dd>A buffer in which <em class="emphasis">res_mkquery
+</em>places the query message. It should be PACKETSZ or larger,
+like the answer buffer in <em class="emphasis">res_search
+</em>and <em class="emphasis">res_query</em>.</p></dd>
+
+</dl><dl>
+<dt><i>buflen</i></dt>
+<dd>The size of the <em class="emphasis">buf</em> buffer (e.g., PACKETSZ).</p></dd>
+
+</dl><em class="emphasis">res_mkquery</em> returns the size of
+the query message or -1 if there was an error.</p></div>
+
+<a name="INDEX-2306" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>res_send</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int res_send(const u_char *msg,
+             int msglen,
+             u_char *answer,
+             int anslen)</pre></blockquote><a name="INDEX-2306" /><em class="emphasis">res_send</em> implements the retry algorithm. It
+sends the query message, <em class="emphasis">msg</em>, in a UDP datagram,
+but it can also send it over a TCP stream. The response message is
+stored in <em class="emphasis">answer</em>. This routine, of all the
+resolver routines, is the only one to use black magic (unless you
+know all about connected datagram sockets). You've seen these
+arguments before in the other resolver routines:</p><dl>
+<dt><i>msg</i></dt>
+<dd>The buffer containing the DNS query message.</p></dd>
+
+</dl><dl>
+<dt><i>msglen</i></dt>
+<dd>The size of the message.</p></dd>
+
+</dl><dl>
+<dt><i>answer</i></dt>
+<dd>The buffer in which to store the DNS response message.</p></dd>
+
+</dl><dl>
+<dt><i>anslen</i></dt>
+<dd>The size of the answer message.</p></dd>
+
+</dl><em class="emphasis">res_send</em> returns the size of the
+response or -1 if there was an error. If this routine returns -1 and
+<em class="emphasis">errno</em> is ECONNREFUSED, then there is no name
+server running on the target name server host.</p>You can look at <em class="emphasis">errno</em> to see if it is
+ECONNREFUSED after calling <em class="emphasis">res_search
+</em>or <em class="emphasis">res_query</em>.
+(<em class="emphasis">res_search</em> calls <em class="emphasis">res_query</em>, which calls <em class="emphasis">res_send</em>.) If you want to check
+<em class="emphasis">errno</em> after calling <em class="emphasis">res_query</em>, clear <em class="emphasis">errno
+</em>first. That way, you know the current call to <em class="emphasis">res_send</em> was the one that set
+<em class="emphasis">errno</em>. However, you don't have to clear
+<em class="emphasis">errno</em> before calling <em class="emphasis">res_search</em>. <em class="emphasis">res_search</em> clears <em class="emphasis">errno
+</em>itself before calling <em class="emphasis">res_query</em>.</p></div>
+
+<a name="INDEX-2307" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>res_init</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int res_init(void)</pre></blockquote><a name="INDEX-2307" /><em class="emphasis">res_init</em> reads <em class="filename">resolv.conf
+</em>and initializes a data structure called <em class="emphasis">_res
+</em>(more about that later). All the previously discussed
+routines will call <em class="emphasis">res_init</em> if
+they detect that it hasn't been called previously. Or you can
+call it on your own; this is useful if you want to change some of the
+defaults before calling the first resolver library routine. If there
+are any lines in <em class="filename">resolv.conf </em>that <em class="emphasis">res_init</em> doesn't understand, it
+ignores them. <em class="emphasis">res_init</em> always
+returns zero, even if the manpage reserves the right to return -1.</p></div>
+
+<a name="INDEX-2308" /><a name="INDEX-2309" /><a name="INDEX-2310" /><a name="INDEX-2311" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>herror and h_errno</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">extern int h_errno;
+int herror(const char *s)</pre></blockquote><a name="INDEX-2308" /><a name="INDEX-2309" /><a name="INDEX-2310" /><em class="emphasis">herror</em> is a
+routine like <em class="emphasis">perror</em>, except that it prints out a
+string based on the value of the external variable <em class="emphasis">h_errno
+</em>instead of <em class="emphasis">errno</em>. The only argument
+is:</p><dl>
+<dt><i>s</i></dt>
+<dd>A string used to identify the error message. If a string
+<em class="emphasis">s</em> is supplied, it is printed first, followed by
+":" and a string based on the value of
+<em class="emphasis">h_errno</em>.</p></dd>
+
+</dl>Here are the possible values of <em class="emphasis">h_errno</em>:</p><dl>
+<dt><i>HOST_NOT_FOUND</i></dt>
+<dd>The domain name does not exist. The return code in the name server
+response was NXDOMAIN.</p></dd>
+
+</dl><dl>
+<dt><i>TRY_AGAIN</i></dt>
+<dd>Either the name server is not running, or the name server returned
+SERVFAIL.</p></dd>
+
+</dl><dl>
+<dt><i>NO_RECOVERY</i></dt>
+<dd>Either the domain name could not be compressed because it was an
+invalid domain name (e.g., a name missing a label -- .<em class="emphasis">movie.edu</em>) or the name server returned
+FORMERR, NOTIMP, or REFUSED.</p></dd>
+
+</dl><dl>
+<dt><i>NO_DATA</i></dt>
+<dd>The domain name exists, but there is no data of the requested type.</p></dd>
+
+</dl><dl>
+<dt><i>NETDB_INTERNAL</i></dt>
+<dd>There was a library error unrelated to the network or name service.
+Instead, see <em class="emphasis">errno</em> for the problem
+description.<a name="INDEX-2311" /></p></dd>
+
+</dl></div>
+
+
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">15.2.5. The _res Structure</h3>
+
+
+<a name="INDEX-2312" />Each of the resolver routines (i.e.,
+each routine whose name starts with <em class="emphasis">res_</em>) makes
+use of a common data structure called <em class="emphasis">_res</em>. You
+can change the behavior of the resolver routines by changing
+<em class="emphasis">_res</em>. If you want to change the number of times
+<em class="emphasis">res_send</em> retries a query, you can change the
+value of the <em class="emphasis">retry</em> field. If you want to turn
+off the resolver search algorithm, you turn off the RES_DNSRCH bit
+from the <em class="emphasis">options</em> mask. You'll find the
+all-important <em class="emphasis">_res</em> structure in
+<em class="filename">resolv.h</em>:</p><p>
+
+
+<blockquote><pre class="code">struct _  _res_state {
+    int      retrans;   /* retransmission time interval */
+    int      retry;     /* number of times to retransmit */
+    u_long   options;   /* option flags - see below. */
+    int      nscount;   /* number of name servers */
+    struct sockaddr_in
+             nsaddr_list[MAXNS];   /* address of name server */
+#define nsaddr nsaddr_list[0]      /* for backward compatibility */
+    u_short id;                    /* current packet id */
+    char     *dnsrch[MAXDNSRCH+1]; /* components of domain to search */
+    char     defdname[MAXDNAME];   /* default domain */
+    u_long   pfcode;               /* RES_PRF_ flags - see below. */
+    unsigned ndots:4;              /* threshold for initial abs. query */
+    unsigned nsort:4;              /* number of elements in sort_list[] */
+    char     unused[3];
+    struct {
+           struct in_addr  addr;   /* address to sort on */
+           u_int32_t       mask;
+    } sort_list[MAXRESOLVSORT];
+};</pre></blockquote>
+
+
+The <em class="emphasis">options</em> field is a simple bit mask of the
+enabled options. To turn on a feature, turn on the corresponding bit
+in the options field. Bit masks for each of the options are defined
+in <em class="filename">resolv.h</em>; the options are:</p><p>
+
+
+<dl>
+<dt><i>RES_INIT</i></dt>
+<dd>If this bit is on, then <em class="emphasis">res_init</em>
+has been called.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_DEBUG</i></dt>
+<dd>This bit causes resolver debugging messages to be printed, if the
+resolver routines were compiled with DEBUG, that is. Off is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_AAONLY</i></dt>
+<dd>Requires the answer to be authoritative, not from a name
+server's cache. It's too bad this isn't
+implemented, as it would be a useful feature. Given the BIND
+resolver's design, this feature would have to be implemented in
+the name server, and it's not.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_PRIMARY</i></dt>
+<dd>Query the primary master name server only -- again, not
+implemented.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_USEVC</i></dt>
+<dd>Turn this bit on if you'd like the resolver to make its queries
+over a<a name="INDEX-2313" /><a name="INDEX-2314" /> virtual circuit (TCP) connection instead
+of with UDP datagrams. As you might guess, there is a performance
+penalty for setting up and tearing down a TCP connection. Off is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_STAYOPEN</i></dt>
+<dd>If you are making your queries over a TCP connection, turning this
+bit on causes the connection to be left open, so you can use it to
+query the same remote name server again. Otherwise, the connection is
+torn down after the query has been answered. Off is the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_IGNTC</i></dt>
+<dd>If the name server response has the truncation bit set, then the
+default resolver behavior is to retry the query using TCP. If this
+bit is turned on, the truncation bit in the response message is
+ignored and the query is not retried using TCP. Off is the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_RECURSE</i></dt>
+<dd>The default behavior for the BIND resolver is to send recursive
+queries. Turning this bit off turns off the "recursion
+desired" bit in the query message. On is the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_DEFNAMES</i></dt>
+<dd>The default behavior for the BIND resolver is to append the local
+domain name to any domain name that does not have a dot in it.
+Turning this bit off turns off appending the local domain name. On is
+the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_DNSRCH</i></dt>
+<dd>The default behavior for the BIND resolver is to append each element
+of the search list to a domain name that does not end in a dot.
+Turning this bit off turns off the search list function. On is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_INSECURE1</i></dt>
+<dd>The default behavior for a 4.9.3 or later BIND resolver is to ignore
+answers from name servers that were not queried. Turning this bit on
+disables this security check. Off (i.e., security check on) is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_INSECURE2</i></dt>
+<dd>The default behavior for a 4.9.3 or later BIND resolver is to ignore
+answers in which the question section of the response does not match
+the question section of the original query. Turning this bit on
+disables this security check. Off (i.e., security check on) is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_NOALIASES</i></dt>
+<dd><a name="INDEX-2315" />The default behavior for the BIND resolver
+is to use aliases defined in the file specified by the user's
+HOSTALIASES environment variable. Turning this bit on disables the
+HOSTALIASES feature for 4.9.3 and later BIND resolvers. Previous
+resolvers did not allow this feature to be disabled. Off is the
+default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_USE_INET6</i></dt>
+<dd>Tells the resolver to return IPv6 addresses (in addition to IPv4
+addresses) to the <em class="emphasis">gethostbyname
+</em>function.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_ROTATE</i></dt>
+<dd>Normally, a resolver that sends repeated queries always queries the
+first name server in <em class="filename">resolv.conf </em>first. With
+RES_ROTATE set, a BIND 8.2 or later resolver sends its first query to
+the first name server in <em class="filename">resolv.conf</em>, its second
+to the second name server, and so on. See the <em class="emphasis">options
+rotate</em> directive in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a> for
+details. The default is not to rotate name servers.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_NOCHECKNAME</i></dt>
+<dd>Since BIND 4.9.4, resolvers have checked the domain names in
+responses to make sure they conform to the naming guidelines
+described in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>. BIND 8.2 resolvers offer
+the option of turning the name checking mechanism off. Off (i.e.,
+name check on) is the default.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_KEEPTSIG</i></dt>
+<dd>This option tells a BIND 8.2 or later resolver not to strip the TSIG
+record from a signed DNS message. This way, the application that
+called the resolver can examine it.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_BLAST</i></dt>
+<dd>"Blast" all recursive servers by sending queries to them
+simultaneously. Not implemented yet.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RES_DEFAULT</i></dt>
+<dd>This isn't a single option, but rather a combination of the
+RES_RECURSE, RES_DEFNAMES, and RES_DNSRCH options, all of which are
+on by default. You normally won't need to set RES_DEFAULT
+explicitly; it's set for you when you call <em class="emphasis">res_init</em>.<a name="INDEX-2316" /></p></dd>
+
+</dl>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">15.2.6. The Name Server Library Routines</h3>
+
+
+<a name="INDEX-2317" />The name server library
+contains routines you need to parse response messages. Here are the
+header files you must include:</p><p>
+
+
+<blockquote><pre class="code">#include &lt;sys/types.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;netdb.h&gt;
+#include &lt;arpa/nameser.h&gt;
+#include &lt;resolv.h&gt;</pre></blockquote>
+
+
+Following are the name server library routines.</p><p>
+
+
+<a name="INDEX-2318" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_initparse</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int ns_initparse(const u_char *msg,
+                  int msglen,
+                  ns_msg *handle)</pre></blockquote><a name="INDEX-2318" /><em class="emphasis">ns_initparse
+</em>is the first routine you must call before you use the
+other name server library routines. <em class="emphasis">ns_initparse</em> fills in the data structure
+pointed to by <em class="emphasis">handle</em>, which is a parameter
+passed to other routines. The arguments are:</p><dl>
+<dt><i>msg</i></dt>
+<dd>A pointer to the beginning of the response message buffer.</p></dd>
+
+</dl><dl>
+<dt><i>msglen</i></dt>
+<dd>The size of the message buffer.</p></dd>
+
+</dl><dl>
+<dt><i>handle</i></dt>
+<dd>A pointer to a data structure filled in by <em class="emphasis">ns_initparse.</em></p></dd>
+
+</dl><em class="emphasis">ns_initparse</em> returns zero on
+success and -1 if it fails to parse the message buffer.</p></div>
+
+<div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_msg_base, ns_msg_end, and ns_msg_size</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">const u_char *ns_msg_base(ns_msg handle)
+const u_char *ns_msg_end(ns_msg handle)
+int ns_msg_size(ns_msg handle)</pre></blockquote>These routines return a pointer to the start of the message, a
+pointer to the end of the message, and the size of the message. They
+return the data you passed into <em class="emphasis">ns_initparse</em>. The only argument is:</p><dl>
+<dt><i>handle</i></dt>
+<dd>A data structure filled in by <em class="emphasis">ns_initparse.</em></p></dd>
+
+</dl></div>
+
+<a name="INDEX-2319" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_msg_id</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">u_int16_t ns_msg_id(ns_msg handle)</pre></blockquote><a name="INDEX-2319" /><em class="emphasis">ns_msg _id</em> returns the identification from
+the header section (described earlier) of the response message. The
+only argument is:</p><dl>
+<dt><i>handle</i></dt>
+<dd>A data structure filled in by <em class="emphasis">ns_initparse</em>.</p></dd>
+
+</dl></div>
+
+<a name="INDEX-2320" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_msg_get_flag</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">u_int16_t ns_msg_get_flag(ns_msg handle, ns_flag flag)</pre></blockquote><a name="INDEX-2320" /><em class="emphasis">ns_msg _ get_
+flag</em> returns the "flag" fields from the header
+section of the response message. Its arguments are:</p><dl>
+<dt><i>handle</i></dt>
+<dd>A data structure filled in by <em class="emphasis">ns_initparse</em>.</p></dd>
+
+</dl><dl>
+<dt><i>flag</i></dt>
+<dd>An enumerated type that can have the following values:</p></dd>
+
+</dl><blockquote><pre class="code">ns_f_qr     /* Question/Response */
+ns_f_opcode /* Operation Code */
+ns_f_aa     /* Authoritative Answer */
+ns_f_tc     /* Truncation Occurred */
+ns_f_rd     /* Recursion Desired */
+ns_f_ra     /* Recursion Available */
+ns_f_z      /* Must Be Zero */
+ns_f_ad     /* Authentic Data (DNSSEC) */
+ns_f_cd     /* Checking Disabled (DNSSEC) *
+ns_f_rcode  /* Response Code */
+ns_f_max</pre></blockquote></div>
+
+<a name="INDEX-2321" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_msg_count</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">u_int16_t ns_msg_count(ns_msg handle, ns_sect section)</pre></blockquote><a name="INDEX-2321" /><em class="emphasis">ns_msg_count
+</em>returns a counter from the header section of the response
+message. Its arguments are:</p><dl>
+<dt><i>handle</i></dt>
+<dd>A data structure filled in by <em class="emphasis">ns_initparse</em>.</p></dd>
+
+</dl><dl>
+<dt><i>section</i></dt>
+<dd>An enumerated type that can have the following values:</p><p>
+
+
+<blockquote><pre class="code">ns_s_qd  /* Query: Question section */
+ns_s_zn  /* Update: Zone section */
+ns_s_an  /* Query: Answer section */
+ns_s_pr  /* Update: Prerequisite section */
+ns_s_ns  /* Query: Name Server section */
+ns_s_ud  /* Update: Update section */
+ns_s_ar  /* Query|Update: Additional records section
+*/</pre></blockquote>
+</dd>
+
+</dl></div>
+
+<a name="INDEX-2322" /><a name="INDEX-2323" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_parserr</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int ns_parserr(ns_msg *handle,
+               ns_sect section,
+               int rrnum,
+               ns_rr *rr)</pre></blockquote><a name="INDEX-2322" /><a name="INDEX-2323" /><em class="emphasis">ns_parserr
+</em>extracts information about a response record and stores it
+in <em class="emphasis">rr</em>, whichis a parameter
+passed to other name server libarary routines. The arguments are:</p><dl>
+<dt><i>handle</i></dt>
+<dd>A pointer to a data structure filled in by <em class="emphasis">ns_initparse</em>.</p></dd>
+
+</dl><dl>
+<dt><i>section</i></dt>
+<dd>The same parameter described in <em class="emphasis">ns_msg
+_count</em>.</p></dd>
+
+</dl><dl>
+<dt><i>rrnum</i></dt>
+<dd>A resource record number for the resource records in this section.
+Resource records start numbering at zero. <em class="emphasis">ns_msg _count
+</em>tells you how many resource records are in this section.</p></dd>
+
+</dl><dl>
+<dt><i>rr</i></dt>
+<dd>A pointer to a data structure to be initialized.</p></dd>
+
+</dl><em class="emphasis">ns_parserr</em> returns zero on
+success and -1 if it fails to parse the response buffer.</p></div>
+
+<div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_rr routines</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">char *ns_rr_name(ns_rr rr)
+u_int16_t ns_rr_type(ns_rr rr)
+u_int16_t ns_rr_class(ns_rr rr)
+u_int32_t ns_rr_ttl(ns_rr rr)
+u_int16_t ns_rr_rdlen(ns_rr rr)
+const u_char *ns_rr_rdata(ns_rr rr)</pre></blockquote>These routines return individual fields from a response record. Their
+only argument is:</p><dl>
+<dt><i>rr</i></dt>
+<dd>A data structure filled in by <em class="emphasis">ns_parserr</em>.</p></dd>
+
+</dl></div>
+
+<a name="INDEX-2324" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_name_compress</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int ns_name_compress(const char *exp_dn,
+                     u_char *comp_dn,
+                     size_t length,
+                     const u_char **dnptrs,
+                     const u_char **lastdnptr)</pre></blockquote><a name="INDEX-2324" /><em class="emphasis">ns_name_compress</em> compresses a domain name.
+You won't normally call this routine
+yourself -- you'll let <em class="emphasis">res_mkquery
+</em>do it for you. However, if you need to compress a name for
+some reason, this is the tool to do it. The arguments are:</p><dl>
+<dt><i>exp_dn</i></dt>
+<dd>The "expanded" domain name that you supply; i.e., a
+normal, null-terminated string containing a fully qualified domain
+name.</p></dd>
+
+</dl><dl>
+<dt><i>comp_dn</i></dt>
+<dd>The place where <em class="emphasis">ns_name_compress
+</em>will store the compressed domain name.</p></dd>
+
+</dl><dl>
+<dt><i>length</i></dt>
+<dd>The size of the <em class="emphasis">comp_dn</em> buffer.</p></dd>
+
+</dl><dl>
+<dt><i>dnptrs</i></dt>
+<dd>An array of pointers to previously compressed domain names.
+<em class="emphasis">dnptrs[0]</em> points to the beginning of the
+message; the list ends with a NULL pointer. After you've
+initialized <em class="emphasis">dnptrs[0]</em> to the beginning of the
+message and <em class="emphasis">dnptrs[1]</em> to NULL, <em class="emphasis">dn_comp
+</em>updates the list each time you call it.</p></dd>
+
+</dl><dl>
+<dt><i>lastdnptr</i></dt>
+<dd>A pointer to the end of the <em class="emphasis">dnptrs</em> array.
+<em class="emphasis">ns_name_compress</em> needs to know
+where the end of the array is so it doesn't overrun it.</p></dd>
+
+</dl>If you want to use this routine, look at how it is used in the BIND
+source in <em class="filename">src/lib/resolv/res_mkquery.c </em>(BIND 8)
+or <em class="filename">res/res_mkquery.c</em> (BIND 4). It's often
+easier to see how to use a routine from an example than from an
+explanation. <em class="emphasis">ns_name_compress</em>
+returns the size of the compressed name or -1 if there was an error.</p></div>
+
+<a name="INDEX-2325" /><a name="INDEX-2326" /><a name="INDEX-2327" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_name_uncompress</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int ns_name_uncompress(const u_char *msg,
+                       const u_char *eomorig,
+                       const u_char *comp_dn,
+                       char *exp_dn,
+                       size_t length)</pre></blockquote><a name="INDEX-2325" /><a name="INDEX-2326" /><a name="INDEX-2327" /><em class="emphasis">ns_name_uncompress
+</em>expands a "compressed" domain name.
+You'll use this routine if you parse a name server response
+message, as we do in <em class="emphasis">check_soa</em>, the C program
+that follows. The arguments are:</p><dl>
+<dt><i>msg</i></dt>
+<dd>A pointer to the beginning of your response message.</p></dd>
+
+</dl><dl>
+<dt><i>eomorig</i></dt>
+<dd>A pointer to the first byte after the message. It is used to make
+sure that <em class="emphasis">ns_name_uncompress
+</em>doesn't go past the end of the message.</p></dd>
+
+</dl><dl>
+<dt><i>comp_dn</i></dt>
+<dd>A pointer to the compressed domain name within the message.</p></dd>
+
+</dl><dl>
+<dt><i>exp_dn</i></dt>
+<dd>The place where <em class="emphasis">ns_name_uncompress
+</em>will store the expanded name. You should always allocate
+an array of MAXDNAME characters for the expanded name.</p></dd>
+
+</dl><dl>
+<dt><i>length</i></dt>
+<dd>The size of the <em class="emphasis">exp_dn</em> buffer.</p></dd>
+
+</dl><em class="emphasis">ns_name_uncompress</em> returns the
+size of the compressed name or -1 if there was an error. You might
+wonder why <em class="emphasis">ns_name_uncompress
+</em>returns the size of the <em class="emphasis">compressed
+</em>name, not the size of the <em class="emphasis">expanded
+</em>name. It does this because when you call <em class="emphasis">ns_name_uncompress</em>, you are parsing a DNS
+message and need to know how much space the compressed name took in
+the message so that you can skip over it.</p></div>
+
+<a name="INDEX-2328" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_name_skip</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">int ns_name_skip(const u_char **ptrptr, const u_char *eom)</pre></blockquote><a name="INDEX-2328" /><em class="emphasis">ns_name_skip
+</em>is like <em class="emphasis">ns_name_uncompress</em>, but instead of
+uncompressing the name, it just skips over it. The arguments are:</p><dl>
+<dt><i>ptrptr</i></dt>
+<dd>A pointer to a pointer to the name to skip over. The original pointer
+is advanced past the name.</p></dd>
+
+</dl><dl>
+<dt><i>eom</i></dt>
+<dd>A pointer to the first byte after the message. It is used to make
+sure that <em class="emphasis">ns_name_skip
+</em>doesn't go past the end of the message.</p></dd>
+
+</dl><em class="emphasis">ns_name_skip</em> returns zero if
+successful. It returns -1 if it fails to uncompress the name.</p></div>
+
+<div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_get16 and ns_put16</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">u_int ns_get16(const u_char *cp)
+void  ns_put16(u_int s, u_char *cp)</pre></blockquote>The DNS messages have fields that are unsigned short integer (type,
+class, and data length, to name a few). <em class="emphasis">ns_get16</em> returns a 16-bit integer pointed
+to by <em class="emphasis">cp</em>, and <em class="emphasis">ns_put16
+</em>assigns the 16-bit value of <em class="emphasis">s</em> to the
+location pointed to by <em class="emphasis">cp</em>.</p></div>
+
+<a name="INDEX-2329" /><a name="INDEX-2330" /><a name="INDEX-2331" /><a name="INDEX-2332" /><a name="INDEX-2333" /><div class="refentry"><table width="515" border="0" cellpadding="5"><tr><td align="left"><font size="+1"><b><i>ns_get32 and ns_put32</i></b></font></td><td align="right"><i /></td></tr></table><p><hr width="515" size="3" noshade="true" align="left" color="black" /><table width="515" border="0" cellpadding="5"><tr><td align="left" /><td align="right" /></tr></table><blockquote><pre class="code">u_long ns_get32(const u_char *cp)
+void   ns_put32(u_long l, u_char *cp)</pre></blockquote><a name="INDEX-2329" /><a name="INDEX-2330" />These routines are like their 16-bit
+counterparts except that they deal with a 32-bit integer instead of a
+16-bit integer. The TTL (time to live) field of a resource<a name="INDEX-2331" /> record is a
+32-bit<a name="INDEX-2332" />
+integer. <a name="INDEX-2333" /></p></div>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.7" /><div class="sect2">
+<h3 class="sect2">15.2.7. Parsing DNS Responses</h3>
+
+
+<a name="INDEX-2334" /><a name="INDEX-2335" />The easiest way to learn how to
+parse a DNS message is to look at code that already does it. Assuming
+that you have the BIND source code, the best file to look through is
+<em class="filename">src/lib/resolv/res_debug.c </em>(BIND 8) or
+<em class="filename">res/res_debug.c </em>(BIND 4). (If you're
+really determined to use BIND 9, you might have to read almost 3000
+lines of <em class="filename">lib/dns/message.c</em>.)
+<em class="filename">res_debug.c </em>contains <em class="emphasis">fp_query</em> (or <em class="emphasis">res_pquery</em> in BIND 8.2 and later), the
+function that prints out the DNS messages in the name server
+debugging output. Our sample program traces its parentage to code
+from this file.</p><p>
+
+
+You won't always want to parse the DNS response manually. An
+"intermediate" way to parse the response is to call
+<em class="emphasis">p_query</em>, which calls <em class="emphasis">fp_query</em>, to print out the DNS message.
+Then use Perl or <em class="filename">awk</em> to grab what you need.
+Cricket has been known to wimp out this way.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-15-SECT-2.8" /><div class="sect2">
+<h3 class="sect2">15.2.8. A Sample Program: check_soa</h3>
+
+
+<a name="INDEX-2336" /><a name="INDEX-2337" />Let's now look at a C program to solve
+the same problem for which we wrote a shell script earlier.</p><p>
+
+
+Here are the header files that are needed, the declarations for
+external variables, and the declarations of functions. Notice that we
+use both <em class="emphasis">h_errno</em> (for the resolver routines) and
+<em class="emphasis">errno</em>. We limit this program to checking 20 name
+servers. You'll rarely see a zone with more than 10 name
+servers, so an upper limit of 20 should suffice:</p><p>
+
+
+<blockquote><pre class="code">/****************************************************************
+ * check_soa -- Retrieve the SOA record from each name server   *
+ *     for a given zone and print out the serial number.        *
+ *                                                              *
+ * usage: check_soa zone                                        *
+ *                                                              *
+ * The following errors are reported:                           *
+ *     o There is no address for a server.                      *
+ *     o There is no server running on this host.               *
+ *     o There was no response from a server.                   *
+ *     o The server is not authoritative for the zone.          *
+ *     o The response had an error response code.               *
+ *     o The response had more than one answer.                 *
+ *     o The response answer did not contain an SOA record.     *
+ *     o The expansion of a compressed domain name failed.      *
+ ****************************************************************/
+
+/* Various header files */
+#include &lt;sys/types.h&gt;
+#include &lt;netinet/in.h&gt;
+#include &lt;netdb.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;arpa/nameser.h&gt;
+#include &lt;resolv.h&gt;
+
+/* Error variables */
+extern int h_errno;  /* for resolver errors */
+extern int errno;    /* general system errors */
+
+/* Our own routines; code included later in this chapter */
+void nsError(  );            /* report resolver errors */
+void findNameServers(  );    /* find a zone's name servers */
+void addNameServers(  );     /* add name servers to our list */
+void queryNameServers(  );   /* grab SOA records from servers */
+void returnCodeError(  );    /* report response message errors */
+
+/* Maximum number of name servers we will check */
+#define MAX_NS 20</pre></blockquote>
+
+
+The main body of the program is small. We have an array of string
+pointers, <em class="emphasis">nsList</em>, to store the names of the name
+servers for the zone. We call the resolver function <em class="emphasis">res_init</em> to initialize the <em class="emphasis">_res
+</em>structure. It wasn't necessary for this program to
+call <em class="emphasis">res_init</em> explicitly since it
+would have been called by the first resolver routine that used the
+<em class="emphasis">_res</em> structure. However, if we had wanted to
+modify the value of any of the <em class="emphasis">_res</em> fields
+before calling the first resolver routine, we would have made the
+modifications right after calling <em class="emphasis">res_init</em>. Next, the program calls <em class="emphasis">findNameServers</em> to find all the name
+servers for the zone referenced in <em class="emphasis">argv[1]</em> and
+to store them in <em class="emphasis">nsList</em>. Last, the program calls
+<em class="emphasis">queryNameServers</em> to query each of
+the name servers in <em class="emphasis">nsList</em> for the SOA record
+for the zone:</p><p>
+
+
+<blockquote><pre class="code">main(argc, argv)
+int argc;
+char *argv[];
+{
+    char *nsList[MAX_NS];  /* list of name servers */
+    int  nsNum = 0;        /* number of name servers in list */
+
+    /* sanity check: one (and only one) argument? */
+    if(argc != 2){
+        (void) fprintf(stderr, "usage: %s zone\n", argv[0]);
+        exit(1);
+    }
+
+    (void) res_init(  );
+
+    /*
+     * Find the name servers for the zone.
+     * The name servers are written into nsList.
+     */
+    findNameServers(argv[1], nsList, &amp;nsNum);
+
+    /*
+     * Query each name server for the zone's SOA record.
+     * The name servers are read from nsList.
+     */
+    queryNameServers(argv[1], nsList, nsNum);
+
+    exit(0);
+}</pre></blockquote>
+
+
+The routine <em class="emphasis">findNameServers
+</em>follows. This routine queries the local name server for
+the NS records for the zone. It then calls <em class="emphasis">addNameServers</em> to parse the response
+message and store away all the name servers it finds. The header
+files, <em class="filename">arpa/nameser.h </em>and
+<em class="filename">resolv.h</em>, contain declarations we make extensive
+use of:</p><p>
+
+
+<blockquote><pre class="code">/****************************************************************
+ * findNameServers -- find all of the name servers for the      *
+ *     given zone and store their names in nsList.  nsNum is    *
+ *     the number of servers in the nsList array.               *
+ ****************************************************************/
+void
+findNameServers(domain, nsList, nsNum)
+char *domain;
+char *nsList[];
+int  *nsNum;
+{
+    union {
+        HEADER hdr;              /* defined in resolv.h */
+        u_char buf[NS_PACKETSZ]; /* defined in arpa/nameser.h */
+    } response;                  /* response buffers */
+    int responseLen;             /* buffer length */
+
+    ns_msg handle;  /* handle for response message */
+
+    /*
+     * Look up the NS records for the given domain name.
+     * We expect the domain name to be a fully qualified, so
+     * we use res_query(  ).  If we'd wanted the resolver search
+     * algorithm, we would have used res_search(  ) instead.
+     */
+    if((responseLen =
+           res_query(domain,      /* the zone we care about   */
+                     ns_c_in,     /* Internet class records     */
+                     ns_t_ns,     /* Look up name server records*/
+                     (u_char *)&amp;response,      /*response buffer*/
+                     sizeof(response)))        /*buffer size    */
+                                        &lt; 0){  /*If negative    */
+        nsError(h_errno, domain); /* report the error           */
+        exit(1);                  /* and quit                   */
+    }
+
+    /*
+     * Initialize a handle to this response.  The handle will
+     * be used later to extract information from the response.
+     */
+    if (ns_initparse(response.buf, responseLen, &amp;handle) &lt; 0) {
+        fprintf(stderr, "ns_initparse: %s\n", strerror(errno));
+        return;
+    }
+
+    /*
+     * Create a list of name servers from the response.
+     * NS records may be in the answer section and/or in the
+     * authority section depending on the DNS implementation.
+     * Walk through both.  The name server addresses may be in
+     * the additional records section, but we will ignore them
+     * since it is much easier to call gethostbyname(  ) later
+     * than to parse and store the addresses here.
+     */
+
+    /*
+     * Add the name servers from the answer section.
+     */
+    addNameServers(nsList, nsNum, handle, ns_s_an);
+
+    /*
+     * Add the name servers from the authority section.
+     */
+    addNameServers(nsList, nsNum, handle, ns_s_ns);
+}
+
+/****************************************************************
+ * addNameServers -- Look at the resource records from a        *
+ *     section.  Save the names of all name servers.            *
+ ****************************************************************/
+
+void
+addNameServers(nsList, nsNum, handle, section)
+char *nsList[];
+int  *nsNum;
+ns_msg handle;
+ns_sect section;
+{
+    int rrnum;  /* resource record number */
+    ns_rr rr;   /* expanded resource record */
+
+    int i, dup; /* misc variables */
+
+    /*
+     * Look at all the resource records in this section.
+     */
+    for(rrnum = 0; rrnum &lt; ns_msg_count(handle, section); rrnum++)
+    {
+        /*
+         * Expand the resource record number rrnum into rr.
+         */
+        if (ns_parserr(&amp;handle, section, rrnum, &amp;rr)) {
+            fprintf(stderr, "ns_parserr: %s\n", strerror(errno));
+        }
+
+        /*
+         * If the record type is NS, save the name of the
+         * name server.
+         */
+        if (ns_rr_type(rr) == ns_t_ns) {
+
+            /*
+             * Allocate storage for the name.  Like any good
+             * programmer should, we test malloc's return value,
+             * and quit if it fails.
+             */
+            nsList[*nsNum] = (char *) malloc (MAXDNAME);
+            if(nsList[*nsNum] == NULL){
+                (void) fprintf(stderr, "malloc failed\n");
+                exit(1);
+            }
+
+            /* Expand the name server's domain name */
+            if (ns_name_uncompress(
+                        ns_msg_base(handle),/* Start of the message    */
+                        ns_msg_end(handle), /* End of the message      */
+                        ns_rr_rdata(rr),    /* Position in the message */
+                        nsList[*nsNum],     /* Result                  */
+                        MAXDNAME)           /* Size of nsList buffer   */
+                                  &lt; 0) {    /* Negative: error         */
+                (void) fprintf(stderr, "ns_name_uncompress failed\n");
+                exit(1);
+            }
+
+            /*
+             * Check the domain name we've just unpacked and add it to
+             * the list of name servers if it is not a duplicate.
+             * If it is a duplicate, just ignore it.
+             */
+            for(i = 0, dup=0; (i &lt; *nsNum) &amp;&amp; !dup; i++)
+                dup = !strcasecmp(nsList[i], nsList[*nsNum]);
+            if(dup)
+                free(nsList[*nsNum]);
+            else
+                (*nsNum)++;
+        }
+    }
+}</pre></blockquote>
+
+
+Notice that we don't explicitly check for finding zero name
+server records. We don't need to check
+because<a name="INDEX-2338" />
+<em class="emphasis">res_query</em> flags that case as an
+error; it returns -1 and sets <em class="emphasis">herrno</em> to
+<em class="emphasis">NO_DATA</em>. If <em class="emphasis">res_query
+</em>returns -1, we call our own routine, <em class="emphasis">nsError</em>, to print out an error string from
+<em class="emphasis">h_errno</em> instead of using <em class="emphasis">herror</em>. The <em class="emphasis">herror
+</em>routine isn't a good fit for our program because its
+messages assume you are looking up address data (e.g., if
+<em class="emphasis">h_ errno</em> is <em class="emphasis">NO_DATA</em>, the
+error message is "No address associated with name").</p><p>
+
+
+The next routine queries each name server that we've found for
+an SOA record. In this routine, we change the value of several of the
+<em class="emphasis">_res</em> structure fields. By changing the
+<em class="emphasis">nsaddr_list</em> field, we change which name server
+<em class="emphasis">res_send</em> queries. We disable the
+search list by turning off bits in the <em class="emphasis">options
+</em>field -- all the domain names that this program handles
+are fully qualified:</p><p>
+
+
+<blockquote><pre class="code">/******************************************************************
+ * queryNameServers -- Query each of the name servers in nsList   *
+ *     for the SOA record of the given zone.  Report any          *
+ *     errors encountered  (e.g., a name server not running or    *
+ *     the response not being an authoritative response).  If     *
+ * there are no errors, print out the serial number for the zone. *
+ ******************************************************************/
+
+void
+queryNameServers(domain, nsList, nsNum)
+char *domain;
+char *nsList[];
+int nsNum;
+{
+    union {
+        HEADER hdr;               /* defined in resolv.h */
+        u_char buf[NS_PACKETSZ];  /* defined in arpa/nameser.h */
+    } query, response;            /* query and response buffers */
+    int responseLen, queryLen;    /* buffer lengths */
+
+    u_char     *cp;       /* character pointer to parse DNS message */
+
+    struct in_addr saveNsAddr[MAXNS];  /* addrs saved from _res */
+    int nsCount;          /* count of addresses saved from _res */
+    struct hostent *host; /* structure for looking up ns addr */
+    int i;                /* counter variable */
+
+    ns_msg handle;  /* handle for response message */
+    ns_rr rr;       /* expanded resource record */
+
+    /*
+     * Save the _res name server list since
+     * we will need to restore it later.
+     */
+    nsCount = _res.nscount;
+    for(i = 0; i &lt; nsCount; i++)
+      saveNsAddr[i] = _res.nsaddr_list[i].sin_addr;
+
+    /*
+     * Turn off the search algorithm and turn off appending
+     * the local domain name before we call gethostbyname(  );
+     * the name server's domain names will be fully qualified.
+     */
+    _res.options &amp;= ~(RES_DNSRCH | RES_DEFNAMES);
+
+    /*
+     * Query each name server for the zone's SOA record.
+     */
+    for(nsNum-- ; nsNum &gt;= 0; nsNum--){
+
+        /*
+         * First, we have to get the IP address of every name server.
+         * So far, all we have are domain names.  We use gethostbyname(  )
+         * to get the addresses, rather than anything fancy.
+         * But first, we have to restore certain values in _res
+         * because _res affects gethostbyname(  ).  (We altered
+         * _res in the previous iteration through the loop.)
+         *
+         * We can't just call res_init(  ) again to restore
+         * these values since some of the _res fields are
+         * initialized when the variable is declared, not when
+         * res_init(  ) is called.
+         */
+        _res.options |= RES_RECURSE;  /* recursion on (default) */
+        _res.retry = 4;               /* 4 retries (default)    */
+        _res.nscount = nsCount;       /* original name servers  */
+        for(i = 0; i &lt; nsCount; i++)
+            _res.nsaddr_list[i].sin_addr = saveNsAddr[i];
+
+        /* Look up the name server's address */
+        host = gethostbyname(nsList[nsNum]);
+        if (host == NULL) {
+            (void) fprintf(stderr,"There is no address for %s\n",
+                                              nsList[nsNum]);
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * Now get ready for the real fun.  host contains IP
+         * addresses for the name server we're testing.
+         * Store the first address for host in the _res
+         * structure.  Soon, we'll look up the SOA record...
+         */
+        (void) memcpy((void *)&amp;_res.nsaddr_list[0].sin_addr,
+           (void *)host-&gt;h_addr_list[0], (size_t)host-&gt;h_length);
+        _res.nscount = 1;
+
+        /*
+         * Turn off recursion.  We don't want the name server
+         * querying another server for the SOA record; this name
+         * server ought to be authoritative for this data.
+         */
+        _res.options &amp;= ~RES_RECURSE;
+
+        /*
+         * Reduce the number of retries.  We may be checking
+         * several name servers, so we don't want to wait too
+         * long for any one server.  With two retries and only
+         * one address to query, we'll wait at most 15 seconds.
+         */
+        _res.retry = 2;
+
+        /*
+         * We want to see the response code in the next
+         * response, so we must make the query message and
+         * send it ourselves instead of having res_query(  )
+         * do it for us.  If res_query(  ) returned -1, there
+         * might not be a response to look at.
+         *
+         * There is no need to check for res_mkquery(  )
+         * returning -1.  If the compression was going to
+         * fail, it would have failed when we called
+         * res_query(  ) earlier with this domain name.
+         */
+        queryLen = res_mkquery(
+                     ns_o_query,      /* regular query         */
+                     domain,          /* the zone to look up */
+                     ns_c_in,         /* Internet type         */
+                     ns_t_soa,        /* look up an SOA record */
+                     (u_char *)NULL,  /* always NULL       */
+                     0,               /* length of NULL        */
+                     (u_char *)NULL,  /* always NULL       */
+                     (u_char *)&amp;query,/* buffer for the query  */
+                     sizeof(query));  /* size of the buffer    */
+
+        /*
+         * Send the query message.  If there is no name server
+         * running on the target host, res_send(  ) returns -1
+         * and errno is ECONNREFUSED.  First, clear out errno.
+         */
+        errno = 0;
+        if((responseLen = res_send((u_char *)&amp;query,/* the query  */
+                                   queryLen,        /* true length*/
+                                   (u_char *)&amp;response,/*buffer  */
+                                   sizeof(response)))  /*buf size*/
+                                        &lt; 0){          /* error  */
+            if(errno == ECONNREFUSED) { /* no server on the host */
+                (void) fprintf(stderr,
+                    "There is no name server running on %s\n",
+                    nsList[nsNum]);
+            } else {                   /* anything else: no response */
+                (void) fprintf(stderr,
+                    "There was no response from %s\n",
+                    nsList[nsNum]);
+            }
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * Initialize a handle to this response.  The handle will
+         * be used later to extract information from the response.
+         */
+        if (ns_initparse(response.buf, responseLen, &amp;handle) &lt; 0) {
+            fprintf(stderr, "ns_initparse: %s\n", strerror(errno));
+            return;
+        }
+
+        /*
+         * If the response reports an error, issue a message
+         * and proceed to the next server in the list.
+         */
+        if(ns_msg_getflag(handle, ns_f_rcode) != ns_r_noerror){
+            returnCodeError(ns_msg_getflag(handle, ns_f_rcode),
+                                                  nsList[nsNum]);
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * Did we receive an authoritative response?  Check the
+         * authoritative answer bit.  If this name server isn't
+         * authoritative, report it, and go on to the next server.
+         */
+        if(!ns_msg_getflag(handle, ns_f_aa)){
+            (void) fprintf(stderr,
+                "%s is not authoritative for %s\n",
+                nsList[nsNum], domain);
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * The response should only contain one answer; if more,
+         * report the error, and proceed to the next server.
+         */
+        if(ns_msg_count(handle, ns_s_an) != 1){
+            (void) fprintf(stderr,
+                "%s: expected 1 answer, got %d\n",
+                nsList[nsNum], ns_msg_count(handle, ns_s_an));
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * Expand the answer section record number 0 into rr.
+         */
+        if (ns_parserr(&amp;handle, ns_s_an, 0, &amp;rr)) {
+                if (errno != ENODEV){
+                        fprintf(stderr, "ns_parserr: %s\n",
+                                strerror(errno));
+                }
+        }
+
+        /*
+         * We asked for an SOA record; if we got something else,
+         * report the error and proceed to the next server.
+         */
+        if (ns_rr_type(rr) != ns_t_soa) {
+            (void) fprintf(stderr,
+                "%s: expected answer type %d, got %d\n",
+                nsList[nsNum], ns_t_soa, ns_rr_type(rr));
+            continue; /* nsNum for-loop */
+        }
+
+        /*
+         * Set cp to point the the SOA record.
+         */
+        cp = (u_char *)ns_rr_rdata(rr);
+
+        /*
+         * Skip the SOA origin and mail address, which we don't
+         * care about.  Both are standard "compressed names."
+         */
+        ns_name_skip(&amp;cp, ns_msg_end(handle));
+        ns_name_skip(&amp;cp, ns_msg_end(handle));
+
+        /* cp now points to the serial number; print it. */
+        (void) printf("%s has serial number %d\n",
+            nsList[nsNum], ns_get32(cp));
+
+    } /* end of nsNum for-loop */
+}</pre></blockquote>
+
+
+Notice that we use recursive queries when we call <em class="emphasis">gethostbyname</em>, but nonrecursive queries
+when we look up the SOA record. <em class="emphasis">gethostbyname</em> may need to query other name
+servers to find the host's address. But we don't want the
+name server querying another server when we ask it for the SOA
+record -- it's <em class="emphasis">supposed</em> to be
+authoritative for this zone, after all. Allowing the name server to
+ask another server for the SOA record would defeat the error check.</p><p>
+
+
+The next two routines print out error messages:</p><p>
+
+
+<blockquote><pre class="code">/****************************************************************
+ * nsError -- Print an error message from h_errno for a failure *
+ *     looking up NS records.  res_query(  ) converts the DNS   *
+ *     message return code to a smaller list of errors and      *
+ *     places the error value in h_errno.  There is a routine   *
+ *     called herror(  ) for printing out strings from h_errno  *
+ *     like perror(  ) does for errno.  Unfortunately, the      *
+ *     herror(  ) messages assume you are looking up address    *
+ *     records for hosts.  In this program, we are looking up   *
+ *     NS records for zones, so we need our own list of error   *
+ *     strings.                                                 *
+ ****************************************************************/
+void
+nsError(error, domain)
+int error;
+char *domain;
+{
+    switch(error){
+        case HOST_NOT_FOUND:
+          (void) fprintf(stderr, "Unknown zone: %s\n", domain);
+          break;
+        case NO_DATA:
+          (void) fprintf(stderr, "No NS records for %s\n", domain);
+          break;
+        case TRY_AGAIN:
+          (void) fprintf(stderr, "No response for NS query\n");
+          break;
+        default:
+          (void) fprintf(stderr, "Unexpected error\n");
+          break;
+    }
+}
+
+/****************************************************************
+ * returnCodeError -- print out an error message from a DNS     *
+ *     response return code.                                    *
+ ****************************************************************/
+void
+returnCodeError(rcode, nameserver)
+ns_rcode rcode;
+char *nameserver;
+{
+    (void) fprintf(stderr, "%s: ", nameserver);
+    switch(rcode){
+        case ns_r_formerr:
+          (void) fprintf(stderr, "FORMERR response\n");
+          break;
+        case ns_r_servfail:
+          (void) fprintf(stderr, "SERVFAIL response\n");
+          break;
+        case ns_r_nxdomain:
+          (void) fprintf(stderr, "NXDOMAIN response\n");
+          break;
+        case ns_r_notimpl:
+          (void) fprintf(stderr, "NOTIMP response\n");
+          break;
+        case ns_r_refused:
+          (void) fprintf(stderr, "REFUSED response\n");
+          break;
+        default:
+          (void) fprintf(stderr, "unexpected return code\n");
+          break;
+    }
+}</pre></blockquote>
+
+
+To compile this program using the resolver and name server routines
+in <em class="emphasis">libc</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cc -o check_soa check_soa.c</b></tt></pre></blockquote>
+
+
+Or, if you've newly compiled the BIND code as we describe in
+<a href="appc_01.html">Appendix C, "Compiling and Installing BIND on Linux"</a>, and want to use the latest header files
+and resolver library:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cc -o check_soa -I/usr/local/src/bind/src/include \ </b></tt>
+<tt class="userinput"><b>check_soa.c /usr/local/src/bind/src/lib/libbind.a</b></tt></pre></blockquote>
+
+
+Here is what the output looks like:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>check_soa mit.edu</b></tt>
+BITSY.MIT.EDU has serial number 1995
+W20NS.MIT.EDU has serial number 1995
+STRAWB.MIT.EDU has serial number 1995</pre></blockquote>
+
+
+If you look back at the shell script output, it looks the same,
+except that the shell script's output is sorted by the name
+server's name. What you can't see is that the C program
+ran<a name="INDEX-2339" />
+much<a name="INDEX-2340" />
+faster.<a name="INDEX-2341" />
+<a name="INDEX-2342" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">15. Programming with the Resolver and Name Server Library Routines</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15.3. Perl Programming with Net::DNS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch15_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

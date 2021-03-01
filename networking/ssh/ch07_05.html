@@ -1,0 +1,895 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch07_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Secure Copy with scp (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch07_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.5. Secure Copy with scp</h2>
+
+
+
+<a name="INDEX-1255" />The secure copy program,
+<tt class="command">scp</tt>, obeys keywords in your client configuration
+file just as <tt class="command">ssh</tt> does. In addition,
+<tt class="command">scp</tt> provides other features and options that
+we'll cover in this section.</p>
+
+
+
+<a name="ch07-43251" /><div class="sect2">
+<h3 class="sect2">7.5.1. Full Syntax</h3>
+
+
+
+<a name="INDEX-1256" />So far,
+we've described the syntax of <tt class="command">scp</tt> only in
+general: [<a href="ch02_02.html#ch02-49656">Section 2.2.1, "File Transfer with scp"</a>]</p>
+
+
+
+<blockquote><pre class="code">scp <em class="replaceable">name-of-source</em> <em class="replaceable">name-of-destination</em></pre></blockquote>
+
+
+
+Each of the two names, or <tt class="command">path specifications</tt>, on
+the command line represents files or directories in the following
+manner (it is fairly consistent with the behavior of Unix
+<tt class="command">cp</tt> or <tt class="command">rcp</tt>):</p>
+
+
+
+<ul><li>If <em class="emphasis">name-of-source</em> is a file,
+<em class="emphasis">name-of-destination</em> may be a file (existing or
+not) or a directory (which must exist). In other words, a single file
+may be copied to another file or into a directory.</p></li><li>If <em class="emphasis">name-of-source</em> is two or more files, one or
+more directories, or a combination,
+<em class="emphasis">name-of-destination</em> must be an existing
+directory into which the copy takes place.<a href="#FOOTNOTE-106">[106]</a>
+In other words, multiple files and directories may be copied only
+into a directory.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-106" />[106]We say
+"must," but technically you may specify a file as a
+destination in some cases. However, this behavior is probably not
+what you want. As your multiple files get copied into a single
+destination file, each is overwritten by the next.</p>
+
+
+</blockquote></li></ul>
+Both <em class="emphasis">name-of-source</em> and
+<em class="emphasis">name-of-destination</em> may have the following form
+from left to right:</p>
+
+
+
+<ol><li>The <em class="emphasis">username</em> of the account containing the file
+or directory, followed by @. This part is optional and if omitted,
+the value is the username of the user invoking
+<tt class="command">scp</tt>.</p></li><li>The <tt class="command">hostname</tt> of the host containing the file or
+directory, followed by a colon. This part is optional if the path is
+present, and the username isn't; if omitted, the value is
+<em class="emphasis">localhost</em>. SSH2 permits an
+optional <tt class="command">TCP port number</tt> for the SSH connection to
+be inserted between the hostname and the colon, preceded by a hash
+sign.</p></li><li>The <tt class="command">directory path</tt> to the file or directory.
+(Optional if the hostname is present.) Relative pathnames are assumed
+relative to the <tt class="command">default directory</tt>, which is the
+current directory (for local paths) or the user's home
+directory (for remote paths). If omitted entirely, the path is
+assumed to be the default directory.</p></li></ol>
+Although each field is optional, you can't omit them all at the
+same time, yielding the empty string. Either the hostname (2) or the directory path (3) must be present. Some examples:</p>
+
+
+
+<dl>
+<dt><i><em class="filename">MyFile</em></i></dt>
+<dd>The file <em class="filename">. /MyFile</em> on <em class="emphasis">localhost</em></p></dd>
+
+
+
+<dt><i><em class="filename">MyDirectory</em></i></dt>
+<dd>The directory <em class="filename">./MyDirectory </em>on<em class="filename">
+</em><em class="emphasis">localhost</em></p></dd>
+
+
+
+<dt><i><tt class="literal">.</tt></i></dt>
+<dd>The current directory on <em class="emphasis">localhost</em></p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com:</em></i></dt>
+<dd>The directory <em class="filename">~username</em> on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com</em></i></dt>
+<dd>A local file named "server.example.com" (oops: did you
+forget the trailing colon -- a common mistake)</p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com:MyFile</em></i></dt>
+<dd>The file <em class="filename">MyFile</em> in the remote user's home
+directory on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">bob@server.example.com:</em></i></dt>
+<dd>The directory <em class="filename">~bob</em> on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">bob@server.example.com</em></i></dt>
+<dd>A local file named "bob@server.example.com" (oops; forgot
+the trailing colon again)</p></dd>
+
+
+
+<dt><i><em class="filename">bob@server.example.com:MyFile</em></i></dt>
+<dd>The file <em class="filename">~bob/MyFile</em> on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com:dir/MyFile</em></i></dt>
+<dd>The file <em class="filename">dir/MyFile</em> in the remote user's
+home directory on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com:/dir/MyFile</em></i></dt>
+<dd>The file <em class="filename">/dir/MyFile </em>on<em class="filename">
+</em><em class="emphasis">server.example.com</em> (note the absolute
+path)</p></dd>
+
+
+
+<dt><i><em class="filename">bob@server.example.com:dir/MyFile</em></i></dt>
+<dd>The file <em class="filename">~bob/dir/MyFile</em> on <em class="emphasis">server.example.com</em></p></dd>
+
+
+
+<dt><i><em class="filename">bob@server.example.com:/dir/MyFile</em></i></dt>
+<dd>The file <em class="filename">/dir/MyFile</em> on <em class="emphasis">server.example.com</em> (although you
+authenticate as bob, the path is absolute)</p></dd>
+
+
+
+<dt><i><em class="filename">server.example.com#2000:</em></i></dt>
+<dd>The remote user's home directory on <em class="emphasis">server.example.com</em>, via TCP port 2000
+(SSH2 only)</p></dd>
+
+</dl>
+
+
+
+Here are a few complete examples:</p>
+
+
+
+<blockquote><pre class="code">$ scp myfile myfile2
+<i class="lineannotation">A local copy just like cp</i>
+$ scp myfile bob@host1:
+<i class="lineannotation">Copy . /myfile to ~bob on host1</i>
+$ scp bob@host1:myfile .
+<i class="lineannotation">Copy ~bob/myfile on host1 to ./myfile</i>
+$ scp host1:file1 host2:file2
+<i class="lineannotation">Copy file1 from host1 to file2 on
+host2</i>
+$ scp bob@host1:file1 jen@host2:file2
+<i class="lineannotation">Same as above, but copying from bob's to jen's account</i></pre></blockquote>
+
+
+
+<a href="ch07_05.html#ch07-72167">Table 7-3</a> summarizes the syntax of an
+<em class="emphasis">scp</em> path.</p>
+
+
+
+<a name="ch07-72167" /><h4 class="objtitle">Table 7-3. scp Path Specifications </h4><table border="1">
+
+
+
+
+
+
+<tr>
+<th>
+Field</p></th>
+<th>
+Other Syntax</p></th>
+<th>
+Optional?</p></th>
+<th>
+Default for Local Host</p></th>
+<th>
+Default for Remote Host</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+Username</p></td>
+<td>
+Followed by @</p></td>
+<td>
+Yes</p></td>
+<td>
+Invoking user's username</p></td>
+<td>
+Invoking user's username</p></td>
+</tr>
+
+
+<tr>
+<td>
+Hostname</p></td>
+<td>
+Followed by :</p></td>
+<td>
+Only if username is omitted and path is present</p></td>
+<td>
+None, file is accessed locally</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+<tr>
+<td>
+Port number <a href="#FOOTNOTE-107">[107]</a></p></td>
+<td>
+Preceded by #</p></td>
+<td>
+Yes</p></td>
+<td>
+22</p></td>
+<td>
+22</p></td>
+</tr>
+
+
+<tr>
+<td>
+Directory path</p></td>
+<td>
+N/A</p></td>
+<td>
+Only if hostname is present</p></td>
+<td>
+Current (invoking) directory</p></td>
+<td>
+Username's remote home directory</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+<a name="FOOTNOTE-107" />[107]SSH2 only.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-44-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.2. Handling of Wildcards</h3>
+
+
+
+<tt class="command">scp</tt> for SSH1 and OpenSSH has no special support
+for wildcards in filenames. It simply lets the shell expand them:</p>
+
+
+
+<blockquote><pre class="code">$ scp *.txt server.example.com:</pre></blockquote>
+
+
+
+Watch out for wildcards in remote file specifications, as they are
+evaluated on the local machine, not the remote. For example, this
+attempt is likely to fail:</p>
+
+
+
+<blockquote><pre class="code">$ scp1 server.example.com:*.txt .              <i class="lineannotation">Bad idea!</i></pre></blockquote>
+
+
+
+The Unix shell attempts to expand the wildcard before
+<tt class="command">scp1</tt> is invoked, but the current directory
+contains no filename matching "server.example.com:*.txt".
+C shell and its derivatives will report "no match" and
+not execute <tt class="command">scp1</tt>. Bourne-style shells, noticing no
+match in the current directory, will pass the unexpanded wildcard to
+<tt class="command">scp1,</tt> and the copy may succeed as planned, but
+this coincidental behavior shouldn't be relied on. Always
+escape your wildcards so they are explicitly ignored by the shell and
+passed to <tt class="command">scp1</tt>:</p>
+
+
+
+<blockquote><pre class="code">$ scp1 server.example.com:\*.txt .</pre></blockquote>
+
+
+
+<tt class="command">scp2</tt> does its own regular expression matching
+after shell-wildcard expansion is complete. The
+<tt class="command">sshregex</tt> manpage for SSH2 (see <a href="appa_01.html">Appendix A, "SSH2 Manpage for sshregex"</a>) describes the supported operators. Even so,
+escape your wildcard characters if you want your local shell to leave
+them alone.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-45-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.3. Recursive Copy of Directories</h3>
+
+
+
+Sometimes you want to copy not just a single file but a directory
+hierarchy. In this case, use the <span class="option">-r</span> option, which
+stands for recursive. If you are familiar with
+<tt class="command">rcp</tt>, its <span class="option">-r</span> option has the same
+effect.</p>
+
+
+
+For example, to securely copy the directory
+<em class="filename">/usr/local/bin</em> and all its files and
+subdirectories to another machine:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ scp -r /usr/local/bin server.example.com:</pre></blockquote>
+
+
+
+If you forget the <span class="option">-r</span> option when copying
+directories, <tt class="command">scp</tt> complains:</p>
+
+
+
+<blockquote><pre class="code">$ scp /usr/local/bin server.example.com:
+/usr/local/bin: not a regular file</pre></blockquote>
+
+
+
+Although <tt class="command">scp</tt> can copy directories, it isn't
+necessarily the best method. If your directory contains hard links or
+soft links, they won't be duplicated. Links are copied as plain
+files (the link targets), and worse, circular directory links cause
+<tt class="command">scp1</tt> to loop indefinitely.
+(<tt class="command">scp2</tt> detects symbolic links and copies their
+targets instead.) Other types of special files, such as named pipes,
+also aren't copied correctly.<a href="#FOOTNOTE-108">[108]</a> A better solution is
+to use <tt class="command">tar</tt>, which handles special files correctly,
+and send it to the remote machine to be untarred, via SSH:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-108" />[108]These limitations
+also are true when copying single files, but at least you see the
+erroneous result quickly. With directories, you can copy a hierarchy
+incorrectly and not notice.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ tar cf - /usr/local/bin | ssh server.example.com tar xf -</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-46-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.4. Preserving Permissions</h3>
+
+
+
+When <tt class="command">scp</tt> copies files, the destination files are
+created with certain file attributes. By default, the file
+permissions adhere to a umask on the destination host, and the
+modification and last access times will be the time of the copy.
+Alternatively, you can tell <tt class="command">scp</tt> to duplicate the
+permissions and timestamps of the original files. The
+<span class="option">-p</span> option accomplishes this:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ scp -p myfile server.example.com:</pre></blockquote>
+
+
+
+For example, if you transfer your entire home directory to a remote
+machine, you probably want to keep the file attributes the same as
+the original:</p>
+
+
+
+<blockquote><pre class="code">$ scp -rp $HOME server.example.com:myhome/</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-47-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.5. Automatic Removal of Original File</h3>
+
+
+
+After copying a file, <tt class="command">scp2</tt> can optionally remove
+the original if desired. The <span class="option">-u</span> command-line option
+specifies this:<a href="#FOOTNOTE-109">[109]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-109" />[109]In some earlier versions of SSH2,
+this option has no effect.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ scp2 myfile server.example.com:
+$ ls myfile
+myfile
+$ scp2 -u myfile server.example.com:
+$ ls myfile
+myfile: No such file or directory</pre></blockquote>
+
+
+
+If you've ever wanted a "secure move" command in
+addition to secure copy, you can define one in terms of <tt class="command">scp2
+-u</tt>:</p>
+
+
+
+<blockquote><pre class="code">$ alias smv='scp2 -u'</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-48-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.6. Safety Features</h3>
+
+
+
+<tt class="command">scp</tt> has two features to protect you from running
+dangerous commands. Suppose you want to copy a local file
+<em class="filename">myfile</em> to a remote directory. You type:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ scp2 myfile server.example.com:mydir
+$ rm myfile</pre></blockquote>
+
+
+
+Then you connect to <em class="emphasis">server.example.com</em> and find, to your
+horror, that <em class="filename">mydir</em> was a file, not a directory,
+and you just overwrote it! The <span class="option">-d</span> option prevents
+this tragedy. If the destination isn't a directory,
+<tt class="command">scp</tt> complains and exits without copying the file.</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ scp2 -d myfile server.example.com:mydir
+warning: Destination file is not a directory.
+warning: Exiting.</pre></blockquote>
+
+
+
+This option is necessary only if you are copying a single file. If
+you are copying multiple files or a directory, all the
+<tt class="command">scp</tt> implementations check by default that the
+remote destination is a directory.<a href="#FOOTNOTE-110">[110]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-110" />[110]There's one
+degenerate case. If your copy occurs on a single machine, e.g.,
+<tt class="command">scp *.c mydir</tt>, the <tt class="command">scp </tt>client
+doesn't necessarily check that <em class="filename">mydir </em>is a
+directory.</p>
+
+
+</blockquote>
+
+
+
+Another safety feature of <tt class="command">scp2</tt> is the
+<em class="emphasis">-n</em> option, which instructs the program to
+describe its actions but not perform any copying. This is useful for
+verifying the behavior of <tt class="command">scp2</tt> before executing a
+potentially risky command.</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ scp2 -n myfile server.example.com:
+Not transferring myfile -&gt; server.example.com:./myfile  (1k)</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-80825" /><div class="sect2">
+<h3 class="sect2">7.5.7. Statistics Display</h3>
+
+
+
+As <tt class="command">scp</tt> copies files, it may print
+<a name="INDEX-1257" />statistics about its progress.</p>
+
+
+
+<a name="ch07-49-fm2xml" /><div class="sect3">
+<h3 class="sect3">7.5.7.1. scp1 statistics</h3>
+
+
+
+For <tt class="command">scp1</tt>, the statistics display is configurable
+by command-line options and environment variables:<a href="#FOOTNOTE-111">[111]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-111" />[111]For starters, <tt class="command">scp1 </tt>must be compiled with the
+configuration flag
+<tt class="literal"> -- with-scp-stats</tt>, or else
+statistics will be unavailable. [<a href="ch04_01.html#ch04-44842">Section 4.1.5.11, "scp behavior"</a>]</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ scp1 myfile* server.example.com:
+myfile1         |         50 KB |  50.0 kB/s | ETA: 00:00:00 | 100%
+myfile2         |         31 KB |  31.3 kB/s | ETA: 00:00:00 | 100%
+myfile3         |          3 KB |   3.8 kB/s | ETA: 00:00:00 | 100%</pre></blockquote>
+
+
+
+For each file, <tt class="command">scp1</tt> displays the name, the size,
+the transfer rate, and a two-part progress meter about the
+transmission. "ETA" (Estimated Time of Arrival) is the
+estimated transfer time, and the final number is the percentage of
+the file transmitted so far. While the file is transferring, the ETA
+value counts down to zero and the percentage increases to 100, though
+you can't see this on the printed page.</p>
+
+
+
+Although the statistics are informative, you might want to change or
+disable them. For example, you might prefer to turn them off when
+<tt class="command">scp1</tt> is part of a batch job that shouldn't
+produce screen output.</p>
+
+
+
+This statistics display can be configured in several ways, using
+command-line options and <a name="INDEX-1258" />environment variables (see <a href="ch07_05.html#ch07-36610">Table 7-4</a>: note that command-line options take
+precedence over environment variables).</p>
+
+
+
+<a name="ch07-36610" /><h4 class="objtitle">Table 7-4. Controlling Statistics in scp1</h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Desired Outcome</p></th>
+<th>
+Using Options</p></th>
+<th>
+Setting Environment Variables</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+No output <a href="#FOOTNOTE-112">[112]</a></p></td>
+<td>
+<em class="emphasis">scp1 -q</em></p></td>
+<td>
+SSH_NO_SCP_STATS</p></td>
+</tr>
+
+
+<tr>
+<td>
+Output, but not file-by-file</p></td>
+<td>
+<em class="emphasis">scp1</em> <tt class="command">-</tt><em class="emphasis">Q
+</em><tt class="command">-</tt><em class="emphasis">A</em></p></td>
+<td>
+SSH_NO_ALL_SCP_STATS</p>
+
+
+
+SSH_SCP_STATS</p></td>
+</tr>
+
+
+<tr>
+<td>
+Output file-by-file</p></td>
+<td>
+<em class="emphasis">scp1</em> <tt class="command">-</tt><em class="emphasis">Q
+</em><tt class="command">-</tt><em class="emphasis">a</em></p></td>
+<td>
+SSH_ALL_SCP_STATSSSH_SCP_STATS</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+<a name="FOOTNOTE-112" />[112]Also works for OpenSSH's
+<tt class="command">scp </tt>client.</p>
+
+
+</blockquote>
+
+
+
+First, you may control the presence or absence of statistics at all.
+This is done with the options <em class="emphasis">-q</em> and
+<em class="emphasis">-Q</em>, or the environment variables
+<a name="INDEX-1259" />SSH_SCP_STATS
+and
+<a name="INDEX-1260" />SSH_NO_SCP_STATS.
+To disable statistics, use either of the following:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ scp -q myfile server.example.com:
+
+# SSH1 only
+$ setenv SSH_NO_SCP_STATS 1
+$ scp1 myfile server.example.com:</pre></blockquote>
+
+
+
+To enable statistics, use either of these:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ scp1 -Q myfile server.example.com:
+
+# SSH1 only
+$ setenv SSH_SCP_STATS 1
+$ scp1 myfile server.example.com:</pre></blockquote>
+
+
+
+If statistics are enabled, you may also choose to print file-by-file
+statistics. This is done with the options <em class="emphasis">-a</em> and
+<em class="emphasis">-A</em>, or the environment variables
+<a name="INDEX-1261" />SSH_ALL_SCP_STATS
+and
+<a name="INDEX-1262" />SSH_NO_ALL_SCP_STATS.
+To print file-by-file statistics, use either of these:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ scp1 -Q -a myfile server.example.com:
+
+# SSH1 only
+$ setenv SSH_ALL_SCP_STATS 1
+$ scp1 myfile server.example.com:</pre></blockquote>
+
+
+
+or to print a single, cumulative statistic:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ scp1 -Q -A myfile server.example.com:
+
+# SSH1 only
+$ setenv SSH_NO_ALL_SCP_STATS 1
+$ scp1 myfile server.example.com:</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch07-50-fm2xml" /><div class="sect3">
+<h3 class="sect3">7.5.7.2. scp2 statistics</h3>
+
+
+
+The statistics display for <tt class="command">scp2</tt> is configurable as
+well, but as of SSH2 2.1.0, this information is missing from the
+manpage. By default, the statistics display is enabled, and
+there's no compile-time option like SSH1's
+<tt class="literal"> -- with-scp-stats</tt><a name="INDEX-1263" /> to disable
+it. The display looks different from that of <tt class="command">scp1</tt>:</p>
+
+
+
+<blockquote><pre class="code">$ scp2 myfile* server.example.com:
+Transfering myfile1 -&gt; server.example.com:./myfile1  (50k)
+|................................................................|
+51200 bytes transferred in 1.00 seconds [50.0 kB/sec].
+Transfering myfile2 -&gt; server.example.com:./myfile2  (30k)
+|................................................................|
+31744 bytes transferred in 1.03 seconds [31.3 kB/sec].
+Transfering myfile3 -&gt; server.example.com:./myfile3  (3k)
+|................................................................|
+3068 bytes transferred in 0.79 seconds [3.8 kB/sec].</pre></blockquote>
+
+
+
+The progress indicators (dotted lines) change as the files are
+transferred, but frankly we find them unintuitive. To suppress the
+statistics display, use the <em class="emphasis">-Q</em> command-line
+option (yes, it has the opposite meaning of SSH1's
+<em class="emphasis">-Q</em> option):</p>
+
+
+
+<blockquote><pre class="code">$ scp2 -Q myfile server.example.com:</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-51-fm2xml" /><div class="sect2">
+<h3 class="sect2">7.5.8. Locating the ssh Executable</h3>
+
+
+
+To copy files securely, <tt class="command">scp</tt> invokes
+<tt class="command">ssh</tt> internally. Therefore, <tt class="command">scp</tt>
+needs to know where the <tt class="command">ssh</tt> executable resides on
+disk. Normally, the path to <tt class="command">ssh</tt> is made known to
+<tt class="command">scp</tt> at compile time (by the compile-time flag
+<tt class="literal"> -- prefix</tt><a name="INDEX-1264" />), but you can
+specify the path manually if you like. [<a href="ch04_01.html#ch04-77323">Section 4.1.5.2, "Installation, files, and directories"</a>]
+For instance, you can test a new version of <tt class="command">ssh</tt>
+with an old version of <tt class="command">scp</tt>. The command-line
+option <em class="emphasis">-S</em> specifies the path:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+$ scp -S /usr/alternative/bin/ssh myfile server.example.com:</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch07-94987" /><div class="sect2">
+<h3 class="sect2">7.5.9. For Internal Use Only</h3>
+
+
+
+<tt class="command">scp</tt> for SSH1 and OpenSSH has two undocumented
+options, <span class="option">-t</span> and <span class="option">-f,</span> for internal
+use. Most likely you will never need to use them explicitly. They
+inform <tt class="command">scp</tt> of the direction of the copy: from the
+local to the remote machine, or from remote to local. The
+<em class="emphasis">-t</em> option means copying to a remote machine and
+<em class="emphasis">-f</em> means copying from a remote machine.</p>
+
+
+
+Whenever you invoke <tt class="command">scp</tt>, it invisibly runs a
+second <tt class="command">scp</tt> process on the remote host that
+includes either <span class="option">-t</span> or <span class="option">-f</span> on its
+command line. You can see this if you run <tt class="command">scp</tt> in
+verbose mode. If copying from the local to the remote machine, you
+see:</p>
+
+
+
+<blockquote><pre class="code">$ scp -v myfile server.example.com:
+Executing: host server.example.com, ..., command scp -v -t .
+...</pre></blockquote>
+
+
+
+On the other hand, if you copy from the remote to the local machine,
+you see:</p>
+
+
+
+<blockquote><pre class="code">$ scp -v server.example.com:myfile .
+Executing: host server.example.com, ..., command scp -v -f .
+...</pre></blockquote>
+
+
+
+Again, it's likely you'll never use these options, but
+they're useful to know when reading
+<tt class="command">scp</tt>'s output in verbose mode. Also, the
+<tt class="command">scp2</tt> manpage mentions them, so it's good to
+understand what they are.<a name="INDEX-1265" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.4. Client Configuration in Depth</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.6. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch07_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

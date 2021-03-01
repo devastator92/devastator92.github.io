@@ -1,0 +1,1914 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:32 GMT -->
+<head><title>Understanding an httpd.conf File (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">11.3. Understanding an httpd.conf File</h2>
+
+<p>It's helpful
+<a name="INDEX-2361" />
+<a name="INDEX-2362" />
+<a name="INDEX-2363" />to know the
+default configuration when you're called upon to correct the
+configuration of someone else's system. In this section we
+examine the values set in the default configuration on a Solaris 8
+system. (The default Solaris 8 configuration file is listed in <a href="appf_01.html">Appendix F, "Solaris httpd.conf File"</a>.)
+</p>
+
+<p>Here we focus on the directives that are actually used in the Solaris
+8 configuration, and a few others that show important Apache
+features. There are some other directives that we don't
+discuss. If you need additional information about any directive,
+there are many places to look. The full
+<em class="filename">httpd.conf</em> file contains many comments, which
+explain the purpose of each directive and are an excellent source of
+information. The Apache web site (<a href="http://www.apache.org/">http://www.apache.org</a>) provides online
+documentation. Two excellent books on Apache configuration are
+<em class="emphasis">Apache: The Definitive Guide</em>, by Ben and Peter
+Laurie (O'Reilly), and <em class="emphasis">Linux Apache Web Server
+Administration</em>, by Charles Aulds (Sybex). However,
+you'll probably find more information about the
+<em class="emphasis">httpd.conf</em> file than you need for an average
+configuration right here in this chapter.
+</p>
+
+<p>The <em class="emphasis">httpd.conf</em> file that comes with Solaris has
+160 active configuration lines. To tackle that much information, the
+following sections organize the configuration directives into
+different groups. Note that the configuration file itself organizes
+directives by scope: global environment directives, main server
+directives, and virtual host directives. (Virtual hosts are explained
+later in this chapter.) Although that organization is great for
+<tt class="literal">httpd</tt> when it is processing the file, it's
+not so great for a human reading the file. Here, related directives
+are grouped by function to make the individual directives more
+understandable. Once you understand the individual directives, you
+will understand the entire configuration.
+</p>
+
+<p>We start our look at the <em class="emphasis">httpd.conf</em> file with
+the directives that load dynamically loadable modules. These modules
+must be loaded before the directives they provide can be used in the
+configuration, so it makes sense to discuss loading the modules
+before we discuss the features they provide. Understanding
+dynamically loadable modules is a good place to start understanding
+Apache configuration.
+</p>
+
+<a name="tcp3-CHP-11-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">11.3.1. Loading Dynamic Shared Objects</h3>
+
+<p>The two directives <a name="INDEX-2364" /> <a name="INDEX-2365" /> <a name="INDEX-2366" /> <a name="INDEX-2367" />that <a name="INDEX-2368" />appear most in the
+Solaris <em class="emphasis">httpd.conf</em> file are LoadModule and
+AddModule. Together, they make up more than 60 of the 160 active
+lines in the <em class="filename">httpd.conf</em> file. All 60 of these
+lines configure the <a name="INDEX-2369" /> <a name="INDEX-2370" />
+<a name="INDEX-2371" />Dynamic Shared Object (DSO) modules
+used by the Apache web server.
+</p>
+
+<p>Apache is composed of many software modules. Like kernel modules, DSO
+modules can be compiled into Apache or loaded at runtime. Running
+<tt class="literal">httpd</tt> with the <tt class="literal">-l</tt> command-line
+option lists all the modules compiled into Apache. The following
+example is from a Solaris 8 system:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">/usr/apache/bin/httpd -l</b>
+Compiled-in modules:
+  http_core.c
+  mod_so.c</pre></blockquote>
+
+<p>Some systems may have many modules compiled into the Apache daemon.
+<a name="INDEX-2372" /> <a name="INDEX-2373" />Solaris
+and Red Hat systems are delivered with only the following two modules
+compiled in:
+</p>
+
+<dl>
+<a name="INDEX-2374" /><dt><i>http_core.c</i></dt>
+<dd>
+<p>This is the core module. It is always statically linked into the
+Apache kernel, and it provides the basic functions that must be found
+in every Apache web server. This module is required; all other
+modules are optional.
+</p>
+</dd>
+
+
+<a name="INDEX-2375" /><dt><i>mod_so.c</i></dt>
+<dd>
+<p>This module provides runtime support for Dynamic Shared Object
+modules. It is required if you plan to dynamically link in other
+modules at runtime. If modules are loaded through the
+<em class="emphasis">httpd.conf</em> file, this module must be installed
+in Apache to support those modules. For this reason it is often
+statically linked into the Apache kernel.
+</p>
+</dd>
+
+</dl>
+
+<p>In addition to these statically linked modules, Solaris uses many
+dynamically loadable modules. The LoadModule and AddModule directives
+are used in the <em class="emphasis">httpd.conf</em> file to load DSOs.
+First, each module is identified by a <a name="INDEX-2376" />LoadModule
+directive. For example, this line in the Solaris
+<em class="emphasis">httpd.conf</em> file identifies the module that
+tracks users through the use of cookies:
+</p>
+
+<blockquote><pre class="code">LoadModule usertrack_module /usr/apache/libexec/mod_usertrack.so</pre></blockquote>
+
+<p>The LoadModule directive is followed by the module name and the path
+of the shared object file.
+</p>
+
+<p>Before a module can be used, it must be added to the list of modules
+that are available to Apache. The first step in building the new
+module list is to clear the old one. This is done with the
+<a name="INDEX-2377" />ClearModuleList directive. ClearModuleList
+has no arguments or options. It occurs in the
+<em class="emphasis">httpd.conf</em> file after the last LoadModule
+directive and before the first AddModule directive.
+</p>
+
+<p>The <a name="INDEX-2378" />AddModule directive adds a module name to
+the module list. The module list must include all optional modules,
+both those compiled into the server and those that are dynamically
+loaded. On our sample Solaris system, that means that there is one
+more AddModule directive in the <em class="emphasis">httpd.conf</em> file
+than there are LoadModule directives. The extra AddModule directive
+handles <em class="filename">mod_so.c</em>, which is the only optional
+module compiled into Apache on our sample system.<a href="#FOOTNOTE-127">[127]</a></p><blockquote class="footnote"> <a name="FOOTNOTE-127" /><p>[127]The
+<em class="filename">http_core.c</em> module is an integrated part of
+Apache. It is not installed with LoadModule and AddModule
+commands.</p> </blockquote> 
+
+<p>Mostly, however, LoadModule and
+AddModule directives occur in pairs: there is one AddModule directive
+for every LoadModule directive. For example, the following AddModule
+directive in the Solaris <em class="emphasis">httpd.conf</em> file adds
+the usertrack_module defined by the LoadModule directive shown
+previously to the module list:
+</p>
+
+<blockquote><pre class="code">AddModule mod_usertrack.c</pre></blockquote>
+
+<p>The AddModule directive is followed by the name of the source file
+for the module being loaded. Notice that this is the name of the
+source file that produced the object module, not the module name seen
+in the LoadModule directive. This name is identical to the object
+filename except for the extension. In the LoadModule directive, which
+uses the shared object extension <em class="filename">.so</em>, the object
+filename is <em class="filename">mod_usertrack.so</em>. AddModule uses the
+source filename extension <em class="filename">.c</em>, so the module name
+is <em class="filename">mod_usertrack.c</em>.
+</p>
+
+<p><a href="ch11_03.html#tcp3-CHP-11-TABLE-1">Table 11-1</a> lists all the modules referenced by
+<a name="INDEX-2379" />
+<a name="INDEX-2380" />AddModule directives in the
+Solaris 8 <em class="emphasis">httpd.conf</em> file.
+</p>
+
+<a name="tcp3-CHP-11-TABLE-1" /><h4 class="objtitle">Table 11-1. DSO modules loaded in the Solaris configuration </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Module</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>mod_access</p>
+</td>
+<td>
+<p>Enables allow/deny type access controls.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_actions</p>
+</td>
+<td>
+<p>Enables the use of user-defined handlers for specific MIME types or
+access methods.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_alias</p>
+</td>
+<td>
+<p>Allows references to documents and scripts outside the document root.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_asis</p>
+</td>
+<td>
+<p>Defines file types returned without headers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_auth</p>
+</td>
+<td>
+<p>Enables user authentication.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_auth_anon</p>
+</td>
+<td>
+<p>Enables anonymous logins.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_auth_dbm</p>
+</td>
+<td>
+<p>Enables use of a DBM authentication file.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_autoindex</p>
+</td>
+<td>
+<p>Enables automatic index generation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_cern_meta</p>
+</td>
+<td>
+<p>Enables compatibility with old CERN web servers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_cgi</p>
+</td>
+<td>
+<p>Enables execution of CGI programs.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_digest</p>
+</td>
+<td>
+<p>Enables MD5 authentication.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_dir</p>
+</td>
+<td>
+<p>Controls formatting of directory listings.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_env</p>
+</td>
+<td>
+<p>Allows CGI scripts and server-side includes (SSI) to inherit all
+shell environment variables.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_expires</p>
+</td>
+<td>
+<p>Set the date for the Expires: header.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_headers</p>
+</td>
+<td>
+<p>Enables customized response headers.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_imap</p>
+</td>
+<td>
+<p>Processes image map files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_include</p>
+</td>
+<td>
+<p>Processes SSI files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_info</p>
+</td>
+<td>
+<p>Enables use of the server-info handler.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_log_config</p>
+</td>
+<td>
+<p>Enables use of custom log formats.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_mime</p>
+</td>
+<td>
+<p>Provides support for MIME files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_mime_magic</p>
+</td>
+<td>
+<p>Determines the MIME type of a file from its content.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_negotiation</p>
+</td>
+<td>
+<p>Enables MIME content negotiation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_perl</p>
+</td>
+<td>
+<p>Provides support for the Perl language.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_proxy</p>
+</td>
+<td>
+<p>Enables web caching.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_rewrite</p>
+</td>
+<td>
+<p>Enables URI-to-filename mapping.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_setenvif</p>
+</td>
+<td>
+<p>Sets environment variables from client information.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_so</p>
+</td>
+<td>
+<p>Provides runtime support for dynamic shared objects (DSOs).</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_speling</p>
+</td>
+<td>
+<p>Automatically corrects minor spelling errors.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_status</p>
+</td>
+<td>
+<p>Provides web-based access to the server-info report.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_unique_id</p>
+</td>
+<td>
+<p>Generates a unique request identifier for each request.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_userdir</p>
+</td>
+<td>
+<p>Defines where users can create public web pages.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_usertrack</p>
+</td>
+<td>
+<p>Provides user tracking through a unique identifier called a cookie.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mod_vhost_alias</p>
+</td>
+<td>
+<p>Provides support for name-based virtual hosts.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>If you decide to add modules to your configuration, do so very
+carefully. The order of the LoadModule and AddModule directives in
+the <em class="emphasis">httpd.conf</em> file is critical. Don't
+change things without knowing what you're doing. Before
+proceeding with a new installation, read the documentation that comes
+with your new module and the modules documentation found in the
+<em class="emphasis">manual/mod</em> directory of the Apache distribution.
+See the previously mentioned book <em class="emphasis">Linux Apache Web Server
+Administration</em> for detailed advice about adding new
+modules.
+</p>
+
+<p>Once the DSOs are loaded, the directives
+<a name="INDEX-2381" />that
+they provide can be used in the configuration file. Let's
+continue looking at the <a name="INDEX-2382" />Solaris
+<em class="emphasis">httpd.conf</em> file by examining some of the basic
+<a name="INDEX-2383" />
+<a name="INDEX-2384" />
+<a name="INDEX-2385" />
+<a name="INDEX-2386" />configuration <a name="INDEX-2387" />directives.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">11.3.2. Basic Configuration Directives</h3>
+
+<p>This section
+<a name="INDEX-2388" />
+<a name="INDEX-2389" />
+<a name="INDEX-2390" />
+<a name="INDEX-2391" />
+<a name="INDEX-2392" />covers
+six different directives. The directives as they appear in the sample
+configuration we created for our
+<a name="INDEX-2393" />Solaris system are:
+</p>
+
+<blockquote><pre class="code">ServerAdmin webmaster@www.wrotethebook.com
+ServerName www.wrotethebook.com
+UseCanonicalName On
+ServerRoot "/var/apache"
+ServerType standalone
+Port 80</pre></blockquote>
+
+<p>Two of the basic directives, ServerAdmin and ServerName, were touched
+upon earlier in the chapter. <a name="INDEX-2394" />ServerAdmin defines the email
+address of the web server administrator. This is set to a bogus
+value, <em class="filename">you@your.host</em>, in the default Solaris
+configuration. You should change this to the full email address of
+the real web administrator before starting the server.
+</p>
+
+<p><a name="INDEX-2395" />ServerName defines the hostname returned
+to clients when they read data from this server. In the default
+Solaris configuration, the ServerName directive is commented out,
+which means that the "real" hostname is sent to clients.
+Thus, if the name assigned to the first network interface is
+<em class="emphasis">crab.wrotethebook.com</em>, then that is the name
+sent to clients. Many Apache experts suggest defining an explicit
+value for ServerName in order to document your configuration and to
+ensure that you get exactly the value you want. Earlier, we set
+ServerName to <em class="emphasis">www.wrotethebook.com</em>, so that even
+though the web server is running on <em class="emphasis">crab</em>, the
+server will be known as <em class="emphasis">www.wrotethebook.com</em>
+during web interactions. Of course,
+<em class="emphasis">www.wrotethebook.com</em> must be a valid hostname
+configured in DNS. (See <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a>, where
+<em class="emphasis">www</em> is defined as a nickname for
+<em class="emphasis">crab</em> in the
+<em class="emphasis">wrotethebook.com</em> zone file.)
+</p>
+
+<p>A configuration directive related to ServerName is
+<a name="INDEX-2396" />UseCanonicalName, which defines how
+<tt class="literal">httpd</tt> builds "self-referencing" URLs.
+A self-referencing URL contains the name of the server itself in the
+hostname portion of the URL. For example, on the server
+<em class="emphasis">www.wrotethebook.com</em>, a URL that starts with
+<em class="emphasis">http://www.wrotethebook.com</em> would be a
+self-referencing URL. The hostname in the URL should be a
+<em class="emphasis">canonical name</em>, which is a name that DNS can
+resolve to a valid IP address. When UseCanonicalName is set to on, as
+it is in the default Solaris configuration, the value in ServerName
+is used to identify the server in self-referencing URLs. For most
+configurations, leave it set to on. If it is set to off, the value
+that came in the query from the client is used.
+</p>
+
+<p>The <a name="INDEX-2397" />ServerRoot option defines the directory
+that contains important files used by <tt class="literal">httpd</tt>,
+including error files, log files, and the three configuration files:
+<em class="emphasis">httpd.conf</em>, <em class="emphasis">srm.conf</em>, and
+<em class="emphasis">access.conf</em>. In the Solaris configuration,
+ServerRoot points to <em class="emphasis">/var/apache</em>. This is
+surprising in that the Solaris <tt class="literal">httpd</tt> configuration
+files are actually located in <em class="emphasis">/etc/apache</em>, so
+clearly something else is at work.
+</p>
+
+<p>Solaris uses the <tt class="literal">-f</tt> option on the
+<tt class="literal">httpd</tt> command line to override the location of the
+<em class="emphasis">httpd.conf</em> file at runtime.
+<tt class="literal">httpd</tt> is started at boot time using the script
+<em class="emphasis">/etc/init.d/apache</em>. That script defines a
+variable named CONF_FILE that contains the value
+<em class="emphasis">/etc/apache/httpd.conf</em>. This variable is used
+with the <tt class="literal">httpd</tt> command that launches the web
+server, and it is this variable that defines the location of the
+configuration file on a
+<a name="INDEX-2398" />Solaris system.
+</p>
+
+<p>The <a name="INDEX-2399" />ServerType option defines how the server
+is started. If the server starts from a startup script at boot time,
+the option is set to <tt class="literal">standalone</tt>. If the server is
+run on demand by <tt class="literal">inetd</tt>, the option is set to
+<tt class="literal">inetd</tt>. The default Solaris configuration sets
+ServerType to <tt class="literal">standalone</tt>, which is the best value;
+web servers are usually in high demand, so it is best to start them
+at boot time. It is possible, of course, for a user to set up a
+small, rarely used web site on a desktop workstation, in which case
+running the server from <tt class="literal">inetd</tt> may be desirable.
+But the web server you create for your network should be
+<tt class="literal">standalone</tt>.
+</p>
+
+<p><a name="INDEX-2400" />Port defines the TCP port number used by
+the server. The standard port number is 80. On occasion, private web
+servers run on other port numbers. For example, Solaris runs the
+<em class="emphasis">AnswerBook2</em> server on port 8888. Other popular
+alternative ports for special-purpose web sites are 8080 and 8000. If
+you change the port number, you must then tell your users the
+nonstandard port number. For example,
+<em class="emphasis">http://jerboas.wrotethebook.com:8080</em> is a URL
+for a web site running on TCP port 8080 on host
+<em class="emphasis">jerboas.wrotethebook.com</em>.
+</p>
+
+<p>When ServerType is set to <tt class="literal">inetd</tt>, it is usually
+desirable to set Port to something other than 80. The reason for this
+is that the ports under 1024 are "privileged" ports. If
+80 is used, <tt class="literal">httpd</tt> must be run from
+<tt class="literal">inetd</tt> with the userid root. This is a potential
+security problem, as an intruder might be able to exploit the web
+site to get root access. Using port 80 is okay when ServerType is
+<tt class="literal">standalone</tt> because the initial
+<tt class="literal">httpd</tt> process does not provide direct client
+service. Instead it starts several other HTTP daemons, called the
+<em class="emphasis">swarm</em>, to provide client services. The daemons
+in the swarm do not run with root privilege.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">11.3.3. Managing the Swarm</h3>
+
+<p>In the original web
+<a name="INDEX-2401" /> <a name="INDEX-2402" /> <a name="INDEX-2403" />server design, the server would create
+separate processes to handle individual requests. This placed a heavy
+load on the CPU when the server was busy and had a major negative
+impact on responsiveness. It was possible for the entire system to be
+overwhelmed by <tt class="literal">httpd</tt> processes.
+</p>
+
+<p>Apache uses a different approach. A swarm of server processes starts
+at boot time (the <tt class="literal">ps</tt> command earlier in the
+chapter shows several <tt class="literal">httpd</tt> processes running on
+the Solaris system), and all the processes in the swarm share the
+workload. If all the persistent <tt class="literal">httpd</tt> processes
+become busy, spare processes are started to share the work. Five
+directives in the Apache configuration
+<a name="INDEX-2404" />
+<a name="INDEX-2405" />control how the swarm of server
+child processes is managed. They are:
+</p>
+
+<dl>
+<a name="INDEX-2406" /><a name="INDEX-2407" /><dt><b>
+inSpareServers</b></dt>
+<dd>
+<p>This directive sets the minimum number of idle server processes that
+must be maintained. In the Solaris configuration, this is set to 5,
+which is the default value used in the Apache distribution. When the
+number of idle processes drops below 5, another process is created to
+maintain the correct number of idle processes. Five is a good value
+for an average server; it allows a burst of up to five quick requests
+to be handled without making the client wait for a child process to
+start. A lightly used server might have a lower number, and a heavily
+used server could benefit from a higher number. However, you
+don't want too many idle servers waiting around for requests
+that may never come.
+</p>
+</dd>
+
+
+<a name="INDEX-2408" /><a name="INDEX-2409" /><dt><b>
+axSpareServers</b></dt>
+<dd>
+<p>This directive sets the maximum number of idle server processes that
+may be maintained. It prevents too many idle servers from sitting
+around with nothing to do. If the number of idle servers exceeds
+axSpareServers, the excess idle servers are killed. In the Solaris
+configuration, MaxSpareServers is set to 10, which is the default
+value that ships with the Apache distribution. Set this value to
+about twice the value set for MinSpareServers.
+</p>
+</dd>
+
+
+<a name="INDEX-2410" /><a name="INDEX-2411" /><dt><b>
+StartServers</b></dt>
+<dd>
+<p>This directive defines the number of <tt class="literal">httpd</tt> daemons
+started at boot time. In the Solaris configuration, it is set to 5.
+The effect of this directive can be seen in the output of the
+<tt class="literal">ps</tt> command earlier in this chapter, which showed
+that six <tt class="literal">httpd</tt> daemons were running. One of these
+is the parent process that manages the swarm; the other five are the
+child processes that actually handle client requests for data.
+</p>
+</dd>
+
+
+<a name="INDEX-2412" /><dt><i>MaxClients</i></dt>
+<dd>
+<p>This directive sets the maximum number of client connections that can
+be serviced simultaneously. HTTP connection requests beyond the
+number set by MaxClients are rejected. Solaris sets this to 150,
+which is the most commonly used value. MaxClients prevents the server
+from consuming all system resources when it receives an overwhelming
+number of client requests. MaxClients should be increased only if you
+have an extremely powerful system with fast disks and a large amount
+of memory. It is generally best to handle additional clients by
+adding additional servers. The upper limit for MaxClients is set by
+HARD_SERVER_LIMIT, which is compiled into Apache. The default for
+HARD_SERVER_LIMIT is 256.
+</p>
+</dd>
+
+
+<a name="INDEX-2413" /><a name="INDEX-2414" /><dt><b>
+axRequestsPerChild</b></dt>
+<dd>
+<p>This directive defines the number of client requests a child process
+can handle before it must terminate. Solaris sets MaxRequestsPerChild
+to 0, which means "unlimited" -- a child process can
+keep handling client requests for as long as the system is up and
+running. This directive should always be set to 0, unless you know
+for a fact that the library you used to compile Apache has a memory
+leak.
+</p>
+</dd>
+
+</dl>
+
+<p>The <a name="INDEX-2415" />
+<a name="INDEX-2416" />User
+and <a name="INDEX-2417" />
+<a name="INDEX-2418" />Group
+directives define the UID and GID under which the swarm of
+<tt class="literal">httpd</tt> processes are run. When
+<tt class="literal">httpd</tt> starts at boot time, it runs as a root
+process, binds to port 80, and then starts a group of child processes
+that provide the actual web services. These child processes are the
+ones given the UID and GID defined in the file. The UID and GID
+should provide the least possible system privileges to the web
+server. On the Solaris system, this is the user
+<em class="emphasis">nobody</em> and the group
+<em class="emphasis">nobody</em>. The previous <tt class="literal">ps</tt>
+command output shows this clearly. One <tt class="literal">httpd</tt>
+process belongs to <em class="emphasis">root</em> and five other
+<tt class="literal">httpd</tt> processes belong to the user
+<em class="emphasis">nobody</em>. An alternative to using
+<em class="emphasis">nobody</em> is to create a userid and groupid just
+for <tt class="literal">httpd</tt>. If you do this, create the file
+permissions granted to the new user account very carefully. The
+advantage of creating a special user and group for
+<tt class="literal">httpd</tt> is that you can use group permissions for
+added protection, and you won't be completely dependent on the
+world permissions granted to <em class="emphasis">nobody</em>.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">11.3.4. Defining Where Things Are Stored</h3>
+
+<p>The <a name="INDEX-2419" />
+<a name="INDEX-2420" />
+<a name="INDEX-2421" />DocumentRoot
+directive <a name="INDEX-2422" />defines the directory that contains the
+web server documents. For security reasons, this is not the same
+directory that holds the configuration files. As we saw earlier, the
+Solaris setting for DocumentRoot is:
+</p>
+
+<blockquote><pre class="code">DocumentRoot "/var/apache/htdocs"</pre></blockquote>
+
+<p>To apply directives to a specific directory, create a
+<em class="emphasis">container</em> for those directives. Three of the
+<em class="emphasis">httpd.conf</em> directives used to create containers
+are:
+</p>
+
+<dl>
+<dt><b><tt class="literal">&lt;Directory</tt> <em class="replaceable">pathname</em><tt class="literal">&gt;</tt></b></dt>
+<dd>
+<p>The <a name="INDEX-2423" /> <a name="INDEX-2424" />Directory directive creates a
+container for directives that apply to the directory identified by
+<em class="replaceable">pathname</em>. Any configuration directives
+that occur after the Directory directive and before the next
+<tt class="literal">&lt;/Directory&gt;</tt> statement apply only to the
+specified directory.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">&lt;Location</tt> <em class="replaceable">document</em><tt class="literal">&gt;</tt></b></dt>
+<dd>
+<p>The <a name="INDEX-2425" />Location directive creates a container for
+directives that apply to a specific
+<em class="replaceable">document</em>. Any configuration directives
+that occur after the Location directive and before the next
+<tt class="literal">&lt;/Location&gt;</tt> statement apply only to the
+specified document.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">&lt;Files</tt> <em class="replaceable">filename</em><tt class="literal">&gt;</tt></b></dt>
+<dd>
+<p>The <a name="INDEX-2426" />Files directive creates a container for
+directives that apply to the file identified by
+<em class="replaceable">filename</em>. Any configuration directives
+that occur after the Files directive and before the next
+<tt class="literal">&lt;/Files&gt;</tt> statement apply only to the
+specified file. <em class="replaceable">filename</em> can refer to more
+than one file if it contains the Unix wildcard character
+<tt class="literal">*</tt> or <tt class="literal">?</tt>. Additionally, if the
+Files directive is followed by an optional <tt class="literal">~</tt>
+(tilde), the <em class="replaceable">filename</em> field is interpreted
+as a regular expression.
+</p>
+</dd>
+
+</dl>
+
+<p>Directories and files are easy to understand: they are parts of the
+Unix filesystem that every system administrator knows. Documents, on
+the other hand, are specific to the web server. The screenful of
+information that appears in response to a web query is a document; it
+can be made up of many files from different directories. The Location
+container provides an easy way to refer to a complex document as a
+single entity. We will see examples of Location and Files containers
+later in this chapter. Here we look at Directory containers.
+</p>
+
+<p>The
+<a name="INDEX-2427" />Solaris configuration defines a
+Directory container for the server's root directory and for the
+DocumentRoot:
+</p>
+
+<blockquote><pre class="code">&lt;Directory /&gt;
+    Options FollowSymLinks
+    AllowOverride None
+&lt;/Directory&gt;
+&lt;Directory "/var/apache/htdocs"&gt;
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>Each Directory container starts with a Directory directive and ends
+with a &lt;/Directory&gt; tag. Both containers shown here enclose
+configuration statements that apply to only a single directory. The
+purpose of the directives inside these containers is covered later in
+<a href="ch11_04.html#tcp3-CHP-11-SECT-4">Section 11.4, "Web Server Security"</a>. For now, it is
+sufficient to understand that containers are used inside the
+<em class="emphasis">httpd.conf</em> file to limit the scope of various
+configuration directives.
+</p>
+
+<p>The <a name="INDEX-2428" />Alias directive and the
+<a name="INDEX-2429" />ScriptAlias directive both map a URL path
+to a directory on the server. For example, the Solaris configuration
+contains the following three directives:
+</p>
+
+<blockquote><pre class="code">Alias /icons/ "/var/apache/icons/"
+Alias /manuals/ "/usr/apache/htdocs/manual/"
+ScriptAlias /cgi-bin/ "/var/apache/cgi-bin/"</pre></blockquote>
+
+<p>The first line maps the URL path <em class="emphasis">/icons/</em> to the
+directory <em class="emphasis">/var/apache/icons/</em>. Thus a request for
+<em class="emphasis">www.wrotethebook.com/icons/</em> is mapped to
+<em class="emphasis">www.wrotethebook.com/var/apache/icons/</em>. The
+second directive maps the URL path <em class="emphasis">/manuals/</em> to
+<em class="emphasis">www.wrotethebook.com/usr/apache/htdocs/manual/</em>.
+</p>
+
+<p>You may have several Alias directives to handle several different
+mappings, but you will have only one ScriptAlias directive. The
+ScriptAlias directive functions in exactly the same ways as the Alias
+directive, except that the directory it points to contains executable
+CGI programs. Therefore, <tt class="literal">httpd</tt> grants this
+directory execution privileges. ScriptAlias is particularly important
+because it allows you to maintain executable web scripts in a
+directory separate from the DocumentRoot. CGI scripts are the single
+biggest security threat to your server; maintaining them separately
+allows you to have tighter control over who has access to the
+scripts.
+</p>
+
+<p>The Solaris configuration has containers for the
+<em class="emphasis">/var/apache/icons</em> directory and the
+<em class="emphasis">/var/apache/cgi-bin</em> directory, but none for the
+<em class="emphasis">/usr/apache/htdocs/manual</em> directory. Just
+because a directory is defined inside the
+<em class="emphasis">httpd.conf</em> file does not mean that a Directory
+container must be created for that directory. The
+<em class="emphasis">/var/apache/icons</em> and the
+<em class="emphasis">/var/apache/cgi-bin</em> containers are shown here:
+</p>
+
+<blockquote><pre class="code">&lt;Directory "/var/apache/icons"&gt;
+    Options Indexes MultiViews
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;
+&lt;Directory "/var/apache/cgi-bin"&gt;
+    AllowOverride None
+    Options None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>These containers enclose AllowOverride, Options, Order, and Allow
+statements -- all of which relate to security. Most of the
+directives found in containers have security implications, and have
+been placed in containers to provide special security settings for a
+file, document, or directory. All of the directives used in the
+containers shown above are covered in <a href="ch11_04.html#tcp3-CHP-11-SECT-4">Section 11.4, "Web Server Security"</a> later in
+this chapter.
+</p>
+
+<p>The <a name="INDEX-2430" />UserDir directive enables personal user
+web pages and points to the directory that contains the user pages.
+UserDir usually points to <em class="emphasis">public_html</em>, and it
+does in the Solaris configuration. With this default setting, users
+create a directory named <em class="emphasis">public_html</em> in their
+home directories to hold their personal web pages. When a request
+comes in for <em class="emphasis">www.wrotethebook.com/~sara</em>, for
+example, it is mapped to
+<em class="emphasis">www.wrotethebook.com/export/home/sara/public_html</em>.
+An alternative is to define a full pathname on the UserDir directive
+line such as <em class="emphasis">/export/home/userpages</em>. Then the
+administrator creates the directory and allows each user to store
+personal pages in subdirectories of this directory, so that a request
+for <em class="emphasis">www.wrotethebook.com/~sara</em> will map to
+<em class="emphasis">www.wrotethebook.com/export/home/userpages/sara</em>.
+The advantage of this approach is that it makes it easier for you to
+monitor the content of user pages. The disadvantage is that a
+separate user web directory tree must be created and protected
+separately, whereas a web folder within the user's home
+directory will inherit the protection of that user's home.
+</p>
+
+<p>The <a name="INDEX-2431" />PidFile and
+<a name="INDEX-2432" />ScoreBoardFile directives define the paths
+of files that relate to process status. The PidFile is the file in
+which <tt class="literal">httpd</tt> stores its process ID, and the
+ScoreBoardFile is the file where <tt class="literal">httpd</tt> writes
+process status information.
+</p>
+
+<p>The <a name="INDEX-2433" />DirectoryIndex option defines the name
+of the file retrieved if the client's request does not include
+a filename. Our Solaris system has the following value for this
+option:
+</p>
+
+<blockquote><pre class="code">DirectoryIndex index.html</pre></blockquote>
+
+<p>Given the value defined for DocumentRoot and this value, if the
+server gets a request for
+<em class="emphasis">http://www.wrotethebook.com</em>, it gives the client
+the file <em class="emphasis">/var/apache/htdocs/index.html</em>. If it
+gets a request for
+<em class="emphasis">http://www.wrotethebook.com/books/</em>, it gives the
+client the file
+<em class="emphasis">/var/apache/htdocs/books/index.html</em>. The
+DocumentRoot is prepended to every request, and the DirectoryIndex is
+appended to any request that doesn't end in a filename.
+</p>
+
+<p>Earlier in this chapter, we saw from an <tt class="literal">ls</tt> of
+<em class="emphasis">/var/apache/htdocs</em> that the directory contains a
+file named <em class="emphasis">index.html</em>. But what if it
+didn't? What would Apache send to the client? If the file
+<em class="emphasis">index.html</em> is not found in the directory,
+<tt class="literal">httpd</tt> sends the client a listing of the directory,
+if the configuration permits it. A directory listing is allowed if
+the Options directive in the Directory container for the directory
+contains the keyword <tt class="literal">Indexes</tt>. (More on Options
+later.) If a directory index is allowed, several different directives
+control how that directory listing is <a name="INDEX-2434" />formatted. 
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">11.3.5. Creating a Fancy Index</h3>
+
+<p>The keyword
+<tt class="literal">FancyIndexing</tt><a name="INDEX-2435" />
+<a name="INDEX-2436" />
+is used on the <a name="INDEX-2437" /><a name="INDEX-2438" />
+<a name="INDEX-2439" /> <a name="INDEX-2440" />IndexOptions directive line
+to enable a "fancy index" of the directory when Apache is
+forced to send the client a directory listing. When fancy indexing is
+enabled, <tt class="literal">httpd</tt> creates a directory list that
+includes graphics, links, and other advanced features. The
+<a name="INDEX-2441" />Solaris configuration
+enables fancy indexing with the IndexOptions directive, and it
+contains about 20 extra lines to help configure the fancy index.
+Solaris uses the following directives
+<a name="INDEX-2442" />to define the graphics and features
+used in the fancy directory listing:
+</p>
+
+<dl>
+<a name="INDEX-2443" /><dt><i>IndexIgnore</i></dt>
+<dd>
+<p>Identifies the files that should not be included in the directory
+listing. Files can be specified by name, partial name, extension, or
+by standard wildcard characters.
+</p>
+</dd>
+
+
+<a name="INDEX-2444" /><dt><i>HeaderName</i></dt>
+<dd>
+<p>Specifies the name of a file that contains information to be
+displayed at the top of the directory listing.
+</p>
+</dd>
+
+
+<a name="INDEX-2445" /><dt><i>ReadmeName</i></dt>
+<dd>
+<p>Specifies the name of a file that contains information to be
+displayed at the bottom of the directory listing.
+</p>
+</dd>
+
+
+<a name="INDEX-2446" /><dt><i>AddIconByEncoding</i></dt>
+<dd>
+<p>Points to the icon used to represent a file based on its MIME
+encoding type.
+</p>
+</dd>
+
+
+<a name="INDEX-2447" /><dt><i>AddIconByType</i></dt>
+<dd>
+<p>Points to the icon used to represent a file based on its MIME file
+type.
+</p>
+</dd>
+
+
+<a name="INDEX-2448" /><dt><i>AddIcon</i></dt>
+<dd>
+<p>Points to the icon used to represent a file based on its extension.</p>
+</dd>
+
+
+<a name="INDEX-2449" /><dt><i>DefaultIcon</i></dt>
+<dd>
+<p>Points to the icon file used to represent a file that has not been
+given an icon by any other option.
+</p>
+</dd>
+
+</dl>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">11.3.6. Defining File Types</h3>
+
+<p>MIME file types <a name="INDEX-2450" />
+<a name="INDEX-2451" />and file
+<a name="INDEX-2452" />extensions play a major role in
+helping the server determine how a file should be handled. Specifying
+IME options is also a major part of the Solaris
+<em class="emphasis">httpd.conf</em> file. The
+<a name="INDEX-2453" />directives involved are:
+</p>
+
+<dl>
+<a name="INDEX-2454" /><dt><i>DefaultType</i></dt>
+<dd>
+<p>Defines the MIME type that is used when the server cannot determine
+the type of a file. In the Solaris configuration this is set to
+text/plain. Thus, when a file has no file extension, the server
+assumes it is a plain-text file.
+</p>
+</dd>
+
+
+<a name="INDEX-2455" /><dt><i>AddEncoding</i></dt>
+<dd>
+<p>Maps a MIME encoding type to a file extension. The Solaris
+configuration contains two AddEncoding directives:
+</p>
+
+
+<blockquote><pre class="code">AddEncoding x-compress Z
+AddEncoding x-gzip gz tgz</pre></blockquote>
+
+<p>The first directive maps the extension <tt class="literal">Z</tt> to the
+IME encoding type x-compress. The second line maps the extensions
+<tt class="literal">gz</tt> and <tt class="literal">tgz</tt> to MIME encoding
+type x-gzip.
+</p>
+</dd>
+
+
+<a name="INDEX-2456" /><dt><i>AddLanguage</i></dt>
+<dd>
+<p>Maps a MIME language type to a file extension. The Solaris
+configuration contains mappings for six languages, e.g.,
+<tt class="literal">.en</tt> for English and <tt class="literal">.fr</tt> for
+French.
+</p>
+</dd>
+
+
+<a name="INDEX-2457" /><dt><i>LanguagePriority</i></dt>
+<dd>
+<p>Sets the priority of the language encoding used when preparing
+multiviews, and the language used when the client does not specify a
+preference. In the Solaris configuration, the priority is English
+(<tt class="literal">en</tt>), French (<tt class="literal">fr</tt>), and German
+(<tt class="literal">de</tt>). This means that English, French, and German
+views will be prepared if multiviews are used. The client will be
+sent the English version if no language preference is specified.
+</p>
+</dd>
+
+
+<a name="INDEX-2458" /><dt><i>AddType</i></dt>
+<dd>
+<p>Maps a MIME file type to a file extension. The Solaris configuration
+has only one AddType directive; it maps MIME type application/x-tar
+to the extension <tt class="literal">.tgz</tt>. A configuration can have
+several AddType directives.
+</p>
+</dd>
+
+</dl>
+
+<p>Another directive that is commonly used to process files based on the
+filename extension is the AddHandler directive. This directive maps a
+file handler to a file extension. A file handler is a program that
+knows how to process a specific file type. For example, the handler
+<tt class="literal">cgi-script</tt> is able to execute CGI files. The
+Solaris configuration does not define any optional handlers, so all
+the AddHandler directives are commented out.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.7" /><div class="sect2">
+<h3 class="sect2">11.3.7. Performance Tuning Directives</h3>
+
+<p>The <a name="INDEX-2459" />
+<a name="INDEX-2460" />KeepAlive
+directive enables the use of <a name="INDEX-2461" /> <a name="INDEX-2462" /> <a name="INDEX-2463" />persistent connections. Without
+persistent connections, the client must make a new connection to the
+server for every link the user selects. Because HTTP runs over TCP,
+every connection requires a connection setup, adding time to every
+file retrieval. With persistent connections, the server waits to see
+if the client has additional requests before it closes the
+connection. Therefore, the client does not need to create a new
+connection to request a new document. The
+<a name="INDEX-2464" />
+<a name="INDEX-2465" />KeepAliveTimeout
+defines the number of seconds the server holds a persistent
+connection open waiting to see if the client has additional requests.
+The Solaris configuration turns KeepAlive on and sets
+KeepAliveTimeout to 15 seconds.
+</p>
+
+<p><a name="INDEX-2466" />
+<a name="INDEX-2467" />MaxKeepAliveRequests
+defines the maximum number of requests that will be accepted on a
+"kept-alive" connection before a new TCP connection is
+required. Solaris sets this value to 100, which is the Apache
+default. Setting MaxKeepAliveRequests to 0 allows unlimited requests.
+100 is a good value for this parameter: few users request 100
+document transfers, so the value essentially creates a persistent
+connection for all reasonable cases. If the client does request more
+than 100 document transfers, it might indicate a problem with the
+client system, so requiring another connection request is probably a
+good idea.
+</p>
+
+<p><a name="INDEX-2468" />
+<a name="INDEX-2469" />Timeout
+defines the number of seconds the server waits for a transfer to
+complete. The value needs to be large enough to handle the size of
+the files your site sends as well as the low performance of the modem
+connections of your clients. But if it is set too high, the server
+will hold open connections for clients that may have gone offline.
+The Solaris configuration has the Timeout set to 5 minutes (300
+seconds), which is a very common setting.
+</p>
+
+<p><a name="INDEX-2470" />
+<a name="INDEX-2471" />BrowserMatch
+is a different type of tuning parameter: it reduces performance for
+compatibility's sake. The Solaris configuration contains the
+following five BrowserMatch directives:
+</p>
+
+<blockquote><pre class="code">BrowserMatch "Mozilla/2" nokeepalive
+BrowserMatch "MSIE 4\.0b2;" nokeepalive downgrade-1.0 force-response-1.0
+BrowserMatch "RealPlayer 4\.0" force-response-1.0
+BrowserMatch "Java/1\.0" force-response-1.0
+BrowserMatch "JDK/1\.0" force-response-1.0</pre></blockquote>
+
+<p>The BrowserMatch statements are used to present information in ways
+that are compatible with the capabilities of different web browsers.
+For example, a browser may be able to handle only HTTP 1.0, not HTTP
+1.1. In this case, <tt class="literal">downgrade-1.0</tt> is used on the
+BrowserMatch line to ensure that the server uses only HTTP 1.0 when
+dealing with that browser.
+</p>
+
+<p>In the Solaris configuration, keepalives are disabled for two
+browsers. One browser is offered only HTTP 1.0 during the connection,
+and responses are formatted to be compatible with HTTP 1.0 for four
+different browsers.
+</p>
+
+<p>Don't fiddle with the BrowserMatch directives. These settings
+are shipped as defaults in the Apache distribution, and are set to
+handle the limitations of different browsers. These are tuning
+parameters, but they are used by the Apache developers to adjust to
+the limitations of older browsers.
+</p>
+
+<p><a name="INDEX-2472" />
+<a name="INDEX-2473" />HostnameLookups
+tells <tt class="literal">httpd</tt> whether or not it should log hostnames
+as well as IP addresses. The advantage of enabling hostname logging
+is that you get a more readable log. The disadvantage is that
+<tt class="literal">httpd</tt> has the added overhead of DNS name lookups.
+Setting this to off, as in the Solaris configuration, enhances server
+performance. The HostnameLookups directive affects what is logged,
+but its major impact is on system performance, which is why we cover
+it under tuning parameters instead of <a name="INDEX-2474" /> <a name="INDEX-2475" /> <a name="INDEX-2476" />logging directives.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.8" /><div class="sect2">
+<h3 class="sect2">11.3.8. Logging Configuration Directives</h3>
+
+<p>Log files provide a great deal of information about the web server.
+The following seven lines define the Apache logging configuration in
+the default Solaris 8 <em class="emphasis">httpd.conf</em> file:
+</p>
+
+<blockquote><pre class="code">ErrorLog /var/apache/logs/error_log
+LogLevel warn
+LogFormat "%h %l %u %t \"%r\" %&gt;s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%h %l %u %t \"%r\" %&gt;s %b" common
+LogFormat "%{Referer}i -&gt; %U" referer
+LogFormat "%{User-agent}i" agent
+CustomLog /var/apache/logs/access_log common</pre></blockquote>
+
+<p>ErrorLog defines the path of the error log file. Use the error log to
+track and correct failures. You should review the log at least once a
+day to check for problems. To keep a close eye on the file while
+you're logged in, use the <tt class="literal">tail</tt> command with
+the <tt class="literal">-f</tt> option:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>tail -l 1 -f /var/log/httpd/apache/error_log</b></tt></pre></blockquote>
+
+<p>The <tt class="literal">tail</tt> command prints the tail end of a file; in
+the example, the file is
+<em class="emphasis">/var/log/httpd/apache/error_log</em>. The
+<tt class="literal">-l</tt> option is the lines option. It tells
+<tt class="literal">tail</tt> how many lines from the end of the file to
+print. In this case, <tt class="literal">-l 1</tt> directs
+<tt class="literal">tail</tt> to print the (one) last line in the file. The
+<tt class="literal">-f</tt> option keeps the <tt class="literal">tail</tt>
+process running so that you will see each record as it is written to
+the file. This allows you to monitor the file in real time.
+</p>
+
+<p>The LogLevel directive defines the type of events written to the
+error log. The Solaris configuration sets LogLevel to
+<tt class="literal">warn</tt>, which specifies that warnings and other more
+critical errors are to be written to the log. This is a safe setting
+for an error log because it logs a wide variety of operational
+errors. LogLevel has eight possible settings:
+<tt class="literal">debug</tt>, <tt class="literal">info</tt>,
+<tt class="literal">notice</tt>, <tt class="literal">warn</tt>,
+<tt class="literal">error</tt>, <tt class="literal">crit</tt>,
+<tt class="literal">alert</tt>, and <tt class="literal">emerg</tt>. The log
+levels are cumulative. For example, <tt class="literal">warn</tt> provides
+warnings, errors, critical messages, alerts, and emergency messages;
+<tt class="literal">debug</tt> provides all types of logging, which causes
+the file to grow at a very rapid rate; <tt class="literal">emerg</tt> keeps
+the file small but notifies you only of disasters.
+<tt class="literal">warn</tt> is a good compromise between not enough
+detail and too much detail.
+</p>
+
+<p>Just as important as reporting errors, the logs provide information
+about who is using the server, how much it is being used, and how
+well it is servicing the users. Web servers are used to distribute
+information; if no one wants or uses the information, you need to
+know it. The LogFormat and CustomLog directives do not configure the
+error log, but rather <em class="emphasis">how</em> server activity is
+logged.
+</p>
+
+<a name="tcp3-CHP-11-SECT-3.8.1" /><div class="sect3">
+<h3 class="sect3">11.3.8.1. Defining the log file format</h3>
+
+<p>The <a name="INDEX-2477" /> <a name="INDEX-2478" />LogFormat
+directives <a name="INDEX-2479" />define the format of log
+<a name="INDEX-2480" />file entries. A LogFormat directive
+contains two things: the layout of a file entry and a label used in
+the <em class="emphasis">httpd.conf</em> file to identify the log entry.
+The layout of the entry is placed directly after the LogFormat
+keyword and is enclosed in quotes. The layout is defined using
+literals and variables.
+</p>
+
+<p>Examining a sample LogFormat directive shows how the variables are
+used. The basic Apache log file conforms to the Common Log Format
+(CLF). CLF is a standard used by all web server vendors, and using
+this format means that the logs generated by Apache servers can be
+processed by any log analysis tool that conforms to the standard. The
+format of a standard CLF entry is clearly defined by the second
+LogFormat directive in the Solaris <em class="emphasis">httpd.conf</em>
+file:
+</p>
+
+<blockquote><pre class="code">LogFormat "%h %l %u %t \"%r\" %&gt;s %b" common</pre></blockquote>
+
+<p>This LogFormat directive specifies exactly the information required
+for a CLF log entry. It does this using seven different
+<a name="INDEX-2481" />LogFormat variables:
+</p>
+
+<dl>
+<dt><b><tt class="literal">%h</tt></b></dt>
+<dd>
+<p>Logs the IP address of the client. If HostnameLookups is set to on,
+this is the client's fully qualified hostname. On the sample
+Solaris system, this would be the client's IP address because
+HostnameLookups is turned off to enhance server performance.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">%l</tt></b></dt>
+<dd>
+<p>Logs the username used to log in to the client, if available. The
+name is retrieved using the <tt class="literal">identd</tt> protocol;
+however, most clients do not run <tt class="literal">identd</tt> and thus
+do not provide this information. Therefore, this field usually
+contains a hyphen to indicate a missing value. Likewise, if the
+server does not have a value for a field, the log contains a hyphen
+in the field.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">%u</tt></b></dt>
+<dd>
+<p>Logs the username used to access a password-protected web page. This
+should match a name you defined in the AuthUser file or the
+AuthDBMUser database you created on the server. (AuthUser and
+AuthDBMUser are covered in <a href="ch11_04.html#tcp3-CHP-11-SECT-4">Section 11.4, "Web Server Security"</a> of this chapter.) Most documents are not password protected,
+and therefore this field contains a hyphen in most log entries.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">%t</tt></b></dt>
+<dd>
+<p>Logs the date and time the log entry was made.</p>
+</dd>
+
+
+<dt><b><tt class="literal">%r</tt></b></dt>
+<dd>
+<p>Logs the first line of the client's request. This often
+contains the URL of the requested document. The <tt class="literal">\"</tt>
+characters in the LogFormat directive indicate that quotes should be
+inserted in the output. In the log file, the client's request
+will be enclosed in quotes.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">%&gt;s</tt></b></dt>
+<dd>
+<p>Logs the status of the last request. This is the three-digit response
+code that the server returned to the client.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">%b</tt></b></dt>
+<dd>
+<p>Logs the number of bytes contained in the document sent to the client.</p>
+</dd>
+
+</dl>
+
+<p>Apache log entries are not limited to the CLF format. The LogFormat
+directive lets you define what information is logged. A wide variety
+of information can be logged.
+</p>
+
+<p>The Solaris configuration contains three additional LogFormat
+directives that demonstrate some optional log formats. The three
+directives are:
+</p>
+
+<blockquote><pre class="code">LogFormat "%{User-agent}i" agent
+LogFormat "%{Referer}i -&gt; %U" referer
+LogFormat "%h %l %u %t \"%r\" %&gt;s %b \"%{Referer}i\" \"%{User-Agent}i\"" 
+combined</pre></blockquote>
+
+<p>All of these directives log the contents of HTTP headers. For
+example, the first directive logs the value received from the client
+in the <tt class="literal">User-agent</tt> header.
+<tt class="literal">User-agent</tt> is the user program that generates the
+document request; generally this is the name of a browser. The format
+that logs the header is:
+</p>
+
+<blockquote><pre class="code">%{User-agent}i</pre></blockquote>
+
+<p>This format works for any header: simply replace
+<tt class="literal">User-agent</tt> with the name of the header. The
+<tt class="literal">i</tt> indicates that this is an input header; output
+headers are indicated by an <tt class="literal">o</tt>. Apache can log the
+contents of any header records received or sent.
+</p>
+
+<p>The second LogFormat directive logs the contents of the
+<tt class="literal">Referer</tt> header received from the client
+(<tt class="literal">%{Referer}i</tt>), the literal characters dash and
+greater-than sign (<tt class="literal">-&gt;</tt>), and the requested URL
+(<tt class="literal">%U</tt>). <tt class="literal">Referer</tt> is the name of
+the remote site that referred the client to your web site;
+<tt class="literal">%U</tt> is the document to which the site referred the
+client.
+</p>
+
+<p>The last LogFormat directive starts with the CLF (<tt class="literal">%h %l %u
+%t \"%r\" %&gt;s %b \"</tt>) and adds to that the values from
+the <tt class="literal">Referer</tt> header and the
+<tt class="literal">User-agent</tt> header. This format is labeled
+<tt class="literal">combined</tt> because it combines the CLF with other
+information; the other two formats are also aptly labeled as
+<tt class="literal">agent</tt> and <tt class="literal">referer</tt>. Yet none of
+these formats is actually used in the Solaris configuration. Simply
+creating a LogFormat is not enough to generate a log file; you must
+also add a matching CustomLog directive to map the format to a file,
+as explained later.
+</p>
+
+<p>In the LogFormat directive, the layout of the log entry is enclosed
+in quotes. The label that occurs after the closing quote is not part
+of the format. In the LogFormat directive that defines the CLF
+format, the label <tt class="literal">common</tt> is an arbitrary string
+used to tie the LogFormat directive to a CustomLog directive. In the
+Solaris configuration, that particular LogFormat is tied to the file
+<em class="emphasis">/var/apache/logs/access_log</em> defined by this
+line:
+</p>
+
+<blockquote><pre class="code">CustomLog /var/apache/logs/access_log common</pre></blockquote>
+
+<p>The label <tt class="literal">common</tt> binds the two directives
+together. Thus the CLF entries defined by this LogFormat directive
+are written to the file defined by this CustomLog directive.
+</p>
+
+<p>In the Solaris configuration, the other CustomLog directives that
+create the <tt class="literal">agent</tt>, <tt class="literal">referer</tt>, and
+<tt class="literal">combined</tt> log files are commented out:
+</p>
+
+<blockquote><pre class="code">#CustomLog /var/apache/logs/referer_log referer
+#CustomLog /var/apache/logs/agent_log agent
+#CustomLog /var/apache/logs/access_log combined</pre></blockquote>
+
+<p>The <em class="emphasis">referer_log</em> stores the URL of the source
+page that linked to your web server. This helps you determine what
+sites are pointing to your web pages. Entries in the
+<em class="emphasis">referer_log</em> are defined by this line:
+</p>
+
+<blockquote><pre class="code">LogFormat "%{Referer}i -&gt; %U" referer</pre></blockquote>
+
+<p>To create the log, uncomment this line:</p>
+
+<blockquote><pre class="code">CustomLog /var/apache/logs/referer_log referer</pre></blockquote>
+
+<p>The <em class="emphasis">agent_log</em> identifies the browsers that are
+used to access your site, and is defined by this LogFormat statement:
+</p>
+
+<blockquote><pre class="code">LogFormat "%{User-agent}i" agent</pre></blockquote>
+
+<p>To create the log, uncomment this line:</p>
+
+<blockquote><pre class="code">CustomLog /var/apache/logs/agent_log agent</pre></blockquote>
+
+<p>Lastly, the format for the expanded CLF log is defined by this line:</p>
+
+<blockquote><pre class="code">LogFormat "%h %l %u %t \"%r\" %&gt;s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined</pre></blockquote>
+
+<p>To create a combined log, uncomment this line:</p>
+
+<blockquote><pre class="code">CustomLog /var/apache/logs/access_log combined</pre></blockquote>
+
+<p>and comment this line:</p>
+
+<blockquote><pre class="code">#CustomLog /var/apache/logs/access_log common</pre></blockquote>
+
+<p>These changes cause the <tt class="literal">combined</tt> log format to be
+used to build a log file named
+<em class="emphasis">/var/apache/logs/access_log</em>. This is the same
+log file that is used by the default <tt class="literal">common</tt> log
+format. To avoid duplicate log entries, turn off
+<tt class="literal">common</tt> logging when you turn on
+<tt class="literal">combined</tt> logging. In effect, these changes switch
+the <em class="emphasis">access_log</em> file from using the
+<tt class="literal">common</tt> log format to logging the
+<tt class="literal">combined</tt> log entry.
+</p>
+
+<p>Each LogFormat statement and its associated CustomLog statement end
+with the same label. The label is an arbitrary name used to bind the
+format and <a name="INDEX-2482" /> <a name="INDEX-2483" />the <a name="INDEX-2484" />file together.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-11-SECT-3.8.2" /><div class="sect3">
+<h3 class="sect3">11.3.8.2. Using conditional logging</h3>
+
+<p>Apache also
+<a name="INDEX-2485" /> <a name="INDEX-2486" />supports conditional logging to
+identify fields that are logged only when certain status codes are
+returned by the server. The status codes are listed in <a href="ch11_03.html#tcp3-CHP-11-TABLE-2">Table 11-2</a>.
+</p>
+
+<a name="tcp3-CHP-11-TABLE-2" /><h4 class="objtitle">Table 11-2. Apache server status codes </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Status code</p>
+</th>
+<th>
+<p>Meaning</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>200: OK</p>
+</td>
+<td>
+<p>A valid request</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>302: Found</p>
+</td>
+<td>
+<p>The document was found</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>304: Not Modified</p>
+</td>
+<td>
+<p>The requested document has not been modified</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>400: Bad Request</p>
+</td>
+<td>
+<p>An invalid request</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>401: Unauthorized</p>
+</td>
+<td>
+<p>The client or user is denied access</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>403: Forbidden</p>
+</td>
+<td>
+<p>The requested access is not allowed</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>404: Not Found</p>
+</td>
+<td>
+<p>The requested document does not exist</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>500 Server Error</p>
+</td>
+<td>
+<p>An unspecified server error occurred</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>503: Out of Resources (Service Unavailable)</p>
+</td>
+<td>
+<p>The server has insufficient resources to honor the request</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>501: Not Implemented</p>
+</td>
+<td>
+<p>The requested server feature is not available</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>502: Bad Gateway</p>
+</td>
+<td>
+<p>The client specified an invalid gateway</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>To make a field conditional, put one or more status codes on the
+field in the LogFormat entry. If multiple status codes are used,
+separate them with commas. Assume that you want to log the browser
+name only if the browser requests a service that is not implemented
+in your server. Combine the Not Implemented (501) status code with
+<tt class="literal">User-agent</tt> header in this manner:
+</p>
+
+<blockquote><pre class="code">%501{User-agent}i</pre></blockquote>
+
+<p>If this value appears in the LogFormat statement, the name of the
+browser is logged only when the status code is 501.
+</p>
+
+<p>Place an exclamation mark in front of the status codes to specify
+that you want to log a field only when the status code does not
+contain the specified values. For example, to log the address of the
+site that referred the user to your web page only if the status code
+is not one of the good status codes, add the following to a
+LogFormat:
+</p>
+
+<blockquote><pre class="code">%!200,302,304{Referer}i</pre></blockquote>
+
+<p>This particular conditional log entry is very useful, as it tells you
+when a remote page has a stale link pointing to your web site.
+</p>
+
+<p>Combine these features with the <tt class="literal">common</tt> log format
+to create a more useful log entry. Here we modify the Solaris
+<tt class="literal">combined</tt> format to include conditional logging:
+</p>
+
+<blockquote><pre class="code">LogFormat "%h %l %u %t \"%r\" %&gt;s %b \"%!200,302,304{Referer}i\" \"%{User-Agent}i\"" combined</pre></blockquote>
+
+<p>This entry provides all the data of the CLF and thus can be analyzed
+by standard tools. But it also provides the browser name and, when
+the user requests a stale link, it provides the address of the remote
+site that references that link.
+</p>
+
+<p>Despite the fact that the Solaris configuration file contains over
+160 active lines, there are some interesting Apache features that the
+Solaris configuration does <em class="emphasis">not</em> exploit. Before
+we move on to the important ongoing tasks of server security and
+server monitoring, the following sections provide a quick overview of
+three features not included in the default Solaris configuration:
+proxies and caching, multi-homed server configuration, and virtual
+hosts.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-11-SECT-3.9" /><div class="sect2">
+<h3 class="sect2">11.3.9. Proxy Servers and Caching</h3>
+
+<p>Servers that <a name="INDEX-2487" />
+<a name="INDEX-2488" /> <a name="INDEX-2489" />
+<a name="INDEX-2490" />act as intermediaries between clients
+and web servers are called <em class="emphasis">proxy servers</em>. When
+firewalls are used, direct web access is often blocked. Instead,
+users connect to the proxy server through the local network, and the
+proxy server is trusted to connect to the remote web server. Proxy
+servers can maintain cached copies of remote servers' web pages
+to improve performance by reducing the amount of traffic sent over
+the wide area network and by reducing the contention for popular web
+sites. The options that control caching behavior are:
+</p>
+
+<dl>
+<a name="INDEX-2491" /><dt><i>CacheNegotiatedDocs</i></dt>
+<dd>
+<p>Allows proxy servers to cache web pages from your server. By default,
+Apache asks proxy servers not to cache your server's web pages.
+This option takes no command-line arguments.
+</p>
+</dd>
+
+
+<a name="INDEX-2492" /><dt><i>ProxyRequests</i></dt>
+<dd>
+<p>Setting this option to on turns your server into a proxy server. By
+default, this is set to off.
+</p>
+</dd>
+
+
+<a name="INDEX-2493" /><dt><i>ProxyVia</i></dt>
+<dd>
+<p>Enables or disables the use of <tt class="literal">Via:</tt> headers, which
+aid in tracking where cached pages actually came from.
+</p>
+</dd>
+
+
+<a name="INDEX-2494" /><dt><i>CacheRoot</i></dt>
+<dd>
+<p>Specifies the directory path where cached web pages are written when
+this server is configured as a proxy server. To avoid making the
+directory writable by the user <em class="emphasis">nobody</em>, create a
+special userid for <tt class="literal">httpd</tt> when you run a proxy
+server.
+</p>
+</dd>
+
+
+<a name="INDEX-2495" /><dt><i>CacheSize</i></dt>
+<dd>
+<p>Sets the maximum size of the cache in kilobytes. The default is 5.</p>
+</dd>
+
+
+<a name="INDEX-2496" /><dt><i>CacheGcInterval</i></dt>
+<dd>
+<p>Sets the time interval (in hours) at which the server prunes the
+cache. The default is 4. Given the defaults, the server prunes the
+cache down to 5 kilobytes every 4 hours.
+</p>
+</dd>
+
+
+<a name="INDEX-2497" /><dt><i>CacheMaxExpire</i></dt>
+<dd>
+<p>Sets the maximum number of hours a document can be held in the cache
+without requesting a fresh copy from the remote server. The default
+is 24 hours. With the default, a cached document can be up to a day
+out of date.
+</p>
+</dd>
+
+
+<a name="INDEX-2498" /><dt><i>CacheLastModifiedFactor</i></dt>
+<dd>
+<p>Sets the length of time a document is cached based on when it was
+last modified. The default factor is 0.1. Therefore, if a document
+that was modified 10 hours ago is retrieved, it is held in the cache
+for only 1 hour before a fresh copy is requested. The assumption is
+that if a document changes frequently, the time of its last
+modification will be recent; thus, documents that change frequently
+are cached for only a short period of time. Regardless, nothing is
+cached longer than CacheMaxExpire.
+</p>
+</dd>
+
+
+<a name="INDEX-2499" /><dt><i>CacheDefaultExpire</i></dt>
+<dd>
+<p>Sets a default cache expiration value for protocols that do not
+provide the value. The default is 1 hour.
+</p>
+</dd>
+
+
+<a name="INDEX-2500" /><dt><i>NoCache</i></dt>
+<dd>
+<p>Defines a list of servers whose pages you do not want to cache. If
+you know that a server has constantly changing information, you
+won't want to cache information from that server because your
+cache will always be out of date. Listing the name of that server on
+the NoCache command line means that queries are sent directly to the
+server, and responses from the server are not saved in the cache.
+</p>
+</dd>
+
+</dl>
+
+<p>All of these directives are commented out in the Solaris
+configuration. By default, the Solaris Apache server is not
+configured to be a proxy server. If you need to create a proxy
+server, refer to a book dedicated to Apache configuration such as
+<em class="emphasis">Linux Apache Web Server Administration</em>.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.10" /><div class="sect2">
+<h3 class="sect2">11.3.10. Multi-Homed Server Options</h3>
+
+<p>Web servers
+<a name="INDEX-2501" /> <a name="INDEX-2502" />
+<a name="INDEX-2503" />with more than one IP address are said
+to be <em class="emphasis">multi-homed</em>. A multi-homed web server
+needs to know what address it should listen to for incoming server
+requests. There are two configuration options to handle this:
+</p>
+
+<dl>
+<a name="INDEX-2504" /><dt><i>BindAddress</i></dt>
+<dd>
+<p>Specifies the address used for server interactions. The default value
+is *, which means that the server should respond to web service
+requests addressed to any of its valid IP addresses. If a specific
+address is used on the BindAddress line, only requests for that
+address are honored.
+</p>
+</dd>
+
+
+<a name="INDEX-2505" /><dt><i>Listen</i></dt>
+<dd>
+<p>Specifies addresses and ports to monitor for web service requests in
+addition to the default port and address. Address and port pairs are
+separated by a colon. For example, to monitor port 8080 on IP address
+172.16.12.5, enter <tt class="literal">Listen 172.16.12.5:8080</tt>. If a
+port is entered with no address, the address of the server is used.
+If the Listen directive is not used, <tt class="literal">httpd</tt>
+monitors only the port defined by the Port directive.
+</p>
+</dd>
+
+</dl>
+
+<p>The BindAddress and Listen directives are commented out of the
+Solaris configuration.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-3.11" /><div class="sect2">
+<h3 class="sect2">11.3.11. Defining Virtual Hosts</h3>
+
+<p>Some of the <a name="INDEX-2506" />
+<a name="INDEX-2507" />
+<a name="INDEX-2508" />options commented out of the sample
+<em class="emphasis">httpd.conf</em> file are used if your server hosts
+multiple web sites. For example, to host web sites for
+<em class="emphasis">fish.edu</em> and <em class="emphasis">mammals.com</em> on
+the <em class="emphasis">crab.wrotethebook.com</em> server, add these
+lines to the <em class="emphasis">httpd.conf</em> file:
+</p>
+
+<blockquote><pre class="code">&lt;VirtualHost "www.fish.edu"&gt;
+DocumentRoot /var/apache/fish
+ServerName www.fish.edu
+&lt;/VirtualHost&gt;
+&lt;VirtualHost "www.mammals.com"&gt;
+DocumentRoot /var/apache/mammals
+ServerName www.mammals.com
+&lt;/VirtualHost&gt;</pre></blockquote>
+
+<p>Each VirtualHost option defines a hostname alias that your server
+responds to. For this to be valid, DNS must define the alias with a
+CNAME record. Our example requires CNAME records that assign
+<em class="emphasis">crab.wrotethebook.com</em> the aliases of
+<em class="emphasis">www.fish.edu</em> and
+<em class="emphasis">www.mammals.com</em>. When <em class="emphasis">crab</em>
+receives a server request addressed to one of these aliases, it uses
+the configuration parameters defined here to override its normal
+settings. Therefore, when it gets a request for
+<em class="emphasis">www.fish.edu</em>, it uses
+<em class="emphasis">www.fish.edu</em> as its ServerName value instead of
+its own server name, and <em class="emphasis">/var/apache/fish</em> as the
+DocumentRoot.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. Configuring the Apache Server</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.4. Web Server Security</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:32 GMT -->
+</html>

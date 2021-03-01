@@ -1,0 +1,292 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>SystemEDGE (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">11.2. SystemEDGE</h2>
+
+<a name="INDEX-1771" /><a name="INDEX-1772" />
+<a name="INDEX-1773" /><a name="INDEX-1774" /><a name="INDEX-1775" /><a name="INDEX-1776" /><a name="INDEX-1777" /><a name="INDEX-1778" /><a name="INDEX-1779" /><a name="INDEX-1780" /><a name="INDEX-1781" /><a name="INDEX-1782" />The SystemEDGE agent is also
+extensible. No other system processes need to be run in order to
+extend this agent. It comes with three predefined extended objects:
+Domain Name System (DNS) for Unix, Network Information System (NIS)
+for Unix, and Remote Pinger for Unix and Windows NT. The first object
+returns the domain name of the underlying operating system, the
+second returns the NIS domain name of the underlying operating
+system, and the third sends ICMP requests to a remote host from the
+system on which the agent is running. While these are nice scripts to
+have, what we want to focus on is how to add your own OIDs to the
+agent.
+</p>
+
+<a name="enettdg-CHP-11-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">11.2.1. Extensibility for Unix and Windows NT</h3>
+
+<a name="INDEX-1783" /><a name="INDEX-1784" /><a name="INDEX-1785" /><a name="INDEX-1786" /><a name="INDEX-1787" /><a name="INDEX-1788" />
+<a name="INDEX-1789" />The SystemEDGE
+agent has a private MIB that defines a table called the
+<em class="emphasis">extensionGroup</em>. Its full OID is
+<em class="emphasis">1.3.6.1.4.1.546.14</em>
+(<em class="emphasis">iso.org.dod.internet.private.enterprises.empire.extensionGroup</em>).
+This is where you define your own objects. The first object you
+define has the OID <em class="emphasis">extensionGroup.1.0</em>
+(<em class="emphasis">1.3.6.1.4.1.546.14.1.0</em>), where the
+<em class="emphasis">.0</em> indicates that the object is scalar; the next
+has the OID <em class="emphasis">extensionGroup.2.0</em>, and so on. Note
+that all the objects defined this way must be scalar. For advanced
+users, Concord has developed a plug-in architecture for SystemEDGE
+that allows you to develop complex extended objects (including
+tables) and full-blown MIBs.
+</p>
+
+<a name="INDEX-1790" />To extend the agent, start by editing the
+<em class="filename">sysedge.cf</em> file. This file tells the agent to
+which extended OIDs it must respond. The format of a command in this
+file is:
+</p>
+
+<blockquote><pre class="code">extension <em class="replaceable">LeafNumber Type Access 'Command'</em></pre></blockquote>
+
+<a name="INDEX-1791" /><a name="INDEX-1792" />
+<a name="INDEX-1793" />The
+keyword <tt class="literal">extension</tt> tells the agent that this
+configuration entry is an extension that belongs to the
+<em class="emphasis">extensionGroup</em>. <em class="emphasis">LeafNumber</em>
+is the extension object number -- i.e., the number you assign to
+the object in the <em class="emphasis">extensionGroup</em> table.
+<em class="emphasis">Type</em> is the SNMP type for the OID. Valid types
+are <tt class="literal">Integer</tt>, <tt class="literal">Counter</tt>,
+<tt class="literal">Gauge</tt>, <tt class="literal">Octetstring</tt>,
+<tt class="literal">TimeTicks</tt>, <tt class="literal">Objectid</tt>, and
+<tt class="literal">IPAddress</tt>. <em class="emphasis">Access</em> is either
+<tt class="literal">Read-Only</tt> or <tt class="literal">Read-Write</tt>. And
+finally, <em class="emphasis">Command</em> is the script or program the
+agent will execute when this particular OID is queried by an NMS.
+We'll talk more about this shortly. Here are some examples of
+extension objects:
+</p>
+
+<blockquote><pre class="code">extension 1 Integer Read-Only '/usr/local/bin/Script.sh'
+extension 2 Gauge Read-Only '/usr/local/bin/Script.pl'
+extension 33 Counter Read-Write '/usr/local/bin/Program'</pre></blockquote>
+
+<a name="INDEX-1794" />The
+first item defines a read-only OID of type
+<tt class="literal">Integer</tt>. The OID is
+<em class="emphasis">1.3.6.1.4.1.546.14.1.0</em>. The agent will execute
+the command <em class="emphasis">/usr/local/bin/exampleScript.sh</em> when
+this OID is queried. The second entry is similar, except its type is
+<tt class="literal">Gauge</tt> and its numeric OID is
+<em class="emphasis">1.3.6.1.4.1.546.14.2.0</em>. The third example simply
+shows that <em class="emphasis">LeafNumber</em> doesn't have to be
+sequential; you can use any number you want, provided that it is
+unique.
+</p>
+
+Extending the agent allows you to write your own scripts that do
+whatever you want: you can get information about devices or programs
+that are not SNMP-capable, as long as you can write a script that
+queries them for their status. In the example above,
+<em class="filename">/usr/local/bin/Script.sh</em>,
+<em class="filename">/usr/local/bin/Script.pl</em>, and
+<em class="filename">/usr/local/bin/Program</em> are all examples of
+scripts the agent will execute when the OID assigned to each script
+is queried. Two requirements must be met by any script or program:
+</p>
+
+<ul><li>
+<a name="INDEX-1795" /><a name="INDEX-1796" /><a name="INDEX-1797" /><a name="INDEX-1798" />All <i class="command">set</i>,
+<i class="command">get</i>, and <i class="command">getnext</i> requests must
+generate output. For <i class="command">get</i> and
+<i class="command">getnext</i>, the output from the script should be the
+actual value of the object requested. This means that the script or
+program that fetches the required information must return a single
+value. For a <i class="command">set</i> request, the script should return
+the object's new value. The request will fail if there is no
+output. (Note that for a <i class="command">set</i> request, a script may
+succeed in changing the state of the device even if it produces no
+output and the agent considers the script to have failed.)
+</p>
+</li><li>
+<a name="INDEX-1799" />The
+script or program should print whatever information it needs to
+return (based on the type of request), followed by a newline
+character. The agent parses only up to this character. If a newline
+is the first character the agent encounters, the agent generates an
+error and returns this to the NMS or SNMP application.
+</p>
+</li></ul>
+<a name="INDEX-1800" />The agent sends three
+arguments to the script or program it executes: the
+<em class="emphasis">LeafNumber</em>, the request type
+(<tt class="literal">GET</tt>, <tt class="literal">GETNEXT</tt>, or
+<tt class="literal">SET</tt>, in capital letters), and a string that
+represents some value to be set (the third argument is used only for
+<tt class="literal">SET</tt> requests). The following skeletal Perl script,
+called <em class="filename">skel.pl</em>, shows how you can use all three
+arguments:
+</p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+
+if ($ARGV[0] == 1) {
+   # OID queried is 1.3.6.1.4.1.546.14.1.0
+   if ($ARGV[1] eq "SET") {
+          # use $ARGV[2] to set the value of something and return the set value, 
+          # followed by a newline character, to the agent
+   } elsif (($ARGV[1] eq "GET") || ($ARGV[1] eq "GETNEXT")) {
+          # get the information to which this OID pertains, then return it,
+          # followed by a newline character, to the agent
+   }
+} else {
+   return 0;
+   # return 0, since I don't know what to do with this OID
+}</pre></blockquote>
+
+<a name="INDEX-1801" />All you have to do is add the logic that
+takes some action to retrieve (or set) the appropriate value and
+return the correct value to the agent. The corresponding entry in
+<em class="filename">sysedge.cf</em> might look something like this:
+</p>
+
+<blockquote><pre class="code">extension 1 Integer Read-Write '/usr/local/bin/skel.pl'</pre></blockquote>
+
+<a name="INDEX-1802" /> <a name="INDEX-1803" /><a name="INDEX-1804" />What we've done so far gives the
+agent the ability to respond to requests for a new kind of data. We
+still need to solve the other part of the puzzle: telling the
+management station that some new kind of data is available for it to
+retrieve. This requires creating an entry in a MIB file.<a href="#FOOTNOTE-56">[56]</a>
+After adding this entry to the file, you must recompile the MIB into
+your NMS system so that the NMS will know the access and type of each
+of the extended objects in the MIB for which it is to perform
+queries. Here is a MIB entry that corresponds to the previous agent
+extension:
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-56" />[56]Concord recommends that you keep all your extended MIB objects
+in a separate file, away from the SystemEDGE MIB file. This makes it
+easier for you to recompile it into your NMS.</p> </blockquote>
+
+<blockquote><pre class="code">skeletonVariable OBJECT-TYPE
+    SYNTAX Integer
+    ACCESS Read-Write
+    DESCRIPTION
+        "This is an example object."
+::= { extensionGroup 1 }</pre></blockquote>
+
+Once this is compiled into the NMS, you can query the object by
+specifying its full name
+(<em class="emphasis">iso.org.dod.internet.private.enterprises.empire.extensionGroup.skeletonVariable.0</em>).
+Alternatively, you can use the numeric OID; for example:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget server.ora.com public .1.3.6.1.4.1.546.14.1.0</b></tt></pre></blockquote>
+
+<a name="INDEX-1805" /><a name="INDEX-1806" />Security can be a concern when
+writing your own extension scripts. On Unix systems, it's a
+good idea to create a separate user and group to execute your
+extensions, rather than allowing the root user to run your scripts.
+</p>
+
+</div>
+<a name="enettdg-CHP-11-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">11.2.2. Added Extensibility for Windows NT</h3>
+
+<a name="INDEX-1807" /><a name="INDEX-1808" /><a name="INDEX-1809" /><a name="INDEX-1810" /><a name="INDEX-1811" />While the
+<em class="emphasis">extensionGroup</em> is supported on all platforms,
+the Windows NT version of SystemEDGE allows you to extend SystemEDGE
+with objects taken from the registry and performance registry. You
+can gain access to configuration data and performance data, which are
+normally viewed using <em class="emphasis">regedit</em> and
+<em class="emphasis">perfmon</em>. The Windows NT extension group is
+defined as
+<em class="emphasis">iso.org.dod.internet.private.enterprises.empire.nt.ntRegPerf</em>
+(<em class="emphasis">1.3.6.1.4.1.546.5.7</em> ). As with the Unix
+extensions, the NT extensions are defined in the
+<em class="filename">sysedge.cf</em> file.
+</p>
+
+To configure a registry extension, add a line with the following
+syntax to <em class="filename">sysedge.cf</em>:
+</p>
+
+<blockquote><pre class="code">ntregperf <em class="replaceable">LeafNumber Type Registry 'Key' 'Value'</em></pre></blockquote>
+
+<a name="INDEX-1812" /><a name="INDEX-1813" />
+<a name="INDEX-1814" />The
+keyword <tt class="literal">ntregperf</tt> defines this as an NT registry
+or performance extension object. <em class="emphasis">LeafNumber</em> and
+<em class="emphasis">Type</em> are the same as for Unix extensions. The
+keyword <tt class="literal">Registry</tt> identifies this entry as a
+registry extension. Registry extensions are read-only.
+<em class="emphasis">Key</em> is a quoted string that specifies the
+registry key to be accessed. <em class="emphasis">Value</em> is the value
+you want to read from the key. Here is an example:
+</p>
+
+<blockquote><pre class="code">ntregperf 1 OctetString Registry 
+'SYSTEM\CurrentControlSet\Control\CrashControl' 'DumpFile'</pre></blockquote>
+
+This creates a registry extension object that returns the path to the
+crash-control dump file. The OID is
+<em class="emphasis">1.3.6.1.4.1.546.5.7.1.0</em>
+(<em class="emphasis">iso.org.dod.internet.private.enterprises.empire.nt.ntRegPerf.1.0</em>).
+</p>
+
+To configure a performance extension, use the following syntax:</p>
+
+<blockquote><pre class="code">ntregperf <em class="replaceable">LeafNumber Type Performance 'Object' 'Counter' 'PerfInstance'</em></pre></blockquote>
+
+Here again, <tt class="literal">ntregperf</tt> is the keyword that
+indicates this is an NT registry/performance extension object.
+<em class="emphasis">LeafNumber</em> and <em class="emphasis">Type</em> should
+be familiar to you. The keyword <tt class="literal">Performance</tt>
+indicates that we're reading a value from the performance
+registry; performance extensions are read-only.
+<em class="emphasis">Object</em> specifies the performance object to be
+accessed. <em class="emphasis">Counter</em> specifies the object's
+performance counter value to be accessed. Finally,
+<em class="emphasis">PerfInstance</em> specifies the performance counter
+instance to be accessed. This should be identical to what's
+listed with <em class="emphasis">perfmon</em>. Here's a typical
+performance extension:
+</p>
+
+<blockquote><pre class="code">ntregperf 2 Counter Performance 'TCP' 'Segments Sent/sec' '1'</pre></blockquote>
+
+<a name="INDEX-1815" />You can use this extension to
+watch the total number of TCP segments transmitted by the system. Its
+OID is <em class="emphasis">1.3.6.1.4.1.546.5.7.2.0</em>
+(<em class="emphasis">iso.org.dod.internet.private.enterprises.empire.nt.ntRegPerf.2.0</em>).
+Keep in mind that you should create a MIB entry (in a MIB file) for
+any NT extensions you create, similar to the entry we defined above
+for <em class="emphasis">skeletonVariable</em>.
+</p>
+
+The examples in this section should be enough to get you up and
+running with an extended SystemEDGE agent. Be sure to read the
+SystemEDGE manual for a complete treatment of this topic.<a name="INDEX-1816" /><a name="INDEX-1817" /> <a name="INDEX-1818" /><a name="INDEX-1819" />
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11. Extensible SNMP Agents</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.3. OpenView's Extensible Agent</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

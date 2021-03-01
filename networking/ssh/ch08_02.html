@@ -1,0 +1,1529 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Public Key-Based Configuration  (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.2. Public Key-Based Configuration </h2>
+
+
+
+<a name="INDEX-1274" /><a name="INDEX-1275" />To set up public-key authentication in
+your account on an SSH server machine, you create an authorization
+file, typically called <a name="INDEX-1276" /><em class="filename">authorized_keys</em>
+(SSH1, OpenSSH/1), <em class="filename">authorized_keys2</em> (OpenSSH/2),
+or <em class="filename">authorization</em> (SSH2), and list the keys that
+provide access to your account. [<a href="ch02_04.html#ch02-26594">Section 2.4, "Authentication by Cryptographic Key"</a>] Well,
+we've been keeping a secret. Your authorization file can
+contain not only keys but also other keywords or options to control
+the SSH server in powerful ways. We will discuss:</p>
+
+
+
+<ul><li>The full format of an authorization file</p></li><li>Forced commands for limiting the set of programs that the client may
+invoke on the server</p></li><li>Restricting incoming connections from particular hosts</p></li><li>Setting environment variables for remote programs</p></li><li>Setting an idle timeout so clients will be forcibly disconnected if
+they aren't sending data</p></li><li>Disabling certain features of the incoming SSH connection, such as
+port forwarding and tty allocation</p></li></ul>
+As we demonstrate how to modify your authorization file, remember
+that the file is consulted by the SSH server only at authentication
+time. Therefore, if you change your authorization file, only new
+connections will use the new information. Any existing connections
+are already authenticated and won't be affected by the change.</p>
+
+
+
+Also remember that an incoming connection request won't reach
+your authorization file if the SSH server rejects it for other
+reasons, namely, failing to satisfy the serverwide configuration. If
+a change to your authorization file doesn't seem to be having
+an effect, make sure it doesn't conflict with a (more powerful)
+serverwide configuration setting.</p>
+
+
+
+<a name="ch08-27462" /><div class="sect2">
+<h3 class="sect2">8.2.1. SSH1 Authorization Files </h3>
+
+
+
+Your SSH1
+<em class="filename">authorized_keys</em><a name="INDEX-1277" /> file,
+generally found in <em class="filename">~/.ssh/authorized_keys</em>, is a
+secure doorway into your account via the SSH-1 protocol. Each line of
+the file contains a public key and means the following: "I give
+permission for SSH-1 clients to access my account, in a particular
+way, using this key as authentication." Notice the words
+"in a particular way." Until now, public keys have
+provided unlimited access to an account. Now we'll see the rest
+of the story.</p>
+
+
+
+Each line of <em class="filename">authorized_keys</em> contains up to
+three items in order, some optional and some required:</p>
+
+
+
+<ul><li>A set of <em class="emphasis">options</em>
+(optional, surprise, surprise).</p></li>
+
+<li>The <em class="emphasis">public key</em><a name="INDEX-1278" /> (required). This appears in three
+parts: [<a href="ch03_04.html#ch03-49086">Section 3.4.2.2, "Public-key authentication"</a>]</p>
+
+<ul>
+<li>The <em class="emphasis">number of bits</em> in the key, typically a small
+integer such as 1024</p></li>
+
+<li>The <em class="emphasis">exponent</em> of the key: an
+integer</p></li>
+
+<li>The <em class="emphasis">modulus</em> of the key: a very large integer,
+typically several hundred digits long</p></li></ul></li>
+
+
+<li>A descriptive <em class="emphasis">comment</em> (optional). This can be
+any text, such as "Bob's public key" or "My
+home PC using SecureCRT 3.1."</p></li></ul>
+Public keys and comments are generated by
+<tt class="command">ssh-keygen</tt> in <em class="filename">.pub</em> files, you
+may recall, and you typically insert them into
+<em class="filename">authorized_keys</em> by copying. [<a href="ch02_04.html#ch02-31366">Section 2.4.3, "Installing a Public Key on an SSH ServerMachine"</a>] Options, however, are usually typed into
+<em class="filename">authorized_keys</em> with a text editor.<a href="#FOOTNOTE-114">[114]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-114" />[114]When editing <em class="filename">authorized_keys</em>, be sure to
+use a text editor capable of handling long lines. The modulus of a
+key may be several hundred characters long. Some text editors
+can't display long lines, won't edit them properly,
+automatically insert line breaks, or wreak other sorts of havoc upon
+your nice public keys. (Aaargh. Don't get us started talking
+about brain-damaged text editors.) Use a modern editor, and turn off
+automatic line breaking. We use GNU Emacs.</p>
+
+
+</blockquote>
+
+
+
+An option may take two forms. It may be a keyword, such as:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH: Turn off port forwarding
+no-port-forwarding</pre></blockquote>
+
+
+
+or it may be a keyword followed by an equals sign and a value, such
+as:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH: Set idle timeout to five minutes
+idle-timeout=5m</pre></blockquote>
+
+
+
+Multiple options may be given together, separated by commas, with no
+whitespace between the options:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-port-forwarding,idle-timeout=5m</pre></blockquote>
+
+
+
+If you mistakenly include whitespace:</p>
+
+
+
+<blockquote><pre class="code"># THIS IS ILLEGAL: whitespace between the options
+no-port-forwarding, idle-timeout=5m</pre></blockquote>
+
+
+
+your connection by this key won't work properly. If you connect
+with debugging turned on (<tt class="command">ssh1 -v</tt>), you will see a
+"syntax error" message from the SSH server.</p>
+
+
+
+Many SSH users aren't aware of options or neglect to use them.
+This is a pity because options provide extra security and
+convenience. The more you know about the clients that access your
+account, the more options you can use to control that access.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-74378" /><div class="sect2">
+<h3 class="sect2">8.2.2. SSH2 Authorization Files </h3>
+
+
+
+An SSH2 authorization file, typically found in
+<em class="filename">~/.ssh2/authorization</em><a name="INDEX-1279" />,<a href="#FOOTNOTE-115">[115]</a> has a different format from its SSH1
+ancestor. Instead of public keys, it contains keywords and values,
+much like other SSH configuration files we've seen. Each line
+of the file contains one keyword followed by its value. The most
+commonly used keywords are <tt class="literal">Key</tt> and
+<tt class="literal">Command</tt>.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-115" />[115]The name may be
+changed with the keyword AuthorizationFile in the serverwide
+configuration file. [<a href="ch05_04.html#ch05-11123">Section 5.4.1.6, "Per-account authorization files"</a>] Also, the
+<tt class="command">ssh2 </tt>manpage claims that AuthorizationFile can be
+set in the <em class="emphasis">client</em> configuration file, but as of
+SSH2 2.2.0 this setting has no effect. Since <tt class="command">sshd2
+</tt>doesn't read the client configuration file, this is
+unsurprising.</p>
+
+
+</blockquote>
+
+
+
+Public keys are indicated using the
+<tt class="literal">Key</tt><a name="INDEX-1280" /> keyword. <tt class="literal">Key</tt> is
+followed by whitespace, and then the name of a file containing a
+public key. Relative filenames refer to files in
+<em class="filename">~/.ssh2</em>. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Key myself.pub</pre></blockquote>
+
+
+
+means that an SSH-2 public key is contained in
+<em class="filename">~/.ssh2/myself.pub.</em> Your
+<em class="filename">authorization</em> file must contain at least one
+<tt class="literal">Key</tt> line for public-key authentication to occur.</p>
+
+
+
+Each <tt class="literal">Key</tt> line may optionally be followed
+immediately by a
+<a name="INDEX-1281" /><tt class="literal">Command</tt>
+keyword and its value. <tt class="literal">Command</tt> specifies a
+<a name="INDEX-1282" />forced command, i.e., a command to be
+executed whenever the key immediately above is used for access. We
+discuss forced commands later in great detail. [<a href="ch08_02.html#ch08-22858">Section 8.2.4, "Forced Commands "</a>] For now, all you need to know is this: a
+forced command begins with the keyword <tt class="literal">Command</tt>, is
+followed by whitespace, and ends with a shell command line. For
+example:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Key somekey.pub
+Command "/bin/echo All logins are disabled"</pre></blockquote>
+
+
+
+Remember that a <tt class="literal">Command</tt> line by itself is an
+error. The following examples are illegal:</p>
+
+
+
+<blockquote><pre class="code"># THIS IS ILLEGAL: no Key line
+Command "/bin/echo This line is bad." 
+# THIS IS ILLEGAL: no Key line precedes the second Command
+Key somekey.pub
+Command "/bin/echo All logins are disabled"
+Command "/bin/echo This line is bad."</pre></blockquote>
+
+
+
+<a name="ch08-4-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.2.1. SSH2 PGP key authentication </h3>
+
+
+
+<a name="INDEX-1283" /><a name="INDEX-1284" />SSH2 Version 2.0.13 introduced support
+for PGP authentication. [<a href="ch05_05.html#ch05-91310">Section 5.5.1.6, "PGP authentication"</a>] Your
+<em class="filename">authorization</em> file may also include
+<tt class="literal">PgpPublicKeyFile</tt>, <tt class="literal">PgpKeyName</tt>,
+<tt class="literal">PgpKey Fingerprint</tt>, and
+<tt class="literal">PgpKeyId</tt> lines. A Command line may follow
+<tt class="literal">PgpKeyName</tt>, <tt class="literal">PgpKeyFingerprint</tt>,
+or <tt class="literal">PgpKeyId</tt>, just as it may follow Key:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+PgpKeyName my-key
+Command "/bin/echo PGP authentication was detected"</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-97216" /><div class="sect2">
+<h3 class="sect2">8.2.3. OpenSSH Authorization Files </h3>
+
+
+
+<a name="INDEX-1285" />For SSH-1
+protocol connections, OpenSSH/1 uses the same
+<em class="filename">authorized_keys</em> file as SSH1. All configuration
+that's possible with SSH1 is available within OpenSSH/1.</p>
+
+
+
+For SSH-2 connections, OpenSSH/2 takes a new approach unlike
+SSH2's: a new authorization file,
+<em class="filename">~/.ssh/authorized_keys2</em>, with a format similar
+to that of <em class="filename">authorized_keys</em>. Each line may
+contain:</p>
+
+
+
+<ul><li>Key authorization options (optional)</p></li><li>The string "ssh-dss" (required)</p></li><li>The DSA public key, represented as a long string (required)</p></li><li><p>A descriptive comment (optional)</p></li></ul>
+<a name="INDEX-1286" />Here's an example with the long
+public key abbreviated:</p>
+
+
+
+<blockquote><pre class="code">host=192.168.10.1 ssh-dss AAAAB3NzaC1kc3MA... My OpenSSH key</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-22858" /><div class="sect2">
+<h3 class="sect2">8.2.4. Forced Commands </h3>
+
+
+
+<a name="INDEX-1287" />Ordinarily, an SSH connection invokes a
+remote command chosen by the client:</p>
+
+
+
+<blockquote><pre class="code"># Invoke a remote login shell
+$ ssh server.example.com 
+# Invoke a remote directory listing
+$ ssh server.example.com /bin/ls</pre></blockquote>
+
+
+
+A forced command transfers this control from the client to the
+server. Instead of the client's deciding which command will
+run, the owner of the server account decides. In <a href="ch08_02.html#ch08-37607">Figure 8-2</a>, the client has requested the command
+<tt class="command">/bin/ls</tt>, but the server-side forced command runs
+<tt class="command">/bin/who</tt> instead.</p>
+
+
+
+<a name="ch08-37607" /><div class="figure"><img height="284" alt="Figure 8-2" src="figs/ssh_0802.gif" width="446" /></div><h4 class="objtitle">Figure 8-2. Forced command substituting /bin/who for /bin/ls</h4>
+
+Forced commands can be quite useful. Suppose you want to give your
+assistant access to your account but only to read your email. You
+could associate a forced command with your assistant's SSH key
+to run only your email program and nothing else.</p>
+
+
+
+In SSH1 and OpenSSH, a forced command may be specified in
+<em class="filename">authorized_keys</em> with the "command"
+option preceding the desired key. For example, to run the email
+program <tt class="command">pine</tt> whenever your assistant connects:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+command="/usr/local/bin/pine" ...<em class="replaceable">secretary's public key</em>...</pre></blockquote>
+
+
+
+In SSH2, a forced command appears on the line immediately following
+the desired Key, using the Command keyword. The previous example
+would be represented:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Key secretary.pub
+Command "/usr/local/bin/pine"</pre></blockquote>
+
+
+
+You may associate at most one forced command with a given key. To
+associate multiple commands with a key, put them in a script on the
+remote machine and run the script as the forced command. (We
+demonstrate this in [<a href="ch08_02.html#ch08-65141">Section 8.2.4.3, "Displaying a command menu "</a>].)</p>
+
+
+
+<a name="ch08-5-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.4.1. Security issues </h3>
+
+
+
+<a name="INDEX-1288" />Before we begin in-depth examples of
+forced commands, let's discuss security. On first glance, a
+forced command seems at least as secure a "normal" SSH
+connection that invokes a shell. This is because a shell can invoke
+any program, while a forced command can invoke only one program, the
+forced command itself. If a forced command is
+<tt class="command">/usr/local/bin/pine</tt>, only
+<em class="filename">/usr/local/bin/pine</em> can be invoked.</p>
+
+
+
+Nevertheless, there's a caveat. A forced command, carelessly
+used, may lull you into a sense of false security, believing that you
+have limited the client's capabilities when you haven't.
+This occurs if the forced command unintentionally permits a
+<em class="emphasis">shell escape</em>, i.e., a way to invoke a shell from
+within the forced command. Using a shell escape, a client can invoke
+any program available to a shell. Many Unix programs have shell
+escapes, such as text editors (<tt class="command">vi, Emacs</tt>), pagers
+(<tt class="command">more, less</tt>), programs that invoke pagers
+(<tt class="command">man</tt>), news readers (<tt class="command">rn</tt>), mail
+readers (such as Pine in the previous example!), and debuggers
+(<tt class="command">adb</tt>). Interactive programs are the most common
+culprits, but even noninteractive commands may run shell commands (
+<tt class="command">find, xargs,</tt> etc.).</p>
+
+
+
+When you define a forced command, you probably don't want its
+key used for arbitrary shell commands. Therefore, we propose the
+following safety rules for deciding whether a program is appropriate
+as a forced command:</p>
+
+
+
+<ul><li>Avoid programs that have <a name="INDEX-1289" /><a name="INDEX-1290" />shell escapes. Read their
+documentation carefully. If you still aren't sure, get help.</p></li><li>Avoid compilers, interpreters, or other programs that let the user
+generate and run arbitrary executable code.</p></li><li>Treat very carefully any program that creates or deletes files on
+disk in user-specified locations. This includes not only applications
+(word processors, graphics programs, etc.) but also command-line
+utilities that move or copy files (<tt class="command">cp, mv, rm, scp,
+ftp,</tt> etc.).</p></li><li>Avoid programs with their <a name="INDEX-1291" />setuid or setgid bits set,
+particularly setuid root.</p></li><li>If using a script as a forced command, follow traditional rules of
+safe script writing. Within the script, limit the search path to
+relevant directories (omitting "."), invoke all programs
+by absolute path, don't blindly execute user supplied strings
+as commands, and don't make the script setuid
+anything.<a href="#FOOTNOTE-116">[116]</a>
+And again, don't invoke any program that has a shell escape.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-116" />[116]Modern Unix implementations often ignore
+the setuid bit on scripts for security reasons.</p>
+
+
+</blockquote></li><li>Consider using a restricted shell to limit what the incoming client
+can do. For example, the restricted shell
+<em class="filename">/usr/lib/rsh</em> (not to be confused with the
+r-command also called "rsh") can limit the remote
+directories the client can enter.</p></li><li>Associate the forced command with a <a name="INDEX-1292" /><a name="INDEX-1293" />separate, dedicated SSH key, not the one
+used for your logins, so you can conveniently disable the key without
+affecting your login capability.</p></li><li>Disable unnecessary SSH features using other options we cover later.
+Under SSH1, you may disable port forwarding with
+<tt class="literal">no-port-forwarding</tt>, agent forwarding with
+<tt class="literal">no-agent-forwarding</tt>, and tty allocation using
+<tt class="literal">no-pty</tt>.</p></li></ul>
+Any program may be used as a forced command, but some may be risky
+choices. In the examples that follow, we cover several of these
+issues as they're encountered.</p>
+</div>
+
+
+
+
+
+<a name="ch08-6-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.4.2. Rejecting connections with a custom message </h3>
+
+
+
+<a name="INDEX-1294" />Suppose you've
+permitted a friend to access your account by SSH, but now
+you've decided to disable the access. You can simply remove his
+key from your authorization file, but here's something fancier.
+You can define a forced command to print a custom message for your
+friend, indicating that his access has been disabled. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+command="/bin/echo Sorry, buddy, but you've been terminated!" ...<em class="replaceable">key</em>... 
+
+# SSH2 only
+Key friend.pub
+Command "/bin/echo Sorry, buddy, but you've been terminated!"</pre></blockquote>
+
+
+
+Any incoming SSH connection that successfully authenticates with this
+key causes the following message to be displayed on standard output:</p>
+
+
+
+<blockquote><pre class="code">Sorry, buddy, but you've been terminated!</pre></blockquote>
+
+
+
+and then the connection closes. If you'd like to print a longer
+message, which might be awkward to include in your authorization
+file, you can store it in a separate file (say,
+<em class="filename">~/go.away</em>) and display it using an appropriate
+program (e.g., <tt class="command">cat</tt>):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+command="/bin/cat $HOME/go.away" ...<em class="replaceable">key</em>... 
+
+# SSH2 only
+Key friend.pub
+Command "/bin/cat $HOME/go.away"</pre></blockquote>
+
+
+
+Since the message is long, you might be tempted to display it one
+screenful at a time with a pager program such as
+<tt class="command">more</tt> or <tt class="command">less</tt>. Don't do
+it!</p>
+
+
+
+<blockquote><pre class="code"># SSH1: Don't do this!
+command="/bin/more $HOME/go.away" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+This forced command opens an unwanted hole into your account: the
+<tt class="command">more</tt> program, like most Unix pager programs, has a
+<a name="INDEX-1295" />shell escape. Instead of
+restricting access to your account, this forced command permits
+unlimited access.</p>
+</div>
+
+
+
+
+
+<a name="ch08-65141" /><div class="sect3">
+<h3 class="sect3">8.2.4.3. Displaying a command menu </h3>
+
+
+
+<a name="INDEX-1296" />Suppose you want to provide limited
+access to your account, permitting the incoming SSH client to invoke
+only a few, specific programs. Forced commands can accomplish this.
+For instance, you can write a shell script that permits a known set
+of programs to be executed and then run the script as a forced
+command. A sample script, shown in <a href="ch08_02.html#ch08-63592">Example 8-1</a>,
+permits only three programs to be chosen from a menu.</p>
+
+
+
+<a name="ch08-63592" /><div class="example">
+<h4 class="objtitle">Example 8-1. Menu Script </h4>
+
+
+<blockquote><pre class="code">#!/bin/sh
+/bin/echo "Welcome!
+Your choices are:
+
+1       See today's date
+2       See who's logged in
+3       See current processes
+q       Quit"
+
+/bin/echo "Your choice: \c"
+read ans
+while [ "$ans" != "q" ]
+do
+  case "$ans" in
+    1)
+        /bin/date
+        ;;
+    2)
+        /bin/who
+        ;;
+    3)
+        /usr/ucb/w
+        ;;
+    q)
+        /bin/echo "Goodbye"
+        exit 0
+        ;;
+    *)
+        /bin/echo "Invalid choice '$ans': please try again"
+        ;;
+  esac
+  /bin/echo "Your choice: \c"
+  read ans
+done
+exit 0</pre></blockquote>
+</div>
+
+
+
+When someone accesses your account by public key and invokes the
+forced command, the script displays:</p>
+
+
+
+<blockquote><pre class="code">Welcome!
+Your choices are:
+ 1       See today's date
+ 2       See who's logged in
+ 3       See current processes
+ q       Quit
+
+Your choice:</pre></blockquote>
+
+
+
+The user may then type <tt class="literal">1</tt>, <tt class="literal">2</tt>,
+<tt class="literal">3</tt>, or <tt class="literal">q</tt> to run the associated
+program. Any other input is ignored, so no other programs can be
+executed.</p>
+
+
+
+Such scripts must be written carefully to avoid security holes. In
+particular, none of the permitted programs should provide a means to
+escape to a shell, or else the user may execute any command in your
+account.</p>
+</div>
+
+
+
+
+
+<a name="ch08-92539" /><div class="sect3">
+<h3 class="sect3">8.2.4.4. Examining the client's original command</h3>
+
+
+
+As we've seen, a forced command gets substituted for any other
+command the SSH client might send. If an SSH client attempts to
+invoke the program <tt class="command">ps </tt>:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 server.example.com ps</pre></blockquote>
+
+
+
+but a forced command is set up to execute "/bin/who"
+instead:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+command="/bin/who" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+then <tt class="command">ps</tt> is ignored and
+<em class="filename">/bin/who</em> runs instead. Nevertheless, the SSH
+server does read the original command string sent by the client and
+stores it in an environment variable. For SSH1 and OpenSSH,<a href="#FOOTNOTE-117">[117]</a> the environment variable is
+<a name="INDEX-1297" /><a name="INDEX-1298" />SSH_ORIGINAL_COMMAND,
+and for SSH2, it's SSH2_ORIGINAL_COMMAND. So in the our
+example, the value of SSH_ORIGINAL_COMMAND would be
+<tt class="command">ps</tt>.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-117" />[117]Older versions of OpenSSH didn't set
+SSH_ORIGINAL_COMMAND.</p>
+
+
+</blockquote>
+
+
+
+A quick way to see these variables in action is to print their values
+with forced commands. For SSH1, create a forced command like the
+following:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+command="/bin/echo You tried to invoke $SSH_ORIGINAL_COMMAND" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Then connect with an SSH-1 client, supplying a remote command (which
+will not be executed), such as:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 server.example.com cat /etc/passwd</pre></blockquote>
+
+
+
+Instead of executing <tt class="command">cat</tt>, the SSH1 server simply
+prints:</p>
+
+
+
+<blockquote><pre class="code">You tried to invoke cat /etc/passwd</pre></blockquote>
+
+
+
+and exits. Similarly, for SSH2, you can set up a forced command like
+this:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Key mykey.pub
+Command "/bin/echo You tried to invoke $SSH2_ORIGINAL_COMMAND"</pre></blockquote>
+
+
+
+and then a client command like:</p>
+
+
+
+<blockquote><pre class="code">$ ssh2 server.example.com cat /etc/passwd</pre></blockquote>
+
+
+
+produces:</p>
+
+
+
+<blockquote><pre class="code">You tried to invoke cat /etc/passwd</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch08-7-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.4.5. Restricting a client's original command </h3>
+
+
+
+Let's try a slightly more complex example using the environment
+variable <a name="INDEX-1299" />SSH_ORIGINAL_COMMAND. We will create a
+forced command that examines the environment variable and turns a
+requested command into another of our choice. For example, suppose
+you want to permit a friend to invoke remote commands in your
+account, except for the <tt class="command">rm</tt> (remove file) command.
+In other words, a command such as:</p>
+
+
+
+<blockquote><pre class="code">$ ssh server.example.com rm myfile</pre></blockquote>
+
+
+
+is rejected. Here's a script that checks for the presence of
+<tt class="command">rm</tt> in the command string and, if present, rejects
+the command:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+# SSH1 only; for SSH2, use $SSH2_ORIGINAL_COMMAND.
+#
+case "$SSH_ORIGINAL_COMMAND" in
+  *rm*)
+    echo "Sorry, rejected"
+    ;;
+  *)
+    $SSH_ORIGINAL_COMMAND
+    ;;
+esac</pre></blockquote>
+
+
+
+Save this script in <em class="filename">~/rm-checker</em>, and define a
+forced command to use it:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+command="$HOME/rm-checker" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Our script is just an example: it isn't secure. It can be
+easily bypassed by a clever command sequence to remove a file:</p>
+
+
+
+<blockquote><pre class="code">$ ssh server.example.com '/bin/ln -s /bin/r? ./killer &amp;&amp; ./killer myfile'</pre></blockquote>
+
+
+
+which creates a link to <em class="filename">/bin/rm</em> with a different
+name (killer) and then performs the removal. Nevertheless, the
+concept is still valid: you can examine SSH_ORIGINAL_COMMAND to
+select another command to execute instead.</p>
+</div>
+
+
+
+
+
+<a name="ch08-8-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.4.6. Logging a client's original command </h3>
+
+
+
+<a name="INDEX-1300" />Another cool use of the
+"original command" environment variables is to keep a log
+of commands that are run using a given key. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+command="log-and-run" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+where <tt class="command">log-and-run</tt> is the following script. It
+appends a line to a log file, containing a timestamp and the command
+attempted:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+if [ -n "$SSH_ORIGINAL_COMMAND" ]
+then
+  echo "`/bin/date`: $SSH_ORIGINAL_COMMAND" &gt;&gt; $HOME/ssh-command-log
+  exec $SSH_ORIGINAL_COMMAND
+fi</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch08-9-fm2xml" /><div class="sect3">
+<h3 class="sect3">8.2.4.7. Forced commands and secure copy (scp) </h3>
+
+
+
+We've <a name="INDEX-1301" />seen
+what happens when <tt class="command">ssh</tt> encounters a key with a
+forced command. But what does <tt class="command">scp</tt> do in this
+situation? Does the forced command run, or does the copy operation
+take place?</p>
+
+
+
+In this case, the forced command executes, and the original operation
+(file copy) is ignored. Depending on your needs, this behavior might
+be good or bad. In general, we do not recommend using
+<tt class="command">scp</tt> with any key that has a forced command.
+Instead, use two keys, one for ordinary logins and file copying and
+the other for the forced command.</p>
+
+
+
+Now that we've thoroughly examined forced commands, let's
+move on to other features of per-account configuration.<a name="INDEX-1302" /> <a name="INDEX-1303" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-42689" /><div class="sect2">
+<h3 class="sect2">8.2.5. Restricting Access by Host or Domain </h3>
+
+
+
+<a name="INDEX-1304" /><a name="INDEX-1305" />Public-key authentication requires two
+pieces of information: the corresponding private key and its
+passphrase (if any). Without either piece, authentication can't
+succeed. Per-account configuration lets you add a third requirement
+for additional security: a restriction on the client's hostname
+or IP address. This is done with the
+<tt class="literal">from</tt><a name="INDEX-1306" /><a name="INDEX-1307" />
+option. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+from="client.example.com" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+enforces that any SSH-1 connection must come from <em class="emphasis">client.example.com</em>, or else it is
+rejected. Therefore, if your private key file is somehow stolen, and
+your passphrase cracked, an attacker might still be stymied if he
+can't connect from the authorized client machine.</p>
+
+
+
+If the concept of "from" sounds familiar, you've
+got a good memory: it's the same access control provided by the
+<tt class="literal">AllowUsers</tt> keyword for serverwide configuration.
+[<a href="ch05_05.html#ch05-56594">Section 5.5.2.1, "Account access control"</a>] The <tt class="literal">authorized_keys</tt>
+option, however, is set by you within your account and applies to a
+single key, while <tt class="literal">AllowUsers</tt> is specified by the
+system administrator and applies to all connections to an account.
+Here's an example to demonstrate the difference. Suppose you
+want to permit connections from <em class="emphasis">remote.org</em> to enter the benjamin
+account. As system administrator, you can configure this within
+<em class="filename">/etc/sshd_config </em>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+AllowUsers benjamin@remote.org</pre></blockquote>
+
+
+
+Using per-account configuration, the user benjamin can configure the
+identical setting within his <em class="filename">authorized_keys</em>
+file, for a particular key only:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+# File ~benjamin/.ssh/authorized_keys
+from="remote.org" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Of course, the serverwide setting takes precedence. If the system
+administrator had denied this access using the
+<tt class="literal">DenyUsers</tt><a name="INDEX-1308" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+DenyUsers benjamin@remote.org</pre></blockquote>
+
+
+
+then user benjamin can't override this restriction using the
+<tt class="literal">from</tt> option in
+<em class="filename">authorized_keys</em>.</p>
+
+
+
+Just like <tt class="literal">AllowUsers</tt>, the <tt class="literal">from</tt>
+option can use the <a name="INDEX-1309" /><a name="INDEX-1310" />wildcard characters *,
+matching any string, and ?, matching any one character:</p>
+
+
+
+<blockquote><pre class="code">from="*.someplace.org" 
+<i class="lineannotation">Matches any host in the someplace.org domain</i></pre></blockquote>
+
+
+ 
+<blockquote><pre class="code">from="som?pla?e.org"
+<i class="lineannotation">Matches somXplaYe.org but not foo.someXplaYe.org or foo.somplace.org </i></pre></blockquote>
+
+
+
+It can also match the client IP address, with or without wildcards
+(though this is not mentioned in the manpage):</p>
+
+
+
+<blockquote><pre class="code">from="192.220.18.5"
+from="192.2??.18.*"</pre></blockquote>
+
+
+
+There may also be multiple patterns, this time separated by commas
+(AllowUsers employs spaces). No whitespace is allowed. You may also
+negate a pattern by prefixing it with an exclamation point (!). The
+exact matching rules are: every pattern in the list is compared to
+either the client's canonical hostname or its IP address. If
+the pattern contains only numerals, dots, and wildcards, it is
+matched against the address, otherwise, the hostname. The connection
+is accepted if and only if the client matches at least one positive
+pattern and no negated patterns. So for example, the following rule
+denies connections from <em class="emphasis">saruman.ring.org</em>, allows connections
+from other hosts in the domain <em class="emphasis">ring.org</em>, and denies everything else:</p>
+
+
+
+<blockquote><pre class="code">from="!saruman.ring.org,*.ring.org"</pre></blockquote>
+
+
+
+while this one again denies <em class="emphasis">saruman.ring.org</em> but allows all other
+clients:</p>
+
+
+
+<blockquote><pre class="code">from="!saruman.ring.org,*"</pre></blockquote>
+
+
+
+SSH1 unfortunately doesn't let you specify arbitrary IP
+networks using an address and mask, nor by <em class="emphasis">address/number
+of bits</em>. <em class="emphasis">libwrap</em> does [<a href="ch09_04.html#ch09-66652">Section 9.4, "Forwarding Security: TCP-wrappers and libwrap"</a>], but its restrictions apply to all
+connections, not on a per-key basis.</p>
+
+
+
+Remember that access control by hostname may be problematic, due to
+issues with name resolution and security. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] Fortunately, the from option is just an
+auxiliary feature of SSH-1 public-key authentication, which provides
+stronger security than would an entirely hostname-based solution.</p>
+
+
+
+<a name="ch08-10544" /><div class="sect3">
+<h3 class="sect3">8.2.5.1. Simulating "from" with SSH2 </h3>
+
+
+
+<a name="INDEX-1311" /><a name="INDEX-1312" />Although SSH2 doesn't support the
+from option, you can create your own host-based access control in
+SSH2 using a forced command. The trick is to examine the environment
+variable $<a name="INDEX-1313" />SSH2_CLIENT [<a href="ch07_04.html#ch07-91208">Section 7.4.4.1, "Selecting a remote port"</a>]
+and create a script that performs the following steps:</p>
+
+
+
+<ol><li>From $SSH2_CLIENT, extract the IP address of the incoming client,
+which is the first value in the string.</p></li><li>Accept or reject the connection based on that IP address and any
+logic you like.</p></li></ol>
+For example, suppose you want to permit connections from IP address
+24.128.97.204 and reject them from 128.220.85.3. The following script
+does the trick when installed as a <a name="INDEX-1314" />forced command:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+IP=`echo $SSH2_CLIENT | /bin/awk '{print $1}'`
+case "$IP" in
+  24.128.97.204)
+    exec $SHELL
+    ;;
+  128.220.85.3)
+    echo "Rejected"
+    exit 1
+    ;;
+esac</pre></blockquote>
+
+
+
+Name the script (say) <em class="filename">~/ssh2from</em> and install it
+as an SSH2 forced command, and you're done:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Key mykey.pub
+Command "$HOME/ssh2from"</pre></blockquote>
+
+
+
+This technique works reliably only for IP addresses, not hostnames.
+If you trust your name service, however, you can conceivably convert
+the IP address found in $SSH2_CLIENT to a hostname. On Linux you can
+use <em class="filename">/usr/bin/host</em> for this purpose and, say,
+accept connections only from <em class="emphasis">client.example.com</em> or the domain
+<em class="emphasis">niceguy.org</em>:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+IP=`echo $SSH2_CLIENT | /bin/awk '{print $1}'`
+HOSTNAME=`/usr/bin/host $IP | /bin/awk '{print $5}'`
+case "$HOSTNAME" in
+  client.example.com)
+    exec $SHELL
+    ;;
+  *.niceguy.org)
+    exec $SHELL
+    ;;
+  *)
+    echo "Rejected"
+    exit 1
+    ;;
+esac <a name="INDEX-1315" /><a name="INDEX-1316" /></pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">8.2.6. Setting Environment Variables </h3>
+
+
+
+<a name="INDEX-1317" /><a name="INDEX-1318" />The
+<tt class="literal">environment</tt> option instructs the SSH1 server to
+set an <a name="INDEX-1319" />environment variable when a client
+connects via the given key. For example, the
+<em class="filename">authorized_keys</em> line:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="EDITOR=emacs" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+sets the environment variable EDITOR to the value
+<tt class="literal">emacs</tt>, thereby setting the client's default
+editor for the login session. The syntax following
+<tt class="literal">environment=</tt> is a quoted string containing a
+variable, an equals sign, and a value. All characters between the
+quotes are significant, i.e., the value may contain whitespace:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="MYVARIABLE=this value has whitespace in it" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+or even a double quote, if you escape it with a forward slash:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="MYVARIABLE=I have a quote\" in my middle" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Also, a single line in <em class="filename">authorized_keys</em> may have
+multiple environment variables set:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="EDITOR=emacs",environment="MYVARIABLE=26" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Why set an environment variable for a key? This feature lets you
+tailor your account to respond differently based on which key is
+used. For example, suppose you create two keys, each of which sets a
+different value for an environment variable, say, SPECIAL:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="SPECIAL=1" ...<em class="replaceable">key</em>...
+environment="SPECIAL=2" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Now, in your account's shell configuration file, you can
+examine $SPECIAL and trigger actions specific to each key:</p>
+
+
+
+<blockquote><pre class="code"># In your .login file
+switch ($SPECIAL)
+  case 1:
+    echo 'Hello Bob!'
+    set prompt = 'bob&gt; '
+    breaksw
+  case 2:
+    echo 'Hello Jane!'
+    set prompt = jane&gt; '
+    source ~/.janerc
+    breaksw
+endsw</pre></blockquote>
+
+
+
+Here, we print a custom welcome message for each key user, set an
+appropriate shell prompt, and in Jane's case, invoke a custom
+initialization script, <em class="filename">~/.janerc.</em> Thus, the
+environment option provides a convenient communication channel
+between <em class="filename">authorized_keys</em> and the remote shell.</p>
+
+
+
+<a name="ch08-65720" /><div class="sect3">
+<h3 class="sect3">8.2.6.1. Example: CVS and $LOGNAME </h3>
+
+
+
+<a name="INDEX-1320" /><a name="INDEX-1321" />As a more advanced example of the
+environment option, suppose a team of open source software developers
+around the Internet is developing a computer program. The team
+decides to practice good software engineering and store its code with
+CVS, the Concurrent Versions System version control tool. Lacking the
+funds to set up a server machine, the team places the CVS repository
+into the computer account of one of the team members, benjamin, since
+he has lots of available disk space. Benjamin's account is on
+the SSH server machine <em class="emphasis">cvs.repo.com</em>.</p>
+
+
+
+The other developers don't have accounts on <em class="emphasis">cvs.repo.com</em>, so benjamin places their
+public keys into his <em class="filename">authorized_keys</em> file so
+they can do check-ins. Now there's a problem. When a developer
+changes a file and checks the new version into the repository, a log
+entry is made by CVS, identifying the author of the change. But
+everyone is connecting through the benjamin account, so CVS always
+identifies the author as "benjamin," no matter who
+checked in the changes. This is bad from a software engineering
+standpoint: the author of each change should be clearly
+identified.<a href="#FOOTNOTE-118">[118]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-118" />[118]In an industrial setting, each developer
+would have an account on the CVS repository machine, so the problem
+would not exist.</p>
+
+
+</blockquote>
+
+
+
+You can eliminate this problem by modifying benjamin's file,
+preceding each developer's key with an environment option. CVS
+examines the <a name="INDEX-1322" />LOGNAME environment variable to get the
+author's name, so you set LOGNAME differently for each
+developer's key:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+environment="LOGNAME=dan" ...<em class="replaceable">key</em>...
+environment="LOGNAME=richard" ...<em class="replaceable">key</em>...
+...</pre></blockquote>
+
+
+
+Now, when a given key is used for a CVS check-in, CVS identifies the
+author of the change by the associated, unique LOGNAME value. Problem
+solved!<a href="#FOOTNOTE-119">[119]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-119" />[119]Incidentally, the authors used this technique
+while collaborating on this book.</p>
+
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-46035" /><div class="sect2">
+<h3 class="sect2">8.2.7. Setting Idle Timeout </h3>
+
+
+
+<a name="INDEX-1323" />The idle-timeout option tells the
+SSH1 server to disconnect a session that has been idle for a certain
+time limit. This is just like the IdleTimeout keyword for serverwide
+configuration but is set by you within your account, instead of by
+the system administrator. [<a href="ch05_04.html#ch05-50432">Section 5.4.3.3, "Idle connections"</a>]</p>
+
+
+
+Suppose you let your friend Jamie access your account by SSH-1. Jamie
+works in an untrusted environment, however, and you are worried that
+he might walk away from his computer while connected to your account,
+and someone else might come by and use his session. One way to reduce
+the risk is to set an <em class="emphasis">idle timeout</em> on
+Jamie's key, automatically disconnecting the SSH-1 session
+after a given period of idle time. If the client stops sending output
+for a while, Jamie has probably walked away, and the session is
+terminated.</p>
+
+
+
+Timeouts are set in with the <a name="INDEX-1324" /><a name="INDEX-1325" /><tt class="literal">idle-timeout</tt> option.
+For example, to set the idle timeout to 60 seconds:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+idle-timeout=60s ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+<tt class="literal">idle-timeout</tt> uses the same notation for time as
+the <tt class="literal">IdleTimeout</tt> keyword: an integer, optionally
+followed by a letter indicating the units. For example, 60s is 60
+seconds, 15m is fifteen minutes, 2h is two hours, and so forth. If no
+letter appears, the default unit is seconds.</p>
+
+
+
+The <tt class="literal">idle-timeout</tt> option overrides any serverwide
+value set with the <tt class="literal">Idle
+Timeout</tt><a name="INDEX-1326" />
+keyword. For example, if the serverwide idle timeout is five minutes:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+IdleTimeout 5m</pre></blockquote>
+
+
+
+but your file sets it to 10 minutes for your account:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+idle-timeout=10m ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+then any connection using this key has an idle timeout of 10 minutes,
+regardless of the serverwide setting.</p>
+
+
+
+This feature has more uses than disconnecting absent typists. Suppose
+you're using an SSH-1 key for an automated process, such as
+backups. An idle timeout value kills the process automatically if it
+hangs due to an error.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-38411" /><div class="sect2">
+<h3 class="sect2">8.2.8. Disabling Forwarding </h3>
+
+
+
+<a name="INDEX-1327" /><a name="INDEX-1328" />Although you're permitting
+SSH-1 access to your account, you might not want your account to be
+used as a springboard to other machines by port forwarding. [<a href="ch09_02.html#ch09-59902">Section 9.2, "Port Forwarding"</a>] To prevent this, use the
+<a name="INDEX-1329" /><tt class="literal">no-port-forwarding</tt>
+option for that key:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-port-forwarding ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Likewise, you can disable agent forwarding if you don't want
+remote users to travel through your account and onto other computers
+using the given key. [<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>] This is done with
+the <a name="INDEX-1330" /><a name="INDEX-1331" /><a name="INDEX-1332" /><tt class="literal">no-agent-forwarding</tt>
+option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-agent-forwarding ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+<a name="ch08-11-fm2xml" /><blockquote><b>WARNING: </b>
+These aren't strong restrictions. As long as you allow shell
+access, just about anything can be done over the connection. The user
+need employ only a pair of custom programs that talk to each other
+across the connection and directly implement port forwarding, agent
+forwarding, or anything else you thought you were preventing. To be
+more than just a reminder or mild deterrent, these options must be
+used together with carefully restricted access on the server side,
+such as forced commands or a restricted shell on the target account.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch08-38676" /><div class="sect2">
+<h3 class="sect2">8.2.9. Disabling TTY Allocation</h3>
+
+
+
+<a name="INDEX-1333" /><a name="INDEX-1334" />Normally
+when you log in via SSH-1, the server allocates a pseudo-terminal
+(henceforth, tty) for the login session: [<a href="ch07_04.html#ch07-56319">Section 7.4.5.5, "Pseudo-terminal allocation (TTY/PTY/PTTY)"</a>]</p>
+
+
+
+<blockquote><pre class="code"># A tty is allocated for this client
+$ ssh1 server.example.com</pre></blockquote>
+
+
+
+The server even sets an environment variable,
+<a name="INDEX-1335" /><a name="INDEX-1336" />SSH_TTY, with the name of
+the tty allocated. For example:</p>
+
+
+
+<blockquote><pre class="code"># After logging in via SSH-1
+$ echo $SSH_TTY
+/dev/pts/1</pre></blockquote>
+
+
+
+When you run a noninteractive command, however, the SSH server
+doesn't allocate a tty to set SSH_TTY:</p>
+
+
+
+<blockquote><pre class="code"># No tty is allocated
+$ ssh1 server.example.com /bin/ls</pre></blockquote>
+
+
+
+Suppose you want to give someone SSH-1 access for invoking
+noninteractive commands but not for running an interactive login
+session. You've seen how forced commands can limit access to a
+particular program, but as an added safety precaution, you can also
+disable tty allocation with the <tt class="literal">no-pty</tt> option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-pty ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Noninteractive commands will now work normally, but requests for
+interactive sessions are refused by the SSH1 server. If you try to
+establish an interactive session, your client prints a warning
+message, such as:</p>
+
+
+
+<blockquote><pre class="code">Warning: Remote host failed or refused to allocate a pseudo-tty.
+SSH_SMSG_FAILURE: invalid SSH state</pre></blockquote>
+
+
+
+or it appears to hang or fail altogether.</p>
+
+
+
+Just for fun, let's observe the effect of
+<tt class="literal">no-pty</tt> on the SSH_TTY environment variable with a
+simple experiment. Set up a public key and precede it with the
+following forced command:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+command="echo SSH_TTY is [$SSH_TTY]" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+Now try connecting
+<a name="INDEX-1337" />noninteractively
+and interactively, and watch the output. The interactive command
+gives SSH_TTY a value, but the noninteractive one doesn't:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 server.example.com
+SSH_TTY is [/dev/pts/2]
+
+$ ssh1 server.example.com anything
+SSH_TTY is []</pre></blockquote>
+
+
+
+Next, add the <tt class="literal">no-pty</tt> option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-pty,command="echo SSH_TTY is [$SSH_TTY]" ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+and try connecting interactively. The connection (properly) fails and
+SSH_TTY has no value:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 server.example.com
+Warning: Remote host failed or refused to allocate a pseudo-tty.
+SSH_TTY is []
+Connection to server.example.com closed.</pre></blockquote>
+
+
+
+Even if a client requests a tty specifically (with <tt class="command">ssh
+-t</tt>), the <tt class="literal">no-pty</tt> option forbids its
+allocation. <a name="INDEX-1338" /><a name="INDEX-1339" /></p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh -t server.example.com emacs
+Warning: Remote host failed or refused to allocate a pseudo-tty.
+emacs: standard input is not a tty
+Connection to server.example.com closed.</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8. Per-Account Server Configuration</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.3. Trusted-Host Access Control </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

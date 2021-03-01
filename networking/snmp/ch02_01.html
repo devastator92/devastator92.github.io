@@ -1,0 +1,211 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch02_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:11 GMT -->
+<head><title>A Closer Look at SNMP (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch02_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h1 class="chapter">Chapter 2. A Closer Look at SNMP</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <a href="#ahead-1">SNMP and UDP</a><br />
+<a href="ch02_02.html">SNMP Communities</a><br />
+<a href="ch02_03.html">The Structure of Management Information</a><br />
+<a href="ch02_04.html">Extensions to the SMI in Version 2</a><br />
+<a href="ch02_05.html">A Closer Look at MIB-II</a><br />
+<a href="ch02_06.html">SNMP Operations</a><br />
+<a href="ch02_07.html">Host Management Revisited</a><br />
+<a href="ch02_08.html">Remote Monitoring Revisited</a><br /></p><p></div>
+
+In this chapter, we start to look at SNMP in detail. By the time you
+finish this chapter, you should understand how SNMP sends and
+receives information, what exactly SNMP communities are, and how to
+read MIB files. We'll also look in more detail at the three
+MIBs that were introduced in <a href="ch01_01.html">Chapter 1, "What Is SNMP?"</a>, namely
+MIB-II, Host Resources, and RMON.
+</p><p>
+
+<div class="sect1"><a name="enettdg-CHP-2-SECT-1" /></a> 
+  <h2 class="sect1"><a name="ahead-1"></a>2.1. SNMP and UDP</h2>
+
+<a name="INDEX-99" /></a><a name="INDEX-100" /></a><a name="INDEX-101" /></a><a name="INDEX-102" /></a><a name="INDEX-103" /></a><a name="INDEX-104" /></a><a name="INDEX-105" /></a><a name="INDEX-106" /></a><a name="INDEX-107" /></a>SNMP uses the
+<em class="firstterm">User Datagram Protocol</em> (UDP) as the transport
+protocol for passing data between managers and agents. UDP, defined
+in RFC 768, was chosen over the <em class="firstterm">Transmission Control
+Protocol</em> (TCP) because it is connectionless; that is, no
+end-to-end connection is made between the agent and the NMS when
+<em class="firstterm">datagrams</em> (packets) are sent back and forth.
+This aspect of UDP makes it unreliable, since there is no
+acknowledgment of lost datagrams at the protocol level. It's up
+to the SNMP application to determine if datagrams are lost and
+retransmit them if it so desires. This is typically accomplished with
+a simple timeout. The NMS sends a UDP request to an agent and waits
+for a response. The length of time the NMS waits depends on how
+it's configured. If the timeout is reached and the NMS has not
+heard back from the agent, it assumes the packet was lost and
+retransmits the request. The number of times the NMS retransmits
+packets is also configurable.
+</p><p>
+
+<a name="INDEX-108" /></a>
+<a name="INDEX-109" /></a><a name="INDEX-110" /></a>At least as far as regular information
+requests are concerned, the unreliable nature of UDP isn't a
+real problem. At worst, the management station issues a request and
+never receives a response. For traps, the situation is somewhat
+different. If an agent sends a trap and the trap never arrives, the
+NMS has no way of knowing that it was ever sent. The agent
+doesn't even know that it needs to resend the trap, because the
+NMS is not required to send a response back to the agent
+acknowledging receipt of the trap.
+</p><p>
+
+<a name="INDEX-111" /></a><a name="INDEX-112" /></a><a name="INDEX-113" /></a>The
+upside to the unreliable nature of UDP is that it requires low
+overhead, so the impact on your network's performance is
+reduced. SNMP has been implemented over TCP, but this is more for
+special-case situations in which someone is developing an agent for a
+proprietary piece of equipment. In a heavily congested and managed
+network, SNMP over TCP is a bad idea. It's also worth realizing
+that TCP isn't magic, and that SNMP is designed for working
+with networks that are in trouble -- if your network never failed,
+you wouldn't need to monitor it. When a network is failing, a
+protocol that tries to get the data through but gives up if it
+can't is almost certainly a better design choice than a
+protocol that will flood the network with retransmissions in its
+attempt to achieve reliability.
+</p><p>
+
+<a name="INDEX-114" /></a><a name="INDEX-115" /></a><a name="INDEX-116" /></a><a name="INDEX-117" /></a><a name="INDEX-118" /></a>SNMP
+uses the UDP port 161 for sending and receiving requests, and port
+162 for receiving traps from managed devices. Every device that
+implements SNMP must use these port numbers as the defaults, but some
+vendors allow you to change the default ports in the agent's
+configuration. If these defaults are changed, the NMS must be made
+aware of the changes so it can query the device on the correct ports.
+</p><p>
+
+<a href="ch02_01.html#enettdg-CHP-2-FIG-1">Figure 2-1</a> <a name="INDEX-119" /></a><a name="INDEX-120" /></a>shows the TCP/IP protocol suite, which is
+the basis for all TCP/IP communication. Today, any device that wishes
+to communicate on the Internet (e.g., Windows NT systems, Unix
+servers, Cisco routers, etc.) must use this protocol suite. This
+model is often referred to as a protocol stack, since each layer uses
+the information from the layer directly below it and provides a
+service to the layer directly above it.
+</p><p>
+
+<a name="enettdg-CHP-2-FIG-1" /></a><div class="figure"><img height="353" alt="Figure 2-1" src="figs/snmp_0201.gif" width="338" /></div><h4 class="objtitle">Figure 2-1.  TCP/IP communication model and SNMP</h4>
+
+<a name="INDEX-121" /></a><a name="INDEX-122" /></a><a name="INDEX-123" /></a>When
+either an NMS or an agent wishes to perform an SNMP function (e.g., a
+request or trap), the following events occur in the protocol stack:
+</p><p>
+
+<dl>
+<dt><b>Application</b></dt>
+<dd>
+<a name="INDEX-124" /></a>First, the actual SNMP application (NMS
+or agent) decides what it's going to do. For example, it can
+send an SNMP request to an agent, send a response to an SNMP request
+(this would be sent from the agent), or send a trap to an NMS. The
+application layer provides services to an end user, such as an
+operator requesting status information for a port on an Ethernet
+switch.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>UDP</b></dt>
+<dd>
+<a name="INDEX-125" /></a><a name="INDEX-126" /></a>The next layer, UDP, allows two hosts to
+communicate with one another. The UDP header contains, among other
+things, the destination port of the device to which it's
+sending the request or trap. The destination port will either be 161
+(query) or 162 (trap).
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>IP</b></dt>
+<dd>
+The IP layer tries to deliver the SNMP packet to its intended
+destination, as specified by its IP address.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Medium Access Control (MAC)</b></dt>
+<dd>
+<a name="INDEX-127" /></a><a name="INDEX-128" /></a>The final event that must occur for an
+SNMP packet to reach its destination is for it to be handed off to
+the physical network, where it can be routed to its final
+destination. The MAC layer is comprised of the actual hardware and
+device drivers that put your data onto a physical piece of wire, such
+as an Ethernet card. The MAC layer also is responsible for receiving
+packets from the physical network and sending them back up the
+protocol stack so they can be processed by the application layer
+(SNMP, in this case).
+</p><p>
+</dd>
+
+</dl>
+
+This interaction between SNMP applications and the network is not
+unlike that between two pen pals. Both have messages that need to be
+sent back and forth to one another. Let's say you decide to
+write your pen pal a letter asking if she would like to visit you
+over the summer. By deciding to send the invitation, you've
+acted as the SNMP application. Filling out the envelope with your pen
+pal's address is equivalent to the function of the UDP layer,
+which records the packet's destination port in the UDP header;
+in this case it's your pen pal's address. Placing a stamp
+on the envelope and putting it in the mailbox for the mailman to pick
+up is equivalent to the IP layer's function. The final act
+occurs when the mailman comes to your house and picks up the letter.
+From here the letter will be routed to its final destination, your
+pen pal's mailbox. The MAC layer of a computer network is
+equivalent to the mail trucks and airplanes that carry your letter on
+its way. When your pen pal receives the letter, she will go through
+the same process to send you a reply.<a name="INDEX-129" /></a><a name="INDEX-130" /></a> 
+</p><p>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">1.7. Getting More Information</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.2. SNMP Communities</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch02_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:13 GMT -->
+</html>

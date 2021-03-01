@@ -1,0 +1,505 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+<head><title>Running a Slave Name Server (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.8. Running a Slave Name Server</h2>
+
+
+<a name="INDEX-604" />You
+need to set up another name server for robustness. You can (and
+probably will eventually) set up more than two authoritative name
+servers for your zones. Two name servers are the minimum -- if you
+have only one name server and it goes down, no one can look up domain
+names. A second name server splits the load with the first server or
+handles the whole load if the first server is down. You
+<em class="emphasis">could</em> set up another primary master name server,
+but we don't recommend it. Instead, set up a slave name server.
+You can always change a slave name server into a primary master name
+server later if you decide to expend the extra effort it takes to run
+multiple primary master name servers.</p><p>
+
+
+How does a <a name="INDEX-605" /> <a name="INDEX-606" />server know if
+it's the primary master or a slave for a zone? The
+<em class="filename">named.conf</em><a name="INDEX-607" /> file tells the name
+server whether it is the primary master or a slave on a per-zone
+basis. The NS records don't tell us which server is the primary
+master for a zone and which servers are slaves -- they only say
+who the servers are. (Globally, DNS doesn't care; as far as the
+actual name resolution goes, slave servers are as good as primary
+master servers.)</p><p>
+
+
+What's the difference between a primary master name server and
+a slave name server? The crucial difference is where the server gets
+its data. A primary master name server reads its data from zone data
+files. A slave name server loads its data over the network from
+another name server. This process is called a
+<a name="INDEX-608" /><em class="emphasis">zone transfer</em>.</p><p>
+
+
+A slave name server is not limited to loading zones from a primary
+mastername server; it can also load from
+another slave server.</p><p>
+
+
+The big advantage of slave name servers is that you maintain only one
+set of zone data files for a zone, the ones on the primary master
+name server. You don't have to worry about synchronizing the
+files among name servers; the slaves do that for you. The caveat is
+that a slave does not resynchronize instantly -- it polls to see
+if its zone data is current. The polling interval is one of those
+numbers in the SOA record that we haven't explained yet. (BIND
+Versions 8 and 9 support a mechanism to speed up the distribution of
+zone data, which we'll describe later.)</p><p>
+
+
+A slave name server doesn't need to retrieve all its zone data
+over the network; the overhead files, <em class="filename">db.cache</em>
+and <em class="filename">db.127.0.0</em>, are the same as on a primary
+master, so keep a local copy on the slave. That means that a slave
+name server is a primary master for <em class="emphasis">0.0.127.in-addr.arpa</em>. Well, you
+<em class="emphasis">could</em> make it a slave for <em class="emphasis">0.0.127.in-addr.arpa</em>, but that
+zone's data never changes -- it may as well be a primary
+master.</p><p>
+
+
+<a name="dns4-CHP-4-SECT-8.1" /><div class="sect2">
+<h3 class="sect2">4.8.1. Setup</h3>
+
+
+<a name="INDEX-609" />
+<a name="INDEX-610" />To
+set up your slave name server, create a directory for the zone data
+files on the slave name server host (e.g., <em class="filename">/var/named
+</em>) and copy over the files
+<em class="filename">/etc/named.conf</em>, <em class="filename">db.cache</em>,
+and <em class="filename">db.127.0.0 </em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>rcp /etc/named.conf </b></tt>host:<tt class="userinput"><b>/etc</b></tt>
+# <tt class="userinput"><b>rcp db.cache db.127.0.0 </b></tt>host:db-file-directory</pre></blockquote>
+
+
+You must modify
+<em class="filename">/etc/named.conf</em><a name="INDEX-611" /> on the slave name server host. For BIND
+4, change every occurrence of <em class="emphasis">primary</em> to
+<em class="emphasis">secondary</em> except for the <em class="emphasis">0.0.127.in-addr.arpa</em> zone. Before the
+filename on each of these lines, add the IP address of the primary
+master server you just set up. For example, if the original BIND 4
+configuration file line was this:</p><p>
+
+
+<blockquote><pre class="code">primary  movie.edu      db.movie.edu</pre></blockquote>
+
+
+then the modified line looks like this:</p><p>
+
+
+<blockquote><pre class="code">secondary  movie.edu      192.249.249.3 db.movie.edu</pre></blockquote>
+
+
+If the original BIND 8 or 9 configuration file line was:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" in {
+      type master;
+      file "db.movie.edu";
+};</pre></blockquote>
+
+
+change <em class="emphasis">master</em> to <em class="emphasis">slave</em> and
+add a <em class="emphasis">masters</em> line with the IP address of the
+master server:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" in {
+      type slave;
+      file "bak.movie.edu";
+      masters { 192.249.249.3; };
+};</pre></blockquote>
+
+
+This tells the name server that it is a slave for the zone
+<em class="emphasis">movie.edu</em> and that it should
+track the version of this zone kept on the name server at
+192.249.249.3. The slave name server keeps a backup copy of this zone
+in the local file <em class="filename">bak.movie.edu</em>.</p><p>
+
+
+For Movie U., we set up our slave name server on <em class="emphasis">wormhole.movie.edu</em>. Recall that the
+configuration file on <em class="emphasis">terminator.movie.edu</em> (the primary
+master) looks like this:</p><p>
+
+
+<blockquote><pre class="code">directory /var/named
+
+primary  movie.edu                db.movie.edu
+primary  249.249.192.in-addr.arpa db.192.249.249
+primary  253.253.192.in-addr.arpa db.192.253.253
+primary  0.0.127.in-addr.arpa     db.127.0.0
+cache    .                        db.cache</pre></blockquote>
+
+
+We copy <em class="filename">/etc/named.conf</em>,
+<em class="filename">db.cache</em>, and <em class="filename">db.127.0.0</em> to
+<em class="emphasis">wormhole.movie.edu</em>, and edit
+the configuration file as previously described. The BIND 4
+configuration file on <em class="emphasis">wormhole.movie.edu</em> now looks like this:</p><p>
+
+
+<blockquote><pre class="code">directory /var/named
+
+secondary  movie.edu                192.249.249.3 bak.movie.edu
+secondary  249.249.192.in-addr.arpa 192.249.249.3 bak.192.249.249
+secondary  253.253.192.in-addr.arpa 192.249.249.3 bak.192.253.253
+primary    0.0.127.in-addr.arpa     db.127.0.0
+cache      .                        db.cache</pre></blockquote>
+
+
+The equivalent BIND 8 or 9 configuration file looks like this:</p><p>
+
+
+<blockquote><pre class="code">options {
+        directory "/var/named";
+};
+
+zone "movie.edu" in {
+        type slave;
+        file "bak.movie.edu";
+        masters { 192.249.249.3; };
+};
+
+zone "249.249.192.in-addr.arpa" in {
+        type slave;
+        file "bak.192.249.249";
+        masters { 192.249.249.3; };
+};
+
+zone "253.253.192.in-addr.arpa" in {
+        type slave;
+        file "db.192.253.253";
+        masters { 192.249.249.3; };
+};
+
+zone "0.0.127.in-addr.arpa" in {
+        type master;
+        file "db.127.0.0";
+};
+
+zone "." in {
+        type hint;
+        file "db.cache";
+};</pre></blockquote>
+
+
+This causes the name server on <em class="emphasis">wormhole.movie.edu</em> to load <em class="emphasis">movie.edu</em>, <em class="emphasis">249.249.192.in-addr.arpa</em>, and
+<em class="emphasis">253.253.192.in-addr.arpa</em>
+over the network from the name server at 192.249.249.3 (<em class="emphasis">terminator.movie.edu</em>). It also saves a
+backup copy of these files in <em class="filename">/var/named</em>. You
+may find it handy to isolate the backup zone data files in a
+subdirectory. We name them with a unique prefix like
+<em class="filename">bak</em>, since on rare occasions, we may have to
+delete all of the backup files manually. It's also helpful to
+be able to tell at a glance that they're backup zone data files
+so that we're not tempted to edit them. We'll cover more
+on backup files later.</p><p>
+
+
+Now start up the <a name="INDEX-612" />
+<a name="INDEX-613" />slave name server. Check for
+<a name="INDEX-614" /> <a name="INDEX-615" />error messages in the
+<a name="INDEX-616" /><em class="filename">syslog</em> file as you did
+for the primary master server. As on the primary master, the command
+to start up a name server is:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/sbin/named</b></tt></pre></blockquote>
+
+
+One extra check to make on the slave that you didn't have to
+make on the primary master is to see that the name server created the
+backup files. Shortly after we started our slave name server on
+<em class="emphasis">wormhole.movie.edu</em>, we saw
+<em class="filename">bak.movie.edu</em>,
+<em class="filename">bak.192.249.249</em>, and
+<em class="filename">bak.192.253.253</em> appear in the
+<em class="filename">/var/named</em> directory. This means the slave has
+successfully loaded these zones from the primary master and saved a
+backup copy.</p><p>
+
+
+To complete setting up your slave name server, try looking up the
+same domain names you looked up after you started the primary master
+server. This time, you must run <a name="INDEX-617" /> <a name="INDEX-618" /><em class="filename">nslookup</em> on
+the host running the slave name server so that the slave server is
+queried. If your slave is working fine, add the proper lines to your
+system <a name="INDEX-619" />
+<a name="INDEX-620" />startup files so that the slave name
+server is started when your system boots up and
+<em class="filename">hostname(1)</em><a name="INDEX-621" />
+is set to a domain name.<a name="INDEX-622" /> <a name="INDEX-623" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-8.2" /><div class="sect2">
+<h3 class="sect2">4.8.2. Backup Files</h3>
+
+
+<a name="INDEX-624" /> <a name="INDEX-625" /> <a name="INDEX-626" />Slave
+<a name="INDEX-627" />name servers are not
+<em class="emphasis">required</em> to save a backup copy of the zone data.
+If there is a backup copy, the slave server reads it on startup and
+later checks with the master server to see if the master server has a
+newer copy instead of loading a new copy of the zone immediately. If
+the master server has a newer copy, the slave pulls it over and saves
+it in the backup file.</p><p>
+
+
+Why save a backup copy? Suppose the master name server is down when
+the slave starts up. The slave will be unable to transfer the zone
+and therefore won't function as a name server for that zone
+until the master server is up. With a backup copy, the slave has zone
+data, although it might be slightly out of date. Since the slave does
+not have to rely on the master server always being up, it's a
+more robust setup.</p><p>
+
+
+To run without a backup copy, omit the filename at the end of the
+<em class="emphasis">secondary</em> lines in the BIND 4 configuration
+file. In BIND 8 or 9, remove the <em class="emphasis">file</em> line.
+However, we recommend configuring all your slave name servers to save
+backup copies. There is very little extra cost to saving a backup
+zone data file, but there is a very high cost if you get caught
+without a backup file when you need it most.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-8.3" /><div class="sect2">
+<h3 class="sect2">4.8.3. SOA Values</h3>
+
+
+<a name="INDEX-628" />Remember <a name="INDEX-629" />this SOA record?</p><p>
+
+
+<blockquote><pre class="code">movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                          1        ; Serial
+                          3h       ; Refresh after 3 hours
+                          1h       ; Retry after 1 hour
+                          1w       ; Expire after 1 week
+                          1h )     ; Negative caching TTL of 1 day</pre></blockquote>
+
+
+We never explained what the values between the parentheses were for.</p><p>
+
+
+The serial number applies to all the data within the zone. We chose
+to start our serial number at 1, a logical place to start. But many
+people find it more useful to use the date in the serial number
+instead, like 1997102301. This format is YYYYMMDDNN, where YYYY is
+the year, MM is the month, DD is the day, and NN is a count of how
+many times the zone data was modified that day. These fields
+won't work in any other order, since no other order gives a
+value that always increases as the date changes. This is critical:
+whatever format you choose, it's important that the serial
+number always increase when you update your zone data.</p><p>
+
+
+When a slave name server contacts a master server for zone data, it
+first asks for the serial number on the data. If the slave's
+serial number for the zone is lower than the master server's,
+the slave's zone data is out of date. In this case, the slave
+pulls a new copy of the zone. If a slave starts up and there is no
+backup file to read, it will always load the zone. As you might
+guess, when you modify the zone data files on the primary master, you
+must increment the serial number. Updating your zone data files is
+covered in <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a>.</p><p>
+
+
+The next four fields specify various time intervals, in seconds by
+default:</p><p>
+
+
+<dl>
+<dt><i>refresh</i></dt>
+<dd>The <a name="INDEX-630" />refresh
+interval tells a slave for the zone how often to check that the data
+for this zone is up to date. To give you an idea of the system load
+this feature causes, a slave makes one SOA query per zone per refresh
+interval. The value we chose, three hours, is reasonably aggressive.
+Most users will tolerate a delay of half a working day for things
+like zone data to propagate when they are waiting for their new
+workstation to become operational. If you provide one-day service for
+your site, you could consider raising this value to eight hours. If
+your zone data doesn't change very often or if all of your
+slaves are spread over long distances (as the root name servers are),
+consider a value that is even longer, say 24 hours.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>retry</i></dt>
+<dd>If the slave fails to reach the master name server after the refresh
+interval (the host could be down), it starts trying to connect every
+<em class="emphasis">retry</em><a name="INDEX-631" /> seconds. Normally, the retry interval
+is shorter than the refresh interval, but it doesn't have to
+be.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>expire</i></dt>
+<dd>If the slave fails to contact the master name server for
+<em class="emphasis">expire</em> seconds, the slave expires the zone.
+Expiring the zone means that the slave stops giving out answers about
+the zone because the zone data is too old to be useful. Essentially,
+this field says that at some point, the data is so old that giving
+out no data is better than giving out stale data. Expire times on the
+order of a week are common -- longer (up to a month) if you
+frequently have problems reaching your updating source. The
+<a name="INDEX-632" />expiration time
+should always be much larger than the retry and refresh intervals; if
+the expire time is smaller than the refresh interval, your slaves
+will expire the zone before trying to load new data.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>negative caching TTL</i></dt>
+<dd><a name="INDEX-633" />
+<a name="INDEX-634" />TTL stands for <em class="firstterm">time to
+live</em>. This value applies to all negative responses from
+the name servers authoritative for the zone.</p></dd>
+
+</dl>
+
+
+
+<a name="ch04-35-fm2xml" /><blockquote><b>TIP: </b>
+On versions of BIND before BIND 8.2, the last field in the SOA record
+is <em class="emphasis">both</em> the default time to live and the
+negative caching time to live for the zone.</p><p>
+
+</blockquote>
+
+Those of you who have read earlier versions of this book may have
+noticed the change in the format we used for the SOA record's
+numeric fields. Once upon a time, BIND only understood units of
+seconds for the four fields we just described. (Consequently, a whole
+generation of administrators know that there are 608400 seconds in a
+week.) Now, with all but the oldest BIND name servers (4.8.3), you
+can specify units besides seconds for these fields and as arguments
+to the TTL control statement, as we saw early in this chapter. For
+example, you can specify a three-hour refresh interval with
+<em class="emphasis">3h</em>, <em class="emphasis">180m</em>, or even
+<em class="emphasis">2h60m</em>. You can also use <em class="emphasis">d</em>
+for days and <em class="emphasis">w</em> for weeks.</p><p>
+
+
+The right values for your <a name="INDEX-635" />SOA record depend upon the
+needs of your site. In general, longer times cause less load on your
+name servers and can delay the propagation of changes; shorter times
+increase the load on your name servers and speed up the propagation
+of changes. The values we use in this book should work well for most
+sites. RFC 1537 recommends the following values for top-level name
+servers:</p><p>
+
+
+<blockquote><pre class="code">Refresh        24 hours
+Retry           2 hours
+Expire         30 days
+Default TTL     4 days</pre></blockquote>
+
+
+There is one implementation feature you should be aware of. Older
+versions (pre-4.8.3) of BIND slaves stop answering queries during a
+zone load. As a result, BIND was modified to spread out the zone
+loads, reducing the periods of unavailability. So, even if you set a
+low refresh interval, your slaves may not check as often as you
+request. BIND attempts a certain number of zone loads and then waits
+15 minutes before trying another batch.</p><p>
+
+
+Now that we've told you all about how slave name servers poll
+to keep their data up to date, BIND 8 and 9 change how zone data
+propagates! The polling feature is still there, but BIND 8 and 9 add
+a notification when zone data changes. If both your primary master
+server and your slaves run BIND 8 or 9, the primary master
+<a name="INDEX-636" />notifies the
+slave that a zone has changed within 15 minutes of loading a new copy
+of that zone. The notification causes the slave server to shorten the
+refresh interval and attempt to load the zone immediately.
+We'll discuss this more in<a name="INDEX-637" /> <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>.<a name="INDEX-638" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-8.4" /><div class="sect2">
+<h3 class="sect2">4.8.4. Multiple Master Servers</h3>
+
+
+<a name="INDEX-639" />Are there
+other ways to make your slave name server's configuration more
+robust? Yes -- you can specify up to 10 IP addresses of
+<a name="INDEX-640" />master servers. In a BIND 4 configuration
+file, just add them after the first IP address and before the backup
+filename. In a BIND 8 or 9 configuration file, add them after the
+first IP address and separate them with semicolons:</p><p>
+
+
+<blockquote><pre class="code">masters { 192.249.249.3; 192.249.249.4; };</pre></blockquote>
+
+
+The slave will query the master server at each IP address in the
+order listed until it gets a response. Through BIND 8.1.2, the slave
+would always transfer the zone from the first master name server to
+respond if that master had a higher <a name="INDEX-641" />serial number. The slave would try
+successive master servers only if the previous master didn't
+respond. From BIND 8.2 on, however, the slave actually queries all of
+the master name servers listed and transfers the zone from the one
+with the highest serial number. If multiple master servers tie for
+the highest serial number, the slave transfers the zone from the
+first of those masters in the list.</p><p>
+
+
+The original intent of this feature was to allow you to list all the
+IP addresses of the host running the primary master name server for
+the zone if that host were multihomed. But since there is no check to
+determine whether the contacted server is a primary master or a
+slave, you can list the IP addresses of hosts running slave servers
+for the zone if that makes sense for your setup. That way, if the
+first master server is down or unreachable, your slave can transfer
+the zone from another master name server.<a name="INDEX-642" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.7. Running a Primary Master Name Server</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.9. Adding More Zones</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+</html>

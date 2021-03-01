@@ -1,0 +1,971 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:32 GMT -->
+<head><title>Packet Filtering (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 8. Packet Filtering</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch08-4069">What Can You Do with Packet Filtering?</a><br />
+<a href="ch08_02.html">Configuring a Packet Filtering Router</a><br />
+<a href="ch08_03.html">What Does the Router Do with Packets?</a><br />
+<a href="ch08_04.html">Packet Filtering Tips and Tricks</a><br />
+<a href="ch08_05.html">Conventions for Packet Filtering Rules</a><br />
+<a href="ch08_06.html">Filtering by Address</a><br />
+<a href="ch08_07.html">Filtering by Service</a><br />
+<a href="ch08_08.html">Choosing a Packet Filtering Router</a><br />
+<a href="ch08_09.html">Packet Filtering Implementations for General-Purpose Computers</a><br />
+<a href="ch08_10.html">Where to Do Packet Filtering</a><br />
+<a href="ch08_11.html">What Rules Should You Use?</a><br />
+<a href="ch08_12.html">Putting It All Together</a><br /></p><p></div>
+
+
+
+
+
+
+
+<a name="INDEX-497" /></a><a name="INDEX-498" /></a><a name="INDEX-499" /></a>Packet
+filtering is a network security mechanism that works by controlling
+what data can flow to and from a network.
+<a name="INDEX-500" /></a><a name="INDEX-501" /></a><a name="INDEX-502" /></a>The
+basic device that interconnects IP networks is called a
+<em class="emphasis">router</em>. A router may be a dedicated piece of
+hardware that has no other purpose, or it may be a piece of software
+that runs on a general-purpose computer running Unix, Windows NT, or
+another operating system (MS-DOS, Windows 95/98, Macintosh, or
+other). Packets traversing an internetwork (a network of networks)
+travel from router to router until they reach their destination. The
+Internet itself is sort of the granddaddy of internetworks  -- 
+the ultimate "network of networks".</p><p>
+
+
+
+
+
+A router has to make a routing decision about each packet it
+receives; it has to decide how to send that packet on towards its
+ultimate destination. In general, a packet carries no information to
+help the router in this decision, other than the IP address of the
+packet's ultimate destination. The packet tells the router
+where it wants to go but not how to get there. Routers communicate
+with each other using <em class="emphasis">routing</em>
+<em class="emphasis">protocols</em> such as the Routing Information
+Protocol (RIP) and Open Shortest Path First (OSPF) to build
+<em class="emphasis">routing tables</em> in memory to determine how to get
+the packets to their destinations. When routing a packet, a router
+compares the packet's destination address to entries in the
+routing table and sends the packet onward as directed by the routing
+table. Often, there won't be a specific route for a particular
+destination, and the router will use a <em class="emphasis">default</em>
+<em class="emphasis">route;</em> generally, such a route directs the
+packet towards smarter or better-connected routers. (The default
+routes at most sites point towards the Internet.)</p><p>
+
+
+
+
+
+In determining how to forward a packet towards its destination, a
+normal router looks only at a normal packet's destination
+address and asks only "<em class="emphasis">How</em> can I forward
+this packet?" A packet filtering router also considers the
+question "<em class="emphasis">Should</em> I forward this
+packet?" The packet filtering router answers that question
+according to the security policy programmed into the router via the
+packet filtering rules.</p><p>
+
+
+
+
+
+Some machines do packet filtering without doing routing; that is,
+they may accept or reject packets destined for them before they do
+further processing.</p><p>
+
+
+
+
+
+<a name="ch08-2-fm2xml" /></a><blockquote><b>TIP:</b> 
+Some unusual packets do contain routing information about how they
+are to reach their destination, using the "source route"
+IP option. These packets, called <em class="emphasis">source-routed
+packets</em>, are discussed in <a href="ch04_02.html#ch04-4472">Section 4.2.2, "IP Options"</a>, in <a href="ch04_01.html">Chapter 4, "Packets and Protocols "</a>.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch08-4069" /></a>
+<h2 class="sect1">8.1. What Can You Do with Packet Filtering?</h2>
+
+
+
+
+
+If you put enough work into it, you can do anything you want to with
+packet filtering; all of the information that crosses the Internet
+has to go into a packet at some point, after all. But some things are
+very much easier to do than others. For instance, operations that
+require detailed protocol knowledge or prolonged tracking of past
+events are easier to do in proxy systems. Operations that are simple
+but need to be done fast and on individual packets are easier to do
+in packet filtering systems.</p><p>
+
+
+
+
+
+The main advantage of packet filtering is leverage: it allows you to
+provide, in a single place, particular protections for an entire
+network. Consider the Telnet service as an example. If you disallow
+Telnet by turning off the Telnet server on all your hosts, you still
+have to worry about someone in your organization installing a new
+machine (or reinstalling an old one) with the Telnet server turned
+on. On the other hand, if Telnet is not allowed by your filtering
+router, such a new machine would be protected right from the start,
+regardless of whether or not its Telnet server was actually running.
+This is an example of the kind of "fail safe" stance we
+discussed in <a href="ch03_01.html">Chapter 3, "Security Strategies"</a>.</p><p>
+
+
+
+
+
+<a name="INDEX-503" /></a><a name="INDEX-504" /></a>Routers also
+present a useful choke point (also discussed in <a href="ch03_01.html">Chapter 3, "Security Strategies"</a>) for all of the traffic entering or leaving a
+network. Even if you have multiple routers for redundancy, you
+probably have far fewer routers, under much tighter control, than you
+have host machines.</p><p>
+
+
+
+
+
+Certain protections can be provided <em class="emphasis">only</em> by
+filtering routers, and then only if they are deployed in particular
+locations in your network. For example, it's a good idea to
+reject all external packets that have internal source addresses
+ --  that is, packets that claim to be coming from internal
+machines but that are actually coming in from the outside  -- 
+because such packets are usually part of address-spoofing attacks. In
+such attacks, an attacker is pretending to be coming from an internal
+machine. You should also reject all internal packets that have
+external source addresses; once again, they are usually part of
+address-spoofing attacks. Decision-making of this kind can be done
+only in a filtering router at the perimeter of your network. Only a
+filtering router in that location (which is, by definition, the
+boundary between "inside" and "outside") is
+able to recognize such a packet, by looking at the source address and
+whether the packet came from the inside (the internal network
+connection) or the outside (the external network connection). <a href="ch08_01.html#ch08-67845">Figure 8-1</a> illustrates this type of source address
+forgery.</p><p>
+
+
+
+
+
+<a name="ch08-67845" /></a><div class="figure"><img height="302" alt="Figure 8-1" src="figs/fire2.0801.gif" width="475" /></div><h4 class="objtitle">Figure 8-1. Source address forgery</h4>
+
+Filtering routers are also good at detecting and filtering out
+illegal packets. Many denial of service attacks depend on sending
+misformatted packets of one sort or another. Routers in general have
+very reliable TCP/IP implementations (so they are not vulnerable to
+these attacks) and are well placed to prevent these attacks.
+General-purpose computers being used as packet filters are more
+likely to be vulnerable to these attacks, but at least it is easier
+to fix them than it is to fix all your internal machines.</p><p>
+
+
+
+
+
+<a name="ch08-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">8.1.1. Basic Packet Filtering</h3>
+
+
+
+
+
+<a name="INDEX-505" /></a>The
+most straightforward kind of packet filtering lets you control (allow
+or disallow) data transfer based on:</p><p>
+
+
+
+
+
+<ul><li>The address the data is (supposedly) coming from</p><p></li><li>The address the data is going to<p></p></li><li><p>The session and application ports being used to transfer the data</p></li></ul>
+Basic packet filtering systems don't do anything based on the
+data itself; they don't make content-based decisions.
+Straightforward packet filtering will let you say:</p><p>
+
+
+
+
+
+
+Don't let anybody use the port used by Telnet (an application
+protocol) to log in from the outside.</p><p>
+
+
+
+
+
+
+or:</p><p>
+
+
+
+
+
+
+Let everybody send us data over the port used for electronic mail by
+SMTP (another application protocol).</p><p>
+
+
+
+
+
+
+or even:</p><p>
+
+
+
+
+
+
+That machine can send us data over the port used for news by NNTP
+(yet another application protocol), but no other machines can do so.</p><p>
+
+
+
+
+
+
+However, it won't let you say:</p><p>
+
+
+
+
+
+
+This user can Telnet in from outside, but no other users can do so.</p><p>
+
+
+
+
+
+
+because "user" isn't something a basic packet
+filtering system can identify. And it won't let you say:</p><p>
+
+
+
+
+
+
+You can transfer these files but not those files.</p><p>
+
+
+
+
+
+
+because "file" also isn't something a basic packet
+filtering system can identify. It won't even let you say:</p><p>
+
+
+
+
+
+
+Only allow people to send us electronic mail over the port used by
+SMTP.</p><p>
+
+
+
+
+
+
+because a basic packet filtering system looks only at the port being
+used; it can't tell whether the data is good data, conforming
+to the protocol that's supposed to use that port, or whether
+somebody is using the port for some other purpose.</p><p>
+
+
+
+
+
+ore advanced packet filtering systems will let you look further into
+the data of a packet. Instead of paying attention only to headers for
+lower-level protocols, they also understand the data structures used
+by higher-level protocols, so they can make more detailed decisions.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-4-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">8.1.2. Stateful or Dynamic Packet Filtering</h3>
+
+
+
+
+
+Slightly more advanced packet filtering systems offer state tracking
+and/or protocol checking (for well-known protocols). State tracking
+allows you to make rules like the following:</p><p>
+
+
+
+
+
+
+Let incoming UDP packets through only if they are responses to
+outgoing UDP packets you have seen.</p><p>
+
+
+
+
+
+
+or:</p><p>
+
+
+
+
+
+
+Accept TCP packets with SYN set only as part of TCP connection
+initiation.</p><p>
+
+
+
+
+
+
+<a name="INDEX-506" /></a><a name="INDEX-507" /></a>This is
+called <em class="emphasis">stateful</em> <em class="emphasis">packet</em>
+<em class="emphasis">filtering</em> because the packet filter has to keep
+track of the state of transactions. It is also called
+<em class="emphasis">dynamic</em> <em class="emphasis">packet</em>
+<em class="emphasis">filtering</em> because the behavior of the system
+changes depending on the traffic it sees. For instance, if it's
+using the preceding rule, you can't look at an incoming UDP
+packet and say that it will always be accepted or rejected.</p><p>
+
+
+
+
+
+Different systems keep track of different levels of state
+information. Some people are willing to call something a stateful
+packet filtering system if it enforces TCP state rules (which control
+the flags used during startup and teardown of TCP sessions), even if
+the packet filtering system provides no further stateful features.
+While TCP state enforcement is nice to have (it helps to prevent some
+forms of port scanning and denial of service), it does not allow you
+to support additional protocols, and we do not consider it stateful
+packet filtering.</p><p>
+
+
+
+
+
+<a href="ch08_01.html#ch08-47122">Figure 8-2</a> illustrates dynamic packet filtering at
+the UDP layer.</p><p>
+
+
+
+
+
+<a name="ch08-47122" /></a><div class="figure"><img height="343" alt="Figure 8-2" src="figs/fire2.0802.gif" width="414" /></div><h4 class="objtitle">Figure 8-2. Dynamic packet filtering at the UDP layer</h4>
+
+State tracking provides the ability to do things that you can't
+do otherwise, but it also adds complications. First, the router has
+to keep track of the state; this increases the load on the router,
+opens it to a number of denial of service attacks, and means that if
+the router reboots, packets may be denied when they should have been
+accepted. If a packet may go through redundant routers, they all need
+to have the same state information. There are protocols for
+exchanging this information, but it's still a tricky business.
+If you have redundant routers only for emergency failover, and most
+traffic consistently uses the same router, it's not a problem.
+If you are using redundant routers simultaneously, the state
+information needs to be transferred between them almost continuously,
+or the response packet may come through before the state is updated.</p><p>
+
+
+
+
+
+Second, the router has to keep track of state without any guarantee
+that there's ever going to be a response packet. Not all UDP
+packets have responses. At some point, the router's going to
+have to give up and get rid of the rule that will allow the response.
+If the router gives up early, it will deny packets that should have
+been accepted, causing delays and unneeded network traffic. If the
+router keeps the rule too long, the load on the router will be
+unneccessarily high, and there's an increased chance that
+packets will be accepted when they should have been denied. Some
+protocol specifications provide guidelines, but those are not
+necessarily useful. For instance, DNS replies are supposed to arrive
+within 5 seconds, but reply times for name service queries across the
+Internet can be as high as 15 seconds; implementing to the protocol
+specification will almost always deny a response that you wanted to
+accept.</p><p>
+
+
+
+
+
+This sort of filtering is also vulnerable to address forging; it is
+validating that packets are responses based on their source
+addresses, so an attacker who intercepts an outgoing packet can forge
+the appropriate source address and return an acceptable
+"reply" (or, depending on the implementation, a whole
+bunch of packets all of which will be accepted as replies).
+Nonetheless, this provides a reasonable degree of security for some
+UDP-based protocols that would otherwise be extremely difficult to
+protect.<a name="INDEX-508" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-5-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">8.1.3. Protocol Checking</h3>
+
+
+
+
+
+<a name="INDEX-509" /></a>Protocol checking allows you to make
+rules like:</p><p>
+
+
+
+
+
+
+Let in packets bound for the DNS port, but only if they are formatted
+like DNS packets.</p><p>
+
+
+
+
+
+
+Protocol checking therefore helps you avoid situations where somebody
+has set up an unsafe service on a port that is allowed through
+because it normally belongs to a safe service. It can also help avoid
+some attacks that involve sending misformatted packets to perfectly
+genuine servers. Protocol checking is normally fairly rudimentary and
+still can be circumvented by a determined insider. It also gives you
+no guarantee that the data is good, so it will catch only a fairly
+small number of attacks that involve sending hostile data to genuine
+servers. However, it still provides a useful degree of sanity
+checking.</p><p>
+
+
+
+
+
+The most advanced packet filtering systems will allow you to specify
+all sorts of data-specific rules for well-known protocols. For
+instance, you can say:</p><p>
+
+
+
+
+
+
+Disconnect any FTP connection where the remote username is
+"anonymous".</p><p>
+
+
+
+
+
+
+or:</p><p>
+
+
+
+
+
+
+Do not allow HTTP transfers to these sites.</p><p>
+
+
+
+
+
+
+In order to do this, these packet filters have to have a deep
+understanding of the application protocol. In general, they can
+provide this level of control only for a few popular protocols, and
+there is a significant cost to provide it, since they have to process
+larger amounts of data. Furthermore, it is often possible to
+circumvent this sort of control. For instance, there are numerous
+ways of getting to a site via HTTP without having the site's
+name appear in the outgoing HTTP request, including using an IP
+address instead of a hostname and using an anonymizing site set up to
+provide this sort of service.</p><p>
+
+
+
+
+
+Stateful packet filters may also look at protocol-specific details to
+make state changes. Some protocols contain information about what
+ports transactions will use. For instance, the file transfer protocol
+FTP often uses a connection that is started from the server to the
+client, and the two ends negotiate the port number that will be used
+for this connection. A stateful packet filter that understands the
+FTP protocol can watch this negotiation and allow the new connection
+to be made, without allowing other connections of the same sort.
+<a name="INDEX-510" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.3. Put Everything Together</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.2. Configuring a Packet Filtering Router</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:36 GMT -->
+</html>

@@ -1,0 +1,891 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:20 GMT -->
+<head><title>Maintaining BIND (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch07_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 7. Maintaining BIND</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-7-SECT-1">Controlling the Name Server</a><br />
+<a href="ch07_02.html">Updating Zone Data Files</a><br />
+<a href="ch07_03.html">Organizing Your Files</a><br />
+<a href="ch07_04.html">Changing System File Locations in BIND 8 and 9</a><br />
+<a href="ch07_05.html">Logging in BIND 8 and 9</a><br />
+<a href="ch07_06.html">Keeping Everything Running Smoothly</a><br /><p></p></div>
+
+
+<em>"Well, in our country," said Alice, still panting a
+little, "you'd generally get to somewhere else -- if
+you ran very fast for a long time as we've been doing."</p><p>
+
+
+"A slow sort of country!" said the Queen. "Now,
+here, you see, it takes all the running you can do, to keep in the
+same place. If you want to get somewhere else, you must run at least
+twice as fast as that!"</em></p><p>
+
+
+<a name="INDEX-934" /></a>This
+chapter discusses a number of related topics pertaining to name
+server maintenance. We'll talk about controlling name servers,
+modifying zone data files, and keeping the root hints file up to
+date. We'll list common <em class="emphasis">syslog</em> error
+messages and explain the statistics BIND keeps.</p><p>
+
+
+This chapter doesn't cover troubleshooting problems.
+Maintenance involves keeping your data current and watching over your
+name servers as they operate. Troubleshooting involves putting out
+fires -- those little DNS emergencies that flare up periodically.
+Firefighting is covered in <a href="ch14_01.html">Chapter 14, "Troubleshooting DNS and BIND"</a>.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-7-SECT-1" /></a>
+<h2 class="sect1">7.1. Controlling the Name Server</h2>
+
+
+<a name="INDEX-935" /></a>Traditionally,
+administrators have controlled the BIND name server,
+<em class="filename">named</em>, with Unix
+<a name="INDEX-936" /></a>signals. The name
+server interprets the receipt of certain signals as an instruction to
+take a particular action, such as reloading all of the primary master
+zones that have changed. However, there are a limited number of
+signals available, and signals offer no means of passing along
+additional information such as the domain name of a particular zone
+to reload.</p><p>
+
+
+In BIND 8.2, the ISC introduced a method of controlling the name
+server by sending messages to it on a special
+<a name="INDEX-937" /></a>control channel. The control channel can
+be either a Unix domain socket or a TCP port that the name server
+listens on for messages. Because the control channel isn't
+limited to a finite number of discrete signals, it's more
+flexible and powerful. The ISC says that the control channel is the
+way of the future and that administrators should use it, rather than
+<a name="INDEX-938" /></a>signals, for all name
+server management.</p><p>
+
+
+You send messages to a name server via the control channel using a
+program called <em class="filename">ndc</em> (in BIND 8) or
+<em class="filename">rndc</em> (in BIND 9). <em class="filename">ndc </em>has
+been around since BIND 4.9, but prior to BIND 8.2, it was simply a
+shell script that allowed you to substitute convenient arguments
+(such as <em class="emphasis">reload</em> ) for signals (such as
+<em class="emphasis">HUP</em> ). We'll talk about that version of
+<em class="filename">ndc</em> later in this chapter.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">7.1.1. ndc and controls (BIND 8)</h3>
+
+
+<a name="INDEX-939" /></a>Executed <a name="INDEX-940" /></a>without arguments,
+<em class="filename">ndc</em> will try to communicate with a name server
+running on the local host by sending messages through a
+<a name="INDEX-941" /></a>Unix domain socket. The socket is usually
+called
+<em class="filename">/var/run/ndc</em><a name="INDEX-942" /></a>
+<a name="INDEX-943" /></a>, though some operating systems use a different
+pathname. The socket is normally owned by root and readable and
+writable only by the owner. BIND 8.2 and later name servers create
+the Unix domain socket when they start up. You can specify an
+alternate pathname or permissions for the socket using the
+<em class="firstterm">controls</em><a name="INDEX-944" /></a>
+statement. For example, to change the socket's path to
+<em class="filename">/etc/ndc</em> and group ownership to
+<em class="filename">named</em>, and to make the socket readable and
+writable by both owner and group, you could use:</p><p>
+
+
+<blockquote><pre class="code">controls {
+	unix "/etc/ndc" perm 0660 owner 0 group 53;  // group 53 is "named"
+};</pre></blockquote>
+
+
+The permission value must be specified as an octal quantity (with a
+leading zero to indicate its octalness). If you're not familiar
+with this format, see the <em class="emphasis">chmod(1)</em> manpage. The
+owner and group values must also be numeric.</p><p>
+
+
+The ISC recommends, and we agree, that you restrict access to the
+Unix domain socket to administrative personnel authorized to control
+the name server.</p><p>
+
+
+You can also use <em class="filename">ndc</em> to send messages across a
+<a name="INDEX-945" /></a>TCP socket to a name server, possibly remote
+from the host that you're running <em class="filename">ndc</em> on.
+To use this mode of operating, run <em class="filename">ndc</em> with the
+-<em class="filename">c</em> command-line option, specifying the name or
+address of the name server, a slash, and the port on which it's
+listening for control messages. For example:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc -c 127.0.0.1/953</b></tt></pre></blockquote>
+
+
+<a name="INDEX-946" /></a> <a name="INDEX-947" /></a>To configure your name server to listen on
+a particular TCP port for control messages, use the
+<em class="emphasis">controls</em> statement:</p><p>
+
+
+<blockquote><pre class="code">controls {
+	inet 127.0.0.1 port 953 allow { localhost; };
+};</pre></blockquote>
+
+
+By default, BIND 8 name servers don't listen on any TCP ports.
+BIND 9 name servers listen on port 953 by default, so we're
+using that port here. We're configuring the name server to
+listen only on the local loopback address for messages, and to allow
+only messages from the local host. Even this isn't especially
+prudent, since anyone with a login on the local host will be able to
+control the name server. If we felt even more imprudent (and we
+don't advise this), we could widen the allow access list and
+let the name server listen on all local network interfaces by
+specifying:</p><p>
+
+
+<blockquote><pre class="code">controls {
+	inet * port 953 allow { localnets; };
+};</pre></blockquote>
+
+
+<em class="filename">ndc </em>supports two modes of operation, interactive
+and noninteractive. In noninteractive mode, you specify the command
+to the name server on the command line, for example:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc reload</b></tt></pre></blockquote>
+
+
+If you don't specify a command on the command line, you enter
+interactive mode:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc</b></tt>
+Type   help  -or-   /h   if you need help.
+ndc&gt;</pre></blockquote>
+
+
+<em class="emphasis">/h</em> gives you a list of commands that
+<em class="filename">ndc</em> (not the name server) understands. These
+apply to <em class="filename">ndc </em>'s operation, not the name
+server's:</p><p>
+
+
+<blockquote><pre class="code">ndc&gt;<tt class="userinput"><b> /h</b></tt>
+        /h(elp)                 this text
+        /e(xit)                 leave this program
+        /t(race)                toggle tracing (protocol and system events)
+        /d(ebug)                toggle debugging (internal program events)
+        /q(uiet)                toggle quietude (prompts and results)
+        /s(ilent)               toggle silence (suppresses nonfatal errors)
+ndc&gt;</pre></blockquote>
+
+
+For example, the <em class="emphasis">/d</em> command induces
+<em class="emphasis">ndc</em> to produce debugging output (e.g., what
+it's sending to the name server and what it's getting in
+response). It has no effect on the name server's debugging
+level. For that, see the <tt class="command">debug</tt> command, described
+later.</p><p>
+
+
+Note that <em class="emphasis">/e,</em> not <em class="emphasis">/x or /q,
+</em>exits<em class="filename">ndc</em><em class="emphasis">.
+</em>That's a little counterintuitive.</p><p>
+
+
+<em class="emphasis">help</em><a name="INDEX-948" /></a> tells you the commands at your
+disposal. These control the name server:</p><p>
+
+
+<blockquote><pre class="code">ndc&gt;<tt class="userinput"><b> help</b></tt>
+getpid
+status
+stop
+exec
+reload [zone] ...
+reconfig [-noexpired] (just sees new/gone zones)
+dumpdb
+stats
+trace [level]
+notrace
+querylog
+qrylog
+help
+quit
+ndc&gt;</pre></blockquote>
+
+
+There are two commands that aren't listed here, though you can
+still use them: <tt class="command">start</tt> and
+<tt class="command">restart</tt>. They're not listed because
+<em class="filename">ndc</em> is telling you what commands the name
+server -- as opposed to
+<em class="filename">ndc</em> -- understands. The name server
+can't perform a <tt class="command">start</tt> command, since to do
+so it would need to be running (and if it's running, it
+doesn't need to be started). It can't perform a
+<tt class="command">restart</tt> command, either, because if it exited, it
+would have no way to start a new instance of itself (it
+wouldn't be around to do it). None of this prevents
+<em class="filename">ndc</em> from doing a <tt class="command">start</tt> or
+<tt class="command">restart</tt>, though.</p><p>
+
+
+Here's what those commands do:</p><p>
+
+
+<dl>
+<dt><a name="INDEX-949" /></a><a name="INDEX-950" /></a>
+<i>getpid</i></dt>
+<dd>Prints the name server's current process ID.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-951" /></a><a name="INDEX-952" /></a>
+<i>status</i></dt>
+<dd>Prints lots of useful status information about the name server,
+including its version, its debug level, the number of zone transfers
+running, and whether query logging is on.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-953" /></a><a name="INDEX-954" /></a>
+<i>start</i></dt>
+<dd>Starts the name server. If you need to start
+<em class="filename">named</em> with any command-line arguments, you can
+specify these after <em class="emphasis">start</em>. For example,
+<em class="emphasis">start -c /usr/local/etc/named.conf</em>.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-955" /></a><a name="INDEX-956" /></a>
+<i>stop</i></dt>
+<dd>Causes the name server to exit, writing dynamic zones to their zone
+data files.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-957" /></a><a name="INDEX-958" /></a>
+<i>restart</i></dt>
+<dd>Stops and then starts the name server. As with
+<em class="emphasis">start</em>, you can specify command-line arguments
+for <em class="filename">named </em>after the command.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-959" /></a><a name="INDEX-960" /></a>
+<i>exec</i></dt>
+<dd>Stops and then starts the name server. Unlike
+<em class="emphasis">restart</em>, however, you can't specify
+command-line options for <em class="filename">named</em>; the name server
+just starts a new copy of itself with the same command-line
+arguments.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-961" /></a><a name="INDEX-962" /></a>
+<i>reload</i></dt>
+<dd>Reloads the name server. Send this command to a
+<a name="INDEX-963" /></a>primary master name server after modifying
+its configuration file or one or more of its zone data files. Send
+this command to a 4.9 or later <a name="INDEX-964" /></a>slave name server to have it update its
+slave zones if they are not current. You can also specify one or more
+domain names of zones as arguments to <em class="emphasis">reload</em>; if
+you do, the name server will reload only these zones.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-965" /></a><a name="INDEX-966" /></a>
+<i>reconfig [-noexpired]</i></dt>
+<dd>Tells the name server to check its configuration file for new or
+deleted zones. Send this command to a name server if you've
+added or deleted zones but haven't changed any existing
+zones' data. Specifying the <a name="INDEX-967" /></a>-<em class="emphasis">noexpired</em> flag tells
+the name server not to bother you with error messages about zones
+that have expired. This can come in handy if your name server is
+authoritative for thousands of zones and you want to avoid seeing a
+flurry of expiration messages you already know about.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-968" /></a><a name="INDEX-969" /></a>
+<i>dumpdb</i></dt>
+<dd>Dumps a copy of the name server's internal database to
+<em class="filename">named_dump.db</em> in <em class="filename">/usr/tmp</em>
+(Version 4) or in the name server's current directory (Version
+8).<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-970" /></a><a name="INDEX-971" /></a>
+<i>stats</i></dt>
+<dd>Appends the name server's statistics to
+<em class="filename">named.stats</em><a name="INDEX-972" /></a> in <em class="filename">/usr/tmp</em> (Version
+4) or in the name server's current directory (Version 8).<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-973" /></a><a name="INDEX-974" /></a>
+<i>trace [level]</i></dt>
+<dd>Appends debugging information to <em class="filename">named.run</em> in
+<em class="filename">/usr/tmp</em> (Version 4) or in the name
+server's current directory (Version 8). Specifying higher debug
+levels increases the amount of detail in the debugging information.
+For information on what is logged at each level, see <a href="ch13_01.html">Chapter 13, "Reading BIND Debugging Output"</a>.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-975" /></a><a name="INDEX-976" /></a>
+<i>notrace</i></dt>
+<dd>Turns off debugging.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-977" /></a><a name="INDEX-978" /></a>
+<a name="INDEX-979" /></a>
+<i>querylog (or qrylog )</i></dt>
+<dd>Toggle logging all queries with <em class="emphasis">syslog</em>. Logging
+takes place at priority LOG_INFO. <em class="filename">named</em> must be
+compiled with QRYLOG defined (it is defined by default). This feature
+was added in Version 4.9.<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-980" /></a><a name="INDEX-981" /></a>
+<i>quit</i></dt>
+<dd>Ends the control<a name="INDEX-982" /></a> session.<a name="INDEX-983" /></a><p></p></dd>
+
+</dl>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">7.1.2. rndc and controls (BIND 9)</h3>
+
+
+<a name="INDEX-984" /></a>
+<a name="INDEX-985" /></a>BIND 9, like BIND 8, uses the
+<em class="emphasis">controls</em><a name="INDEX-986" /></a>
+statement to determine how the name server listens for control
+messages. The syntax is the same, except that only the
+<em class="emphasis">inet</em><a name="INDEX-987" /></a> substatement is allowed. (BIND
+9.1.0 doesn't support Unix domain sockets for the control
+channel, and the ISC suggests BIND 9 probably never will.)</p><p>
+
+
+With BIND 9, you can leave out the port specification and the name
+server will default to listening on port 953. You must also add a
+<em class="emphasis">keys</em><a name="INDEX-988" /></a> specification:</p><p>
+
+
+<blockquote><pre class="code">controls {
+       inet * allow { any; } keys { "rndc-key"; };
+};</pre></blockquote>
+
+
+This determines which cryptographic key <em class="filename">rndc</em>
+users must authenticate themselves with to send control messages to
+the name server. If you leave the <em class="emphasis">keys</em>
+specification out, you'll see this message after the name
+server starts:</p><p>
+
+
+<blockquote><pre class="code">Jan 13 18:22:03 terminator named[13964]: type 'inet' control channel 
+has no 'keys' clause; control channel will be disabled</pre></blockquote>
+
+
+The key or keys specified in the <em class="emphasis">keys</em>
+substatement must be defined in a
+<em class="emphasis">key</em><a name="INDEX-989" /></a> statement:</p><p>
+
+
+<blockquote><pre class="code">key "rndc-key" {
+        algorithm hmac-md5;
+        secret "Zm9vCg==";
+};</pre></blockquote>
+
+
+The <em class="emphasis">key</em> statement can go directly in
+<em class="filename">named.conf</em><a name="INDEX-990" /></a>, but if your <em class="filename">named.conf
+</em>file is world-readable, it's safer to put it in a
+different file that's not world-readable and include that file
+in <em class="filename">named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">include "/etc/rndc.key";</pre></blockquote>
+
+
+The only algorithm currently supported is
+<a name="INDEX-991" /></a>HMAC-MD5,
+a technique for using the fast MD5 secure hash algorithm to do
+authentication.<a href="#FOOTNOTE-50">[50]</a> The secret is simply the
+base 64 encoding of a password that <em class="filename">named </em>and
+authorized <em class="filename">rndc</em> users will share. You can
+generate the secret using programs like <em class="filename">mmencode</em>
+or <em class="filename">dnssec-keygen</em> from the BIND distribution, as
+described in <a href="ch11_01.html">Chapter 11, "Security"</a>.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-50" /></a>[50]See RFCs 2085 and 2104 for more
+information on HMAC-MD5.</p><p>
+
+</blockquote>
+
+
+For example, you can use <em class="emphasis">mmencode</em> to generate
+the base 64 encoding of <em class="emphasis">foobarbaz</em>:</p><p>
+
+
+<blockquote><pre class="code"><tt class="userinput"><b>% mmencode</b></tt>
+<tt class="userinput"><b>foobarbaz</b></tt>
+CmZvb2JhcmJh</pre></blockquote>
+
+
+To use <em class="filename">rndc</em>, you need to create an
+<em class="filename">rndc.conf </em>file to tell <em class="filename">rndc
+</em>which authentication keys to use and which name servers to
+use them with. <em class="filename">rndc.conf </em>usually lives in
+<em class="filename">/etc</em>. Here's a simple <em class="filename">rndc.conf
+</em>file:</p><p>
+
+
+<blockquote><pre class="code">options {
+        default-server localhost;
+        default-key "rndc-key";
+};
+
+key "rndc-key" {
+        algorithm hmac-md5;
+        secret "Zm9vCg==";
+};</pre></blockquote>
+
+
+The syntax of the file is very similar to the syntax of
+<em class="filename">named.conf</em>. In the <em class="emphasis">options</em>
+statement, you define the default name server to send control
+messages to (which you can override on the command line) and the name
+of the default key to present to remote name servers (which you can
+also override on the command line).</p><p>
+
+
+The syntax of the <em class="emphasis">key</em> statement is the same as
+that used in <em class="filename">named.conf</em>, described earlier. The
+name of the key in <em class="filename">rndc.conf</em>, as well as the
+secret, must match the key definition in
+<em class="filename">named.conf</em>.</p><p>
+
+
+
+<a name="ch07-6-fm2xml" /></a><blockquote><b>TIP: </b>
+Remember that since you're storing keys (which are essentially
+passwords) in <em class="filename">rndc.conf</em> and
+<em class="filename">named.conf</em>, you should make sure that neither
+file is readable by users who aren't authorized to control the
+name server.</p><p>
+
+</blockquote>
+
+If you're using <em class="filename">rndc</em> to control only a
+single name server, its configuration is straightforward. You define
+an authentication key using identical <em class="emphasis">key
+</em>statements in <em class="filename">named.conf</em> and
+<em class="filename">rndc.conf</em>. Then you define your name server as
+the default server to control with the <em class="emphasis">default-server
+</em>substatement in the <em class="filename">rndc.conf
+</em><em class="emphasis">options</em> statement, and define the key
+as the default key using the <em class="emphasis">default-key
+</em>substatement. Then run <em class="filename">rndc</em> as:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rndc reload</b></tt></pre></blockquote>
+
+
+If you have multiple name servers to control, you can associate each
+with a different key. Define the keys in separate
+<em class="emphasis">key</em> statements, and then associate each key with
+a different server in a <em class="emphasis">server</em> statement:</p><p>
+
+
+<blockquote><pre class="code">server localhost { 
+	key "rndc-key";
+};
+
+server wormhole.movie.edu {
+	key "wormhole-key";
+};</pre></blockquote>
+
+
+Then run <em class="filename">rndc</em> with the -<span class="option">s</span>
+option to specify the server to control:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rndc -s wormhole.movie.edu reload</b></tt></pre></blockquote>
+
+
+If you haven't associated a key with a particular name server,
+you can still specify which key to use on the command line with the
+-<span class="option">y</span> option:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rndc -s wormhole.movie.edu -y rndc-wormhole reload</b></tt></pre></blockquote>
+
+
+Finally, if your name server is listening on a nonstandard port for
+control messages (i.e., a port other than 953), you must use
+the<em class="filename"> </em> -<span class="option">p</span> option to tell
+<em class="filename">rndc</em> which port to connect to:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rndc -s terminator.movie.edu -p 54 reload</b></tt></pre></blockquote>
+
+
+Now the bad news: in BIND 9.0.0, <em class="filename">rndc</em> supports
+only the <em class="emphasis">reload</em> command -- and not
+single-zone reloads, which aren't supported until 9.1.0. Though
+BIND 9.1.0 doesn't support all the commands that BIND 8 does,
+it does support the <em class="emphasis">reload</em>,
+<em class="emphasis">stop</em>, <em class="emphasis">stats</em>,
+<em class="emphasis">querylog</em>,and
+<em class="emphasis">dumpdb</em> commands, as well as the new
+<em class="emphasis">refresh</em> and <em class="emphasis">halt</em> commands:</p><p>
+
+
+<dl>
+<dt><a name="INDEX-992" /></a><a name="INDEX-993" /></a>
+<i>refresh</i></dt>
+<dd>Schedules immediate maintenance for a slave zone<p></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><a name="INDEX-994" /></a><a name="INDEX-995" /></a>
+<i>halt</i></dt>
+<dd>Stops the name server without saving pending updates to
+journa<a name="INDEX-996" /></a> <a name="INDEX-997" /></a>l files<a name="INDEX-998" /></a> <a name="INDEX-999" /></a><p></p></dd>
+
+</dl>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">7.1.3. Using Signals</h3>
+
+
+<a name="INDEX-1000" /></a>Now,
+back in the old days, all we had to control the name server with were
+signals. If you're stuck in the past (with a version of BIND
+older than 8.2), you'll need to use signals to manage your name
+server. We'll give you a list of the signals you can send to a
+name server and tell you which modern <em class="filename">ndc
+</em><a name="INDEX-1001" /></a>command each is equivalent to. If you
+have the shell script version of <em class="filename">ndc</em> (from BIND
+4.9 to 8.1.2), you don't have to pay attention to the signal
+names because <em class="filename">ndc</em> will translate the commands
+into the appropriate signals. Be careful not to use a BIND 4 version
+of <em class="filename">ndc</em> with a BIND 8 name server, since the
+signal to send for statistics has changed.</p><p>
+
+
+<a name="ch07-8-fm2xml" /></a><table border="1">
+
+
+
+<tr>
+<th>
+<b class="emphasis-bold">Command</b><p></p></th>
+<th>
+Signal<p></p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+<em class="emphasis">reload</em><p></p></td>
+<td>
+<a name="INDEX-1002" /></a>HUP<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">dumpdb</em><p></p></td>
+<td>
+<a name="INDEX-1003" /></a>INT<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">stats</em><p></p></td>
+<td>
+<a name="INDEX-1004" /></a>ABRT (BIND 4) or
+<a name="INDEX-1005" /></a>ILL (BIND 8)<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">trace</em><p></p></td>
+<td>
+<a name="INDEX-1006" /></a>USR1<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">notrace</em><p></p></td>
+<td>
+USR2<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">querylog</em><p></p></td>
+<td>
+<a name="INDEX-1007" /></a>WINCH<p></p></td>
+</tr>
+
+<tr>
+<td>
+<em class="emphasis">stop</em> (BIND 8)<p></p></td>
+<td>
+<a name="INDEX-1008" /></a>TERM<p></p></td>
+</tr>
+
+
+</table><p>
+
+So to toggle query logging with an older version of
+<em class="filename">ndc</em>, you could use:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc querylog</b></tt></pre></blockquote>
+
+
+just as you would with the newer version of <em class="filename">ndc</em>.
+Under the hood, though, this <em class="filename">ndc</em> is tracking
+down <em class="filename">named </em>'s PID and sending it the WINCH
+signal.</p><p>
+
+
+If you don't have <em class="filename">ndc</em>, you'll have
+to do what <em class="filename">ndc</em> does by hand: find
+<em class="filename">named </em>'s <a name="INDEX-1009" /></a>process ID and send it the appropriate
+signal. The BIND name server leaves its process ID in a disk file
+called the <em class="firstterm">pid file</em>, making it easier to chase
+the critter down -- you don't have to use
+<em class="filename">ps</em>. The most common path for the <em class="emphasis">pid
+</em>fileis
+<em class="filename">/var/run/named.pid</em>. On some systems, the
+<em class="emphasis">pid</em> file is <a name="INDEX-1010" /></a> <a name="INDEX-1011" /></a><em class="filename">/etc/named.pid</em>. Check the
+<em class="filename">named</em> manual page to see which directory
+<em class="filename">named.pid</em> is in on your system. Since the name
+server's process ID is the only thing in the
+<em class="emphasis">pid</em> file, sending a HUP signal can be as simple
+as:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>kill -HUP `cat /var/run/named.pid`</b></tt></pre></blockquote>
+
+
+If you can't find the <em class="emphasis">pid</em> file, you can
+always find the process ID with <a name="INDEX-1012" /></a><em class="filename">ps</em>. On a BSD-based
+system, use:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ps -ax | grep named</b></tt></pre></blockquote>
+
+
+On a SYS V-based system, use:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ps -ef | grep named</b></tt></pre></blockquote>
+
+
+However, you may find more than one <em class="filename">named
+</em>process running if you use <em class="filename">ps</em>, since
+BIND name servers spawn children to perform <a name="INDEX-1013" /></a>zone transfers. During a zone transfer,
+the name server pulling the zone data -- the slave -- may start
+a child process, and the name server providing the zone
+data -- its master -- may also start a child process.
+We'll digress a little here and explain why
+<a name="INDEX-1014" /></a>child
+processes are used.</p><p>
+
+
+BIND 4 and BIND 8 slave name servers start a child process to perform
+a zone transfer. This allows the slave name server to keep answering
+queries while the zone data is being transferred from the master
+server to the local disk by the child process. Once the zone is on
+the local disk, the slave name server reads in the new data. Using a
+child process to do the zone transfer fixed a problem with pre-4.8.3
+versions of BIND in which slave name servers wouldn't answer
+queries during a zone transfer. This could be a real nuisance on name
+servers that loaded lots of zones or large zones: they'd go
+silent for long periods of time.</p><p>
+
+
+BIND 9 slave name servers, with their new architecture, don't
+need to spawn a child process to prevent the name server from going
+silent while transferring a zone. A name server can transfer a zone
+while it answers queries.</p><p>
+
+
+Version 8 and 9 master name servers do <em class="emphasis">not</em> spawn
+a child process to provide a zone to a slave name server. Instead,
+the master server transfers the zone at the same time that it answers
+queries. If the master server loads a new copy of the zone from a
+zone data file while a transfer of that zone is in progress, it
+aborts that zone transfer and loads the new zone from the zone data
+file. The slave server will have to attempt the zone transfer again
+after the master has completed loading the new zone.</p><p>
+
+
+A Version 4 master name server starts a child process to provide a
+zone to a slave name server. This creates an additional load on the
+host running the master server, especially if the zones are very
+large or many zone transfers are active at one time.</p><p>
+
+
+If the <em class="filename">ps</em> output shows multiple name servers,
+you should be able to easily tell which name server process is the
+parent and which processes are children. A child name server started
+by a slave server to pull a copy of a zone is called
+<a name="INDEX-1015" /></a>
+<a name="INDEX-1016" /></a><em class="filename">named-xfer</em>
+instead of <em class="filename">named</em>:</p><p>
+
+
+<blockquote><pre class="code">root  548 547  0 22:03:17 ?     0:00 named-xfer -z movie.edu
+      -f /usr/tmp/NsTmp0 -s 0 -P 53 192.249.249.3</pre></blockquote>
+
+
+A child name server started by a master name server changes its
+command-line options to indicate which slave server it is providing
+the zone to:</p><p>
+
+
+<blockquote><pre class="code">root 1137 1122 6 22:03:18 ?     0:00 /etc/named -zone XFR
+     to [192.249.249.1]</pre></blockquote>
+
+
+You may encounter a version of <em class="filename">named </em>that
+doesn't change its command line, but you can still figure out
+the relationship between multiple <em class="filename">named</em>
+processes by examining their process IDs and parent process IDs. All
+the child processes will have the parent name server's process
+ID as their parent process ID. This may seem like stating the
+obvious, but you should only send signals to the
+<em class="emphasis">parent</em> name server process. The child processes
+go away after the zone transfers<a name="INDEX-1017" /></a> complete.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.4. Vendor -Specific Options</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.2. Updating Zone Data Files</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:22 GMT -->
+</html>

@@ -1,0 +1,469 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_16.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>IPv6 Forward and Reverse Mapping (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_15.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.16. IPv6 Forward and Reverse Mapping</h2>
+
+
+<a name="INDEX-1775" />
+<a name="INDEX-1776" />
+<a name="INDEX-1777" />Clearly, <a name="INDEX-1778" /> <a name="INDEX-1779" />the existing A
+record won't accommodate IPv6's 128-bit addresses; BIND
+expects an A record's record-specific data to be a 32-bit
+address in dotted-octet format.</p><p>
+
+
+The IETF came up with a simple solution to this problem, described in
+<a name="INDEX-1780" />RFC 1886. A new
+address record, <a name="INDEX-1781" />AAAA, is used to store a 128-bit IPv6
+address, and there's a new IPv6 reverse-mapping domain,
+<em class="emphasis">ip6.int</em>. This solution was straightforward
+enough to implement in BIND 4.9. Unfortunately, not everyone liked
+the simple solution, so they came up with a much more complicated
+one. This solution, which we'll describe shortly, involves the
+new A6 and DNAME records and required a complete overhaul of the BIND
+name server to implement.</p><p>
+
+
+Use of the old AAAA record and <em class="emphasis">ip6.int</em> is now
+deprecated, but there's enough IPv6 software out there still
+using it -- and not the new stuff -- that it's important
+to understand both methods.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-16.1" /><div class="sect2">
+<h3 class="sect2">10.16.1. AAAA and ip6.int</h3>
+
+
+Now the simple way to handle this, described in RFC 1886, is with an
+address record that's four times as long as an A record.
+That's the AAAA (pronounced "<a name="INDEX-1782" />quad A")
+record. The AAAA record takes as its record-specific data the textual
+format of an IPv6 record as described earlier. So for example,
+you'd see AAAA records like this one:</p><p>
+
+
+<blockquote><pre class="code">ipv6-host    IN    AAAA    4321:0:1:2:3:4:567:89ab</pre></blockquote>
+
+
+RFC 1886 also established
+<em class="emphasis">ip6.int</em><a name="INDEX-1783" />
+<a name="INDEX-1784" />,
+a new reverse-mapping name space for IPv6 addresses. Each level of
+subdomain under <em class="emphasis">ip6.int</em> represents four bits of
+the 128-bit address, encoded as a hexadecimal digit just like in the
+record-specific data of the AAAA record. The least significant
+(lowest order) bits appear at the far left of the domain name. Unlike
+the format of addresses in AAAA records, omitting leading zeros is
+not allowed, so there are always 32 hexadecimal digits and 32 levels
+of subdomain below <em class="emphasis">ip6.int</em> in a domain name
+corresponding to a full IPv6 address. The domain name that
+corresponds to the address in the previous example is:</p><p>
+
+
+<blockquote><pre class="code">b.a.9.8.7.6.5.0.4.0.0.0.3.0.0.0.2.0.0.0.1.0.0.0.0.0.0.0.1.2.3.4.ip6.int.</pre></blockquote>
+
+
+These domain names have PTR records attached, just as the domain
+names under <em class="emphasis">in-addr.arpa</em> do:</p><p>
+
+
+<blockquote><pre class="code">b.a.9.8.7.6.5.0.4.0.0.0.3.0.0.0.2.0.0.0.1.0.0.0.0.0.0.0.1.2.3.4.ip6.int.  IN  PTR  mash.ip6.movie.edu.</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-16.2" /><div class="sect2">
+<h3 class="sect2">10.16.2. A6, DNAMEs, Bitstring Labels, and ip6.arpa</h3>
+
+
+That's the easy way. The more difficult -- and now
+official -- way of handling IPv6 forward and reverse mapping uses
+two new record types, <a name="INDEX-1785" />A6 and <a name="INDEX-1786" />DNAME records. A6 and DNAME records are
+described in RFCs 2874 and 2672, respectively. Version 9.0.0 is the
+first version of BIND to support these records.</p><p>
+
+
+The main reason the AAAA record and the <em class="emphasis">ip6.int</em>
+reverse-mapping scheme were replaced was because they made network
+renumbering difficult. For example, if an organization were to change
+Next-Level Aggregators, it would have to change all the AAAA records
+in its zone data files since 24 of the bits of an IPv6 address are an
+identifier for the NLA.<a href="#FOOTNOTE-80">[80]</a> Or imagine an NLA changing TLAs: this would
+wreak havoc with its customers' zone data.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-80" />[80]And, of course, the new NLA
+might use a different TLA, which would mean 16 more bits to change .
+. .</p><p>
+
+</blockquote>
+
+
+<a name="dns4-CHP-10-SECT-16.2.1" /><div class="sect3">
+<h3 class="sect3">10.16.2.1. A6 records and forward mapping</h3>
+
+
+<a name="INDEX-1787" /> <a name="INDEX-1788" />
+<a name="INDEX-1789" />To
+make renumbering easier, A6 records can specify only a part of an
+IPv6 address, such as the last 64 bits (the interface ID) assigned to
+a host's network interface, and then refer to the remainder of
+the address by a symbolic domain name. This allows zone
+administrators to specify only the part of the address under their
+control. To build an entire address, a resolver or name server must
+follow the chain of A6 records from a host's domain name to the
+TLA ID. And that chain may branch if a site network is connected to
+multiple NLAs or if an NLA is connected to multiple TLAs.</p><p>
+
+
+For example, the A6 record:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN movie.edu.
+drunkenmaster  IN   A6   64  ::0210:4bff:fe10:0d24  subnet1.v6.movie.edu.</pre></blockquote>
+
+
+specifies the final 64 bits of
+<em class="emphasis">drunkenmaster.movie.edu</em>'s IPv6 address (64
+is the number of bits of the prefix <em class="emphasis">not
+</em>specified in this A6 record) and that the remaining 64
+bits can be found by looking up an A6 record at
+<em class="emphasis">subnet1.v6.movie.edu</em>.</p><p>
+
+
+<em class="emphasis">subnet1.v6.movie.edu</em>, in turn, specifies the
+last 16 bits of the 64-bit prefix (the SLA ID) that we didn't
+specify in <em class="emphasis">drunkenmaster.movie.edu</em>'s A6
+address as well as the domain name of the next A6 record to look up:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN v6.movie.edu.
+subnet1  IN  A6  48  0:0:0:1::  movie-u.nla-a.net.
+subnet1  IN  A6  48  0:0:0:1::  movie.nlab.net.</pre></blockquote>
+
+
+The first 48 bits of the prefix in
+<em class="emphasis">subnet1.v6.movie.edu</em>'s record-specific
+data are set to zero, since they're not significant here.</p><p>
+
+
+In fact, these records tell us to look up <em class="emphasis">two</em> A6
+records next, one at <em class="emphasis">movie-u.nla-a.net</em> and one
+at <em class="emphasis">movie.nlab.net</em>. That's because Movie U.
+has connections to two NLAs, NLA A and NLA B. In NLA A's zone,
+we'd find:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN nla-a.net.
+movie-u  IN  A6   40  0:0:21::  nla-a.tla-1.net.</pre></blockquote>
+
+
+indicating the eight-bit <em class="emphasis">Site ID</em> pattern within
+the NLA IDfield set by NLA A for the Movie
+University network. You see, the NLA ID field is hierarchical, too,
+comprising both an identifier for our Next-Level Aggregator assigned
+to it by its TLA, <em class="emphasis">and</em> its identifier for our
+network. Since the NLA assigns our Site ID but has the rest of their
+NLA ID assigned by its TLA, we'd expect to see only our Site ID
+in our NLA's zone data. The remainder of its NLA ID would
+appear in an A6 record in its TLA's zone.</p><p>
+
+
+In NLA B's zone, we'd find the following record showing
+us their Site ID for our network:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN nlab.net.
+movie  IN  A6  40  0:0:42::  nlab.tla-2.net.</pre></blockquote>
+
+
+In the TLAs' zones, we'd find:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN tla-1.net.
+nla-a  IN  A6  16  0:10:2500::  tla-1.top-level-v6.net.</pre></blockquote>
+
+
+and:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN tla-2.net.
+nlab   IN  A6  16  0:19:6600::  tla-2.top-level-v6.net.</pre></blockquote>
+
+
+Finally, in the top-level IPv6 address registry's zone,
+we'd find this record showing us the TLA IDs assigned to TLA 1
+and TLA 2:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN top-level-v6.net.
+tla-1  IN  A6  0  222::
+tla-2  IN  A6  0  242::</pre></blockquote>
+
+
+By following this chain of A6 records, a name server can assemble all
+128 bits of <em class="emphasis">drunkenmaster.movie.edu</em>'s two
+IPv6 addresses. These turn out to be:</p><p>
+
+
+<blockquote><pre class="code">222:10:2521:1:210:4bff:fe10:d24
+242:19:6642:1:210:4bff:fe10:d24</pre></blockquote>
+
+
+The first of these uses a route through TLA 1 and NLA A to the Movie
+U. network, and the second uses a route through TLA 2 and NLA B.
+(We're connected to two NLAs for redundancy.) Note that if TLA
+1 changes its NLA assignment for NLA A, it only needs to change the
+A6 record for <em class="emphasis">nla-a.tla-1.net</em> in its zone data;
+the change "cascades" into all A6 chains that go through
+NLA A. This makes the management of addressing on IPv6 networks very
+convenient, and makes changing NLAs easy, too.</p><p>
+
+<a name="ch10-53-fm2xml" /><blockquote><b>TIP: </b>
+If a name server appears in an NS record and owns one or more A6
+records, those A6 records should specify all 128 bits of the IPv6
+address. This helps avoid deadlock problems, where a resolver or name
+server needs to talk to a remote name server to resolve part of that
+name server's IPv6 address.</p><p>
+
+</blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-16.2.2" /><div class="sect3">
+<h3 class="sect3">10.16.2.2. DNAME records and reverse mapping</h3>
+
+
+<a name="INDEX-1790" /> <a name="INDEX-1791" />
+<a name="INDEX-1792" />Now that you've seen how forward
+mapping works with A6 records, let's look at how reverse
+mapping IPv6 addresses works. As with A6 records, unfortunately, this
+isn't nearly as simple as <em class="emphasis">ip6.int</em>.</p><p>
+
+
+Reverse mapping IPv6 addresses involves DNAME records, described in
+<a name="INDEX-1793" />RFC 2672, and
+bitstring labels, introduced in <a name="INDEX-1794" />RFC 2673. DNAME records are a little like
+wildcard CNAME records. They're used to substitute one suffix
+of a domain name with another. For example, if we had previously used
+the domain name <em class="emphasis">movieu.edu</em> at Movie University
+but had since changed to <em class="emphasis">movie.edu</em>, we could
+have replaced the old <em class="emphasis">movieu.edu</em> zone with this
+one:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@    IN  SOA    terminator.movie.edu.  root.movie.edu. ( 
+	2000102300
+	3h
+	30m
+	30d
+	1h  )
+
+	IN   NS     terminator.movie.edu.
+	IN   NS     wormhole.movie.edu.
+
+	IN   MX     10 postmanrings2x.movie.edu.
+
+	IN   DNAME  movie.edu.</pre></blockquote>
+
+
+The DNAME record in the <em class="emphasis">movieu.edu</em> zone applies
+to any domain name that ends in <em class="emphasis">movieu.edu</em>
+except <em class="emphasis">movieu.edu</em> itself. Unlike the CNAME
+record, the DNAME record can coexist with other record types owned by
+the same domain name as long as they aren't CNAME or other
+DNAME records. The owner of the DNAME record may<em class="emphasis">
+not</em> have any subdomains, though.</p><p>
+
+
+When the <em class="emphasis">movieu.edu</em> name server receives a query
+for any domain name that ends in <em class="emphasis">movieu.edu</em>, say
+<em class="emphasis">cuckoosnest.movieu.edu</em>, the DNAME record tells
+it to "synthesize" an alias from
+<em class="emphasis">cuckoosnest.movieu.edu</em> to
+<em class="emphasis">cuckoosnest.movie.edu</em>, replacing
+<em class="emphasis">movieu.edu</em> with <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">cuckoosnest.movieu.edu.  IN  CNAME  cuckoosnest.movie.edu.</pre></blockquote>
+
+
+It's a little like <em class="emphasis">sed</em> 's
+"s" (substitute) command. The
+<em class="emphasis">movieu.edu</em> name server replies with this CNAME
+record. If it's responding to a newer name server, it also
+sends the DNAME record in the response, and the recipient name server
+can then synthesize its own CNAME records from the cached DNAME.</p><p>
+
+
+<a name="INDEX-1795" /><em class="emphasis">Bitstring labels</em> are
+the other half of the magic involved in IPv6 reverse mapping.
+Bitstring labels are simply a compact way of representing a long
+sequence of binary (i.e., one-bit) labels in a domain name. Say you
+wanted to permit delegation between any two bits of an IP address.
+That might compel you to represent each bit of the address as a label
+in a domain name. But that would require over 128 labels for a domain
+name that represented an IPv6 address! Oy!</p><p>
+
+
+Bitstring labels concatenate the bits in successive labels into a
+shorter hexadecimal, octal, binary or dotted-octet string. The string
+is encapsulated between the tokens "\[" and
+"]" to distinguish it from a traditional label, and
+begins with one letter that determines the base of the string:
+<em class="emphasis">b</em> for binary, <em class="emphasis">o</em> for octal,
+and <em class="emphasis">x</em> for hexadecimal.</p><p>
+
+
+Here are the bitstring labels that correspond to
+<em class="emphasis">drunkenmaster.movie.edu</em>'s two IPv6
+addresses:</p><p>
+
+
+<blockquote><pre class="code">\[x022200102521000102104bfffe100d24]
+\[x024200196642000102104bfffe100d24]</pre></blockquote>
+
+
+Notice that the most significant bit begins the string, as in the
+text representation of an IPv6 address, but in the opposite order of
+the labels in the <em class="emphasis">in-addr.arpa</em> domain. Despite
+this, these two bitstring labels are simply a different encoding of
+traditional domain names that begin:</p><p>
+
+
+<blockquote><pre class="code">0.0.1.0.0.1.0.0.1.0.1.1.0.0.0.0.0.0.0.0.1.0.0.0.0.1.1.1.1.1.1.1...</pre></blockquote>
+
+
+Also note that all 32 hex digits in the address are present -- you
+can't drop leading zeros, because there are no colons to
+separate groups of four digits.</p><p>
+
+
+Bitstring labels can also represent parts of IPv6 addresses, in which
+case you need to specify the number of significant bits in the
+string, separated from the string by a slash. So TLA 1's TLA ID
+is <em class="emphasis">\[x0222/16]</em>.</p><p>
+
+
+Together, DNAMEs and bitstring labels are used to match portions of a
+long domain name that encodes an IPv6 address and to iteratively
+change the domain name looked up to a domain name in a zone under the
+control of the organization that manages the host with that IPv6
+address.</p><p>
+
+
+Imagine we're reverse mapping
+<em class="emphasis">\[x024200196642000102104bfffe100d24].ip6.arpa</em>,
+the domain name that corresponds to
+<em class="emphasis">drunkenmaster.movie.edu</em>'s network
+interface (when reached through TLA 2 and NLA B). The root name
+servers would probably refer our name server to the
+<em class="emphasis">ip6.arpa</em><a name="INDEX-1796" /> name servers, which contain these
+records:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN ip6.arpa.
+\[x0222/16]    IN     DNAME      ip6.tla-1.net.
+\[x0242/16]    IN     DNAME      ip6.tla-2.net.</pre></blockquote>
+
+
+The first of these matches the beginning of the domain name
+we're looking up, so the <em class="emphasis">ip6.arpa</em> name
+servers reply to our name server with an alias that says:</p><p>
+
+
+<blockquote><pre class="code">\[x024200196642000102104bfffe100d24].ip6.arpa.  IN  CNAME  
+\[x00196642000102104bfffe100d24].ip6.tla-2.net.</pre></blockquote>
+
+
+Notice that the first four hex digits (the most significant 16 bits)
+of the address are stripped off, and the end of the target of the
+alias is now <em class="emphasis">ip6.tla-2.net</em>, since we know this
+address belongs to TLA 2. In <em class="emphasis">ip6.tla-2.net</em>, we
+find:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN ip6.tla-2.net.
+\[x00196600/24]   IN   DNAME     ip6.nlab.net.</pre></blockquote>
+
+
+This turns the domain name in our new query:</p><p>
+
+
+<blockquote><pre class="code">\[x00196642000102104bfffe100d24].ip6.tla-2.net</pre></blockquote>
+
+
+into:</p><p>
+
+
+<blockquote><pre class="code">\[x42000102104bfffe100d24].ip6.nlab.net</pre></blockquote>
+
+
+Next, our name server queries the <em class="emphasis">ip6.nlab.net</em>
+name servers for the new domain name. This record in the
+<em class="emphasis">ip6.nlab.net</em> zone:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN ip6.nlab.net.
+\[x0042/8]    IN   DNAME    ip6.movie.edu.</pre></blockquote>
+
+
+turns the domain name we're looking up into:</p><p>
+
+
+<blockquote><pre class="code">\[x000102104bfffe100d24].ip6.movie.edu</pre></blockquote>
+
+
+The <em class="emphasis">ip6.movie.edu</em> zone, finally, contains the
+PTR record that gives us the domain name of the host we're
+after:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN ip6.movie.edu.
+\[x000102104bfffe100d24/80]  IN   PTR   drunkenmaster.ip6.movie.edu.</pre></blockquote>
+
+
+Mercifully, as a zone administrator you'll probably only be
+responsible for maintaining PTR records like the ones in
+<em class="emphasis">ip6.movie.edu</em>. Even if you work for a Top-Level
+or Next-Level Aggregator, creating DNAME records that
+"extract" the appropriate NLA ID or Site ID from your
+customers' addresses isn't too tough. And you gain the
+convenience of using a single zone data file for your reverse-mapping
+information, even though each of your hosts has multiple addresses,
+and of being able to switch NLAs without changing all of<a name="INDEX-1797" /> your
+zone<a name="INDEX-1798" />
+<a name="INDEX-1799" />
+data<a name="INDEX-1800" />
+<a name="INDEX-1801" />
+<a name="INDEX-1802" />
+files.<a name="INDEX-1803" /></p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_15.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.15. Addresses and Ports</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11. Security</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_16.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

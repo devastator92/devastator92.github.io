@@ -1,0 +1,1113 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch03_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:03 GMT -->
+<head><title>Software Testing with ping (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.3. Software Testing with ping</h2>
+
+<a name="INDEX-505" /><a name="INDEX-506" /><a name="INDEX-507" /><a name="INDEX-508" />Thus
+far, I have described ways to examine electrical and mechanical
+problems. The tools described in this section,
+<em class="filename">ping</em> and its variants, focus primarily on the
+software problems and the interaction of software with hardware. When
+these tools successfully communicate with remote systems, you have
+established basic connectivity. Your problem is almost certainly at a
+higher level in your system.
+</p>
+
+With these tools, you begin with the presumption that your hardware
+is working correctly. If the link light is out on the local host,
+these tools will tell you nothing you don't already know. But
+if you simply suspect a hardware problem somewhere on your network,
+these tools may help you locate the problem. Once you know the
+location of the problem, you will use the techniques previously
+described to resolve it. These tools can also provide insight when
+your hardware is marginal or when you have intermittent failures.
+</p>
+
+<a name="nettroubletools-CHP-3-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">3.3.1. ping</h3>
+
+<a name="INDEX-509" />While there
+are several useful programs for analyzing connectivity,
+unquestionably <em class="filename">ping </em>is the most commonly used
+program. As it is required by the IP RFC, it is almost always
+available as part of the networking software supplied with any
+system. In addition, numerous enhanced versions of
+<em class="filename">ping</em> are available at little or no cost. There
+are even web sites that will allow you to run
+<em class="filename">ping</em> from their sites.
+</p>
+
+Moreover, the basic idea has been adapted from IP networks to other
+protocols. For example, Cisco's implementation of
+<em class="filename">ping</em> has an optional keyword to check
+connectivity among routers using AppleTalk, DECnet, or IPX.
+<em class="filename">ping</em> is nearly universal.
+</p>
+
+<em class="filename">ping</em><a name="INDEX-510" /> was written by Mike
+Muuss.<a href="#FOOTNOTE-11">[11]</a> Inspired by echo location, the name comes from sounds
+sonar makes. The name <em class="emphasis">ping</em> is frequently
+described as an acronym for Packet InterNet Groper. But, according to
+Muuss's web page, the acronym was applied to the program after
+the fact by someone else.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-11" />[11]For more on the background of
+<em class="filename">ping</em> as well as a review of the book
+<em class="emphasis">The Story About Ping</em>, an alleged allegory of the
+<em class="filename">ping </em>program, visit Muuss's web page at
+<a href="http://ftp.arl.mil/~mike/ping.html">http://ftp.arl.mil/~mike/ping.html</a>.</p>
+</blockquote>
+
+</div>
+<a name="nettroubletools-CHP-3-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">3.3.2. How ping Works</h3>
+
+<a name="INDEX-511" /><a name="INDEX-512" /><a name="INDEX-513" /><a name="INDEX-514" />It is, in
+essence, a simple program based on a simple idea. (Muuss describes it
+as a 1000-line hack that was completed in about one evening.) One
+network device sends a request for a reply to another device and
+records the time the request was sent. The device receiving the
+request sends a packet back. When the reply is received, the
+round-trip time for packet propagation can be calculated. The receipt
+of a reply indicates a working connection. This elapsed time provides
+an indication of the length of the path. Consistency among repeated
+queries gives an indication of the quality of the connection. Thus,
+<em class="filename">ping</em> answers two basic questions. Do I have a
+connection? How good is that connection? In this chapter, we will
+focus on the first question, returning to the second question in the
+next chapter.
+</p>
+
+<a name="INDEX-515" /><a name="INDEX-516" /><a name="INDEX-517" />Clearly,
+for the program to work, the networking protocol must support this
+query/response mechanism. The <em class="filename">ping</em> program is
+based on Internet Control Message Protocol (ICMP), part of the TCP/IP
+protocol. ICMP was designed to pass information about network
+performance between network devices and exchange error messages. It
+supports a wide variety of message types, including this
+query/response mechanism.
+</p>
+
+The normal operation of <em class="filename">ping</em> relies on two
+specific ICMP messages, ECHO_REQUEST and ECHO_REPLY, but it may
+respond to ICMP messages other than ECHO_REPLY when appropriate. In
+theory, all TCP/IP-based network equipment should respond to an
+ECHO_REQUEST by returning the packet to the source, but this is not
+always the case.
+</p>
+
+<a name="nettroubletools-CHP-3-SECT-3.2.1" /><div class="sect3">
+<h3 class="sect3">3.3.2.1. Simple examples</h3>
+
+<a name="INDEX-518" /><a name="INDEX-519" />The default
+behavior of <em class="filename">ping</em> will vary among
+implementations. Typically, implementations have a wide range of
+command-line options so that the behavior discussed here is generally
+available. For example, implementations may default to sending a
+single packet, a small number of packets, or a continuous stream of
+packets. They may respond with a set of round-trip transmission times
+or with a simple message. The version of <em class="filename">ping</em>
+that comes with the Solaris operating system sends, by default, a
+single ICMP packet. It responds that the destination is alive or that
+no answer was received. In this example, an ECHO_REPLY was received:
+</p>
+
+<blockquote><pre class="code">sol1# ping 205.153.63.30
+205.153.63.30 is alive
+sol1#</pre></blockquote>
+
+In this example, no response was received before the program timed
+out:
+</p>
+
+<blockquote><pre class="code">sol1# ping www.microsoft.com
+no answer from microsoft.com
+sol1#</pre></blockquote>
+
+Note that <em class="filename">ping</em> can be used with an IP number or
+with a hostname, as shown by these examples.
+</p>
+
+<a name="INDEX-520" />Other implementations will, by default,
+repeatedly send ECHO_REQUESTs until interrupted. FreeBSD is an
+example:
+</p>
+
+<blockquote><pre class="code">bsd1# ping www.bay.com
+PING www.bay.com (204.80.244.66): 56 data bytes
+64 bytes from 204.80.244.66: icmp_seq=0 ttl=112 time=180.974 ms
+64 bytes from 204.80.244.66: icmp_seq=1 ttl=112 time=189.810 ms
+64 bytes from 204.80.244.66: icmp_seq=2 ttl=112 time=167.653 ms
+^C
+--- www.bay.com ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 167.653/179.479/189.810/9.107 ms
+bsd1#</pre></blockquote>
+
+The execution of the program was interrupted with a Ctrl-C, at which
+point the summary statistics were printed. Without an interrupt, the
+program will continue indefinitely. With the appropriate command-line
+option, <em class="filename">-s</em>, similar output can be obtained with
+Solaris.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.2.2" /><div class="sect3">
+<h3 class="sect3">3.3.2.2. Interpreting results</h3>
+
+<a name="INDEX-521" /><a name="INDEX-522" /><a name="INDEX-523" /><a name="INDEX-524" />Before I go into the syntax of
+<em class="filename">ping</em> and the ways it might be used, it is worth
+getting a clear understanding of what results might be returned by
+<em class="filename">ping</em>. The simplest results are seen with
+Solaris, a message simply stating, in effect, that the reply packet
+was received or was not received. With FreeBSD, we receive a great
+deal more information. It repeatedly sends packets and reports
+results for each packet, as well as providing a summary of results.
+In particular, for each packet we are given the size and source of
+each packet, an ICMP sequence number, a <em class="emphasis">Time-To-Live</em>
+(TTL) count, and the round-trip times. (The TTL field is
+explained later.) Of these, the sequence number and round-trip times
+are the most revealing when evaluating basic connectivity.
+</p>
+
+<a name="INDEX-525" />When each ECHO_REQUEST packet is sent,
+the time the packet is sent is recorded in the packet. This is copied
+into the corresponding ECHO_REPLY packet by the remote host. When an
+ECHO_REPLY packet is received, the elapsed time is calculated by
+comparing the current time to the time recorded in the packet, i.e.,
+the time the packet was sent. This difference, the elapsed time, is
+reported, along with the sequence number and the TTL, which comes
+from the packet's header. If no ECHO_REPLY packet is received
+that matches a particular sequence number, that packet is presumed
+lost. The size and the variability of elapsed times will depend on
+the number and speed of intermediate links as well as the congestion
+on those links.
+</p>
+
+An obvious question is "What values are reasonable?"
+Typically, this is highly dependent on the networks you cross and the
+amount of activity on those networks. For example, these times are
+taken from a PPP link with a 28.8-Kbps modem:
+</p>
+
+<blockquote><pre class="code">64 bytes from 205.153.60.42: icmp_seq=0 ttl=30 time=225.620 ms
+64 bytes from 205.153.60.42: icmp_seq=1 ttl=30 time=213.652 ms
+64 bytes from 205.153.60.42: icmp_seq=2 ttl=30 time=215.306 ms
+64 bytes from 205.153.60.42: icmp_seq=3 ttl=30 time=194.782 ms
+64 bytes from 205.153.60.42: icmp_seq=4 ttl=30 time=199.562 ms
+...</pre></blockquote>
+
+The following times were for the same link only moments later:</p>
+
+<blockquote><pre class="code">64 bytes from 205.153.60.42: icmp_seq=0 ttl=30 time=1037.367 ms
+64 bytes from 205.153.60.42: icmp_seq=1 ttl=30 time=2119.615 ms
+64 bytes from 205.153.60.42: icmp_seq=2 ttl=30 time=2269.448 ms
+64 bytes from 205.153.60.42: icmp_seq=3 ttl=30 time=2209.715 ms
+64 bytes from 205.153.60.42: icmp_seq=4 ttl=30 time=2493.881 ms
+...</pre></blockquote>
+
+There is nothing wrong here. The difference is that a file download
+was in progress on the link during the second set of measurements.
+</p>
+
+<a name="INDEX-526" /><a name="INDEX-527" /><a name="INDEX-528" />In general, you can
+expect very good times if you are staying on a LAN. Typically, values
+should be well under 100 ms and may be less than 10 ms. Once you move
+onto the Internet, values may increase dramatically. A
+coast-to-coast, round-trip time will take at least 60 ms when
+following a mythical straight-line path with no congestion. For
+remote sites, times of 200 ms may be quite good, and times up to 500
+ms may be acceptable. Much larger times may be a cause for concern.
+Keep in mind these are very rough numbers.
+</p>
+
+<a name="INDEX-529" /><a name="INDEX-530" />You can
+also use <em class="filename">ping</em> to calculate a rough estimate of
+the <em class="filename">throughput</em> of a connection. (Throughput and
+related concepts are discussed in greater detail in <a href="ch04_01.html">Chapter 4, "Path Characteristics"</a>.) Send two packets with different sizes across
+the path of interest. This is done with the <em class="filename">-s</em>
+option, which is described later in this chapter. The difference in
+times will give an idea of how much longer it takes to send the
+additional data in the larger packet. For example, say it takes 30 ms
+to ping with 100 bytes and 60 ms with 1100 bytes. Thus, it takes an
+additional 30 ms round trip or 15 ms in one direction to send the
+additional 1000 bytes or 8000 bits. The throughput is roughly 8000
+bits per 15 ms or 540,000 bps. The difference between two
+measurements is used to eliminate overhead. This is extremely crude.
+It makes no adjustment for other traffic and gives a composite
+picture for all the links on a path. Don't try to make too much
+out of these numbers.
+</p>
+
+<a name="INDEX-531" /><a name="INDEX-532" /><a name="INDEX-533" />It may seem that the TTL field could be
+used to estimate the number of hops on a path. Unfortunately, this is
+problematic. When a packet is sent, the TTL field is initialized and
+is subsequently decremented by each router along the path. If it
+reaches zero, the packet is discarded. This imposes a finite lifetime
+on all packets, ensuring that, in the event of a routing loop, the
+packet won't remain on the network indefinitely. Unfortunately,
+the TTL field may or may not be reset at the remote machine and, if
+reset, there is little consistency in what it is set to. Thus, you
+need to know very system-specific information to use the TTL field to
+estimate the number of hops on a path.
+</p>
+
+<a name="INDEX-534" /><a name="INDEX-535" /><a name="INDEX-536" /><a name="INDEX-537" />A steady
+stream of replies with reasonably consistent times is generally an
+indication of a healthy connection. If packets are being lost or
+discarded, you will see jumps in the sequence numbers, the missing
+numbers corresponding to the lost packets. Occasional packet loss
+probably isn't an indication of any real problem. This is
+particularly true if you are crossing a large number of routers or
+any congested networks. It is particularly common for the first
+packet in a sequence to be lost or have a much higher elapsed time.
+This behavior is a consequence of the need to do ARP resolution at
+each link along the path for the first packet. Since the ARP data is
+cached, subsequent packets do not have this overhead. If, however,
+you see a large portion of the packets being lost, you may have a
+problem somewhere along the path.
+</p>
+
+<a name="INDEX-538" /><a name="INDEX-539" /><a name="INDEX-540" /><a name="INDEX-541" /><a name="INDEX-542" />The
+program will also report duplicate and damaged packets. Damaged
+packets are a cause for real concern. You will need to shift into
+troubleshooting mode to locate the source of the problem. Unless you
+are trying to <em class="filename">ping</em> a broadcast address, you
+should not see duplicate packets. If your computers are configured to
+respond to ECHO_REQUESTs sent to broadcast addresses, you will see
+lots of duplicate packets. With normal use, however, duplicate
+responses could indicate a routing loop. Unfortunately,
+<em class="filename">ping</em> will only alert you to the problem; its
+underlying mechanism cannot explain the cause of such problems.
+</p>
+
+<a name="INDEX-543" />In some cases you may receive other
+ICMP error messages. Typically from routers, these can be very
+informative and helpful. For example, in the following, an attempt is
+made to reach a device on a nonexistent network:
+</p>
+
+<blockquote><pre class="code">bsd1# ping 172.16.4.1
+PING 172.16.4.1 (172.16.4.1): 56 data bytes
+36 bytes from 172.16.2.1: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 5031   0 0000  fe  01 0e49 172.16.2.13  172.16.4.1
+
+36 bytes from 172.16.2.1: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 5034   0 0000  fe  01 0e46 172.16.2.13  172.16.4.1
+
+^C
+--- 172.16.4.1 ping statistics ---
+2 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+<a name="INDEX-544" /><a name="INDEX-545" /><a name="INDEX-546" />Since the router has no path to the
+network, it returns the ICMP DESTINATION_HOST_UNREACHABLE message. In
+general, you will receive a <tt class="literal">Destination</tt>
+<tt class="literal">Host Unreachable</tt> <em class="emphasis">warning</em> or a
+<tt class="literal">Destination Network Unreachable</tt>
+<em class="emphasis">warning</em> if the problem is detected on the machine where
+<em class="filename">ping</em> is being run. If the problem is detected on
+a device trying to forward a packet, you will receive only a
+<tt class="literal">Destination Host Unreachable</tt> warning.
+</p>
+
+In the next example, an attempt is being made to cross a router that
+has been configured to deny traffic from the source:
+</p>
+
+<blockquote><pre class="code">bsd1# ping 172.16.3.10
+PING 172.16.3.10 (172.16.3.10): 56 data bytes
+36 bytes from 172.16.2.1: Communication prohibited by filter
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 5618   0 0000  ff  01 0859 172.16.2.13  172.16.3.10
+
+36 bytes from 172.16.2.1: Communication prohibited by filter
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 561b   0 0000  ff  01 0856 172.16.2.13  172.16.3.10
+
+^C
+--- 172.16.3.10 ping statistics ---
+2 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+<a name="INDEX-547" /><a name="INDEX-548" /><a name="INDEX-549" /><a name="INDEX-550" />The
+warning <tt class="literal">Communication prohibited by filter</tt>
+indicates the packets are being discarded. Be aware that you may be
+blocked by filters without seeing this message. Consider the
+following example:
+</p>
+
+<blockquote><pre class="code">bsd1# ping 172.16.3.10
+PING 172.16.3.10 (172.16.3.10): 56 data bytes
+^C
+--- 172.16.3.10 ping statistics ---
+6 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+The same filter was used on the router, but it was applied to traffic
+leaving the network rather than inbound traffic. Hence, no messages
+were sent. Unfortunately, <em class="filename">ping</em> will often be
+unable to tell you why a packet is unanswered.
+</p>
+
+While these are the most common ICMP messages you will see,
+<em class="filename">ping</em> may display a wide variety of messages. A
+listing of ICMP messages can be found in RFC 792. A good discussion
+of the more common messages can be found in Eric A. Hall's
+<em class="emphasis">Internet Core Protocols: The Definitive Guide</em>.
+Most ICMP messages are fairly self-explanatory if you are familiar
+with TCP/IP.<a name="INDEX-551" /> 
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.2.3" /><div class="sect3">
+<h3 class="sect3">3.3.2.3. Options</h3>
+
+<a name="INDEX-552" />A number of
+options are generally available with <em class="filename">ping</em>. These
+vary considerably from implementation to implementation. Some of the
+more germane options are described here.
+</p>
+
+<a name="INDEX-553" /><a name="INDEX-554" />Several options control the number
+of or the rate at which packets are sent. The <em class="filename">-c</em>
+option will allow you to specify the number of packets you want to
+send. For example, <em class="filename">ping -c10</em> would send 10
+packets and stop. This can be very useful if you are running
+<em class="filename">ping</em> from a script.
+</p>
+
+<a name="INDEX-555" /><a name="INDEX-556" /><a name="INDEX-557" /><a name="INDEX-558" />The commands
+<em class="filename">-f</em> and <em class="filename">-l</em> are used to flood
+packets onto a network. The <em class="filename">-f</em> option says that
+packets should be sent as fast as the receiving host can handle them.
+This can be used to stress-test a link or to get some indication of
+the comparative performance of interfaces. In this example, the
+program is run for about 10 seconds on each of two different
+destinations:
+</p>
+
+<blockquote><pre class="code">bsd1# ping -f 172.16.2.12
+PING 172.16.2.12 (172.16.2.12): 56 data bytes
+..^C
+--- 172.16.2.12 ping statistics ---
+27585 packets transmitted, 27583 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.303/0.310/0.835/0.027 ms
+bsd1# ping -f 172.16.2.20
+PING 172.16.2.20 (172.16.2.20): 56 data bytes
+.^C
+--- 172.16.2.20 ping statistics ---
+5228 packets transmitted, 5227 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 1.535/1.736/6.463/0.363 ms</pre></blockquote>
+
+In the first case, the destination was a 200-MHz Pentium with a PCI
+adapter. In the second, the destination was a 50-MHz 486 with an ISA
+adapter. It is not surprising that the first computer was more than
+five times faster. But remember, it may not be clear whether the
+limiting factor is the source or the receiver unless you do multiple
+tests. Clearly, use of this option could cripple a host.
+Consequently, the option requires root privileges to run and may not
+be included in some implementations.
+</p>
+
+The <em class="filename">-l</em> option takes a count and sends out that
+many packets as fast as possible. It then falls back to normal mode.
+This could be used to see how the router handles a flood of packets.
+Use of this command is also restricted to root.
+</p>
+
+<a name="INDEX-559" /><a name="INDEX-560" />The <em class="filename">-i</em> option
+allows the user to specify the amount of time in seconds to wait
+between sending consecutive packets. This could be a useful way to
+space out packets for extended runs or for use with scripts. In
+general, the effect of an occasional <em class="filename">ping</em> packet
+is negligible when compared to the traffic already on all but the
+slowest of links. Repeated packets or packet flooding can, however,
+add considerably to traffic and congestion. For that reason, you
+should be very circumspect in using any of these options (and perhaps
+<em class="filename">ping</em> in general).
+</p>
+
+<a name="INDEX-561" /><a name="INDEX-562" /><a name="INDEX-563" /><a name="INDEX-564" /><a name="INDEX-565" /><a name="INDEX-566" />The
+amount and form of the data can be controlled to a limited extent.
+The <em class="filename">-n</em> option restricts output to numeric form.
+This is useful if you are having DNS problems. Implementations also
+typically include options for more detailed output, typically
+<em class="filename">-v</em> for verbose output, and for fewer details,
+typically <em class="filename">-q</em> and <em class="filename">-Q</em> for
+quiet output.
+</p>
+
+<a name="INDEX-567" /><a name="INDEX-568" /><a name="INDEX-569" /><a name="INDEX-570" /><a name="INDEX-571" /><a name="INDEX-572" /><a name="INDEX-573" /><a name="INDEX-574" />The
+amount and nature of the data in the frame can be controlled using
+the <em class="filename">-s</em> and <em class="filename">-p</em> options. The
+packet size option, <em class="filename">-s</em>, allows you to specify
+how much data to send. If set too small, less than 8, there
+won't be space in the packet for a timestamp. Setting the
+packet size can help in diagnosing a problem caused by path
+<em class="emphasis">Maximum Transmission Unit</em> (MTU) settings (the
+largest frame size that can be sent on the path) or fragmentation
+problems. (Fragmentation is dividing data among multiple frames when
+a single packet is too large to cross a link. It is handled by the IP
+portion of the protocol stack.) The general approach is to increase
+packet sizes up to the maximum allowed to see if at some point you
+have problems. When this option isn't used,
+<em class="filename">ping</em> defaults to 64 bytes, which may be too
+small a packet to reveal some problems. Also remember that
+<em class="filename">ping</em> does not count the IP or ICMP header in the
+specified length so your packets will be 28 bytes larger than you
+specify.
+</p>
+
+<a name="INDEX-575" /><a name="INDEX-576" />You could conceivably see MTU problems
+with protocols, such as PPP, that use escaped characters as
+well.<a href="#FOOTNOTE-12">[12]</a> With escaped characters, a single character may be
+replaced by two characters. The expansion of escaped characters
+increases the size of the data frame and can cause problems with MTU
+restrictions or fragmentation.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-12" />[12]Generally there are better ways to deal with
+problems with PPP. For more information, see Chapter 15 in
+<em class="emphasis">Using and Managing PPP,</em> by Andrew Sun.</p>
+</blockquote>
+
+<a name="INDEX-577" /><a name="INDEX-578" /><a name="INDEX-579" />The <em class="filename">-p</em> option
+allows you to specify a pattern for the data included within the
+packet after the timestamp. You might use this if you think you have
+data-dependent problems. The FreeBSD manpage for
+<em class="filename">ping</em> notes that this sort of problem might show
+up if you lack sufficient "transitions" in your data,
+i.e., your data is all or almost all ones or all or almost all zeros.
+Some serial links are particularly vulnerable to this sort of
+problem.
+</p>
+
+<a name="INDEX-580" /><a name="INDEX-581" />There
+are a number of other options not discussed here. These provide
+control over what interfaces are used, the use of multicast packets,
+and so forth. The flags presented here are from FreeBSD and are
+fairly standard. Be aware, however, that different implementations
+may use different flags for these options. Be sure to consult your
+documentation if things don't work as expected.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.2.4" /><div class="sect3">
+<h3 class="sect3">3.3.2.4. Using ping</h3>
+
+<a name="INDEX-582" /><a name="INDEX-583" /><a name="INDEX-584" /><a name="INDEX-585" />To isolate
+problems using <em class="filename">ping</em>, you will want to run it
+repeatedly, changing your destination address so that you work your
+way through each intermediate device to your destination. You should
+begin with your <em class="emphasis">loopback</em> interface. Use either
+<tt class="literal">localhost</tt> or <tt class="literal">127.0.0.1</tt>. Next,
+<em class="filename">ping</em> your interface by IP number. (Run
+<em class="filename">ifconfig -a</em> if in doubt.) If either of these
+fails, you know that you have a problem with the host.
+</p>
+
+<a name="INDEX-586" />Next, try a host on a local network that
+you know is operational. Use its IP address rather than its hostname.
+If this fails, there are several possibilities. If other hosts are
+able to communicate on the local network, then you likely have
+problems with your connection to the network. This could be your
+interface, the cable to your machine, or your connection to a hub or
+switch. Of course, you can't rule out configuration errors such
+as media type on the adapter or a bad IP address or mask.
+</p>
+
+<a name="INDEX-587" />Next, try to reach the same host by name
+rather than number. If this fails, you almost certainly have problems
+with name resolution. Even if you have this problem, you can continue
+using <em class="filename">ping</em> to check your network, but you will
+need to use IP addresses.
+</p>
+
+<a name="INDEX-588" />Try reaching the near and far interfaces
+of your router. This will turn up any basic routing problems you may
+have on your host or connectivity problems getting to your router.
+</p>
+
+<a name="INDEX-589" />If all goes well here, you are ready to
+ping remote computers. (You will need to know the IP address of the
+intermediate devices to do this test. If in doubt, read the section
+on <em class="filename">traceroute</em> in the next chapter.) Realize, of
+course, that if you start having failures at this point, the problem
+will likely lie beyond your router. For example, your ICMP
+ECHO_REQUEST packets may reach the remote machine, but it may not
+have a route to your machine to use for the ICMP ECHO_REPLY packets.
+</p>
+
+When faced with failure at this point, your response will depend on
+who is responsible for the machines beyond your router. If this is
+still part of your network, you will want to shift your tests to
+machines on the other side of the router and try to work in both
+directions.
+</p>
+
+If these machines are outside your responsibility or control, you
+will need to enlist the help of the appropriate person. Before you
+contact this person, however, you should collect as much information
+as you can. There are three things you may want to do. First, go back
+to using IP numbers if you have been using names. As said before, if
+things start working, you have a name resolution problem.
+</p>
+
+Second, if you were trying to ping a device several hops beyond your
+router, go back to closer machines and try to zero in on exactly
+where you first encountered the problem.
+</p>
+
+Finally, be sure to probe from more than one machine. While you may
+have a great deal of confidence in your local machine at this point,
+your discussion with the remote administrator may go much more
+smoothly if you can definitely say that you are seeing this problem
+from multiple machines instead of just one. In general, this stepwise
+approach is the usual approach for this type of problem.
+</p>
+
+<a name="INDEX-590" />Sometimes, you may be more interested in
+investigating connectivity over time. For example, you might have a
+connection that seems to come and go. By running
+<em class="filename">ping</em> in the background or from a script, you may
+be able to collect useful information. For example, with some routing
+protocols, updates have a way of becoming synchronized, resulting in
+periodic loading on the network. If you see increased delays, for
+example every 30 seconds, you might be having that sort of problem.
+Or, if you lose packets every time someone uses the elevator, you
+might look at the path your cable takes.
+</p>
+
+If you are looking at performance over a long period of time, you
+will almost certainly want to use the <em class="filename">-i</em> option
+to space out your packets in a more network- friendly manner. This is
+a reasonable approach to take if you are experiencing occasional
+outages and need to document the time and duration of the outages.
+You should also be aware that over extended periods of time, you may
+see changes in the paths the packets follow.
+</p>
+
+</div>
+</div>
+<a name="nettroubletools-CHP-3-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">3.3.3. Problems with ping</h3>
+
+<a name="INDEX-591" />Up to
+this point, I have been describing how <em class="filename">ping</em> is
+normally used. I now describe some of the complications faced when
+using <em class="filename">ping</em>.
+</p>
+
+<a name="INDEX-592" /><a name="INDEX-593" /><a name="INDEX-594" />First,
+the program does not exist in isolation, but depends on the proper
+functioning of other elements of the network. In particular,
+<em class="filename">ping</em> usually depends upon ARP and DNS. As
+previously noted, if you are using a hostname rather than an IP
+address as your destination, the name of the host will have to be
+resolved before <em class="filename">ping</em> can send any packets. You
+can bypass DNS by using IP addresses.
+</p>
+
+<a name="INDEX-595" /><a name="INDEX-596" />It is also necessary to discover the
+host's link-level address for each host along the path to the
+destination. Although this is rarely a problem, should ARP resolution
+fail, then <em class="filename">ping </em>will fail. You could avoid this
+problem, in part, by using static ARP entries to ensure that the ARP
+table is correct. A more common problem is that the time reported by
+<em class="filename">ping</em> for the first packet sent will often be
+distorted since it reflects both transit times and ARP resolution
+times. On some networks, the first packet will often be lost. You can
+avoid this problem by sending more than one packet and ignoring the
+results for the first packet.
+</p>
+
+<a name="INDEX-597" />The correct operation of your network will
+depend on considerations that do not affect
+<em class="filename">ping</em>. In such situations,
+<em class="filename">ping</em> will work correctly, but you will still
+have link problems. For example, if there are problems with the
+configuration of the path MTU, smaller <em class="filename">ping</em>
+packets may zip through the network while larger application packets
+may be blocked. S. Lee Henry described a problem in which she could
+<em class="filename">ping</em> remote systems but could not download web
+pages.<a href="#FOOTNOTE-13">[13]</a> While her particular problem was highly unusual, it does
+point out that a connection can appear to be working, but still have
+problems.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-13" />[13]"Systems Administration: You Can't
+Get There from Here," <em class="emphasis">Server/Workstation
+Expert</em>, May 1999. This article can be found in PDF format
+at <a href="http://sw.expert.com/C4/SE.C4.MAY.99.pdf">http://sw.expert.com/C4/SE.C4.MAY.99.pdf</a>.</p>
+</blockquote>
+
+The opposite can be true as well. Often <em class="filename">ping</em>
+will fail when the connection works for other uses. For various
+reasons, usually related to security, some system administrators may
+block ICMP packets in general or ECHO_REQUEST packets in particular.
+Moreover, this practice seems to be increasing. I've even seen
+a site block <em class="filename">ping</em> traffic at its DNS server.
+</p>
+
+<a name="nettroubletools-CHP-3-SECT-3.3.1" /><div class="sect3">
+<h3 class="sect3">3.3.3.1. Security and ICMP</h3>
+
+<a name="INDEX-598" /><a name="INDEX-599" /><a name="INDEX-600" /><a name="INDEX-601" /><a name="INDEX-602" />Unfortunately, <em class="filename">ping</em>
+in particular, and ICMP packets in general, have been implicated in
+several recent denial-of-service attacks. But while these attacks
+have used <em class="filename">ping</em>, they are not inherently problems
+with <em class="filename">ping</em>. Nonetheless, network administrators
+have responded as though <em class="filename">ping</em> was the problem
+(or at least the easiest way to deal with the problem), and this will
+continue to affect how and even if <em class="filename">ping</em> can be
+used in some contexts.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.3.2" /><div class="sect3">
+<h3 class="sect3">3.3.3.2. Smurf Attacks</h3>
+
+<a name="INDEX-603" /><a name="INDEX-604" /><a name="INDEX-605" />In a <em class="emphasis">Smurf Attack</em>,
+ICMP ECHO_REQUEST packets are sent to the broadcast address of a
+network. Depending on how hosts are configured on the network, some
+may attempt to reply to the ECHO_REQUEST. The resulting flood of
+responses may degrade the performance of the network, particularly at
+the destination host.
+</p>
+
+<a name="INDEX-606" /><a name="INDEX-607" /><a name="INDEX-608" /><a name="INDEX-609" /><a name="INDEX-610" /><a name="INDEX-611" />With this attack, there are
+usually three parties involved -- the attacker who generates the
+original request; an intermediary, sometimes called a reflector or
+multiplier, that delivers the packet onto the network; and the
+victim. The attacker uses a forged source address so that the
+ECHO_REPLY packets are returned, not to the attacker, but to a
+"spoofed" address, i.e., the victim. The intermediary may
+be either a router or a compromised host on the destination network.
+</p>
+
+<a name="INDEX-612" /><a name="INDEX-613" />Because there are many machines
+responding to a single request, little of the attacker's
+bandwidth is used, while much of the victim's bandwidth may be
+used. Attackers have developed tools that allow them to send
+ECHO_REQUESTs to multiple intermediaries at about the same time.
+Thus, the victim will be overwhelmed by ECHO_REPLY packets from
+multiple sources. Notice also that congestion is not limited to just
+the victim but may extend through its ISP all the way back to the
+intermediaries' networks.
+</p>
+
+<a name="INDEX-614" /><a name="INDEX-615" />The result of these attacks is that
+many sites are now blocking ICMP ECHO_REQUEST traffic into their
+network. Some have gone as far as to block all ICMP traffic. While
+understandable, this is not an appropriate response. First, it blocks
+legitimate uses of these packets, such as checking basic
+connectivity. Second, it may not be effective. In the event of a
+compromised host, the ECHO_REQUEST may originate within the network.
+At best, blocking pings is only a temporary solution.
+</p>
+
+A more appropriate response requires taking several steps. First, you
+should configure your routers so they will not forward broadcast
+traffic onto your network from other networks. How you do this will
+depend on the type of router you have, but solutions are available
+from most vendors.
+</p>
+
+<a name="INDEX-616" />Second, you may want to configure
+your hosts so they do not respond to ECHO_REQUESTs sent to broadcast
+addresses. It is easy to get an idea of which hosts on your network
+respond to these broadcasts. First, examine your ARP table, then ping
+your broadcast address, and then look at your ARP table again for new
+entries.<a href="#FOOTNOTE-14">[14]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-14" />[14]At one time, you could test your site by
+going to <a href="http://www.netscan.org/">http://www.netscan.org</a>,
+but this site seems to have disappeared.</p> </blockquote>
+
+<a name="INDEX-617" />Finally, as a good network citizen,
+you should install filters on your access router to prevent packets
+that have a source address not on your network from leaving your
+network. This limits not only Smurf Attacks but also other attacks
+based on spoofed addresses from originating on your network. These
+filters should also be applied to internal routers as well as access
+routers. (This assumes you are providing forwarding for other
+networks!)
+</p>
+
+If you follow these steps, you should not have to disable ICMP
+traffic. For more information on Smurf Attacks, including information
+on making these changes, visit <a href="http://www.cert.org/advisories/CA-1998-01.html">http://www.cert.org/advisories/CA-1998-01.html</a>.
+You might also look at RFC 2827.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.3.3" /><div class="sect3">
+<h3 class="sect3">3.3.3.3. Ping of Death</h3>
+
+<a name="INDEX-618" /><a name="INDEX-619" /><a name="INDEX-620" /><a name="INDEX-621" /><a name="INDEX-622" /><a name="INDEX-623" /><a name="INDEX-624" />The specifications for TCP/IP have a
+maximum packet size of 65536 octets or bytes. Unfortunately, some
+operating systems behave in unpredictable ways if they receive a
+larger packet. Systems may hang, crash, or reboot. With a
+<em class="emphasis">Ping of Death</em> (or <em class="emphasis">Ping o'
+Death</em>) <em class="emphasis">Attack</em>, the packet size option
+for <em class="filename">ping</em> is used to send a slightly oversized
+packet to the victim's computer. For example, on some older
+machines, the command <em class="filename">ping -s 65510 172.16.2.1</em>
+(use <em class="emphasis">-l</em> rather than <em class="emphasis">-s</em> on
+old Windows systems) will send a packet, once headers are added, that
+causes this problem to the host <em class="filename">172.16.2.1</em>.
+(Admittedly, I have some misgivings about giving an explicit command,
+but this has been widely published and some of you may want to test
+your systems.)
+</p>
+
+This is basically an operating system problem. Large packets must be
+fragmented when sent. The destination will put the pieces in a buffer
+until all the pieces have arrived and the packet can be reassembled.
+Some systems simply don't do adequate bounds checking, allowing
+memory to be trashed.
+</p>
+
+Again, this is not really a problem with <em class="filename">ping</em>.
+Any oversized packet, whether it is an ICMP packet, TCP packet, or
+UDP packet, will cause the same problem in susceptible operating
+systems. (Even IPX has been mentioned.) All <em class="filename">ping</em>
+does is supply a trivial way to exploit the problem. The correct way
+to deal with this problem is to apply the appropriate patch to your
+operating system. Blocking ICMP packets at your router will not
+protect you from other oversized packets. Fortunately, most systems
+have corrected this problem, so you are likely to see it only if you
+are running older systems.<a href="#FOOTNOTE-15">[15]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-15" />[15]For more information on
+this attack, see <a href="http://www.cert.org/advisories/CA-1996-26.html">http://www.cert.org/advisories/CA-1996-26.html</a>.</p>
+</blockquote>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.3.4" /><div class="sect3">
+<h3 class="sect3">3.3.3.4. Other problems</h3>
+
+Of course, there may be other perceived problems with
+<em class="filename">ping</em>. Since it can be used to garner information
+about a network, it can be seen as a threat to networks that rely on
+security through obscurity. It may also be seen as generating
+unwanted or unneeded traffic. For these and previously cited reasons,
+ICMP traffic is frequently blocked at routers.
+</p>
+
+<a name="INDEX-625" /><a name="INDEX-626" /><a name="INDEX-627" /><a name="INDEX-628" /><a name="INDEX-629" /><a name="INDEX-630" />Blocking is not the only difficulty
+that routers may create. Routers may assign extremely low priorities
+to ICMP traffic rather than simply block such traffic. This is
+particularly true for routers implementing quality of service
+protocols. The result can be much higher variability in traffic
+patterns. <em class="emphasis">Network Address Translation</em> (NAT) can
+present other difficulties. Cisco's implementation has the
+router responding to ICMP packets for the first address in the
+translation pool regardless of whether it is being used. This might
+not be what you would have expected.
+</p>
+
+In general, blocking ICMP packets, even just ECHO_REQUEST packets, is
+not desirable. You lose a valuable source of information about your
+network and inconvenience users who may have a legitimate need for
+these messages. This is often done as a stopgap measure in the
+absence of a more comprehensive approach to security.
+</p>
+
+<a name="INDEX-631" />Interestingly, even if ICMP packets are
+being blocked, you can still use <em class="filename">ping</em> to see if
+a host on the local subnet is up. Simply clear the ARP table
+(typically <em class="filename">arp -ad</em>), ping the device, and then
+examine the ARP table. If the device has been added to the ARP table,
+it is up and responding.
+</p>
+
+<a name="INDEX-632" />One final note about
+<em class="filename">ping</em>. It should be obvious, but
+<em class="filename">ping</em> checks only connectivity, not the
+functionality of the end device. During some network changes, I once
+used <em class="filename">ping</em> to check to see if a networked printer
+had been reconnected yet. When I was finally able to ping the device,
+I sent a job to the printer. However, my system kept reporting that
+the job hadn't printed. I eventually got up and walked down the
+hall to the printer to see what was wrong. It had been reconnected to
+the network, but someone had left it offline. Be warned, it is very
+easy to read too much into a successful ping.<a name="INDEX-633" />
+</p>
+
+</div>
+</div>
+<a name="nettroubletools-CHP-3-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">3.3.4. Alternatives to ping</h3>
+
+<a name="INDEX-634" />Variants to <em class="filename">ping</em> fall
+into two general categories, those that add to
+<em class="filename">ping</em>'s functionality and those that are
+alternatives to <em class="filename">ping</em>. An example of the first is
+<em class="filename">fping,</em> and an example of the second is
+<em class="filename">echoping</em>.
+</p>
+
+<a name="nettroubletools-CHP-3-SECT-3.4.1" /><div class="sect3">
+<h3 class="sect3">3.3.4.1. fping</h3>
+
+<a name="INDEX-635" /><a name="INDEX-636" />Written by Roland Schemers of
+Stanford University, <em class="filename">fping</em> extends
+<em class="filename">ping</em> to support multiple hosts in parallel.
+Typical output is shown in this example:
+</p>
+
+<blockquote><pre class="code">bsd1# fping 172.16.2.10 172.16.2.11 172.16.2.12 172.16.2.13 172.16.2.14
+172.16.2.13 is alive
+172.16.2.10 is alive
+172.16.2.12 is alive
+172.16.2.14 is unreachable
+172.16.2.11 is unreachable</pre></blockquote>
+
+Notice that five hosts are being probed at the same time and that the
+results are reported in the order replies are received.
+</p>
+
+This works the same way <em class="filename">ping</em> works, through
+sending and receiving ICMP messages. It is primarily designed to be
+used with files. Several command-line options are available,
+including the <em class="filename">-f</em> option for reading a list of
+devices to probe from a file and the <em class="filename">-u</em> option
+used to print only those systems that are unreachable. For example:
+</p>
+
+<blockquote><pre class="code">bsd1# fping -u 172.16.2.10 172.16.2.11 172.16.2.12 172.16.2.13 172.16.2.14
+172.16.2.14
+172.16.2.11</pre></blockquote>
+
+The utility of this form in a script should be self-evident.</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.4.2" /><div class="sect3">
+<h3 class="sect3">3.3.4.2. echoping</h3>
+
+<a name="INDEX-637" />Several tools similar to
+<em class="filename">ping</em> don't use ICMP ECHO_REQUEST and
+ECHO_REPLY packets. These may provide an alternative to
+<em class="filename">ping</em> in some contexts.
+</p>
+
+<a name="INDEX-638" />One such program is
+<em class="filename">echoping</em>. It is very similar to
+<em class="filename">ping</em>. It works by sending packets to one of
+several services that may be offered over TCP and UDP -- ECHO,
+DISCARD, CHARGEN, and HTTP. Particularly useful when ICMP messages
+are being blocked, <em class="filename">echoping</em> may work where
+<em class="filename">ping</em> fails.
+</p>
+
+<a name="INDEX-639" /><a name="INDEX-640" /><a name="INDEX-641" /><a name="INDEX-642" />If none of these services is
+available, <em class="filename">echoping</em> cannot be used.
+Unfortunately, ECHO and CHARGEN have been used in the
+<em class="emphasis">Fraggle</em> denial of service attacks. By sending
+the output from CHARGEN (a character-generation protocol) to ECHO,
+the network can be flooded. Consequently, many operating systems are
+now shipped with these services disabled. Thus, the program may not
+be as useful as <em class="filename">ping</em>. With Unix, these services
+are controlled by <em class="filename">inetd </em>and could be enabled if
+desired and if you have access to the destination machine. But these
+services have limited value, and you are probably better off
+disabling them.
+</p>
+
+In this example, I have previously enabled ECHO<em class="filename">
+</em>on<em class="filename"> lnx1</em>:
+</p>
+
+<blockquote><pre class="code">bsd1# echoping -v lnx1
+
+This is echoping, version 2.2.0.
+
+Trying to connect to internet address 205.153.61.177  to transmit 256 bytes...
+Connected...
+Sent (256 bytes)...
+256 bytes read from server.
+Checked
+Elapsed time: 0.004488 seconds</pre></blockquote>
+
+<a name="INDEX-643" /><a name="INDEX-644" />This
+provides basically the same information as <em class="filename">ping</em>.
+The <em class="filename">-v</em> option simply provides a few more
+details. The program defaults to TCP and ECHO. Command-line options
+allow UDP packet or the other services to be selected.
+</p>
+
+When <em class="filename">ping</em> was first introduced in this chapter,
+we saw that <em class="filename">www.microsoft.com</em> could not be
+reached by <em class="filename">ping</em>. Nor can it be reached using
+<em class="filename">echoping</em> in its default mode. But, as a web
+server, port 80 should be available. This is in fact the case:
+</p>
+
+<blockquote><pre class="code">bsd1# echoping -v -h /ms.htm www.microsoft.com:80
+
+This is echoping, version 2.2.0.
+
+Trying to connect to internet address 207.46.130.14 (port 80) to transmit 100 bytes...
+Connected...
+Sent (100 bytes)...
+2830 bytes read from server.
+Elapsed time: 0.269319 seconds</pre></blockquote>
+
+Clearly, Microsoft is blocking ICMP packets. In this example, we
+could just as easily have turned to our web browser. Sometimes,
+however, this is not the case.
+</p>
+
+An obvious question is "Why would you need such a tool?"
+If you have been denied access to a network, should you be using such
+probes? On the other hand, if you are responsible for the security of
+a network, you may want to test your configuration. What can users
+outside your network discover about your network? If this is the
+case, you'll need these tools to test your network.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.4.3" /><div class="sect3">
+<h3 class="sect3">3.3.4.3. arping</h3>
+
+<a name="INDEX-645" /><a name="INDEX-646" />Another interesting and useful variant of
+<em class="filename">ping</em> is <em class="filename">arping</em>.
+<em class="filename">arping</em> uses ARP requests and replies instead of
+ICMP packets. Here is an example:
+</p>
+
+<blockquote><pre class="code">bsd2# arping -v -c3 00:10:7b:66:f7:62
+This box:   Interface: ep0  IP: 172.16.2.236   MAC address: 00:60:97:06:22:22
+ARPING 00:10:7b:66:f7:62
+60 bytes from 172.16.2.1 (00:10:7b:66:f7:62): icmp_seq=0
+60 bytes from 172.16.2.1 (00:10:7b:66:f7:62): icmp_seq=1
+60 bytes from 172.16.2.1 (00:10:7b:66:f7:62): icmp_seq=2
+
+--- 00:10:7b:66:f7:62 statistics ---
+3 packets transmitted, 3 packets received,   0% unanswered
+2 packets transmitted, 2 packets received,   0% unanswered</pre></blockquote>
+
+<a name="INDEX-647" /><a name="INDEX-648" /><a name="INDEX-649" /><a name="INDEX-650" />In
+this case, I've used the MAC address, but the IP address could
+also be used. The <em class="filename">-v</em> option is for verbose,
+while <em class="filename">-c3</em> limits the run to three probes.
+Verbose doesn't really add a lot to the default output, just
+the first line identifying the source. If you just want the packets
+sent, you can use the <em class="filename">-q,</em> or quiet, option.
+</p>
+
+<a name="INDEX-651" />This
+tool has several uses. First, it is a way to find which IP addresses
+are being used. It can also be used to work backward, i.e., to
+discover IP addresses given MAC addresses. For example, if you have
+captured non-IP traffic (e.g., IPX, etc.) and you want to know the IP
+address for the traffic's source, you can use
+<em class="filename">arping</em> with the MAC address. If you just want to
+check connectivity, <em class="filename">arping</em> is also a useful
+tool. Since ARP packets won't be blocked, this should work even
+when ICMP packets are blocked. You could also use this tool to probe
+for ARP entries in a router. Of course, due to the nature of ARP,
+there is not a lot that this tool can tell you about devices not on
+the local network.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-3-SECT-3.4.4" /><div class="sect3">
+<h3 class="sect3">3.3.4.4. Other programs</h3>
+
+There are other programs that can be used to check connectivity. Two
+are described later in this book. <em class="filename">nmap</em> is
+described in <a href="ch06_01.html">Chapter 6, "Device Discovery and Mapping"</a>, and
+<em class="filename">hping</em> is described in <a href="ch09_01.html">Chapter 9, "Testing Connectivity Protocols"</a>. Both are versatile tools that can be used for
+many purposes.
+</p>
+
+A number of <em class="filename">ping</em> variants and extended versions
+of <em class="filename">ping</em> are also available, both freely and
+commercially. Some extend <em class="filename">ping</em>'s
+functionality to the point that the original functionality seems
+little more than an afterthought. Although only a few examples are
+described here, don't be fooled into believing that these are
+all there are. A casual web search should turn up many, many more.
+</p>
+
+Finally, don't forget the obvious. If you are interested in
+checking only basic connectivity, you can always try programs like
+<em class="filename">telnet</em> or your web browser. While this is
+generally not a recommended approach, each problem is different, and
+you should use whatever works. (For a discussion of the problems with
+this approach, see <a href="ch03_03.html#nettroubletools-CHP-3-SIDEBAR-2">the sidebar "Using Applications to Test Connectivity"</a>.)
+</p>
+
+<a name="nettroubletools-CHP-3-SIDEBAR-2" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Using Applications to Test Connectivity</h4>
+
+<a name="INDEX-652" /><a name="INDEX-653" /><a name="INDEX-654" />One all-too-common way of testing
+a new installation is to see if networking applications are working.
+The cable is installed and connected, the TCP/IP stack is configured,
+and then a web browser is started to see if the connection is
+working. If you can hit a couple of web sites, then everything is
+alright and no further testing is needed.
+</p>
+
+This is understandably an extremely common way to test a connection.
+It can be particularly gratifying to see a web page loading on a
+computer you have just connected to your network. But it is also an
+extremely poor way to test a connection.
+</p>
+
+One problem is that the software stack you use to test the connection
+is designed to hide problems from users. If a packet is lost, the
+stack will transparently have the lost packet resent without any
+indication to the user. You could have a connection that is losing
+90% of its packets. The problem would be immediately obvious when
+using <em class="filename">ping</em>. But with most applications, this
+would show up only as a slow response. Other problems include locally
+cached information or the presence of proxy servers on the network.
+</p>
+
+Unfortunately, web browsers seem to be the program of choice for
+testing a connection. This, of course, is the worst possible choice.
+The web's slow response is an accepted fact of life. What
+technician is going to blame a slow connection on his shoddy wiring
+when the alternative is to blame the slow connection on the Web? What
+technician would even consider the possibility that a slow web
+response is caused by a cable being too close to a fluorescent light?
+</p>
+
+The only thing testing with an application will really tell you is
+whether a connection is totally down. If you want to know more than
+that, you will have to do real testing.<a name="INDEX-655" /><a name="INDEX-656" /><a name="INDEX-657" /> 
+</p>
+</td></tr></table><p></blockquote>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.2. Testing Adapters</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.4. Microsoft Windows</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch03_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:03 GMT -->
+</html>

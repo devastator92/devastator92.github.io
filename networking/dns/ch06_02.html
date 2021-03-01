@@ -1,0 +1,155 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+<head><title>Sample Resolver Configurations (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.2. Sample Resolver Configurations</h2>
+
+
+<a name="INDEX-792" /> <a name="INDEX-793" />So much for
+theory -- let's now go over what
+<em class="filename">resolv.conf</em> files look like on real hosts.
+Resolver configuration needs vary depending on whether or not a host
+runs a local name server, so we'll cover both cases: hosts with
+local name servers and hosts with remote name servers.</p><p>
+
+
+<a name="dns4-CHP-6-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">6.2.1. Resolver Only</h3>
+
+
+<a name="INDEX-794" /><a name="INDEX-795" />We, as the administrators of
+<em class="emphasis">movie.edu</em>, have just been
+asked to configure a professor's new standalone workstation,
+which doesn't run a name server. Deciding which domain the
+workstation belongs in is easy -- there's only <em class="emphasis">movie.edu</em> to choose from. However, she
+<em class="emphasis">is</em> working with researchers at Pixar on new
+shading algorithms, so perhaps it'd be wise to put <em class="emphasis">pixar.com</em> in her workstation's
+search list. The <em class="emphasis">search</em> directive:</p><p>
+
+
+<blockquote><pre class="code">search movie.edu pixar.com</pre></blockquote>
+
+
+makes <em class="emphasis">movie.edu</em> her
+workstation's local domain name and searches <em class="emphasis">pixar.com</em> for names not found in
+<em class="emphasis">movie.edu</em>.</p><p>
+
+
+The new workstation is on the 192.249.249/24 network, so the closest
+name servers are <em class="emphasis">wormhole.movie.edu</em> (192.249.249.1) and
+<em class="emphasis">terminator.movie.edu</em>
+(192.249.249.3). As a rule, you should configure hosts to use the
+closest name server available first. (The closest possible name
+server is a name server on the local host; the next closest is a name
+server on the same subnet or network.) In this case, both name
+servers are equally close, but we know that <em class="emphasis">wormhole.movie.edu</em> is bigger (it's
+a faster host, with more capacity). So the first
+<em class="emphasis">nameserver</em> directive in
+<em class="filename">resolv.conf</em> should be:</p><p>
+
+
+<blockquote><pre class="code">nameserver 192.249.249.1</pre></blockquote>
+
+
+Since this particular professor is known to get awfully vocal when
+she has problems with her computer, we'll also add <em class="emphasis">terminator.movie.edu</em> (192.249.249.3) as
+a backup name server. That way, if <em class="emphasis">wormhole.movie.edu</em> is down for any
+reason, the professor's workstation can still get name service
+(assuming <em class="emphasis">terminator.movie.edu</em> and the rest of the
+network are up).</p><p>
+
+
+The <em class="filename">resolv.conf</em> file ends up looking like this:</p><p>
+
+
+<blockquote><pre class="code">search movie.edu pixar.com
+nameserver 192.249.249.1
+nameserver 192.249.249.3</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">6.2.2. Local Name Server</h3>
+
+
+<a name="INDEX-796" /><a name="INDEX-797" />Next, we have to configure the
+university mail hub, <em class="emphasis">postmanrings2x.movie.edu</em>, to use domain
+name service. <em class="emphasis">postmanrings2x.movie.edu</em> is shared by
+all groups in <em class="emphasis">movie.edu</em>.
+We've recently configured a name server on the host to help cut
+down the load on the other name servers, so we should make sure the
+resolver queries the name server on the local host first.</p><p>
+
+
+The simplest resolver configuration for this case is no configuration
+at all: don't create a <em class="filename">resolv.conf</em> file,
+and let the resolver default to using the local name server. The
+<em class="emphasis">hostname</em> should be set to the full domain name
+of the host so that the resolver can determine the local domain name.</p><p>
+
+
+<a name="INDEX-798" /><a name="INDEX-799" />If we decide we need a backup name
+server -- a prudent decision -- we can use
+<em class="filename">resolv.conf</em>. Whether or not we configure a
+backup name server depends largely on the reliability of the local
+name server. A good implementation of the BIND name server will keep
+running for longer than some operating systems, so there may be no
+need for a backup. If the local name server has a history of
+problems, though -- say it hangs occasionally and stops responding
+to queries -- it'd be a good idea to add a backup name
+server.</p><p>
+
+
+To add a backup name server, just list the local name server first in
+<em class="filename">resolv.conf</em> (at the host's IP address or
+the zero address, 0.0.0.0 -- either will do), then one or two
+backup name servers. Remember not to use the loopback address unless
+you know your system's TCP/IP stack doesn't have the
+problem we mentioned earlier.</p><p>
+
+
+Since we'd rather be safe than sorry, we're going to add
+two backup name servers. <em class="emphasis">postmanrings2x.movie.edu</em> is on the
+192.249.249/24 network, too, so <em class="emphasis">terminator.movie.edu</em> and <em class="emphasis">wormhole.movie.edu</em> are its closest name
+servers (besides its own). We'll reverse the order in which
+they're queried from the previous resolver-only example to help
+balance the load between the two. And because we'd rather not
+wait the full five seconds for the resolver to try the second name
+server, we'll lower the timeout to two seconds. The
+<em class="filename">resolv.conf </em>file ends up looking like this:</p><p>
+
+
+<a name="INDEX-800" /><a name="INDEX-801" /><a name="INDEX-802" /><a name="INDEX-803" /><blockquote><pre class="code">domain movie.edu
+nameserver 0.0.0.0
+nameserver 192.249.249.3
+nameserver 192.249.249.1
+
+options timeout:2
+</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6. Configuring Hosts</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.3. Minimizing Pain and Suffering</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+</html>

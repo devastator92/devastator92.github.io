@@ -1,0 +1,560 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:46 GMT -->
+<head><title>Network Security (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 12. Network Security</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-12-SECT-1">User-oriented network security</a><br />
+<a href="ch12_02.html">How secure are NIS and NFS?</a><br />
+<a href="ch12_03.html">Password and NIS security</a><br />
+<a href="ch12_04.html">NFS security</a><br />
+<a href="ch12_05.html">Stronger security for NFS</a><br />
+<a href="ch12_06.html">Viruses</a><br /></p><p></div>
+
+The simplicity and transparency provided by NFS and NIS must be
+weighed against security concerns. Providing access to all files to
+all users may not be in the best interests of security, particularly
+if the files contain sensitive or proprietary data. Not all hosts may
+be considered equally secure or "open," so access may be
+restricted to certain users. Transparency must be limited when
+dealing with secured hosts: if you have taken precautions to prevent
+unauthorized access to a machine, you don't want someone to be
+able to sit down and use an open window or logged-in terminal to
+access the secured machine. To enforce access restrictions, you
+always want password verification for users, which means eliminating
+some of the network transparency provided by NIS.
+</p><p>
+
+This chapter describes mechanisms for tightening access restrictions
+to machines and filesystems. It is not intended to be a complete list
+of security loopholes and their fixes. The facilities and
+administrative techniques covered are meant to complement the network
+transparency provided by NFS and NIS while still enforcing local
+security measures. For a more detailed treatment of security issues,
+refer to <em class="emphasis">Practical Unix Security</em>, by Garfinkel
+and Spafford (O'Reilly &amp; Associates, 1996).
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-12-SECT-1" /></a>
+<h2 class="sect1">12.1. User-oriented network security</h2>
+
+One area of concern is user access to hosts on <a name="INDEX-1653" /></a>
+<a name="INDEX-1654" /></a>the network. <a href="ch12_01.html#nfs2-CHP-12-FIG-1">Figure 12-1</a> shows several classes of permissions to
+consider, reflecting the ways in which a user might access a host
+from another host on the network.
+</p><p>
+
+<a name="nfs2-CHP-12-FIG-1" /></a><div class="figure"><img height="217" alt="Figure 12-1" src="figs/nfs2.1201.gif" width="398" /></div><h4 class="objtitle">Figure 12-1. Client-server remote logins</h4>
+
+Remote logins are not the only concern; remote
+<a name="INDEX-1655" /></a>execution of commands using
+<em class="emphasis">rsh</em> should be considered in the same context.
+This section covers only login <a name="INDEX-1656" /></a> <a name="INDEX-1657" /></a>restrictions; we'll look at
+protecting data in NFS filesystems later in this chapter. Local login
+restrictions are defined by the local host's password file, NIS
+password maps, and the use of netgroups. Across the network, access
+is determined by the notion of trusted hosts and trusted users.
+</p><p>
+
+<a name="nfs2-CHP-12-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">12.1.1. Trusted hosts and trusted users</h3>
+
+Defining a <em class="emphasis">trusted host</em> requires two machines:
+one <a name="INDEX-1658" /></a> <a name="INDEX-1659" /></a>
+<a name="INDEX-1660" /></a> <a name="INDEX-1661" /></a>that
+will be trusted and one that is extending the trust to it. The local
+host <em class="emphasis">lh</em> trusts remote host
+<em class="emphasis">rh</em> if users can log into <em class="emphasis">lh</em>
+from <em class="emphasis">rh</em> without supplying their passwords.
+Similarly, a user is trusted if he or she can log into a host from
+some remote machine without supplying a password. Trust is defined
+only for the local host; users and machines may be trusted on some
+systems but not on others.
+</p><p>
+
+The relationships between hosts often
+<a name="INDEX-1662" /></a>define the realm of trusted
+users and trusted hosts. Two NIS or NFS clients, for example, may
+trust all users and all other client hosts. On the NFS server, only
+other servers may be trusted hosts and only the system administration
+staff may be trusted users.
+</p><p>
+
+<a name="ch12-3-fm2xml" /></a><blockquote><b>WARNING: </b> 
+The following trusted user and trusted host descriptions apply in an
+environment in which you do not have to be wary of users or outsiders
+who will attempt to compromise security. These are basic security
+measures that fit in with the other network management strategies
+discussed in this book. If you need to secure your systems against
+all attacks, then you must consider the effects of having security
+compromised on any machine in your network. Again, these extensive
+security mechanisms are discussed in <em class="citetitle">Practical Unix
+Security</em>.
+</p><p>
+</blockquote>
+
+Some of the common patterns of trusting hosts and users are:</p><p>
+
+<dl>
+<dt><i>Server-Server</i></dt>
+<dd>
+Generally, servers trust each other. A <a name="INDEX-1663" /></a>
+<a name="INDEX-1664" /></a> <a name="INDEX-1665" /></a>few users can be trusted in
+server-to-server relationships if each server has a password file
+that contains a subset of the NIS password map, or a password file
+with no NIS references. To emphasize the previous warning, extending
+trust between servers means that if one server is compromised, then
+they all <a name="INDEX-1666" /></a>
+<a name="INDEX-1667" /></a>
+<a name="INDEX-1668" /></a>are.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>Server-Client</i></dt>
+<dd>
+Most clients should trust the servers
+<a name="INDEX-1669" /></a> <a name="INDEX-1670" /></a> <a name="INDEX-1671" /></a>and users on the servers. A
+system administrator may need to run performance monitoring daemons
+on the client from the server and require transparent access to the
+client. Similarly, the server may be used to distribute files to the
+clients on a regular basis.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>Client-Server</i></dt>
+<dd>
+This is probably the most restrictive
+<a name="INDEX-1672" /></a> <a name="INDEX-1673" /></a> <a name="INDEX-1674" /></a>relationship. Only users with a
+need to use a service are generally given transparent access to the
+servers. Remote access to the server for access to a server's
+printer can be controlled via the <em class="emphasis">-u</em> option to
+the <em class="emphasis">lpadmin</em> command, instead of by trusting
+client machines on the server.
+</p><p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>Client-Client</i></dt>
+<dd>
+Client-client relationships depend upon how
+<a name="INDEX-1675" /></a> <a name="INDEX-1676" /></a> <a name="INDEX-1677" /></a>you have centralized your disk
+resources. If all files live on one or more fileservers, then
+client-to-client relationships are generally relaxed. However, if you
+are using the clients as isolated systems, with some per-client
+storage containing private data, then client-client relationships
+look more like those between clients and servers. The scope of the
+client-client relationships depends upon the sensitivity of the data
+on the clients: if you don't want other users to see the
+private data, then you must treat the client machine like a server.
+</p><p>
+</dd>
+
+</dl>
+
+The <em class="emphasis">/etc/hosts.equiv</em> and
+<em class="emphasis">.rhosts</em> files (in each user's home
+directory) define the set of trusted hosts, users, and user-host
+pairs for each system. Again, trust and transparent access are
+granted by the machine being accessed remotely, so these
+configuration files vary from host to host. The
+<em class="emphasis">.rhosts</em> file is maintained by each user and
+specifies a list of hosts or user-host pairs that are also parsed for
+determining if a host or user<a name="INDEX-1678" /></a> <a name="INDEX-1679" /></a> <a name="INDEX-1680" /></a> <a name="INDEX-1681" /></a> is trusted.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">12.1.2. Enabling transparent access</h3>
+
+Both <em class="emphasis">rlogin</em> and <em class="emphasis">rsh</em> use the
+<em class="emphasis">ruserok</em>( ) library routine <a name="INDEX-1682" /></a>to bypass the normal login and
+password security mechanism. The <em class="emphasis">ruserok</em>( )
+routine is<a name="INDEX-1683" /></a> invoked on the server side of a
+connection to see if the remote user gets transparent (i.e., no
+password prompt) access. To understand the semantics, let's
+look at its function prototype:
+</p><p>
+
+<blockquote><pre class="code">int ruserok(const char *rhost, int suser, const char *ruser,
+     const char *luser);</pre></blockquote>
+
+The <em class="emphasis">rhost</em> parameter is the name of the remote
+host from where the remote user is. The <em class="emphasis">ruser</em>
+parameter is the login name of the remote user. The
+<em class="emphasis">luser</em> parameter is the name of local login name
+that the remote user wants transparent access to. Often
+<em class="emphasis">luser</em> and <em class="emphasis">ruser</em> are the
+same, but not always. The <em class="emphasis">suser</em> parameter is set
+to 1 if the UID of luser is 0, i.e., superuser. Otherwise,
+<em class="emphasis">suser</em> is set to 0.
+</p><p>
+
+<em class="emphasis">ruserok</em>( ) checks first if
+<em class="emphasis">luser</em> exists; i.e., does
+<em class="emphasis">getpwnam</em>( ) return success for <em class="emphasis">luser</em>
+? It then determines if the remote user and hostname given
+are trusted on the <em class="emphasis">local</em> host; it is usually
+called by the remote daemon for these utilities during its startup.
+If the user or host are not trusted, then the user must supply a
+password to log in or get "Permission denied" errors when
+attempting to use <em class="emphasis">rsh</em>. If the remote host trusts
+the user and host, execution (or login) proceeds without any other
+verification of the user's identity.
+</p><p>
+
+The <em class="emphasis">hosts.equiv</em> file contains either hostnames
+or host-user pairs:
+</p><p>
+
+<blockquote><pre class="code">hostname [username]</pre></blockquote>
+
+If a username follows the hostname, only that
+combination<a name="INDEX-1684" /></a>
+<a name="INDEX-1685" /></a> of user and hostnames is trusted.
+Netgroup names, in the form <em class="emphasis">+@group</em>, may be
+substituted for either hostnames or usernames. As with the password
+file, using a plus sign (<tt class="literal">+</tt>) for an entry includes
+the appropriate NIS map: in the first column, the hosts map is
+included, and in the second column, the password map is included.
+Entries that grant permission contain the hostname, a host and
+username, or a netgroup inclusion.
+</p><p>
+
+The following is <em class="emphasis">/etc/hosts.equiv</em> on host
+<em class="emphasis">mahimahi</em>:
+</p><p>
+
+<blockquote><pre class="code">wahoo 
+bitatron + 
+corvette johnc 
++@source-hosts 
++@sysadm-hosts +@sysadm-users</pre></blockquote>
+
+The first example trusts all users on host
+<em class="emphasis">wahoo</em>. Users on <em class="emphasis">wahoo</em> can
+<em class="emphasis">rlogin</em> to <em class="emphasis">mahimahi</em> without
+a password, but only if the <em class="emphasis">ruser</em> and
+<em class="emphasis">luser</em> strings are equal.The second example is similar to the first, except that
+any remote user from <em class="emphasis">bitatron</em> can claim to be
+any local user and get access as the local user; i.e.,
+<em class="emphasis">luser</em> and <em class="emphasis">ruser</em> do not have
+to be equal. This is certainly useful to the users who have access to
+<em class="emphasis">bitatron</em>, but it is very relaxed (or lax)
+security on <em class="emphasis">mahimahi</em>. The third example is the
+most restrictive. Only user <em class="emphasis">johnc</em> is trusted on
+host <em class="emphasis">corvette</em>, and of course
+<em class="emphasis">luser</em> and <em class="emphasis">ruser</em> (both
+"johnc") must be the same. Other users on host
+<em class="emphasis">corvette</em> are not trusted and must supply a
+password when logging in to <em class="emphasis">mahimahi</em>.
+</p><p>
+
+The last two entries use netgroups to define lists of hosts and
+users. The <em class="emphasis">+@source-hosts</em> entry trusts all hosts
+whose names appear in the <em class="emphasis">source-hosts</em> netgroup.
+If usernames are given as part of the netgroup triples, they are
+ignored. This means that hostname wildcards grant overly generous
+permissions. If the <em class="emphasis">source-hosts</em> netgroup
+contained <em class="emphasis">(,stern,)</em>, then using this netgroup in
+the first column of <em class="emphasis">hosts.equiv</em> effectively
+opens up the machine to all hosts on the network. If you need to
+restrict logins to specific users from specific machines, you must
+use either explicit names or netgroups in both the first and second
+column of <em class="emphasis">hosts.equiv</em>.
+</p><p>
+
+The last example does exactly this. Instead of trusting one
+host-username combination, it trusts all combinations of hostnames in
+<em class="emphasis">sysadm-hosts</em> and the usernames in
+<em class="emphasis">sysadm-users</em>. Note that the
+<em class="emphasis">usernames</em> in the
+<em class="emphasis">sysadm-hosts</em> netgroup and the
+<em class="emphasis">hostnames</em> in the
+<em class="emphasis">sysadm-users</em> netgroup are completely ignored.
+</p><p>
+
+Permission may be revoked by
+<a name="INDEX-1686" /></a>
+<a name="INDEX-1687" /></a>preceding the host or user
+specification with a minus sign <tt class="literal">(-</tt>):
+</p><p>
+
+<blockquote><pre class="code">-wahoo 
++ -@dangerous-users</pre></blockquote>
+
+The first entry denies permission to all users on host
+<em class="emphasis">wahoo</em>. The second example negates all users in
+the netgroup <em class="emphasis">dangerous-users</em> regardless of what
+machine they originate from (the plus sign (+) makes the remote
+machine irrelevant in this entry).
+</p><p>
+
+If you want to deny permission to everything in both the hosts and
+password NIS maps, leave <em class="emphasis">hosts.equiv</em> empty.
+</p><p>
+
+The <em class="emphasis">.rhosts</em> file uses the same syntax as the
+<em class="emphasis">hosts.equiv</em> file, but it is parsed
+<em class="emphasis">after</em> <em class="emphasis">hosts.equiv</em>. The sole
+exception to this rule is when granting remote permission to
+<em class="emphasis">root</em>. When the superuser attempts to access a
+remote host, the <em class="emphasis">hosts.equiv</em> file is ignored and
+only the <em class="emphasis">/.rhosts</em> file is read. For all other
+users, the <em class="emphasis">ruserok( )</em> routine first reads
+<em class="emphasis">hosts.equiv</em>. If it finds a positive match, then
+transparent access is granted. If it finds a negative match, and
+there is no <em class="emphasis">.rhosts</em> file for
+<em class="emphasis">luser</em>, then transparent access is denied.
+Otherwise, the <em class="emphasis">luser</em> 's
+<em class="emphasis">.rhosts</em> file is parsed until a match, either
+positive or negative, is found. If an entry in either file denies
+permission to a remote user, the file parsing stops at that point,
+even if an entry further down in the file grants permission to that
+user and host combination.
+</p><p>
+
+Usernames that are not the same on all systems are handled through
+the user's <em class="emphasis">.rhosts</em> file. If you are user
+<em class="emphasis">julie</em> on your desktop machine
+<em class="emphasis">vacation</em>, but have username
+<em class="emphasis">juliec</em> on host <em class="emphasis">starter</em>, you
+can still get to that remote host transparently by adding a line to
+your <em class="emphasis">.rhosts</em> file on
+<em class="emphasis">starter</em>. Assuming a standard home directory
+scheme, your <em class="emphasis">.rhosts</em> file would be
+<em class="emphasis">/home/juliec/.rhosts</em> and should contain the name
+of the machine you are logging in from and your username on the
+originating machine:
+</p><p>
+
+<blockquote><pre class="code">vacation julie</pre></blockquote>
+
+From <em class="emphasis">vacation</em>, you can execute commands on
+<em class="emphasis">starter</em> using:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rsh starter -l juliec "ls -l"</b></tt></pre></blockquote>
+
+or:</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rlogin starter -l juliec</b></tt></pre></blockquote>
+
+On <em class="emphasis">starter</em>, the <em class="emphasis">ruserok( )</em>
+routine looks for a <em class="emphasis">.rhosts</em> file for user
+<em class="emphasis">juliec</em>, your username on that system. If no
+entry in <em class="emphasis">hosts.equiv</em> grants you permission
+(probably the case because you have a different username on that
+system), then your <em class="emphasis">.rhosts</em> file entry maps your
+local username into its remote equivalent. You can also use netgroups
+in <em class="emphasis">.rhosts</em> files, with the same warnings that
+apply to using them in <em class="emphasis">/etc/hosts.equiv</em>.
+</p><p>
+
+As a network manager, watch for overly permissive
+<em class="emphasis">.rhosts</em> files. Users may accidentally grant
+password-free access to any user on the network, or map a foreign
+username to their own Unix username. If you have many password files
+with private, non-NIS managed entries, watch the use of
+<em class="emphasis">.rhosts</em> files. Merging password files to
+eliminate non-uniform usernames may be easier than maintaining a
+constant lookout for <a name="INDEX-1688" /></a>unrestricted access granted through a
+<em class="emphasis">.rhosts</em> file.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">12.1.3. Using netgroups</h3>
+
+Netgroups have been used in several examples<a name="INDEX-1689" /></a>
+<a name="INDEX-1690" /></a>
+already to show how triples of host, user, and domain names are used
+in granting access across the network. The best use of netgroups is
+for the definition of splinter groups of a large NIS domain, where
+creating a separate NIS domain would not justify the administrative
+effort required to keep the two domains synchronized.
+</p><p>
+
+Because of the variety of ways in which netgroups are applied, their
+use and administration are sometimes counterintuitive. Perhaps the
+most common mistake is defining a netgroup with host or usernames not
+<a name="INDEX-1691" /></a>
+<a name="INDEX-1692" /></a>present
+in the NIS maps or local host and password files. Consider a netgroup
+that includes a hostname in another NIS domain:
+</p><p>
+
+<blockquote><pre class="code">remote-hosts   (poi,-,-), (muban,-,-)</pre></blockquote>
+
+When a user attempts to <em class="emphasis">rlogin</em> from host
+<em class="emphasis">poi</em>, the local server-side daemon attempts to
+find the hostname corresponding to the IP address of the originating
+host. If <em class="emphasis">poi</em> cannot be found in the NIS
+<em class="emphasis">hosts.byaddr</em> map, then an IP address, instead of
+a hostname, is passed to <em class="emphasis">ruserok( )</em>. The
+verification process fails to match the hostname, even though it
+appears in the netgroup. Any time information is shared between NIS
+domains, the appropriate entries must appear in both NIS maps for the
+netgroup construction to function as expected.
+</p><p>
+
+Even though netgroups are specified as host and user pairs, no
+utility uses both names together. There is no difference between the
+following two netgroups:
+</p><p>
+
+<blockquote><pre class="code">group-a         (los, mikel,) (bitatron, stern, ) 
+group-b         (los, -,) (bitatron, -,) (-, mikel, ) (-, stern, )</pre></blockquote>
+
+Things that need hostnames  --  the first column of
+<em class="emphasis">hosts.equiv</em> or NFS export lists  --  produce
+the set of hosts {<em class="emphasis">los, bitatron</em>} from both
+netgroups. Similarly, anything that takes a username, such as the
+password file or the second column of
+<em class="emphasis">hosts.equiv</em>, always finds the set
+{<em class="emphasis">mikel, stern</em>}. You can even mix-and-match these
+two groups in <em class="emphasis">hosts.equiv</em>. All four of the
+combinations of the two netgroups, when used in both columns of
+<em class="emphasis">hosts.equiv</em>, produce the same net effect: users
+<em class="emphasis">stern</em> and <em class="emphasis">mikel</em> are trusted
+on hosts <em class="emphasis">bitatron</em> and <em class="emphasis">los</em>.
+</p><p>
+
+The triple-based format of the netgroups map clouds the real function
+of the netgroups. Because all utilities parse either host or
+usernames, you will find it helpful to define netgroups that contain
+only host or usernames. It's easier to remember what each group
+is supposed to do, and the time required to administer a few extra
+netgroups will be more than made up by time not wasted chasing down
+strange permission problems that arise from the way the
+<em class="emphasis">netgroups</em> map is used.
+</p><p>
+
+An example here helps to show how the <em class="emphasis">netgroup</em>
+map <a name="INDEX-1693" /></a>can
+produce unexpected results. We'll build a netgroup containing a
+list of users and hosts that we trust on a server named
+<em class="emphasis">gate</em>. Users in the netgroup will be able to log
+in to <em class="emphasis">gate</em>, and hosts in the netgroup will be
+able to mount filesystems from it. The netgroup definition looks like
+this:
+</p><p>
+
+<blockquote><pre class="code">gate-group   (,stern,), (,johnc,), (bitatron, -,), (corvette, -,)</pre></blockquote>
+
+In the <em class="emphasis">/etc/dfs/dfstab</em> file on
+<em class="emphasis">gate</em>, we'll add a host access restriction:
+</p><p>
+
+<blockquote><pre class="code">share -o rw=gate-group /export/home/gate</pre></blockquote>
+
+No at-sign (<tt class="literal">@</tt>) is needed to include the netgroup
+name in the <em class="emphasis">/etc/dfs/dfstab</em> file. The
+<em class="emphasis">netgroup</em> map is searched first for the names in
+the <em class="emphasis">rw=</em> list, followed by the
+<em class="emphasis">hosts</em> map.
+</p><p>
+
+In <em class="emphasis">/etc/hosts.equiv</em> on
+<em class="emphasis">gate</em>, we'll include the
+<em class="emphasis">gate-group</em> netgroup:
+</p><p>
+
+<blockquote><pre class="code">+ +@gate-group</pre></blockquote>
+
+To test our access controls, we go to a machine not in the netgroup
+ --  NFS client <em class="emphasis">vacation</em>  --  and attempt
+to mount <em class="emphasis">/export/home/gate</em>. We expect that the
+<em class="emphasis">mount</em> will fail with a "Permission
+denied" error:
+</p><p>
+
+<blockquote><pre class="code">vacation# <tt class="userinput"><b>mount gate:/home/gate/home/gate</b></tt> <tt class="userinput"><b>/mnt</b></tt>
+vacation#</pre></blockquote>
+
+The mount completes without any errors. Why doesn't this
+netgroup work as expected?
+</p><p>
+
+The answer is in the wildcards left in the host fields in the
+netgroup entries for users <em class="emphasis">stern</em> and
+<em class="emphasis">johnc</em>. Because a wildcard was used in the host
+field of the netgroup, <em class="emphasis">all</em> hosts in the NIS map
+became part of <em class="emphasis">gate-group</em> and were added to the
+access list for <em class="emphasis">/export/home/gate</em>. When creating
+this netgroup, our intention was probably to allow users
+<em class="emphasis">stern</em> and <em class="emphasis">johnc</em> to log in
+to <em class="emphasis">gate</em> from any host on the network, but
+instead we gave away access rights.
+</p><p>
+
+A better way to manage this problem is to define two netgroups, one
+for the users and one for the hosts, so that wildcards in one
+definition do not have strange effects on the other. The modified
+<em class="emphasis">/etc/netgroup</em> file looks like this:
+</p><p>
+
+<blockquote><pre class="code">gate-users:   (,stern,), (,johnc,) 
+gate-hosts:   (bitatron,,), (corvette,,)</pre></blockquote>
+
+In the <em class="emphasis">/etc/dfs/dfstab</em> file on
+<em class="emphasis">gate</em>, we use the <em class="emphasis">gate-hosts</em>
+netgroup:
+</p><p>
+
+<blockquote><pre class="code">share -o rw=gate-hosts /export/home/gate</pre></blockquote>
+
+and in <em class="emphasis">/etc/hosts.equiv</em>, we use the netgroup
+<em class="emphasis">gate-users</em>. When host information is used, the
+<em class="emphasis">gate-hosts</em> group explicitly defines those hosts
+in the group; when usernames are needed, the
+<em class="emphasis">gate-users</em> map lists just those users. Even
+though there are wildcards in each group, those wildcards are in
+fields that are not referenced <a name="INDEX-1694" /></a> <a name="INDEX-1695" /></a>when <a name="INDEX-1696" /></a> <a name="INDEX-1697" /></a>the maps <a name="INDEX-1698" /></a> <a name="INDEX-1699" /></a>are used in these function-specific
+ways.
+</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.3. Troubleshooting locking problems</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.2. How secure are NIS and NFS?</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:48 GMT -->
+</html>

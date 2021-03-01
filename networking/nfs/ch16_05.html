@@ -1,0 +1,739 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch16_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Server tuning (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch17_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">16.5. Server tuning</h2>
+
+If the server is not able to field new <a name="INDEX-2450" /> <a name="INDEX-2451" />requests or
+efficiently schedule and handle those that it does receive, then
+overall performance suffers. In some cases, the only way to rectify
+the problem is to add a new server or upgrade existing hardware.
+However, identification of the problem areas should be a prerequisite
+for any hardware changes, and some analyses may point to software
+configuration changes that provide sufficient relief. The first area
+to examine is the server's CPU utilization.
+</p>
+
+<a name="nfs2-CHP-16-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">16.5.1. CPU loading</h3>
+
+The CPU speed of a pure NFS server <a name="INDEX-2452" /> <a name="INDEX-2453" />
+<a name="INDEX-2454" />is rarely a constraining factor. Once
+the <em class="emphasis">nfsd</em> thread gets scheduled, and has read and
+decoded an RPC request, it doesn't do much more within the NFS
+protocol that requires CPU cycles. Other parts of the system, such as
+the Unix filesystem and cache management code, may use CPU cycles to
+perform work given to them by NFS requests. NFS usually poses a light
+load on a server that is providing pure NFS service. However, very
+few servers are used solely for NFS service. More common is a central
+server that performs mail spool and delivery functions, serves
+telnet, and provides NFS file service.
+</p>
+
+There are two aspects to CPU loading: increased
+<em class="emphasis">nfsd</em> thread scheduling latency, and decreased
+performance of server-resident, CPU-bound processes. Normally, the
+<em class="emphasis">nfsd</em> threads will run as soon as a request
+arrives, because they are running with a kernel process priority that
+is higher than that of all user processes. However, if there are
+other processes<a name="INDEX-2455" />
+<a name="INDEX-2456" /> doing I/O, or running in the kernel
+(doing system calls) the latency to schedule the
+<em class="emphasis">nfsd</em> threads is increased. Instead of getting
+the CPU as soon as a request arrives, the <em class="emphasis">nfsd</em>
+thread must wait until the next context switch, when the process with
+the CPU uses up its time slice or goes to sleep. Running an excessive
+number of interactive processes on an NFS server will generate enough
+I/O activity to impact NFS performance. These loads affect a
+server's ability to schedule its <em class="emphasis">nfsd</em>
+threads; latency in scheduling the threads translates into decreased
+NFS request handling capacity since the <em class="emphasis">nfsd</em>
+threads cannot accept incoming requests as quickly. Systems with more
+than one CPU have additional horse-power to schedule and run its
+applications and <em class="emphasis">nfsd</em> threads. Many SMP NFS
+servers scale very well as CPUs are added to the configuration. In
+many cases doubling the number of CPUs nearly doubles the maximum
+throughput provided by the NFS server.
+</p>
+
+The other aspect of CPU loading is the effect of
+<em class="emphasis">nfsd</em> threads on other user-level processes. The
+<em class="emphasis">nfsd</em> threads run entirely in the kernel, and
+therefore they run at a higher priority than other user-level
+processes. <em class="emphasis">nfsd</em> threads take priority over other
+user-level processes, so CPU cycles spent on NFS activity are taken
+away from user processes. If you are running CPU-bound
+(computational) processes on your NFS servers, they will not impact
+NFS performance. Instead, handling NFS requests cripples the
+performance of the CPU-bound processes, since the
+<em class="emphasis">nfsd</em> threads always get the CPU before they do.
+</p>
+
+CPU loading is easy to gauge using any number of
+<a name="INDEX-2457" /> <a name="INDEX-2458" />utilities
+that read the CPU utilization figures from the kernel.
+<em class="emphasis">vmstat</em> is one of the<a name="INDEX-2459" />
+simplest tools that breaks CPU usage into user, system, and idle time
+components:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>vmstat 10</b></tt> 
+ procs     memory            page            disk          faults      cpu
+ r b w   swap  free  re  mf pi po fr de sr dd f0 s0 --   in   sy   cs us sy id
+<i class="lineannotation">...Ignore first line of output</i>
+ 0 0 34 667928 295816 0   0  0  0  0  0  0  1  0  0  0  174  126   73  0  1 99</pre></blockquote>
+
+The last three columns show where the CPU cycles are expended. If the
+server is CPU bound, the <em class="emphasis">idle</em> time decreases to
+zero. When <em class="emphasis">nfsd</em> threads are waiting for disk
+operations to complete, and there is no other system activity, the
+CPU is idle, not accumulating cycles in <em class="emphasis">system</em>
+mode. The <em class="emphasis">system</em> column shows the amount of time
+spent executing system code, exclusive of time waiting for disks or
+other devices. If the NFS server has very little (less than 10%) CPU
+idle time, consider adding CPUs, upgrading to a faster server, or
+moving some CPU-bound processes off of the NFS server.
+</p>
+
+The "pureness" of NFS service provided by a machine and
+the type of other work done by the CPU determines how much of an
+impact CPU loading has on its NFS response time. A machine used for
+print spooling, hardwire terminal server, or modem line connections,
+for example, is forced to handle large numbers of high-priority
+interrupts from the serial line controllers. If there is a sufficient
+level of high-priority activity, the server may miss incoming network
+traffic. Use <em class="emphasis">iostat</em>,
+<em class="emphasis">vmstat</em>, or similar <a name="INDEX-2460" />
+<a name="INDEX-2461" /> <a name="INDEX-2462" />tools to watch for large numbers of
+interrupts. Every interrupt requires CPU time to service it, and
+takes away from the CPU availability for NFS.
+</p>
+
+If an NFS server must be used as a home for terminals, consider using
+a networked terminal server instead of hardwired terminals.<a href="#FOOTNOTE-46">[46]</a> The largest advantage of terminal servers is that they
+can accept terminal output in large buffers. Instead of writing a
+screenful of output a character at a time over a serial line, a host
+writing to a terminal on a terminal server sends it one or two
+packets containing all of the output. Streamlining the terminal and
+NFS input and output sources places an additional load on the
+server's network interface and on the network itself. These
+factors must be considered when planning or expanding the base of
+terminal service.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-46" />[46]A terminal server has RS-232 ports for terminal
+<a name="INDEX-2463" />
+<a name="INDEX-2464" />connections and runs a simple ROM
+monitor that connects terminal ports to servers over
+<em class="emphasis">telnet</em> sessions. Terminal servers vary
+significantly: some use RS-232 DB-25 connectors, while others have
+RJ-11 phone jacks with a variable number of ports. </p>
+</blockquote>
+
+Along these lines, NFS servers do not necessarily make the best
+gateway hosts. Each fraction of its network bandwidth that is devoted
+to forwarding packets or converting protocols is taken away from NFS
+service. If an NFS server is used as a router between two or more
+networks, it is possible that the non-NFS traffic occludes the NFS
+packets. The actual performance effects, if any, will be determined
+by the bandwidth of the server's network interfaces and other
+CPU loading <a name="INDEX-2465" /> <a name="INDEX-2466" /> <a name="INDEX-2467" />factors.
+</p>
+
+</div>
+<a name="nfs2-CHP-16-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">16.5.2. NFS server threads</h3>
+
+The default number of <em class="emphasis">nfsd</em> threads is
+chosen<a name="INDEX-2468" /> <a name="INDEX-2469" />
+<a name="INDEX-2470" /> empirically by the system vendor, and
+provides average performance under average conditions. The number of
+threads is specified as an argument to the <em class="emphasis">nfsd</em>
+daemon when it is <a name="INDEX-2471" />started
+from the boot scripts:
+</p>
+
+<blockquote><pre class="code">/usr/lib/nfs/nfsd -a 16</pre></blockquote>
+
+This example starts 16 kernel <em class="emphasis">nfsd</em> threads.</p>
+
+In Solaris, the <em class="emphasis">nfsd</em> daemon creates multiple
+kernel threads that perform the actual filesystem operations. It
+exists as a user-level process in order to establish new connections
+to clients, allowing a server to accept more NFS requests while other
+<em class="emphasis">nfsd</em> threads are waiting for a disk operation to
+complete. Increasing the number of server-side threads improves NFS
+performance by allowing the server to grab incoming requests more
+quickly. Increasing <em class="emphasis">nfsd</em> threads without bound
+can adversely affect other system resources by dedicating excessive
+compute resources to NFS, making the optimal choice an exercise in
+observation and tuning.
+</p>
+
+<a name="nfs2-CHP-16-SECT-5.2.1" /><div class="sect3">
+<h3 class="sect3">16.5.2.1. Context switching overhead</h3>
+
+All <em class="emphasis">nfsd</em> threads run in the kernel and
+<a name="INDEX-2472" />
+<a name="INDEX-2473" />do not context switch in the same way as
+user-level processes do. The two major costs associated with a
+context switch are loading the address translation cache and resuming
+the newly scheduled task on the CPU. In the case of NFS server
+threads, both of these costs are near zero. All of the NFS server
+code lives in the kernel, and therefore has no user-level address
+translations loaded in the memory management unit. In addition, the
+task-to-task switch code in most kernels is on the order of a few
+hundred instructions. Systems can context switch much faster than the
+network can deliver NFS requests.
+</p>
+
+NFS server threads don't impose the "usual" context
+switching load on a system because all of the NFS server code is in
+the kernel. Instead of using a per-process context descriptor or a
+user-level process "slot" in the memory management unit,
+the <em class="emphasis">nfsd</em> threads use the kernel's address
+space mappings. This eliminates the address translation<a name="INDEX-2474" /> <a name="INDEX-2475" /> loading cost of a
+context switch.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-16-SECT-5.2.2" /><div class="sect3">
+<h3 class="sect3">16.5.2.2. Choosing the number of server threads</h3>
+
+The maximum number of server threads can <a name="INDEX-2476" />
+<a name="INDEX-2477" />be specified as a parameter to the
+<em class="emphasis">nfsd</em> daemon:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/lib/nfs/nfsd -a 16</b></tt></pre></blockquote>
+
+The <em class="emphasis">-a</em> directive indicates that the daemon
+should listen on all available transports. In this example the daemon
+allows a maximum of 16 NFS requests to be serviced concurrently. The
+<em class="emphasis">nfsd</em> threads are created on demand, so you are
+only setting a high water mark, not the actual number of threads. If
+you configure too many threads, the unused threads will not be
+created. You can throttle NFS server usage by limiting the maximum
+number of <em class="emphasis">nfsd</em> threads, allowing the NFS server
+to concentrate on performing other tasks.
+</p>
+
+It is hard to come up with a magic formula to compute the ideal
+number of <em class="emphasis">nfsd</em> threads, since hardware and NFS
+implementations vary considerably between vendors. For example, at
+the time of this writing, Sun servers are recommended<a href="#FOOTNOTE-47">[47]</a> to use the maximum of:
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-47" />[47]Refer to the <em class="emphasis">Solaris 8 NFS Server Performance and
+Tuning Guide for Sun Hardware</em> (February 2000).</p>
+</blockquote>
+
+<ul><li>
+2 <em class="emphasis">nfsd</em> threads for each active client process</p>
+</li><li>
+16 to 32 <em class="emphasis">nfsd</em> threads for each CPU</p>
+</li><li>
+16 <em class="emphasis">nfsd</em> threads per 10Mb network or 160 per
+100Mb <a name="INDEX-2478" />
+<a name="INDEX-2479" />
+<a name="INDEX-2480" />network
+</p>
+</li></ul>
+</div>
+</div>
+<a name="nfs2-CHP-16-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">16.5.3. Memory usage</h3>
+
+NFS uses the server's <a name="INDEX-2481" />page <a name="INDEX-2482" />
+<a name="INDEX-2483" /> <a name="INDEX-2484" />cache (in SunOS 4.x, Solaris and System
+V Release 4) for file blocks read in NFS <em class="emphasis">read</em>
+requests. Because these systems implement page mapping, the NFS
+server will use available page frames to cache file pages, and
+<a name="INDEX-2485" />
+<a name="INDEX-2486" />
+<a name="INDEX-2487" />use
+the <a name="INDEX-2488" />buffer
+cache<a href="#FOOTNOTE-48">[48]</a> to store UFS
+inode and file metadata (direct and indirect blocks).
+</p><blockquote class="footnote"> <a name="FOOTNOTE-48" />[48]In Solaris, SunOS 4.x, and SVR4, the buffer
+cache stores only UFS metadata. This in contrast to the
+"traditional" buffer cache used by other Unix systems,
+where file data is also stored in the buffer cache. The Solaris
+buffer cache consists of disk blocks full of inodes, indirect blocks,
+and cylinder group information only.</p> </blockquote>
+
+In Solaris, you can view the buffer cache statistics by using
+<em class="emphasis">sar -b</em>. This will show you the number of data
+transfers per second between system buffers and disk
+(<em class="emphasis">bread/s</em> &amp; <em class="emphasis">bwrite/s</em>),
+the number of accesses to the system buffers (logical reads and
+writes identified by <em class="emphasis">lread/s</em> &amp;
+<em class="emphasis">lwrit/s</em>), the cache hit ratios
+(<em class="emphasis">%rcache</em> &amp; <em class="emphasis">%wcache</em>),
+and the number of physical reads and writes using the raw device
+mechanism (<em class="emphasis">pread/s</em> &amp;
+<em class="emphasis">pwrit/s</em>):
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>sar -b 20 5</b></tt>
+SunOS bunker 5.8 Generic sun4u    12/06/2000
+
+10:39:01 bread/s lread/s %rcache bwrit/s lwrit/s %wcache pread/s pwrit/s
+10:39:22      19     252      93      34     103      67       0       0
+10:39:43      21     612      97      46     314      85       0       0
+10:40:03      20     430      95      35     219      84       0       0
+10:40:24      35     737      95      49     323      85       0       0
+10:40:45      21     701      97      60     389      85       0       0
+
+Average       23     546      96      45     270      83       0       0</pre></blockquote>
+
+In practice, a cache hit ratio of 100% is hard to achieve due to lack
+of access locality by the NFS clients, consequently a cache hit ratio
+of around 90% is considered acceptable. By default, Solaris grows the
+dynamically sized buffer cache, as needed, until it reaches a high
+watermark specified by the <em class="emphasis">bufhwm</em> kernel
+parameter. By default, Solaris limits this value to 2% of physical
+memory in the system. In most cases, this 2%<a href="#FOOTNOTE-49">[49]</a> ceiling is more
+than enough since the buffer cache is only used to cache inode and
+metadata information. You can use the <em class="emphasis">sysdef</em>
+command to view its value:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-49" />[49]2% of
+total memory can be too much buffer cache for some systems, such as
+the Sun Sparc Center 2000 with very large memory configurations. You
+may need to reduce the size of the buffer cache to avoid starving the
+kernel of memory resources, since the kernel address space is limited
+on Super Sparc-based systems. The newer Ultra Sparc-based systems do
+not suffer from this limitation.</p> </blockquote>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>sysdef</b></tt>
+...
+*
+* Tunable Parameters
+*
+41385984   maximum memory allowed in buffer cache (bufhwm)
+...</pre></blockquote>
+
+If you need to modify the default value of
+<em class="emphasis">bufhwm</em>, set its new value in
+<em class="emphasis">/etc/system</em>, or use <em class="emphasis">adb</em> as
+described in <a href="ch15_01.html">Chapter 15, "Debugging Network Problems"</a>.
+</p>
+
+The actual file contents are cached in the page cache, and by default
+the filesystem will cache as many pages as possible. There is no high
+watermark, potentially causing the page cache to grow and consume all
+available memory. This means that all process memory that has not
+been used recently by local applications may be reclaimed for use by
+the filesystem page cache, possibly causing local processes to page
+excessively.
+</p>
+
+If the server is used for non-NFS purposes, enable priority paging to
+ensure that it has enough memory to run all of its processes without
+paging. Priority paging prevents the filesystem from consuming
+excessive memory by limiting the file cache so that filesystem I/O
+does not cause unnecessary paging of applications. The filesystem can
+still grow to use free memory, but cannot take memory from other
+applications on the system. Enable priority paging by adding the
+following line to <em class="emphasis">/etc/system</em> and reboot:
+</p>
+
+<blockquote><pre class="code">*
+* Enable Priority Paging
+*
+set priority_paging=1</pre></blockquote>
+
+Priority paging can also be enabled on a live system. Refer to the
+excellent <em class="emphasis">Solaris Internals</em> book written by
+Mauro and McDougall and published by Sun Microsystems Press for an
+in-depth explanation of Priority Paging and File System Caching in
+Solaris. The following procedure for enabling priority paging on a
+live 64-bit system originally appeared on their book:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>adb -kw /dev/ksyms /dev/mem</b></tt>
+physmem         3ac8
+<tt class="userinput"><b>lotsfree/E</b></tt>
+lotsfree:
+lotsfree:       234              /* <i class="lineannotation">value of lotsfree is printed</i> */
+<tt class="userinput"><b>cachefree/Z 0t468                </b></tt>/* <i class="lineannotation">set to twice the value of lotsfree</i> */
+cachefree:      ea   =  1d4
+<tt class="userinput"><b>dyncachefree/Z 0t468             </b></tt>/* <i class="lineannotation">set to twice the value of lotsfree</i> */
+dyncachefree:   ea   =  1d4
+<tt class="userinput"><b>cachefree/E</b></tt>
+cachefree:
+cachefree:      468
+<tt class="userinput"><b>dyncachefree/E</b></tt>
+dyncachefree:
+dyncachefree:   468</pre></blockquote>
+
+Setting <em class="emphasis">priority_ paging=1</em> in
+<em class="emphasis">/etc/system</em> causes a new memory tunable,
+<em class="emphasis">cachefree</em>, to be set to twice the old paging
+high watermark, <em class="emphasis">lotsfree</em>, when the system boots.
+The previous <em class="emphasis">adb</em> procedure does the equivalent
+work on a live system. <em class="emphasis">cachefree</em> scales
+proportionally to other memory parameters used by the Solaris Virtual
+Memory System. Again, refer to the <em class="emphasis">Solaris
+Internals</em> book for an in-depth explanation. The same
+<em class="emphasis">adb</em> procedure can be performed on a 32-bit
+system by replacing the <em class="emphasis">/E</em> directives with
+<em class="emphasis">/D</em> to print the<a name="INDEX-2489" /> <a name="INDEX-2490" /> <a name="INDEX-2491" /> value of a 32-bit quantity and
+<em class="emphasis">/Z</em> with <em class="emphasis">/W</em> to set the value
+of the 32-bit quantity.
+</p>
+
+</div>
+<a name="nfs2-CHP-16-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">16.5.4. Disk and filesystem throughput</h3>
+
+For NFS requests requiring disk access, the<a name="INDEX-2492" /> <a name="INDEX-2493" />
+<a name="INDEX-2494" />
+constraining performance factor can often be the server's
+ability to turn around disk requests. A well-conditioned network
+feels sluggish if the file server is not capable of handling the load
+placed on it. While there are both network and client-side NFS
+parameters that may be tuned, optimizing the server's use of
+its disks and filesystems can deliver large benefit. Efficiency in
+accessing the disks, adequate kernel table sizes, and an equitable
+distribution of requests over all disks providing NFS service
+determine the round-trip filesystem delay.
+</p>
+
+A basic argument about NFS performance centers on the overhead
+imposed by the network when reading or writing to a remote disk. If
+identical disks are available on a remote server and on the local
+host, total disk throughput will be better with the local disk. This
+is not grounds for an out-of-hand rejection of NFS for two reasons:
+NFS provides a measure of transparency and ease of system
+administration that is lost with multiple local disks, and
+centralized disk resources on a server take advantage of economies of
+scale. A large, fast disk or disk array on a server provides better
+throughput, with the network overhead, than a slower local disk if
+the decrease in disk access time outweighs the cost of the network
+data transfer.
+</p>
+
+<a name="nfs2-CHP-16-SECT-5.4.1" /><div class="sect3">
+<h3 class="sect3">16.5.4.1. Unix filesystem effects</h3>
+
+NFS Version 2 write operations are not often able to take advantage
+of disk controller optimizations or caching when multiple clients
+write to different areas on the same disk. Many controllers use an
+elevator-seek algorithm to schedule disk operations according to the
+disk track number accessed, minimizing seek time. These optimizations
+are of little value if the disk request queue is never more than one
+or two operations deep. Read operations suffer from similar problems
+because read-ahead caching done by the controller is wasted if
+consecutive read operations are from different clients using
+different parts of the disk. NFS Version 3 enables the server to take
+better advantage of controller optimizations through the use of the
+two-phase commit write.
+</p>
+
+Writing large files multiplies the number of NFS write operations
+that must be performed. As a file grows beyond the number of blocks
+described in its inode, indirect and double indirect blocks are used
+to point to additional arrays of data blocks. A file that has grown
+to several megabytes, for example, requires three write operations to
+update its indirect, double indirect, and data blocks on each write
+operation. The design of the Unix filesystem is ideal for small
+files, but imposes a penalty on large files.
+</p>
+
+Large directories also adversely impact NFS performance. Directories
+are searched linearly during an NFS <em class="emphasis">lookup</em>
+operation; the time to locate a named directory component is directly
+proportional to the size of the directory and the position of a name
+in the directory. Doubling the number of entries in a directory will,
+on average, double the time required to locate any given entry.
+Furthermore, reading a large directory from a remote host may require
+the server to respond with several packets instead of a single packet
+containing the entire directory structure.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-16-SECT-5.4.2" /><div class="sect3">
+<h3 class="sect3">16.5.4.2. Disk array caching and Prestoserve</h3>
+
+As described in <a href="ch16_04.html#nfs2-CHP-16-SECT-4.2.1">Section 16.4.2.1, "NFS writes (NFS Version 2 versus NFS Version 3)"</a>, synchronous NFS
+Version 2 writes are slow because the server needs to flush the data
+to <a name="INDEX-2495" />disk before an acknowledgment to the
+client can be generated. One way of speeding up the disk access is by
+using host-based fast nonvolatile memory. This battery-backed
+nonvolatile memory serves as temporary cache for the data before it
+is written to the disk. The server can acknowledge the write request
+as soon as the request is placed in the cache, since the cache is
+considered permanent storage (since it's memory-backed and it
+can survive reboots). Examples of host-based accelerators include the
+<em class="emphasis">Sun StorEdge Fast Write Cache</em> product from Sun
+Microsystems, Inc., and the
+<a name="INDEX-2496" /><em class="emphasis">Prestoserve</em>
+board from Legato Systems, Inc. They both intercept the synchronous
+filesystem write operations to later flush the data to the disk
+drive; significantly improving synchronous filesystem write
+performance.
+</p>
+
+Newer disk array systems provide similar benefits by placing the data
+written in the disk array's NVRAM before the data is written to
+the actual disk platters. In addition, disk arrays provide extra
+features that increase data availability through the use of mirroring
+and parity bits, and increased throughput through the use of
+striping. There are many good books describing the Berkeley
+RAID<a href="#FOOTNOTE-50">[50]</a> concepts. Refer to
+Brian Wong's <em class="emphasis">Configuration and Capacity Planning for
+Solaris Servers</em> book, published by Sun Microsystems Press,
+for a thorough description of disk array caching and
+<em class="emphasis">Prestoserve</em> boards in the Sun architecture.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-50" />[50]RAID stands for Redundant Array of Inexpensive
+Disks. Researchers at Berkeley defined different types of RAID
+configurations, where lots of small disks are used in place of a very
+large disk. The various configurations provide the means of combining
+disks to distribute data among many disks (striping), provide higher
+data availability (mirroring), and provide partial data loss recovery
+(with parity computation).</p> </blockquote>
+
+</div>
+
+<a name="nfs2-CHP-16-SECT-5.4.3" /><div class="sect3">
+<h3 class="sect3">16.5.4.3. Disk load balancing</h3>
+
+If you have one or more "hot" disks that receive an
+unequal share of requests, your NFS performance suffers. To keep
+requests in fairly even queues, you must balance your NFS load across
+your disks.
+</p>
+
+Server response time is improved by balancing the load among all
+disks and minimizing the average waiting time for disk service. Disk
+balancing entails putting heavily used filesystems on separate disks
+so that requests for them may be serviced in parallel. This division
+of labor is particularly important for diskless client servers. If
+all clients have their root and swap filesystems on a single disk,
+requests using that disk may far outnumber those using any other on
+the server. Performance of each diskless client is degraded, as the
+single path to the target disk is a bottleneck. Dividing client
+partitions among several disks improves the overall throughput of the
+client root and swap filesystem requests.
+</p>
+
+The average waiting time endured by each request is a function of the
+random disk transfer rate and of the backlog of requests for that
+disk. Use the <em class="emphasis">iostat -D</em> utility to check the
+utilization of each disk, and look for imbalance in the disk queues.
+The <em class="emphasis">rps</em> and <em class="emphasis">wps</em> values are
+the number of read and write operations, per second, performed on
+each disk device, and the <em class="emphasis">util</em> column shows the
+utilization of the disk's bandwidth:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>iostat -D 5</b></tt> 
+    md10          md11          md12          md13
+rps wps util  rps wps util  rps wps util  rps wps util
+ 17  45 33.7    5   4 10.5    3   3  7.5    5   5 11.6
+  1   5  6.1   17  20 43.7    1   1  2.0    1   0  1.1
+  2   7 10.4   14  22 42.0    0   0  0.7    0   1  2.3</pre></blockquote>
+
+If the disk queues are grossly uneven, consider shuffling data on the
+filesystems to spread the load across more disks. Most medium to
+large servers take advantage of their disk storage array volume
+managers to provide some flavor of RAID to stripe data among multiple
+disks.
+</p>
+
+If all of your disks are more than 75-80% utilized, you are disk
+bound and either need faster disks, more disks, or an environment
+that makes fewer disk requests. Tuning kernel and client
+configurations usually helps to reduce the number of disk requests
+<a name="INDEX-2497" />
+<a name="INDEX-2498" />
+<a name="INDEX-2499" />made by
+NFS clients.
+</p>
+
+</div>
+</div>
+<a name="nfs2-CHP-16-SECT-5.5" /><div class="sect2">
+<h3 class="sect2">16.5.5. Kernel configuration</h3>
+
+A significant amount of NFS requests require only<a name="INDEX-2500" /> <a name="INDEX-2501" /> <a name="INDEX-2502" /> <a name="INDEX-2503" /> information in the
+underlying inode for a file, rather than access to the data blocks
+composing the file. A bottleneck can be introduced in the inode
+table, which serves as a cache for recently opened files. If file
+references from NFS clients frequently require reloading entries in
+the inode table, then the file server is forced to perform expensive
+linear searches through disk-based directory structures for the new
+file pathname requiring an inode table entry.
+</p>
+
+Recently read directory entries are cached on the NFS server in the
+directory name lookup cache, better known as the DNLC. A sufficiently
+large cache speeds NFS <em class="emphasis">lookup</em> operations by
+eliminating the need to read directories from disk. Taking a
+directory cache miss is a fairly expensive operation, since the
+directory must be read from disk and searched linearly for the named
+component. For simplicity and storage, many implementations only
+cache pathnames under 30 characters long. Solaris removes this
+limitation by caching all pathnames regardless of their length. You
+can check your directory name lookup cache hit rate by running
+<em class="emphasis">vmstat -s</em> on your NFS server:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>vmstat -s</b></tt> 
+<i class="lineannotation">...Page and swap info... </i>
+ 621833654 total name lookups (cache hits 96%)
+<i class="lineannotation">...CPU info...</i></pre></blockquote>
+
+If you are hitting the cache less than 90% of the time, increase
+<em class="emphasis">ncsize</em> on the NFS server. The
+<em class="emphasis">ncsize</em> kernel tunable specifies the number of
+entries cached by the DNLC.
+</p>
+
+In Solaris, every file currently opened holds an inode cache entry
+active, making the inode readily available without the need to access
+the disk. To improve performance, inodes for files recently opened
+are kept in this cache, anticipating that they may be accessed again
+in the not too distant future. Furthermore, inodes of files recently
+closed are maintained in an inactive inode cache, in anticipation
+that the same files may be reopened again soon. Since NFS does not
+define an open operation, NFS clients accessing files on the server
+will not hold the file open during access, causing the inodes for
+these files to only be cached in the inactive inode cache. This
+caching greatly improves future accesses by NFS clients, allowing
+them to benefit from the cached inode information instead of having
+to go to disk to satisfy the operation. The size of the inactive
+inode table is determined by the <em class="emphasis">ufs_ninode</em>
+kernel tunable and is set to the value of <em class="emphasis">ncsize</em>
+during boot. If you<a name="INDEX-2504" /> update <em class="emphasis">ncsize</em> during
+runtime, make sure to also update the value of
+<em class="emphasis">ufs_ninode</em> accordingly. The default value for
+<em class="emphasis">ncsize</em> is (<em class="emphasis">maxusers</em> * 68) +
+360. <em class="emphasis">Maxusers</em> can be defined as the number of
+simultaneous users, plus some margin for daemons, and be set to about
+one user per megabyte of RAM in the system, with a default limit of
+4096 in<a name="INDEX-2505" />
+<a name="INDEX-2506" />
+<a name="INDEX-2507" />
+<a name="INDEX-2508" /> Solaris.
+</p>
+
+</div>
+<a name="nfs2-CHP-16-SECT-5.6" /><div class="sect2">
+<h3 class="sect2">16.5.6. Cross-mounting filesystems</h3>
+
+An NFS client may find many of its <a name="INDEX-2509" />
+<a name="INDEX-2510" /> <a name="INDEX-2511" /> <a name="INDEX-2512" />processes in a high-priority wait
+state when an NFS server on which it relies stops responding for any
+reason. If two servers mount filesystems from each other, and the
+filesystems are hard-mounted, it is possible for processes on each
+server to wait on NFS responses from the other. To avoid a deadlock,
+in which processes on two NFS servers go to sleep waiting on each
+other, cross-mounting of servers should be avoided. This is
+particularly important in a network that uses hard-mounted NFS
+filesystems with fairly large timeout and retransmission count
+parameters, making it hard to interrupt the processes that are
+waiting on the NFS server.
+</p>
+
+If filesystem access requires cross-mounted filesystem, they should
+be mounted with the background (<em class="emphasis">bg</em>)
+option.<a href="#FOOTNOTE-51">[51]</a> This ensures that servers will not go
+into a deadly embrace after a power failure or other reboot. During
+the boot process, a machine attempts to mount its NFS filesystems
+before it accepts any incoming NFS requests. If two file servers
+request each other's services, and boot at about the same time,
+it is likely that they will attempt to cross-mount their filesystems
+before either server is ready to provide NFS service. With the
+<em class="emphasis">bg</em> option, each NFS mount will time out and be
+put into the background. Eventually the servers will complete their
+boot processes, and when the network services are started the
+backgrounded mounts complete.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-51" />[51]There are no adverse effects of using the
+background option, so you can use it for all your NFS-mounted
+filesystems.</p> </blockquote>
+
+This deadlock problem goes away when your NFS clients use the
+automounter in place of hard-mounts. Most systems today heavily rely
+on the automounter to administer NFS mounts. Also note that the
+<em class="emphasis">bg</em> mount option is for use by the
+<em class="emphasis">mount</em> command only. It is not needed when the
+mounts are administered with the<a name="INDEX-2513" /> <a name="INDEX-2514" /> <a name="INDEX-2515" /> <a name="INDEX-2516" /> automounter.
+</p>
+
+</div>
+<a name="nfs2-CHP-16-SECT-5.7" /><div class="sect2">
+<h3 class="sect2">16.5.7. Multihomed servers</h3>
+
+When a server exports NFS filesystems on <a name="INDEX-2517" />
+<a name="INDEX-2518" />
+<a name="INDEX-2519" />
+<a name="INDEX-2520" />more than one network interface, it may
+expend a measurable number of CPU cycles forwarding packets between
+interfaces. Consider host <em class="emphasis">boris</em> on four
+networks:
+</p>
+
+<blockquote><pre class="code">138.1.148.1     boris-bb4 
+138.1.147.1     boris-bb3 
+138.1.146.1     boris-bb2 
+138.1.145.1     boris-bb1 boris</pre></blockquote>
+
+Hosts on network 138.1.148.0 are able to "see"
+<em class="emphasis">boris</em> because <em class="emphasis">boris</em>
+forwards packets from any one of its network interfaces to the other.
+Hosts on the 138.1.148.0 network may mount filesystems from either
+hostname:
+</p>
+
+<blockquote><pre class="code">boris:/export/boris 
+boris-bb4:/export/boris </pre></blockquote>
+
+<a name="nfs2-CHP-16-FIG-2" /><div class="figure"><img height="182" alt="Figure 16-2" src="figs/nfs2.1602.gif" width="400" /></div><h4 class="objtitle">Figure 16-2. A multihomed host</h4>
+
+The second form is preferable on network 138.1.148.0 because it does
+not require <em class="emphasis">boris</em> to forward packets to its
+other interface's input queue. Likewise, on network
+138.1.145.0, the <em class="emphasis">boris:/export/boris</em> form is
+preferable. Even though the requests are going to the same physical
+machine, requests that are addressed to the "wrong"
+server must be forwarded, as shown in <a href="ch16_05.html#nfs2-CHP-16-FIG-2">Figure 16-2</a>.
+This adds to the IP protocol processing overhead. If the packet
+forwarding must be done for every NFS RPC request, then
+<em class="emphasis">boris</em> uses more CPU cycles to provide NFS
+service.
+</p>
+
+Fortunately, the automounter handles <a name="INDEX-2521" /> <a name="INDEX-2522" />this automatically. It is able to
+determine what addresses are local to its subnetwork and give strong
+preference to them. If the server reply is not received within a
+given timeout, the automounter <a name="INDEX-2523" /> <a name="INDEX-2524" /> <a name="INDEX-2525" /> <a name="INDEX-2526" />will use<a name="INDEX-2527" /> <a name="INDEX-2528" /> an alternate server address, as
+explained in <a href="ch09_05.html#nfs2-CHP-9-SECT-5.1">Section 9.5.1, "Replicated servers"</a>.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.4. Identifying NFS performance bottlenecks</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17. Network Performance Analysis</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch16_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:43 GMT -->
+</html>

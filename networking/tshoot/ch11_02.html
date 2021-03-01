@@ -1,0 +1,486 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:15 GMT -->
+<head><title>Log Files and Auditing (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.2. Log Files and Auditing</h2>
+
+<a name="INDEX-2709" /><a name="INDEX-2710" />A primary source of
+information on any system is its log files. Of course, log files are
+not unique to networking software. They are simply another aspect of
+general systems management that you must master.
+</p>
+
+Some applications manage their own log files. Web servers and
+accounting software are prime examples. Many of these applications
+have specific needs that aren't well matched to a more general
+approach. In dealing with these, you will have to consult the
+documentation and deal with each on a case-by-case basis.
+Fortunately, most Unix software is now designed to use a central
+logging service, <em class="filename">syslog</em>, which greatly
+simplifies management.
+</p>
+
+<a name="nettroubletools-CHP-11-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">11.2.1. syslog</h3>
+
+<a name="INDEX-2711" /><a name="INDEX-2712" />You
+are probably already familiar with <em class="filename">syslog</em>, a
+versatile logging tool written by Eric Allman. What is often
+overlooked is that <em class="filename">syslog</em> can be used across
+networks. You can log events from your Cisco router to your Unix
+server. There are even a number of Windows versions available. Here
+is a quick review of <em class="filename">syslog</em>.
+</p>
+
+<a name="INDEX-2713" /><a name="INDEX-2714" />An early and persistent criticism of Unix
+was that every application seemed to have its own set of log files
+hidden away in its own directories. <em class="filename">syslog</em> was
+designed to automate and standardize the process of maintaining
+system log files. The main program is the daemon
+<em class="filename">syslogd</em>, typically started as a separate process
+during system initialization. Messages can be sent to the daemon
+either through a set of library routines or by a user command,
+<em class="filename">logger</em>. <em class="filename">logger</em> is
+particularly useful for logging messages from scripts or for testing
+<em class="filename">syslog</em>, e.g., checking file permissions.
+</p>
+
+<a name="nettroubletools-CHP-11-SECT-2.1.1" /><div class="sect3">
+<h3 class="sect3">11.2.1.1. Configuring syslog</h3>
+
+<em class="filename">syslogd</em><a name="INDEX-2715" /><a name="INDEX-2716" /> 's
+behavior is initialized through a configuration file, which by
+default is <em class="filename">/etc/syslog.conf</em>. An alternative file
+can be specified with the <em class="filename">-f</em> option when the
+daemon is started. If changes are made to the configuration file,
+<em class="filename">syslogd</em> must be restarted for the changes to
+take effect. The easiest way to do this is to send it a HUP signal
+using the <em class="filename">kill</em> command. For example:
+</p>
+
+<blockquote><pre class="code">bsd1# kill -HUP 127</pre></blockquote>
+
+where <tt class="literal">127</tt> is the PID for
+<em class="filename">syslogd</em>, found using the <em class="filename">ps</em>
+command. (Alternately, the PID is written to the file
+<em class="filename">/var/run/syslogd.pid</em> on some systems.)
+</p>
+
+<a name="INDEX-2717" /><a name="INDEX-2718" /><a name="INDEX-2719" /><a name="INDEX-2720" />The configuration
+file is a text file with two fields separated by tabs, not spaces!
+Blank lines are ignored. Lines beginning with <tt class="literal">#</tt> in
+the first column are comments. The first field is a
+<em class="emphasis">selector</em>, and the second is an
+<em class="emphasis">action</em>. The selector identifies the program or
+facility sending the message. It is composed of both a facility name
+and a security level. The facility names must be selected from a
+short list of facilities defined for the kernel. You should consult
+the manpage for <em class="filename">syslogd</em> for a complete list and
+description of facilities, as these vary from implementation to
+implementation. The security level is also taken from a predefined
+list: <em class="filename">emerg</em>, <em class="filename">alert</em>,
+<em class="filename">crit</em>, <em class="filename">err</em>,
+<em class="filename">warning</em>, <em class="filename">notice</em>,
+<em class="filename">info</em>, or <em class="filename">debug</em>. Their
+meanings are just what you might guess. <em class="filename">emerg</em> is
+the most severe. You can also use <em class="filename">*</em> for all or
+<em class="filename">none</em> for nothing. Multiple facilities can be
+combined on a single line if you separate them with commas. Multiple
+selectors must be separated with semicolons.
+</p>
+
+<a name="INDEX-2721" />The Action field tells where to send
+the messages. Messages can be sent to files, including device files
+such as the console or printers, logged-in users, or remote hosts.
+Pathnames must be absolute, and the file must exit with the
+appropriate permissions. You should be circumspect in sending too
+much to the console. Otherwise, you may be overwhelmed by messages
+when you are using the console, particularly when you need the
+console the most. If you want multiple actions, you will need
+multiple lines in the configuration file.
+</p>
+
+Here are a few lines from a <em class="filename">syslog.conf</em> file
+that should help to clarify this:
+</p>
+
+<blockquote><pre class="code">mail.info                                       /var/log/maillog
+cron.*                                          /var/log/cron
+security.*                                      @loghost.netlab.lander.edu
+*.notice;news.err                               root
+*.err                                           /dev/console
+*.emerg                                         *</pre></blockquote>
+
+The first line says that all informational messages from
+<em class="filename">sendmail</em> and other mail related programs should
+be appended to the file <em class="filename">/var/log/maillog</em>. The
+second line says all messages from <em class="filename">cron</em>,
+regardless of severity, should be appended to the file
+<em class="filename">/var/log/cron</em>. The next line says that all
+security messages should be sent to a remote system,
+<em class="filename">loghost.netlab.lander.edu</em>. Either a hostname or
+an IP address can be used. The fourth line says that all notice-level
+messages and any news error messages should be sent to root if root
+is logged on. The next to last line says that all error messages,
+including news error messages, should be displayed on the system
+console. Finally, the last line says emergency messages should be
+sent to all users. It is easy to get carried away with configuration
+files, so remember to keep yours simple.
+</p>
+
+<a name="INDEX-2722" /><a name="INDEX-2723" />One
+problem with <em class="filename">syslog</em> on some systems is that, by
+default, the log files are world readable. This is a potential
+security hole. For example, if you log mail transactions, any user
+can determine who is sending mail to whom -- not necessarily
+something you want.
+</p>
+
+</div>
+
+<a name="nettroubletools-CHP-11-SECT-2.1.2" /><div class="sect3">
+<h3 class="sect3">11.2.1.2. Remote logging</h3>
+
+<a name="INDEX-2724" /><a name="INDEX-2725" /><a name="INDEX-2726" /><a name="INDEX-2727" />For anything but the smallest of
+networks, you really should consider remote logging for two reasons.
+First, there is simply the issue of managing and checking everything
+on a number of different systems. If all your log files are on a
+single system, this task is much easier. Second, should a system
+become compromised, one of the first things crackers alter are the
+log files. With remote logging, future entries to log files may be
+stopped, but you should still have the initial entries for the actual
+break-in.
+</p>
+
+To do remote logging, you will need to make appropriate entries in
+the configuration files for two systems. On the system generating the
+message, you'll need to specify the address of the remote
+logging machine. On the system receiving the message, you'll
+need to specify a file for the messages. Consider the case in which
+the source machine is <em class="filename">bsd1</em> and the destination
+is <em class="filename">bsd2</em>. In the configuration file for
+<em class="filename">bsd1</em>, you might have an entry like:
+</p>
+
+<blockquote><pre class="code">local7.*                                        @bsd2.netlab.lander.edu</pre></blockquote>
+
+<em class="filename">bsd2 </em>'s configuration file might have an
+entry like:
+</p>
+
+<blockquote><pre class="code">local7.*                                        /var/log/bsd1</pre></blockquote>
+
+Naming the file for the remote system makes it much easier to keep
+messages straight. Of course, you'll need to create the file
+and enable <em class="filename">bsd2</em> to receive remote messages from
+<em class="filename">bsd1</em>.
+</p>
+
+You can use the <em class="filename">logger</em> command to test your
+configuration. For example, you might use the following to generate a
+message:
+</p>
+
+<blockquote><pre class="code">bsd1# logger -p local7.debug "testing"</pre></blockquote>
+
+This is what the file looks like on <em class="filename">bsd2:</em></p>
+
+<blockquote><pre class="code">bsd2# cat bsd1
+Dec 26 14:22:08 bsd1 jsloan: testing</pre></blockquote>
+
+Notice that both a timestamp and the source of the message have been
+included in the file.
+</p>
+
+<a name="INDEX-2728" /><a name="INDEX-2729" /><a name="INDEX-2730" /><a name="INDEX-2731" />There are a number of problems with remote
+logging. You should be aware that <em class="filename">syslog</em> uses
+UDP. If the remote host is down, the messages will be lost. You will
+need to make sure that your firewalls pass appropriate
+<em class="filename">syslog</em> traffic. <em class="filename">syslog</em>
+messages are in clear text, so they can be captured and read. Also,
+it is very easy to forge a <em class="filename">syslog</em> message.
+</p>
+
+<a name="INDEX-2732" /><a name="INDEX-2733" />It is also possible to overwhelm a
+host with <em class="filename">syslog</em> messages. For this reason, some
+versions of <em class="filename">syslog</em> provide options to control
+whether information from a remote system is allowed. For example,
+with FreeBSD the <em class="filename">-s</em> option can be used to enter
+secure mode so logging requests are ignored. Alternately, the
+<em class="filename">-a</em> option can be used to control hosts from
+which messages are accepted. With some versions of Linux, the
+<em class="filename">-r</em> option is used to enable a system to receive
+messages over the network. While you will need to enable your central
+logging systems to receive messages, you should probably disable this
+on all other systems to avoid potential denial-of-service attacks. Be
+sure to consult the manpage for <em class="filename">syslogd</em> to find
+the particulars for your system.
+</p>
+
+<a name="INDEX-2734" /><a name="INDEX-2735" /><a name="INDEX-2736" /><a name="INDEX-2737" /><a name="INDEX-2738" /><a name="INDEX-2739" /><a name="INDEX-2740" /><a name="INDEX-2741" />Both
+Linux and FreeBSD have other enhancements that you may want to
+consider. If security is a major concern, you may want to investigate
+<em class="emphasis">secure</em> <em class="filename">syslog</em>
+(<em class="filename">ssyslog</em>) or <em class="emphasis">modular</em>
+<em class="filename">syslog</em> (<em class="filename">msyslog</em>). For
+greater functionality, you may also want to look at
+<em class="filename">syslog-ng</em>.<a name="INDEX-2742" /><a name="INDEX-2743" /> 
+</p>
+
+</div>
+</div>
+<a name="nettroubletools-CHP-11-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">11.2.2. Log File Management</h3>
+
+<a name="INDEX-2744" /><a name="INDEX-2745" /><a name="INDEX-2746" /><a name="INDEX-2747" /><a name="INDEX-2748" />Even after you have the log files, whether
+created by <em class="filename">syslog</em> or some other program, you
+will face a number of problems. The first is keeping track of all the
+files so they don't fill your filesystem. It is easy to forget
+fast-growing files, so I recommend keeping a master list for each
+system. You'll want to develop a policy of what information to
+keep and how long to keep it. This usually comes down to some kind of
+log file rotation system in which older files are discarded or put on
+archival media. Be aware that what you save and for how long may have
+legal implications, depending on the nature of your organization.
+</p>
+
+Another issue is deciding how much information you want to record in
+the first place. Many authors argue, with some justification, that
+you should record anything and everything that you might want, no
+matter how remote the possibility. In other words, it is better to
+record too much than to discover, after the fact, that you
+don't have something you need. Of course, if you start with
+this approach, you can cut back as you gain experience.
+</p>
+
+The problem with this approach is that you are likely to be so
+overwhelmed with data that you won't be able to find what you
+need. <em class="filename">syslog</em> goes a long way toward addressing
+this problem with its support for different security levels -- you
+can send important messages one place and everything else somewhere
+else. Several utilities are designed to further simplify and automate
+this process, each with its own set of strengths. These utilities may
+condense or display log files, often in real time. They can be
+particularly useful if you are managing a number of devices.
+</p>
+
+<a name="INDEX-2749" /><a name="INDEX-2750" />Todd Atkins'
+<em class="filename">swatch</em> (simple watcher) is one of the best
+known. Designed with security monitoring in mind, the program is
+really suitable to monitor general system activity.
+<em class="filename">swatch</em> can be run in three different
+ways -- making a pass over a log file, monitoring messages as they
+are appended to a log file, or examining the output from a program.
+You might scan a log file initially to come up-to-date on your
+system, but the second usage is the most common.
+</p>
+
+<em class="filename">swatch</em><a name="INDEX-2751" /><a name="INDEX-2752" /><a name="INDEX-2753" />'s actions include ignoring the
+line, echoing the line on the controlling terminal, ringing the bell,
+sending the message to someone by <em class="filename">write</em> or mail,
+or executing a command using the line as an argument. Behavior is
+determined based on a configuration file composed of up to four
+tab-separated fields. The first and second fields, the pattern
+expression and actions, are the most interesting. The pattern is a
+regular expression used to match messages.
+<em class="filename">swatch</em> is written in Perl, so the syntax used
+for the regular expressions is fairly straightforward.
+</p>
+
+While it is a powerful program, you are pretty much on your own in
+setting up the configuration files. Deciding what you will want to
+monitor is a nontrivial task that will depend on what you think is
+important. Since this could be almost anything -- errors, full
+disks, security problems such as privilege
+violations -- you'll have a lot of choices if you select
+<em class="filename">swatch</em>. The steps are to decide what is of
+interest, identify the appropriate files, and then design your
+filters.
+</p>
+
+<em class="filename">swatch</em><a name="INDEX-2754" /><a name="INDEX-2755" /><a name="INDEX-2756" /> is not unique.
+<em class="filename">xlogmaster</em> is a GTK+ based program for
+monitoring log files, devices, and status-gathering programs. It was
+written by Georg Greve and is available under the GNU General Public
+License. It provides filtering and displays selected events with
+color and audio. Although <em class="filename">xlogmaster</em> is no
+longer being developed, it is a viable program that you should
+consider. Its successor is GNU AWACS. AWACS is new code, currently
+under development, that expands on the capabilities of
+<em class="filename">xlogmaster</em>.
+</p>
+
+<a name="INDEX-2757" />Another program worth looking at is
+<em class="filename">logcheck</em>. This began as a shell script written
+by Craig Rowland. <em class="filename">logcheck</em> is now available
+under the GNU license from Psionic Software, Inc., a company founded
+by Rowland. <em class="filename">logcheck</em> can be run by
+<em class="filename">cron</em> rather than continuously.
+</p>
+
+You should be able to find a detailed discussion of log file
+management in any good book on Unix system administration. Be sure to
+consult <a href="appb_01.html">Appendix B, "Resources and References"</a> for more information.
+</p>
+
+</div>
+<a name="nettroubletools-CHP-11-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">11.2.3. Other Approaches to Logging</h3>
+
+<a name="INDEX-2758" />Unfortunately, many
+services traditionally don't do logging, either through the
+<em class="filename">syslog</em> facility or otherwise. If these services
+are started by <em class="filename">inetd</em>, you have a couple of
+alternatives.
+</p>
+
+<a name="INDEX-2759" /><a name="INDEX-2760" /><a name="INDEX-2761" />Some implementations of
+<em class="filename">inetd</em> have options that will allow connection
+logging. That is, each time a connection is made to one of these
+services, the connection is logged. With <em class="filename">inetd</em>
+on Solaris, the <em class="filename">-t</em> option traces all
+connections. On FreeBSD, the <em class="filename">-l</em> option records
+all successful connections. The problem with this approach is that it
+is rather indiscriminate.
+</p>
+
+<a name="INDEX-2762" />One
+alternative is to replace <em class="filename">inetd</em> with Panos
+Tsirigotis's <em class="filename">xinetd</em>.
+<em class="filename">xinetd</em> is an expanded version of
+<em class="filename">inetd</em> that greatly expands <em class="filename">inetd
+</em>'s functionality, particularly with respect to
+logging. Another program to consider is
+<em class="filename">tcpwrappers</em>.
+</p>
+
+<a name="nettroubletools-CHP-11-SECT-2.3.1" /><div class="sect3">
+<h3 class="sect3">11.2.3.1. tcpwrappers</h3>
+
+<a name="INDEX-2763" /><a name="INDEX-2764" /><a name="INDEX-2765" /><a name="INDEX-2766" /><a name="INDEX-2767" />The <em class="filename">tcpwrappers</em>
+program was developed to provide additional security, including
+logging. Written by Wietse Venema, a well-respected security expert,
+<em class="filename">tcpwrappers</em> is a small program that sits between
+<em class="filename">inetd</em> (or <em class="filename">inetd</em>-like
+programs) and the services started by <em class="filename">inetd</em>.
+When a service is requested, <em class="filename">inetd</em> calls the
+wrapper program, <em class="filename">tcpd</em>, which checks permission
+files, logs its actions, and then, if appropriate, starts the
+service. For example, if you want to control access to
+<em class="filename">telnet</em>, you might change the line in
+<em class="filename">/etc/inetd.conf</em> that starts the
+<em class="filename">telnet</em> daemon from:
+</p>
+
+<blockquote><pre class="code">telnet stream  tcp     nowait  root    /usr/libexec/telnetd    telnetd</pre></blockquote>
+
+to:</p>
+
+<blockquote><pre class="code">telnet  stream  tcp     nowait  root    /usr/sbin/tcpd          telnetd</pre></blockquote>
+
+Now, the wrapper daemon <em class="filename">tcpd</em> is started
+initially instead of <em class="filename">telnetd</em>, the
+<em class="filename">telnet</em> daemon. You'll need to make similar
+changes for each service you want to control. If the service is not
+where <em class="filename">tcpd</em> expects it, you can give an absolute
+path as an argument to <em class="filename">tcpd</em> in the configuration
+file.
+</p>
+
+
+<a name="ch11-14-fm2xml" /><blockquote><b>TIP: </b>
+Actually, there is an alternative way of configuring
+<em class="emphasis">tcpwrappers</em>. You can leave the
+<em class="emphasis">inetd</em> configuration file alone, move each
+service to a new location, and replace the service at its default
+location with <em class="emphasis">tcpd</em>. I strongly discourage this
+approach as it can create maintenance problems, particularly when you
+upgrade your system.
+</p>
+</blockquote>
+
+<a name="INDEX-2768" /><a name="INDEX-2769" />As noted,
+<em class="filename">tcpwrappers</em> is typically used for two
+functions -- logging and access control.<a href="#FOOTNOTE-40">[40]</a> Logging is done through <em class="filename">syslog</em>. The
+particular facility used will depend on how
+<em class="filename">tcpwrappers</em> is compiled. Typically,
+<em class="filename">mail</em> or <em class="filename">local2</em> is used. You
+will need to edit <em class="filename">/etc/syslog.conf</em> and recompile
+<em class="filename">tcpwrappers</em> if you want to change how logging is
+recorded.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-40" />[40]<em class="filename">tcpwrappers</em> provides additional
+functionality not described here, such as login banners.</p>
+</blockquote>
+
+Access is typically controlled through the file
+<em class="filename">/etc/hosts.allow</em>, though some systems may also
+have an <em class="filename">/etc/hosts.deny</em> file. These files
+specify which systems can access which services. These are a few
+potential rules based on the example configuration:
+</p>
+
+<blockquote><pre class="code">ALL : localhost : allow
+sendmail : nice.guy.example.com : allow
+sendmail : .evil.cracker.example.com : deny
+sendmail : ALL : allow</pre></blockquote>
+
+<em class="filename">tcpwrappers</em> uses a first match wins approach.
+The first rule allows all services from the local machine without
+further testing. The next three rules control the
+<em class="filename">sendmail</em> program. The first rule allows a
+specific host, <em class="filename">nice.guy.example.com</em>. All hosts
+on the domain <em class="filename">.evil.cracker.example.com</em> are
+blocked. (Note the leading dot.) Finally, all other hosts are
+permitted to use <em class="filename">sendmail</em>.
+</p>
+
+<a name="INDEX-2770" /><a name="INDEX-2771" /><a name="INDEX-2772" /><a name="INDEX-2773" /><a name="INDEX-2774" /><a name="INDEX-2775" />There are a number of other forms for rules
+that are permitted, but these are all pretty straightforward. The
+distribution comes with a very nice example file. But, should you
+have problems, <em class="filename">tcpwrappers</em> comes with two
+utilities for testing configuration files.
+<em class="filename">tcpdchk</em> looks for general syntax errors within
+the file. <em class="filename">tcpdmatch</em> can be used to check how
+<em class="filename">tcpd</em> will respond to a specific action. (Kudos
+to Venema for including these!)
+</p>
+
+The primary limitation to <em class="filename">tcpwrappers</em> is that,
+since it disappears after it starts the target service, its control
+is limited to the brief period while it is running. It provides no
+protection from attacks that begin after that point.
+</p>
+
+<em class="filename">tcpwrappers</em> is a ubiquitous program. In fact, it
+is installed by default on many Linux systems. Incidentally, some
+versions of <em class="filename">inetd</em> now have wrappers technology
+built-in. Be sure to review your documentation.<a name="INDEX-2776" /><a name="INDEX-2777" />
+</p>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11. Miscellaneous Tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.3. NTP</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:15 GMT -->
+</html>

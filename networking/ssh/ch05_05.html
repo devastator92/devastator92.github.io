@@ -1,0 +1,2390 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:10 GMT -->
+<head><title>Letting People in: Authentication and Access Control (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.5. Letting People in: Authentication and Access Control</h2>
+
+
+
+<a name="INDEX-838" />A
+large part of the SSH server's job is to grant or deny
+connection requests from clients. This is done at two levels:
+<em class="emphasis">authentication</em> and <em class="emphasis">access
+control</em> (a.k.a <em class="emphasis">authorization</em>).</p>
+
+
+
+Authentication, as we've seen, means verifying the identity of
+the user requesting a connection. Access control means permitting or
+denying SSH connections from particular users, machines, or Internet
+domains.</p>
+
+
+
+<a name="ch05-46136" /><div class="sect2">
+<h3 class="sect2">5.5.1. Authentication</h3>
+
+
+
+<tt class="command">sshd</tt> supports several different techniques for
+authentication that may be enabled or disabled. [<a href="ch03_01.html#ch03-14161">Section 3.1.3, "Authentication "</a>] [<a href="ch03_04.html#ch03-83508">Section 3.4.2, "Client Authentication"</a>] For example, if
+you don't trust password authentication, you can turn it off
+serverwide but still permit public-key authentication.</p>
+
+
+
+As SSH has evolved, the syntax for configuring authentication has
+changed several times. We cover not only the current keywords but
+also the deprecated or obsolete ones, in case you're running an
+older version of <tt class="command">sshd</tt>.</p>
+
+
+
+In <a name="INDEX-839" />SSH1 and
+<a name="INDEX-840" />OpenSSH, different authentication
+techniques are turned on and off with keywords of the form:</p>
+
+
+
+<blockquote><pre class="code"><em class="replaceable">Name_Of_Technique</em>Authentication</pre></blockquote>
+
+
+
+For example, password authentication is controlled by the keyword
+<tt class="literal">Password-Authentication</tt>, RSA public-key
+authentication by <tt class="literal">RSA-Authentication</tt>, and so
+forth, one keyword per technique. Values may be
+<tt class="literal">yes</tt> or <tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH; deprecated for SSH2
+RSAAuthentication yes</pre></blockquote>
+
+
+
+<a name="INDEX-841" />Early versions of SSH2 also used one
+keyword per authentication technique, but keywords were a bit more
+generic. Instead of <tt class="literal">RSAAuthentication</tt>, which
+mentions the algorithm RSA, the keyword was changed to
+<tt class="literal">PubKeyAuthentication</tt> without naming a specific
+algorithm.</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only, but deprecated
+PubKeyAuthentication yes</pre></blockquote>
+
+
+
+This left the door open for the support of other public key
+algorithms. The older keywords such as
+<tt class="literal">RSAAuthentication</tt> were still usable as synonyms
+for the more generic keywords.</p>
+
+
+
+SSH2 today uses an entirely different syntax. Instead of creating a
+new keyword for each technique, it uses only two keywords,
+<tt class="literal">AllowedAuthentications</tt><a name="INDEX-842" />
+and
+<tt class="literal">RequiredAuthentications</tt><a name="INDEX-843" />.
+Each is followed by the names of one or more authentication
+techniques, for example:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only; recommended technique
+AllowedAuthentications password,hostbased,publickey</pre></blockquote>
+
+
+
+<tt class="literal">AllowedAuthentications</tt> specifies which techniques
+can be used to connect to this SSH server.<a href="#FOOTNOTE-60">[60]</a> In contrast,
+<tt class="literal">RequiredAuthentications</tt> specifies which ones must
+be used.<a href="#FOOTNOTE-61">[61]</a> A configuration line
+like:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-60" />[60]The order
+is not significant, since the client drives the authentication
+process.</p>
+
+
+</blockquote><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-61" />[61]<tt class="literal">RequiredAuthentications</tt>
+was broken in SSH2 2.0.13, causing authentication to always fail. The
+problem was fixed in 2.1.0.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH2 only; recommended technique
+AllowedAuthentications publickey,password
+RequiredAuthentications publickey,password</pre></blockquote>
+
+
+
+means that the server requires both public-key and password
+authentication before allowing a connection. The
+<tt class="literal">RequiredAuthentications</tt> list must be a subset of
+<tt class="literal">AllowedAuthentications</tt>: a required technique must
+also be allowed. By default, <tt class="command">sshd2</tt> allows only
+password and public-key authentication.</p>
+
+
+
+If you think about it, these keywords are a little confusing, or at
+least not well-chosen. In practice, if you use
+<tt class="literal">RequiredAuthentications</tt> at all, it always has
+exactly the same value as <tt class="literal">AllowedAuthentications</tt>:
+there's no point in having a method allowed but not in the
+"required" set, since that method doesn't get you a
+connection. It would be more useful to be able to specify multiple
+subsets of the allowed methods, which are the combinations acceptable
+for authenticating a client.</p>
+
+
+
+<a href="ch05_05.html#ch05-65960">Table 5-1</a> displays the
+<a name="INDEX-844" />authentication-related keywords.</p>
+
+
+
+<a name="ch05-65960" /><h4 class="objtitle">Table 5-1. Authentication-Related Keywords </h4><table border="1">
+
+
+
+
+
+
+<tr>
+<th>
+Type</p></th>
+<th>
+SSH1</p></th>
+<th>
+OpenSSH</p></th>
+<th>
+New SSH2</p></th>
+<th>
+Old SSH2</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">AllowedAuthentications</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">DSAAuthentication</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+Yes <a href="#FOOTNOTE-62">[62]</a></p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">KerberosAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">PasswordAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+Deprecated</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">PubKeyAuthentication</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Deprecated</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">RequiredAuthentications</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">RhostsAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">RhostsPubKeyAuthentication</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">RhostsRSAAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">RSAAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+Deprecated</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SKeyAuthentication</pre></blockquote></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">TISAuthentication</pre></blockquote></td>
+<td>
+Yes</p></td>
+<td>
+Yes<a href="#FOOTNOTE-63">[63]</a></p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+<a name="FOOTNOTE-62" />[62]SSH-2 protocol only.</p>
+
+
+</blockquote><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-63" />[63]Actually means S/Key authentication, not
+TIS.</p>
+
+
+</blockquote>
+
+
+
+We now describe how to enable and disable each type of
+authentication.</p>
+
+
+
+<a name="ch05-24-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.1. Password authentication</h3>
+
+
+
+<a name="INDEX-845" /><a name="INDEX-846" />Password
+authentication accepts your login password as proof of identity.
+[<a href="ch03_04.html#ch03-24952">Section 3.4.2.1, "Password authentication "</a>] In SSH1 and OpenSSH, password
+authentication is permitted or forbidden with the
+<tt class="literal">PasswordAuthentication</tt><a name="INDEX-847" />
+keyword, given the value <tt class="literal">yes</tt> (the default) or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH; deprecated for SSH2
+PasswordAuthentication yes</pre></blockquote>
+
+
+
+<tt class="literal">PasswordAuthentication</tt> works for SSH2, but this
+keyword is discouraged. Instead, use the keyword
+<tt class="literal">AllowedAuthentications</tt><a name="INDEX-848" />
+with a value of <tt class="literal">password</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowedAuthentications password</pre></blockquote>
+
+
+
+Normally, password authentication requires your ordinary login
+password. However, this may be changed by compile-time configuration.
+For SSH1, if Kerberos or SecurID support has been compiled into the
+server, password authentication changes to support Kerberos [<a href="ch05_05.html#ch05-86440">Section 5.5.1.7, "Kerberos authentication"</a>] or SecurID. [<a href="ch05_05.html#ch05-29482">Section 5.5.1.9, "SecurID authentication"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch05-25-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.2. Public-key authentication</h3>
+
+
+
+<a name="INDEX-849" /><a name="INDEX-850" />Public-key authentication
+verifies a user's identity by way of cryptographic keys. [<a href="ch03_04.html#ch03-49086">Section 3.4.2.2, "Public-key authentication"</a>] In SSH1 and OpenSSH/1, public-key
+authentication uses RSA encryption and is permitted or forbidden with
+the
+<tt class="literal">RSAAuthentication</tt><a name="INDEX-851" />
+keyword. It may have the value <tt class="literal">yes</tt> (the default)
+or <tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH; deprecated for SSH2
+RSAAuthentication yes</pre></blockquote>
+
+
+
+The keyword <tt class="literal">RSAAuthentication</tt> works for SSH2, as
+does the more general-sounding keyword
+<tt class="literal">PubKeyAuthentication</tt><a name="INDEX-852" />,
+which has the same function, but both are no longer recommended.
+Instead, use the keyword
+<tt class="literal">Allowed-Authentications</tt><a name="INDEX-853" />
+with a value of <tt class="literal">publickey</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowedAuthentications publickey</pre></blockquote>
+
+
+
+OpenSSH provides public-key authentication for SSH-2 connections with
+the
+<tt class="literal">DSAAuthentication</tt><a name="INDEX-854" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH/2 only
+DSAAuthentication yes</pre></blockquote>
+
+
+
+Public-key authentication is marvelously configurable for most Unix
+SSH implementations. See <a href="ch08_01.html">Chapter 8, "Per-Account Server Configuration"</a> for details on
+tailoring authentication for individual accounts.</p>
+</div>
+
+
+
+
+
+<a name="ch05-20102" /><div class="sect3">
+<h3 class="sect3">5.5.1.3. Rhosts authentication</h3>
+
+
+
+<a name="INDEX-855" /><a name="INDEX-856" />Trusted-host
+authentication verifies an SSH client's identity by checking
+the remote hostname and username associated with it. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] In SSH1 and OpenSSH, two types of trusted-host
+authentication are supported. The weaker Rhosts authentication mimics
+the behavior of the Berkeley r-commands (<tt class="command">rsh</tt>,
+<tt class="command">rcp</tt>, <tt class="command">rlogin</tt>), checking the
+server files <em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">~/.rhosts</em> for permission to authenticate and
+using the network naming service (e.g., DNS, NIS) and privileged TCP
+source port to verify the client host's identity. SSH2
+doesn't support this insecure technique.</p>
+
+
+
+Rhosts authentication is permitted or forbidden with the
+<tt class="literal">RhostsAuthentication</tt><a name="INDEX-857" />
+keyword, given the value <tt class="literal">yes</tt> (the default) or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+RhostsAuthentication yes</pre></blockquote>
+
+
+
+Rhosts authentication can be useful, but unfortunately it also
+enables connections via the insecure r-commands, since it uses the
+same permission files. To eliminate this potential security risk, use
+the SSH-specific files <em class="filename">/etc/shosts.equiv</em> and
+<em class="filename">~/.shosts</em> instead, deleting
+<em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">~/.rhosts.</em> You can also tell the SSH server to
+ignore all users' <em class="filename">.rhosts </em>and
+<em class="filename">.shosts</em> files with the keyword
+<tt class="literal">IgnoreRhosts</tt><a name="INDEX-858" />.
+Permissible values are <tt class="literal">yes</tt> (to ignore them) or
+<tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+IgnoreRhosts yes</pre></blockquote>
+
+
+
+Some subtleties: although the keyword name contains
+"Rhosts," remember that it applies to
+<em class="emphasis">.shosts</em> files as well. Also, although user files
+are ignored by <tt class="literal">Ignore-Rhosts</tt>,
+<em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">/etc/shosts.equiv</em> remain in force.</p>
+
+
+
+SSH1 and SSH2 also permit separate control over Rhosts authentication
+for root. The keyword
+<tt class="literal">IgnoreRootRhosts</tt><a name="INDEX-859" />
+permits or prevents use of the superuser's
+<em class="filename">.rhosts</em> and <em class="filename">.shosts</em> files,
+overriding <tt class="literal">IgnoreRhosts</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+IgnoreRootRhosts yes</pre></blockquote>
+
+
+
+Values of <tt class="literal">yes</tt> (ignore the files) or
+<tt class="literal">no</tt> (don't ignore) are permitted. If not
+specified, the value of <tt class="literal">IgnoreRootRhosts</tt> defaults
+to that of <tt class="literal">IgnoreRhosts</tt>. For example, you can
+permit all <em class="filename">.rhosts</em> files except root's:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+IgnoreRhosts no
+IgnoreRootRhosts yes</pre></blockquote>
+
+
+
+You can also ignore all <em class="filename">.rhosts</em> files except
+root's:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+IgnoreRhosts yes
+IgnoreRootRhosts no</pre></blockquote>
+
+
+
+Again, <tt class="literal">IgnoreRootRhosts</tt> doesn't stop the
+server from considering <em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">/etc/shosts.equiv</em>. For stronger security,
+it's best to disable <em class="filename">.rhosts</em> access
+entirely.</p>
+
+
+
+Rhosts authentication can be complicated by other aspects of your
+server machine's environment, such as DNS, NIS, and the
+ordering of entries in static host files. It may also open new
+avenues for attack on a system. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch05-26-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.4. Stronger trusted-host authentication</h3>
+
+
+<a name="INDEX-860" /><a name="INDEX-861" />
+
+The second, stronger type of trusted-host authentication is supported
+by SSH1, SSH2, and OpenSSH. For SSH1 and OpenSSH/1, it is called
+RhostsRSA authentication, and for SSH2, hostbased
+authentication.<a href="#FOOTNOTE-64">[64]</a> In either case, the less secure parts of
+<em class="emphasis">rhosts</em> authentication are supplemented by
+cryptographic tests of host keys. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] The
+files <em class="filename">/etc/hosts.equiv</em> and
+<em class="filename">~/.rhosts</em> (and the SSH-specific
+<em class="filename">/etc/shosts.equiv</em> and
+<em class="filename">~/.shosts</em>) are still consulted, but they
+aren't sufficient to pass the test.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-64" />[64]OpenSSH 2.3.0 doesn't yet
+support hostbased authentication for SSH-2 connections.</p>
+
+
+</blockquote>
+
+
+
+SSH1 and OpenSSH use the keyword
+<tt class="literal">RhostsRSAAuthentication</tt><a name="INDEX-862" />
+(surprise!) to enable or disable this type of authentication:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH; deprecated for SSH2
+RhostsRSAAuthentication yes</pre></blockquote>
+
+
+
+The keyword <tt class="literal">RhostsRSAAuthentication</tt> is accepted by
+<tt class="command">sshd2</tt>, as is the more general-sounding keyword
+<tt class="literal">RhostsPubKeyAuthentication</tt><a name="INDEX-863" />,
+which has the same function; however, both keywords are considered
+obsolete. Instead, use the keyword
+<tt class="literal">AllowedAuthentications</tt><a name="INDEX-864" /> with the value
+<tt class="literal">hostbased</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowedAuthentications hostbased</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-27-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.5. Fetching public keys of known hosts</h3>
+
+
+
+<tt class="command">sshd2</tt><a name="INDEX-865" /> needs the public keys of
+all hosts from which it accepts connections via hostbased
+authentication. These keys are kept in separate files in the
+<a name="INDEX-866" />directory
+<em class="filename">/etc/ssh2/knownhosts</em>. A host's
+<a name="INDEX-867" />public key is
+fetched from this directory whenever that host requests a connection.
+Optionally, the server also searches the directory
+<em class="filename">~/.ssh2/knownhosts</em> in the target user's
+account. This optional feature is enabled with the keyword
+<tt class="literal">UserKnownHosts</tt><a name="INDEX-868" />,
+with a value of <tt class="literal">yes</tt> (the default) or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+UserKnownHosts no</pre></blockquote>
+
+
+
+OpenSSH supports the same functionality, but reversed, with the
+<tt class="literal">IgnoreUser-KnownHosts</tt><a name="INDEX-869" />
+keyword. The value <tt class="literal">yes</tt> causes the user's
+known hosts database to be ignored; the default is
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+IgnoreUserKnownHosts yes</pre></blockquote>
+
+
+
+Having <tt class="command">sshd</tt> consult the user's known hosts
+database might be unacceptable in a security-conscious environment.
+Since hostbased authentication relies on the integrity and correct
+administration of the client host, the system administrator usually
+grants hostbased authentication privileges to only a limited set of
+audited hosts. If the user's file is respected, however, a user
+can extend this trust to a possibly insecure remote host. An attacker
+can then:</p>
+
+
+
+<ol><li>Compromise the insecure, remote host</p></li><li>Impersonate the user on the remote host</p></li><li>Access the user's local account via SSH, without needing a key
+passphrase or the local account password</p></li></ol>
+</div>
+
+
+
+
+
+<a name="ch05-91310" /><div class="sect3">
+<h3 class="sect3">5.5.1.6. PGP authentication</h3>
+
+
+
+<a name="INDEX-870" />Pretty
+Good Privacy
+<a name="INDEX-871" />(PGP)
+is another security product employing public-key authentication.
+[<a href="ch01_06.html#ch01-77776">Section 1.6.2, "Pretty Good Privacy (PGP)"</a>] PGP keys and SSH keys are implemented
+differently and aren't interchangeable. However, recent
+versions of SSH2 now support authentication by PGP key, following the
+OpenPGP standard. Yes, you can use your favorite PGP key to prove
+your identity to an SSH2 server (as long as the key file is
+<a name="INDEX-872" />OpenPGP-compatible; some PGP
+keys, especially those produced by older software versions,
+aren't). At press time, this feature is only sketchily
+documented. Here's how to make it work.</p>
+
+
+
+First, you need SSH2 2.0.13 or higher, or the corresponding version
+from F-Secure, installed on both the client and server machines.
+Also, both implementations must be compiled with PGP support
+included, using the compile-time flag
+<tt class="literal"> -- with-pgp</tt><a name="INDEX-873" />. [<a href="ch04_01.html#ch04-56995">Section 4.1.5.7, "Authentication"</a>]</p>
+
+
+
+On the client machine, you need to make your PGP secret key ring and
+the desired secret key for authentication available to SSH2 clients.
+Here's how:</p>
+
+
+
+<ol><li>Copy your PGP secret key ring to your account's SSH2 directory,
+<em class="filename">~/.ssh2.</em> Suppose it is called
+<em class="filename">secring.pgp</em>.</p></li><li>In an identification file, either
+<em class="filename">~/.ssh2/identification</em> or another of your
+choice, indicate the secret key ring with the keyword
+<tt class="literal">PgpSecretKeyFile</tt><a name="INDEX-874" />:</p>
+
+
+<blockquote><pre class="code"># SSH2 only
+PgpSecretKeyFile secring.pgp</pre></blockquote>
+</li>
+
+
+<li>Identify the PGP key you wish to use for authentication. This may be
+done with any of three keywords:</p>
+
+
+<ul><li>To identify the key by name, use
+<tt class="literal">IdPgpKeyName</tt><a name="INDEX-875" />:</p>
+
+
+<blockquote><pre class="code"># SSH2 only
+IdPgpKeyName mykey</pre></blockquote>
+</li>
+
+<li>To identify the key by its PGP fingerprint, use
+<tt class="literal">IdPgpKeyFingerprint</tt><a name="INDEX-876" />:</p>
+<blockquote><pre class="code"># SSH2 only
+IdPgpKeyFingerprint 48 B5 EA 28 80 5E 29 4D 03 33 7D 17 5E 2E CD 20</pre></blockquote>
+
+</li>
+
+<li>To identify the key by its key ID, use
+<tt class="literal">IdPgpKeyId</tt><a name="INDEX-877" />:</p>
+
+<blockquote><pre class="code"># SSH2 only
+IdPgpKeyId 0xD914738D</pre></blockquote>
+</li>
+</ul>
+
+</li>
+</ol>
+
+
+For <tt class="literal">IdPgpKeyId</tt>, the leading <tt class="literal">0x</tt>
+is necessary, indicating that the value is in hexadecimal. You can
+give the value in decimal instead, without the leading
+<tt class="literal">0x</tt>, but since PGP displays the value in hex
+already, it's unlikely you'd want to do this.</p>
+
+
+
+On the server machine (say, <em class="emphasis">server.example.com</em>), you need to make
+your public key ring and the desired public key for authentication
+available to the SSH2 server:</p>
+
+
+
+<ol><li>Copy your public key ring from the client machine to the server
+machine. (Note that this is a key ring, not a lone public key.) Place
+the ring into your <em class="filename">~/.ssh2</em> directory on the
+server. Suppose it is called <em class="filename">pubring.pgp</em>.</p></li><li>In your authorization file,
+<em class="filename">~/.ssh2/authorization</em>, identify the public key
+ring with the keyword
+<tt class="literal">PgpPublicKeyFile</tt><a name="INDEX-878" />:</p>
+<blockquote><pre class="code"># SSH2 only
+PgpPublicKeyFile pubring.pgp</pre></blockquote>
+</li>
+
+<li>Identify the public key by name, fingerprint, or key ID as in the
+client's identification file. The relevant keywords are
+slightly different:
+<tt class="literal">PgpKeyName</tt><a name="INDEX-879" />,
+<tt class="literal">PgpKeyFingerprint</tt><a name="INDEX-880" />,
+and
+<tt class="literal">PgpKeyId</tt><a name="INDEX-881" />,
+respectively. (The keywords for the identification file begin with
+"Id".)</p>
+<blockquote><pre class="code"># SSH2 only: use any ONE of these
+PgpKeyName mykey
+PgpKeyFingerprint 48 B5 EA 28 80 5E 29 4D 03 33 7D 17 5E 2E CD 20
+PgpKeyId 0xD914738D</pre></blockquote></li></ol>
+
+
+
+You are done! From the client, initiate an SSH2 session. Suppose you
+create an alternative identification file to use PGP authentication,
+called <em class="filename">~/.ssh2/idpgp</em>, containing your
+<tt class="literal">PgpSecretKeyFile</tt><a name="INDEX-882" />
+and other lines. Use the <em class="emphasis">-i</em> flag to indicate
+this file, and initiate a connection:</p>
+
+
+
+<blockquote><pre class="code">$ ssh2 -i idpgp server.example.com</pre></blockquote>
+
+
+
+If everything is set up properly, you are prompted for your PGP
+passphrase:</p>
+
+
+
+<blockquote><pre class="code">Passphrase for pgp key "mykey":</pre></blockquote>
+
+
+
+Enter your PGP passphrase, and authentication should succeed.</p>
+</div>
+
+
+
+
+
+<a name="ch05-86440" /><div class="sect3">
+<h3 class="sect3">5.5.1.7. Kerberos authentication</h3>
+
+
+
+<a name="INDEX-883" /><a name="INDEX-884" />Kerberos
+can be used as an authentication mechanism by SSH1 and
+OpenSSH.<a href="#FOOTNOTE-65">[65]</a>
+We summarize the Kerberos-related configuration keywords here and
+defer a more detailed treatment of the topic. [<a href="ch11_04.html#ch11-75655">Section 11.4, "Kerberos and SSH"</a>] Just as this book went to press, SSH2 2.3.0
+was released with "experimental" Kerberos-5 support,
+which we don't discuss here.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-65" />[65]They use different versions of Kerberos:
+Kerberos-5 for SSH1, and Kerberos-4 for OpenSSH.</p>
+
+
+</blockquote>
+
+
+
+First, note that Kerberos authentication is supported only if it is
+enabled at compile time. Unless the configuration option
+<tt class="literal"> -- with-kerberos5</tt><a name="INDEX-885" /> (SSH1)
+or <tt class="literal"> -- with-kerberos4</tt><a name="INDEX-886" />
+(OpenSSH) is used, Kerberos support isn't present in
+<tt class="command">sshd</tt>.</p>
+
+
+
+Assuming the server supports it, Kerberos authentication is enabled
+or disabled by the keyword
+<tt class="literal">KerberosAuthentication</tt><a name="INDEX-887" />
+with the value <tt class="literal">yes</tt> or <tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KerberosAuthentication yes</pre></blockquote>
+
+
+
+The default is <tt class="literal">yes</tt> if Kerberos support has been
+compiled into the server; otherwise, the default is
+<tt class="literal">no</tt>.</p>
+
+
+
+Connections may be authenticated by Kerberos ticket or by password
+(authenticated by the Kerberos server) if password authentication is
+also enabled:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KerberosAuthentication yes
+PasswordAuthentication yes</pre></blockquote>
+
+
+
+Instead of checking against the local login password,
+<tt class="command">sshd</tt> instead requests a Kerberos TGT for the user
+and allows login if the ticket matches the password.<a href="#FOOTNOTE-66">[66]</a> It also
+stores that TGT in the user's credentials cache, eliminating
+the need to do a separate <tt class="command">kinit</tt>.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-66" />[66]It also requires a successful granting of a host ticket for the
+local host as an antispoofing measure.</p>
+
+
+</blockquote>
+
+
+
+If Kerberos fails to validate a password, the server optionally
+validates the same password by ordinary password authentication. This
+is useful in an environment where Kerberos is in use, but not by
+everyone. To enable this option, use the keyword
+<tt class="literal">KerberosOrLocalPasswd</tt><a name="INDEX-888" />
+with a value of <tt class="literal">yes</tt>; the default is
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KerberosOrLocalPasswd yes</pre></blockquote>
+
+
+
+Finally, the keyword
+<tt class="literal">KerberosTgtPassing</tt><a name="INDEX-889" />
+controls whether the SSH server does Kerberos ticket-granting-ticket
+(TGT) forwarding:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KerberosTgtPassing yes</pre></blockquote>
+
+
+
+Its default value follows the same rule as
+<tt class="literal">KerberosAuthentication</tt>: if Kerberos support is
+compiled into the server, the default is <tt class="literal">yes</tt>,
+otherwise <tt class="literal">no</tt>.</p>
+
+
+
+OpenSSH adds the keyword
+<tt class="literal">KerberosTicketCleanup</tt><a name="INDEX-890" />,
+which deletes the user's Kerberos ticket cache on logout.
+Values are <tt class="literal">yes</tt> and <tt class="literal">no</tt>, and the
+default is <tt class="literal">yes</tt>, to perform the deletion:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+KerberosTicketCleanup yes</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-42015" /><div class="sect3">
+<h3 class="sect3">5.5.1.8. TIS authentication</h3>
+
+
+
+The SSH1 server may authenticate users via the Gauntlet firewall
+toolkit from <a name="INDEX-891" />Trusted Information Systems (TIS). When
+an SSH client tries to authenticate via Gauntlet, the SSH server
+communicates with Gauntlet's authentication server,
+<tt class="command">authsrv</tt>, forwarding <tt class="command">authsrv
+</tt>'s requests to the client, and the client's
+responses to <tt class="command">authsrv</tt>.</p>
+
+
+
+TIS authentication is a compile-time option, controlled by the
+configuration flag <tt class="literal"> -- with-tis</tt>.
+[<a href="ch04_01.html#ch04-56995">Section 4.1.5.7, "Authentication"</a>] Assuming support has been compiled into
+<tt class="command">sshd</tt>, TIS authentication is enabled and disabled
+by the keyword
+<tt class="literal">TISAuthentication</tt><a name="INDEX-892" />
+with a value of <tt class="literal">yes</tt> or <tt class="literal">no</tt> (the
+default):</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+TISAuthentication yes</pre></blockquote>
+
+
+
+See the file <em class="filename">README.TIS</em> in the SSH1 distribution
+for further details about TIS authentication. Additional information
+on Trusted Information Systems and <tt class="command">authsrv</tt> can be
+found at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.tis.com/">http://www.tis.com/</a></p>
+
+<a href="http://www.msg.net/utility/FWTK/">http://www.msg.net/utility/FWTK/</a></p>
+
+<a href="http://www.fwtk.org/">http://www.fwtk.org/</a></p>
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-29482" /><div class="sect3">
+<h3 class="sect3">5.5.1.9. SecurID authentication</h3>
+
+
+
+<a name="INDEX-893" /><a name="INDEX-894" />SecurID from Security Dynamics is a
+hardware-based authentication technique. Users need a physical card,
+called a SecurID card, in order to authenticate. The card contains a
+microchip that displays (on a little LCD) an integer that changes at
+regular intervals. To authenticate, you must provide this integer
+along with your password. Some versions of the SecurID card also have
+a keypad that supports entering a password, for two-factor
+authentication.</p>
+
+
+
+If the SSH1 server is compiled with support for SecurID, using
+<tt class="literal"> -- with-securid</tt><a name="INDEX-895" />, password
+authentication is transformed into SecurID authentication. [<a href="ch04_01.html#ch04-56995">Section 4.1.5.7, "Authentication"</a>] Users must provide the current integer from
+their card in order to authenticate.</p>
+</div>
+
+
+
+
+
+<a name="ch05-81830" /><div class="sect3">
+<h3 class="sect3">5.5.1.10. S/Key authentication</h3>
+
+
+
+<a name="INDEX-896" /><a name="INDEX-897" />S/Key is a <a name="INDEX-898" />one-time
+password system, created by Bellcore, supported as an SSH
+authentication method only by OpenSSH. "One-time" means
+that each time you authenticate, you provide a different password,
+helping to guard against attacks, since a captured password will
+likely be useless. Here's how it works:</p>
+
+
+
+<ol><li>When you connect to a remote service, it provides you with an integer
+and a string, called the <em class="emphasis">sequence
+number</em><a name="INDEX-899" /> and the
+<em class="emphasis">key</em><a name="INDEX-900" />, respectively.</p></li><li>You enter the sequence number and key into an
+<em class="emphasis">s/key</em> <em class="emphasis">calculator</em> program on
+your local machine.</p></li><li>You also enter a secret passphrase into the calculator, known only to
+yourself. This passphrase isn't transmitted over the network,
+only into the calculator on your local machine, so security is
+maintained.</p></li><li>Based on the three inputs you provided, the calculator produces your
+one-time password.</p></li><li>You enter the password to authenticate to the remote service.</p></li></ol>
+The OpenSSH server optionally supports S/Key authentication if you
+set the keyword
+<tt class="literal">SKeyAuthentication</tt><a name="INDEX-901" />.
+The default is <tt class="literal">yes</tt>, to support it. To turn it off,
+use <tt class="literal">no</tt>.</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+SkeyAuthentication no</pre></blockquote>
+
+
+
+More information on one-time passwords is found at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.ietf.cnri.reston.va.us/html.charters/otp-charter.html">http://www.ietf.cnri.reston.va.us/html.charters/otp-charter.html</a></p>
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-28-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.11. PAM authentication</h3>
+
+
+
+<a name="INDEX-902" />The Pluggable Authentication Modules
+system
+(<a name="INDEX-903" /><a name="INDEX-904" />PAM) by Sun Microsystems is an
+infrastructure for supporting multiple authentication methods.
+Ordinarily when a new authentication mechanism comes along, programs
+need to be rewritten to accommodate it. PAM eliminates this hassle.
+Programs are written to support PAM, and new authentication
+mechanisms may be plugged in at runtime without further source-code
+modification. More PAM information is found at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.sun.com/solaris/pam/">http://www.sun.com/solaris/pam/</a></p>
+
+</blockquote>
+
+
+
+OpenSSH includes support for PAM. SSH1 1.2.27 has been integrated
+with PAM by a third party, but the combination requires changes to
+the SSH1 source code. Details are found at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://diamond.rug.ac.be/sshd_PAM/">http://diamond.rug.ac.be/sshd_PAM/</a></p>
+
+</blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-29-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.1.12. AFS token passing</h3>
+
+
+
+The
+<a name="INDEX-905" /><a name="INDEX-906" />Andrew File System (AFS) is a
+distributed filesystem with goals similar to NFS, but more
+sophisticated and scalable. It uses a modified version of the
+<a name="INDEX-907" />Kerberos 4 protocol for authentication.
+OpenSSH can be compiled with support for AFS, using the compile-time
+flags <tt class="literal"> -- with-afs</tt> and
+<tt class="literal"> -- with-kerberos4</tt>. The keyword
+<tt class="literal">AFSTokenPassing</tt><a name="INDEX-908" />
+controls this feature, given a value of <tt class="literal">yes</tt>
+(accept forwarded tokens, the default) or <tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+KerberosAuthentication  yes
+KerberosTGTPassing      yes
+AFSTokenPassing         yes</pre></blockquote>
+
+
+
+<tt class="literal">AFSTokenPassing</tt> causes OpenSSH to establish
+Kerberos/AFS credentials on the remote host, based on your existing
+credentials on the client (which you must have previously obtained
+using
+<tt class="command">klog</tt><a name="INDEX-909" />
+or
+<tt class="command">kinit</tt><a name="INDEX-910" />).
+This can be a necessity for using OpenSSH at all in an AFS
+environment, not just a convenience: if your remote home directory is
+on AFS, <tt class="command">sshd</tt> needs AFS credentials to access your
+remote <em class="filename">~/.ssh</em> directory in order to perform
+public-key authentication, for example. In that case, you may also
+need to use AFS tools to adjust the permissions on the remote
+<em class="filename">~/.ssh</em> directory, to allow
+<tt class="command">sshd</tt> to read what it needs to. Just make sure that
+others cannot read your sensitive files
+(<em class="filename">~/.ssh/identity</em>, any other private key files,
+and <em class="filename">~/.ssh/random_seed</em> )<em class="filename">.</em>
+For more information on AFS, visit:<a name="INDEX-911" /></p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.alw.nih.gov/Docs/AFS/AFS_toc.html">http://www.alw.nih.gov/Docs/AFS/AFS_toc.html</a></p>
+
+<a href="http://www.faqs.org/faqs/afs-faq/">http://www.faqs.org/faqs/afs-faq/</a></p>
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-30-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.5.2. Access Control</h3>
+
+
+
+<a name="INDEX-912" /><a name="INDEX-913" />Serverwide access control permits or
+denies connections from particular hosts or Internet domains, or to
+specific user accounts on the server machine. It is applied
+separately from authentication: for example, even if a user's
+identity is legitimate, you might still want to reject connections
+from her computer. Similarly, if a particular computer or Internet
+domain has poor security policies, you might want to reject all SSH
+connection attempts from that domain.</p>
+
+
+
+SSH access control is scantily documented and has many subtleties and
+"gotchas." The configuration keywords look obvious in
+meaning, but they aren't. Our primary goal in this section is
+to illuminate the murky corners so you can develop a correct and
+effective access-control configuration.</p>
+
+
+
+Keep in mind that SSH access to an account is permitted only if both
+the server and the account are configured to allow it. If a server
+accepts SSH connections to all accounts it serves, individual users
+may still deny connections to their accounts. [<a href="ch08_02.html#ch08-13075">Section 8.2, "Public Key-Based Configuration "</a>] Likewise, if an account is configured to
+permit SSH access, the SSH server on its host can nonetheless forbid
+access. This two-level system applies to all SSH access control, so
+we won't state it repeatedly. <a href="ch05_05.html#ch05-30800">Figure 5-2</a>
+summarizes the two-level access control system.<a href="#FOOTNOTE-67">[67]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-67" />[67]This
+concept is true for the configuration keywords discussed in this
+section but not for trusted-host control files, e.g.,
+<em class="filename">~/.rhosts </em>and
+<em class="filename">/etc/hosts.equiv</em>. Each of these may in fact
+override the other. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>]</p>
+
+
+</blockquote>
+
+
+
+<a name="ch05-30800" /><div class="figure"><img height="95" alt="Figure 5-2" src="figs/ssh_0502.gif" width="416" /></div><h4 class="objtitle">Figure 5-2. Access control levels</h4>
+
+<a name="ch05-56594" /><div class="sect3">
+<h3 class="sect3">5.5.2.1. Account access control</h3>
+
+
+
+Ordinarily, any <a name="INDEX-914" />account may receive SSH connections as
+long as it is set up correctly. This access may be overridden by the
+server keywords
+<tt class="literal">AllowUsers</tt><a name="INDEX-915" />
+and <tt class="literal">DenyUsers</tt>. <tt class="literal">AllowUsers</tt>
+specifies that only a limited set of local accounts may receive SSH
+connections. For example, the line:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers smith</pre></blockquote>
+
+
+
+permits the local smith account and <em class="emphasis">only</em> the
+smith account, to receive SSH connections. The configuration file may
+have multiple <tt class="literal">AllowUsers</tt> lines:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers smith
+AllowUsers jones
+AllowUsers oreilly</pre></blockquote>
+
+
+
+in which case the results are cumulative: the local accounts smith,
+jones, and oreilly, and only those accounts, may receive SSH
+connections. The SSH server maintains a list of all
+<tt class="literal">AllowUsers</tt> values, and when a connection request
+arrives, it does a string comparison (really a pattern match, as
+we'll see in a moment) against the list. If a match occurs, the
+connection is permitted; otherwise, it is rejected.</p>
+
+
+
+<a name="ch05-31-fm2xml" /><blockquote><b>WARNING: </b>
+A single <tt class="literal">AllowUsers</tt> keyword in the configuration
+file cuts off SSH access for all other accounts<em class="emphasis">
+</em>not mentioned. If the configuration file has no
+<tt class="literal">AllowUsers</tt> keywords, the server's
+<tt class="literal">AllowUsers</tt> list is empty, and connections are
+permissible to all accounts.</p>
+
+
+</blockquote>
+
+<tt class="literal">DenyUsers</tt><a name="INDEX-916" />
+is the opposite of <tt class="literal">AllowUsers</tt>: it shuts off SSH
+access to particular accounts. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+DenyUsers smith</pre></blockquote>
+
+
+
+states that the smith account may not receive SSH connections.
+<tt class="literal">DenyUsers</tt> keywords may appear multiple times, just
+like <tt class="literal">AllowUsers</tt>, and the effects are again
+cumulative. As for <tt class="literal">AllowUsers</tt>, the server
+maintains a list of all <tt class="literal">DenyUsers</tt> values and
+compares incoming connection requests against them.</p>
+
+
+
+Both <tt class="literal">AllowUsers</tt> and <tt class="literal">DenyUsers</tt>
+can accept more complicated values than simple account names. An
+interesting but potentially confusing syntax supported by
+<tt class="command">sshd1</tt> and <tt class="command">sshd2</tt> is to specify
+both an account name and a hostname (or numeric IP address),
+separated by an @ symbol:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+AllowUsers jones@example.com</pre></blockquote>
+
+
+
+Despite its appearance, this string isn't an email address, and
+it doesn't mean "the user jones on the machine
+<em class="emphasis">example.com</em>." Rather,
+it describes a relationship between a <em class="emphasis">local</em>
+account, jones, and a <em class="emphasis">remote</em> client machine,
+<em class="emphasis">example.com</em>. The meaning is:
+"clients on <em class="emphasis">example.com</em> may connect to the
+server's jones account." Although this meaning is
+surprising, it would be even stranger if jones were a remote account,
+since the SSH server has no way to verify account names on remote
+client machines (except when using hostbased authentication).</p>
+
+
+
+For SSH1 and OpenSSH, wildcard characters are acceptable in the user
+and host portions of <tt class="literal">AllowUsers</tt> and
+<tt class="literal">DenyUsers</tt> arguments. The ? symbol represents any
+single character except @, and the * represents any sequence of
+characters, again not including @. For SSH2, you may use full regular
+expressions, although the syntax is a little different from usual to
+accommodate "fileglob" syntax as well; see <a href="appa_01.html">Appendix A, "SSH2 Manpage for sshregex"</a>.</p>
+
+
+
+<a name="ch05-32-fm2xml" /><blockquote><b>WARNING: </b>
+The SSH2 regular-expression language
+includes keywords with a colon character in them, such as [:digit:].
+Using a colon in an SSH2 access-control pattern can cause a nasty,
+difficult-to-track-down problem: it is ignored, along with the rest
+of your configuration file! The problem is that the parser is a bit
+dumb and interprets the colon as introducing a labelled section of
+the file. The label doesn't match anything, and so the rest of
+the file, now included in the section, is silently ignored. You can
+avoid this problem simply by placing the pattern inside quotation
+marks:</p>
+
+
+
+<blockquote><pre class="code">AllowHosts "10.1.1.[:digit:]##"</pre></blockquote>
+
+
+
+Though undocumented, this quoting syntax works.</p>
+
+
+</blockquote>
+
+Here are some examples. SSH connections are permitted only to
+accounts with five-character names ending in "mith":</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers ?mith</pre></blockquote>
+
+
+
+SSH connections are permitted only to accounts with names beginning
+with the letter "s", coming from hosts whose names end in
+".edu":</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers s*@*.edu</pre></blockquote>
+
+
+
+SSH2 connections are permitted only to account names of the form
+"test<em class="replaceable">N </em>" where
+<em class="replaceable">N</em> is a number, e.g.,
+"test123".</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowUsers test[0-9]##</pre></blockquote>
+
+
+
+One unfortunate, glaring omission is that you can't specify IP
+networks with traditional "address/masklength" syntax,
+e.g., 10.1.1.0/28 to mean the addresses 10.1.1.0 through
+10.1.1.15.<a href="#FOOTNOTE-68">[68]</a> To
+restrict connections to come from this range of addresses with
+<tt class="literal">AllowHosts</tt><a name="INDEX-917" />
+[<a href="ch05_05.html#ch05-11656">Section 5.5.2.3, "Hostname access control"</a>] is rather more verbose:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-68" />[68]In this notation, the mask specifies the
+number of 1 bits in the most-significant portion of the netmask. You
+might be more familiar with the older, equivalent notation giving the
+entire mask, e.g., 10.1.1.0/255.255.255.240.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH1
+AllowHosts *@10.1.1.? *@10.1.1.10 *@10.1.1.11 *@10.1.1.12 *@10.1.1.13
+AllowHosts *@10.1.1.14 *@10.1.1.15</pre></blockquote>
+
+
+
+or complicated:</p>
+
+
+
+<blockquote><pre class="code"># SSH2
+AllowHosts *@10.1.1.(?|(1[0-5]))</pre></blockquote>
+
+
+
+Restricting to a network that falls on an octet boundary, of course,
+is easier:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+# Allow connections only from 10.1.1.0/24
+AllowHosts *@10.1.1.*</pre></blockquote>
+
+
+
+Note, though, that this can be easily circumvented; an attacker need
+only control a domain server somewhere and connect from a machine
+named 10.1.1.evil.org. A more effective statement is:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowUsers "*@10.1.1.[:isdigit:]##"</pre></blockquote>
+
+
+
+Even this isn't foolproof. Address and hostname-based
+restrictions are weak restrictions at best; they should be used only
+as an adjunct to a strong authentication method.</p>
+
+
+
+Multiple strings may appear on a single <tt class="literal">AllowUsers</tt>
+line. SSH1 and OpenSSH separate strings with whitespace; however, the
+syntax differs between SSH1/OpenSSH and SSH2:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+AllowUsers  smith jones cs*</pre></blockquote>
+
+
+
+and SSH2 separates them with commas, no whitespace permitted:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowUsers  smith,jones,cs*</pre></blockquote>
+
+
+
+<tt class="literal">AllowUsers</tt> and <tt class="literal">DenyUsers</tt> may be
+combined effectively. Suppose you're teaching a course and want
+your students to be the only users with SSH access to your server. It
+happens that only student usernames begin with "stu", so
+you specify:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers stu*</pre></blockquote>
+
+
+
+Later, one of your students, stu563, drops the course so you want to
+disable her SSH access. Simply change the configuration to:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers stu*
+DenyUsers stu563</pre></blockquote>
+
+
+
+Hmm... this seems strange. The two lines appear to conflict because
+the first permits stu563 but the second rejects it. The server
+handles this in the following way: if any line prevents access to an
+account, the account can't be accessed. So in the preceding
+example, stu563 is denied access by the second line.</p>
+
+
+
+Consider another example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowUsers smith
+DenyUsers s*</pre></blockquote>
+
+
+
+It permits SSH connections to the smith account but denies
+connections to any account beginning with "s". What does
+the server do with this clear contradiction? It rejects connections
+to the smith account, following the same rule: if any restriction
+prevents access, such as the <tt class="literal">DenyUsers</tt> line shown,
+access is denied. Access is granted only if there are no restrictions
+against it.</p>
+
+
+
+<tt class="command">sshd</tt> can store at most 256 user strings for
+<tt class="literal">AllowUsers</tt> and 256 for
+<tt class="literal">DenyUsers</tt>. This undocumented static limit applies
+if the strings follow a single keyword (e.g.,
+<tt class="literal">AllowUsers</tt> followed by 256 strings) or multiple
+keywords (e.g., 16 <tt class="literal">AllowUsers</tt> keywords with 16
+strings each). That is, the limit is internal to the server, not
+related to the length of a line in the configuration file.</p>
+
+
+
+Finally, here is a useful configuration example, expressed in SSH1
+syntax:</p>
+
+
+
+<blockquote><pre class="code">AllowUsers walrus@* carpenter@* *@*.beach.net</pre></blockquote>
+
+
+
+This restricts access for most accounts to connections originating
+inside the domain <em class="emphasis">beach.net</em> -- except for the accounts
+"walrus" and "carpenter", which may be
+accessed from anywhere. The @* following walrus and carpenter
+isn't strictly necessary, but it helps make clear the intent of
+the line.</p>
+
+
+
+It's worth noting that hostnames in these access-control
+statements are dependent on the integrity of DNS, which is easily
+spoofed. If this is a concern, consider using IP addresses instead,
+even though maintenance might be more cumbersome.</p>
+</div>
+
+
+
+
+
+<a name="ch05-34-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.2.2. Group access control</h3>
+
+
+
+<tt class="command">sshd</tt><a name="INDEX-918" /> may permit
+or deny SSH access to all accounts in a Unix group on the server
+machine. The keywords
+<tt class="literal">AllowGroups</tt><a name="INDEX-919" />
+and
+<tt class="literal">DenyGroups</tt><a name="INDEX-920" />
+serve this purpose. They are followed by one or more Unix group
+names:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH (separation by whitespace)
+AllowGroups faculty
+DenyGroups students secretaries
+
+# SSH2 only (separation by comma)
+AllowGroups faculty
+DenyGroups students,secretaries</pre></blockquote>
+
+
+
+These keywords operate much like <tt class="literal">AllowUsers</tt> and
+<tt class="literal">DenyUsers</tt>. SSH1 and OpenSSH accept the wildcards
+<a name="INDEX-921" />* and
+<a name="INDEX-922" />? within group names, whereas SSH2
+accepts its usual regular expressions (see <a href="appa_01.html">Appendix A, "SSH2 Manpage for sshregex"</a>), and you may provide multiple strings per
+line:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+AllowGroups ?aculty s*s
+
+# SSH2 only
+AllowGroups ?aculty,s*s</pre></blockquote>
+
+
+
+Unfortunately, these directives apply only to the target user's
+<em class="emphasis">primary</em> group, the one listed in the
+<em class="filename">passwd</em> record for the account. An account may
+belong to other groups as well (e.g., by entry in the
+<em class="filename">/etc/groups</em> file or NIS map), but SSH
+doesn't notice. It's a pity: if supplementary groups were
+supported, you could easily designate a subset of SSH-accessible
+accounts by defining a group -- say,
+<em class="emphasis">sshusers</em> -- and configure the SSH server with
+<tt class="literal">AllowGroups sshusers</tt>. This feature also
+automatically prevents access to system accounts such as
+<em class="filename">bin</em>, <em class="filename">news</em>, and
+<em class="filename">uucp</em> that don't require SSH. Perhaps some
+SSH implementors will fix this someday.</p>
+
+
+
+By default, access is allowed to all groups. If any
+<tt class="literal">AllowGroups</tt> keyword appears, access is permitted
+to only the primary groups specified (and may be further restricted
+with <tt class="literal">DenyGroups</tt>).</p>
+
+
+
+As was the case for <tt class="literal">AllowUsers</tt> and
+<tt class="literal">DenyUsers</tt>, conflicts are resolved in the most
+restrictive way. If any <tt class="literal">AllowGroups</tt> or
+<tt class="literal">DenyGroups</tt> line prevents access to a given group,
+access is denied to that group even if another line appears to permit
+it. Also as before, there is a static limit of 256 strings that may
+follow <tt class="literal">Allow-Groups</tt> or
+<tt class="literal">DenyGroups</tt> keywords in the configuration file.</p>
+</div>
+
+
+
+
+
+<a name="ch05-11656" /><div class="sect3">
+<h3 class="sect3">5.5.2.3. Hostname access control</h3>
+
+
+
+In the discussion of <tt class="literal">AllowUsers</tt> and
+<tt class="literal">DenyUsers</tt>, we described how to permit or reject
+SSH-1 connections from a given host, say,
+<em class="filename">example.com</em>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+AllowUsers *@example.com
+DenyUsers *@example.com</pre></blockquote>
+
+
+
+SSH1 and SSH2 provide the keywords
+<tt class="literal">AllowHosts</tt><a name="INDEX-923" />
+and
+<tt class="literal">DenyHosts</tt><a name="INDEX-924" />
+to restrict access by s host more concisely, getting rid of the
+unnecessary account-name wildcard:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+AllowHosts example.com
+DenyHosts example.com</pre></blockquote>
+
+
+
+The <tt class="literal">AllowHosts</tt> and <tt class="literal">DenyHosts</tt>
+keywords permit or prevent (respectively) SSH connections from given
+hosts.<a href="#FOOTNOTE-69">[69]</a> As with <tt class="literal">AllowUsers</tt> and
+<tt class="literal">DenyUsers</tt>:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-69" />[69]Finer-grained control is provided by the
+"from" option in <em class="filename">authorized_keys</em>.
+[<a href="ch08_02.html#ch08-42689">Section 8.2.5, "Restricting Access by Host or Domain "</a>] Each public key may be tagged with a
+list of acceptable hosts that may connect via that key.</p>
+
+
+</blockquote>
+
+
+
+<ul><li>Values may contain the wildcards ? and * (SSH1, OpenSSH) or regular
+expressions (SSH2, <a href="appa_01.html">Appendix A, "SSH2 Manpage for sshregex"</a>).</p></li><li>Values may contain multiple strings separated by whitespace (SSH1,
+OpenSSH) or commas (SSH2).</p></li><li>Keywords may appear multiple times in the configuration file, and the
+results are cumulative.</p></li><li>Hostnames or IP addresses may be used.</p></li><li>At most 256 strings may follow <tt class="literal">AllowHosts</tt> or
+<tt class="literal">DenyHosts</tt> keywords in the configuration file.</p></li></ul>
+<tt class="literal">AllowHosts</tt> and <tt class="literal">DenyHosts</tt> have a
+unique feature among the access-control keywords. If
+<tt class="command">sshd1</tt> refuses a connection based on
+<tt class="literal">AllowHosts</tt> or <tt class="literal">DenyHosts</tt>, it
+optionally prints an informative message for the client:</p>
+
+
+
+<blockquote><pre class="code">Sorry, you are not allowed to connect.</pre></blockquote>
+
+
+
+This printing is controlled by the
+<tt class="literal">SilentDeny</tt><a name="INDEX-925" />
+keyword. If its value is <tt class="literal">no</tt> (the default), the
+message is printed, but if the value is <tt class="literal">yes</tt>, the
+message is suppressed (i.e., silent denial):</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+SilentDeny no</pre></blockquote>
+
+
+
+As a side effect, <tt class="literal">SilentDeny</tt> also prevents the
+failed connection attempt from appearing in the server's log
+messages. With <tt class="literal">SilentDeny</tt> turned off, you see this
+in the log:</p>
+
+
+
+<blockquote><pre class="code">log: Connection from client.marceau.net not allowed.
+fatal: Local: Sorry, you are not allowed to connect.</pre></blockquote>
+
+
+
+When <tt class="literal">SilentDeny</tt> is turned on, these messages
+don't appear in the server logs. <tt class="literal">SilentDeny</tt>
+doesn't apply to any other access-control keywords
+(<tt class="literal">DenyUsers</tt>, <tt class="literal">DenySHosts</tt>, etc.),
+nor is it related to authentication.</p>
+</div>
+
+
+
+
+
+<a name="ch05-35-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.2.4. shosts access control</h3>
+
+
+
+<tt class="literal">AllowHosts</tt><a name="INDEX-926" /><a name="INDEX-927" /> and <tt class="literal">DenyHosts</tt> offer
+total hostname-based access control, regardless of the type of
+authentication requested. A similar but less restrictive access
+control is specific to trusted-host authentication. You can deny
+access to hosts that are named in
+<em class="filename">.rhosts</em><a name="INDEX-928" />,
+<em class="filename">.shosts</em><a name="INDEX-929" />,
+<em class="filename">/etc/hosts.equiv</em><a name="INDEX-930" />,
+and
+<em class="filename">/etc/shosts.equiv</em><a name="INDEX-931" /> files. This is accomplished with the
+keywords
+<tt class="literal">AllowSHosts</tt><a name="INDEX-932" />
+and
+<tt class="literal">DenySHosts</tt><a name="INDEX-933" />.<a href="#FOOTNOTE-70">[70]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-70" />[70]Even though the keywords have "SHosts" in their
+names, they apply also to <em class="emphasis">.rhosts</em> and
+<em class="emphasis">/etc/hosts.equiv</em> files<em class="emphasis">.</em></p>
+
+
+</blockquote>
+
+
+
+For example, the line:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+DenySHosts badguy.com</pre></blockquote>
+
+
+
+forbids access by connections from <em class="emphasis">badguy.com</em>, but only when trusted-host
+authentication is being attempted. Likewise,
+<tt class="literal">AllowSHosts</tt> permits access only to given hosts
+when trusted-host authentication is used. Values follow the same
+syntax as for <tt class="literal">AllowHosts</tt> and
+<tt class="literal">DenyHosts</tt>. As a result, system administrators can
+override values in users' <em class="filename">.rhosts</em> and
+<em class="filename">.shosts</em> files (which is good, because this
+can't be done via the <em class="filename">/etc/hosts.equiv</em> or
+<em class="filename">/etc/shosts.equiv</em> files).</p>
+
+
+
+As for
+<tt class="literal">AllowHosts</tt><a name="INDEX-934" /> and
+<tt class="literal">DenyHosts</tt><a name="INDEX-935" />:</p>
+
+
+
+<ul><li>Values may contain the wildcards ? and * (SSH1) or regular
+expressions (SSH2, <a href="appa_01.html">Appendix A, "SSH2 Manpage for sshregex"</a>).</p></li><li>Values may contain multiple strings separated by whitespace (SSH1) or
+commas (SSH2).</p></li><li>Keywords may appear multiple times in the configuration file, and the
+results are cumulative.</p></li><li>Hostnames or IP addresses may be used.</p></li><li>There is a static limit of 256 strings that may follow
+<tt class="literal">AllowSHosts</tt> or <tt class="literal">DenySHosts</tt>
+keywords in the configuration file.</p></li></ul>
+</div>
+
+
+
+
+
+<a name="ch05-36-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.2.5. Root access control</h3>
+
+
+
+<tt class="command">sshd</tt><a name="INDEX-936" /> has a
+separate access-control mechanism for the superuser. The keyword
+<tt class="literal">PermitRootLogin</tt><a name="INDEX-937" />
+allows or denies access to the root account by SSH:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+PermitRootLogin no</pre></blockquote>
+
+
+
+Permissible values for this keyword are <tt class="literal">yes</tt> (the
+default) to allow access to the root account by SSH,
+<tt class="literal">no</tt> to deny all such access, and
+<tt class="literal">nopwd</tt> (SSH1, SSH2) or
+<tt class="literal">without-password</tt> (OpenSSH) to allow access except
+by password authentication.</p>
+
+
+
+In SSH1 and OpenSSH, <tt class="literal">PermitRootLogin</tt> applies only
+to logins, not to forced commands specified in
+<em class="filename">authorized_keys</em>. [<a href="ch08_02.html#ch08-22858">Section 8.2.4, "Forced Commands "</a>]
+For example, if root's <em class="filename">authorized_keys</em>
+file contains a line beginning with:</p>
+
+
+
+<blockquote><pre class="code">command="/bin/dump" ....</pre></blockquote>
+
+
+
+then the root account may be accessed by SSH to run the
+<tt class="command">dump</tt> command, no matter what the value of
+<tt class="literal">PermitRootLogin</tt>. This capability lets remote
+clients run superuser processes, such as backups or filesystem
+checks, but not unrestricted login sessions.</p>
+
+
+
+The server checks <tt class="literal">PermitRootLogin</tt> after
+authentication is complete. In other words, if
+<tt class="literal">PermitRootLogin</tt> is <tt class="literal">no</tt>, a client
+is offered the opportunity to authenticate (e.g., is prompted for a
+password or passphrase) but is shut down afterward regardless.</p>
+
+
+
+We've previously seen a similar keyword,
+<tt class="literal">IgnoreRootRhosts</tt><a name="INDEX-938" />,
+that controls access to the root account by trusted-host
+authentication. It prevents entries in
+<em class="filename">~root/.rhosts</em> and
+<em class="filename">~root/.shosts</em> from being used to authenticate
+root. Because <tt class="command">sshd</tt> checks
+<tt class="literal">PermitRootLogin</tt> after authentication is complete,
+it overrides any value of <tt class="literal">IgnoreRootRhosts</tt>. <a href="ch05_05.html#ch05-82536">Table 5-2</a> illustrates the interaction of these two
+keywords.</p>
+
+
+
+<a name="ch05-82536" /><h4 class="objtitle">Table 5-2. Can root Log In? </h4><table border="1">
+
+
+
+
+<tr>
+<th />
+<th>
+IgnoreRootRhosts yes</p></th>
+<th>
+IgnoreRootRhosts no</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<tt class="literal">PermitRootLogin yes</tt></p></td>
+<td>
+Yes, except by trusted-host</p></td>
+<td>
+Yes</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">PermitRootLogin no</tt></p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">PermitRootLogin nopwd (nopassword)</tt></p></td>
+<td>
+Yes, except by trusted-host or password</p></td>
+<td>
+Yes, except by password</p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+
+
+
+
+
+<a name="ch05-37-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.2.6. Restricting directory access with chroot</h3>
+
+
+
+The Unix system call <tt class="function">chroot</tt> causes a process to
+treat a given directory as the root directory. Any attempt to
+<tt class="command">cd</tt> outside the subtree rooted at the given
+directory fails. This is useful for restricting a user or process to
+a subset of a filesystem for security reasons.</p>
+
+
+
+SSH2 provides two keywords for imposing this restriction on incoming
+SSH clients.
+<tt class="literal">ChRootUsers</tt><a name="INDEX-939" />
+specifies that SSH clients, when accessing a given account, are
+restricted to the account's home directory and its
+subdirectories:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+ChRootUsers smith</pre></blockquote>
+
+
+
+Several accounts may be specified on the same line, separated by
+commas, meaning that each of these accounts are individually
+restricted when accessed via SSH2:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+ChRootUsers smith,jones,mcnally</pre></blockquote>
+
+
+
+The other keyword,
+<tt class="literal">ChRootGroups</tt><a name="INDEX-940" />,
+works similarly but applies to all accounts in a given Unix group:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+ChRootGroups users,wheel,mygroup</pre></blockquote>
+
+
+
+<a name="ch05-38-fm2xml" /><blockquote><b>WARNING: </b>
+<tt class="literal">ChRootGroups</tt> only examines an account's
+<em class="emphasis">primary</em> group; supplementary groups aren't
+considered. This makes it a much less useful feature than it would
+otherwise be. Hopefully, a fuller implementation will come in the
+future.</p>
+
+
+</blockquote>
+
+To make this <tt class="function">chroot</tt> functionality work, you
+might need to copy some system files into the account in question.
+Otherwise the login might fail because it can't access needed
+resources, such as shared libraries. On our Linux system, we needed
+to copy the following programs and libraries into the account:</p>
+
+
+
+<blockquote class="simplelist">
+
+<em class="filename">/bin/ls</em></p>
+
+<em class="filename">/bin/bash</em></p>
+
+<em class="filename">/lib/ld-linux.so.2</em></p>
+
+<em class="filename">/lib/libc.so.6</em></p>
+
+<em class="filename">/lib/libtermcap.so.2</em></p>
+
+</blockquote>
+
+
+
+This sort of thing can be reduced by statically linking the SSH
+executables. SSH2 recently added a tool called
+<tt class="command">ssh-chrootmgr</tt> to help with this process;
+unfortunately, it occurred too close to press time for us to review
+it. See the manpage for details.</p>
+</div>
+
+
+
+
+
+<a name="ch05-39-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.5.2.7. Summary of authentication and access control</h3>
+
+
+
+<a name="INDEX-941" />SSH provides several ways to
+permit or restrict connections to particular accounts or from
+particular hosts.
+<a name="INDEX-942" /><a href="ch05_05.html#ch05-68198">Table 5-3</a>
+and <a href="ch05_05.html#ch05-14634">Table 5-4</a> 
+<a name="INDEX-943" /> summarize the available
+options.<a name="INDEX-944" /><a name="INDEX-945" /></p>
+
+
+
+<a name="ch05-68198" /><h4 class="objtitle">Table 5-3. SSH1 and OpenSSH Summary of Authentication and Access Control </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+If you are...</p></th>
+<th>
+And you want to allow or restrict...</p></th>
+<th>
+Then use...</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections to your account by public-key authentication</p></td>
+<td>
+<em class="filename">authorized_keys</em> [<a href="ch08_02.html#ch08-27462">Section 8.2.1, "SSH1 Authorization Files "</a>]</p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Connections to an account</p></td>
+<td>
+<tt class="literal">AllowUsers</tt>, <tt class="literal">DenyUsers</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections by a host</p></td>
+<td>
+<em class="filename">authorized_keys</em> from="..." option
+[<a href="ch08_02.html#ch08-10544">Section 8.2.5.1, "Simulating "from" with SSH2 "</a>]</p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Connections by a host</p></td>
+<td>
+<tt class="literal">AllowHosts</tt><em class="emphasis">,
+</em><tt class="literal">DenyHosts</tt> (or
+<tt class="literal">AllowUsers</tt>, <tt class="literal">DenyUsers</tt>)</p></td>
+</tr>
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections to your account by trusted-host authentication</p></td>
+<td>
+<em class="filename">.rhosts,</em> <em class="filename">.shosts</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Trusted-host authentication</p></td>
+<td>
+<tt class="literal">RhostsAuthentication</tt>,
+<tt class="literal">RhostsRSAAuthentication</tt>,
+<tt class="literal">IgnoreRhosts</tt>, <tt class="literal">AllowSHosts</tt>,
+<tt class="literal">DenySHosts</tt>, <em class="emphasis">/etc/hosts.equiv</em>,
+<em class="emphasis">/etc/shosts.equiv</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Root logins</p></td>
+<td>
+<tt class="literal">IgnoreRootRhosts</tt>,
+<tt class="literal">PermitRootLogin</tt></p></td>
+</tr>
+
+
+
+</table><p>
+
+
+
+<a name="ch05-14634" /><h4 class="objtitle">Table 5-4. SSH2 Summary of Authentication and Access Control </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+If you are...</p></th>
+<th>
+And you want to allow or restrict...</p></th>
+<th>
+Then use...</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections to your account by public-key authentication</p></td>
+<td>
+<em class="filename">authorization</em> file [<a href="ch08_02.html#ch08-74378">Section 8.2.2, "SSH2 Authorization Files "</a>]</p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Connections to an account</p></td>
+<td>
+<tt class="literal">AllowUsers</tt>, <tt class="literal">DenyUsers</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections by a host</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Connections by a host</p></td>
+<td>
+<tt class="literal">AllowHosts</tt>, <tt class="literal">DenyHosts</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+User</p></td>
+<td>
+Connections to your account by trusted-host authentication</p></td>
+<td>
+<em class="filename">.rhosts</em>, .<em class="filename">shosts</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Trusted-host authentication</p></td>
+<td>
+<tt class="literal">AllowedAuthentications</tt>,
+<tt class="literal">AllowSHosts</tt>, <tt class="literal">DenySHosts</tt>,
+<em class="filename">/etc/hosts.equiv</em>,
+<em class="filename">/etc/shosts.equiv</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+Administrator</p></td>
+<td>
+Root logins</p></td>
+<td>
+<tt class="literal">PermitRootLogin</tt></p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-40802" /><div class="sect2">
+<h3 class="sect2">5.5.3. Selecting a Login Program</h3>
+
+
+
+<a name="INDEX-946" /><a name="INDEX-947" /><a name="INDEX-948" />Another way to control
+authentication and access to a machine is to replace the Unix
+<tt class="command">login</tt> program. SSH1 provides a hook for doing so,
+though it requires solid knowledge of your operating system's
+login procedure.</p>
+
+
+
+When an SSH1 client initiates a terminal session with the server,
+normally the server invokes the local account's login shell
+directly. You can override this choice by specifying
+<tt class="literal"> -- with-login</tt><a name="INDEX-949" /> [<a href="ch04_01.html#ch04-38373">Section 4.1.5.9, "User logins and shells"</a>] during compile-time configuration, causing the
+server to invoke a login program instead (e.g.,
+<em class="filename">/bin/login</em> or Kerberos's
+<tt class="command">login.krb5</tt>).<a href="#FOOTNOTE-71">[71]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-71" />[71]If
+<tt class="command">/bin/login </tt>is invoked, you might wonder why it
+doesn't prompt every SSH client for a login password. Well, the
+server runs <tt class="command">/bin/login -f</tt>, which disables
+<tt class="command">login</tt>'s password authentication. The
+<span class="option">-f </span>option is left unmentioned in the <tt class="command">login
+</tt>manpage of many operating systems.</p>
+
+
+</blockquote>
+
+
+
+What's the difference? That depends on the operating system on
+the server machine. The login program might set some additional
+environment variables (such as DISPLAY for the X Windows system),
+perform additional auditing or logging, or take other actions a shell
+doesn't.</p>
+
+
+
+In order for the login program specified by
+<tt class="literal"> -- with-login</tt> to be invoked by
+<tt class="command">sshd1</tt>, you must also set the undocumented keyword
+<tt class="literal">UseLogin</tt><a name="INDEX-950" />.
+It takes a value of <tt class="literal">yes</tt> (to use an alternative
+login program) or <tt class="literal">no</tt>, the default:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+UseLogin yes</pre></blockquote>
+
+
+
+OpenSSH doesn't have
+<tt class="literal"> -- with-login</tt>, so you
+can't specify an alternative login program. The OpenSSH
+<tt class="literal">UseLogin</tt> statement chooses only between
+<em class="filename">/bin/login</em> and a login shell.</p>
+
+
+
+The behavior of a login program versus a login shell is entirely
+implementation-specific, so we won't cover the intricacies. If
+you need to muck with <tt class="literal">UseLogin</tt>, you first need to
+understand the features of your operating system and your login
+program in detail.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.4. Getting Ready: Initial Setup</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.6. User Logins and Accounts</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

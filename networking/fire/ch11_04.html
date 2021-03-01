@@ -1,0 +1,305 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Installing and Modifying Services (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.4. Installing and Modifying Services</h2>
+
+
+
+
+
+<a name="INDEX-973" /> <a name="INDEX-974" /> <a name="INDEX-975" /><a name="INDEX-976" /><a name="INDEX-977" /><a name="INDEX-978" />Some of the services you want to provide
+may not be provided with your operating system (for example, web
+servers generally are not). Others may be provided in versions that
+are inappropriate for use in a secure environment or that are missing
+features you probably want (for example, stock
+<em class="emphasis">fingerd</em> and <em class="emphasis">ftpd</em> ). Even
+those few remaining services that are provided, secure, and up to
+date in your vendor's operating system release should be
+protected with the TCP Wrapper package or the
+<em class="emphasis">netacl</em> program from TIS FWTK to improve security
+and provide logging. (Although TCP Wrapper and
+<em class="emphasis">netacl</em> will increase security, they're not
+perfect; they rely on the source IP address to identify hosts, and IP
+addresses can be forged.)</p><p>
+
+
+
+
+
+For detailed information about individual services, including advice
+on selecting HTTP, NNTP, and FTP servers, see the chapters in <a href="part3.html">Part III, "Internet Services"</a>.</p><p>
+
+
+
+
+
+Whatever services you do leave enabled should also be protected to
+the extent possible by the TCP Wrapper package or the
+<em class="emphasis">netacl</em> program, as we describe in the following
+sections. For example, you might want to set up your bastion host so
+that it accepts Telnet connections from only one specific machine,
+such as the workstation you normally use.</p><p>
+
+
+
+
+
+<a name="ch11-3546" /><div class="sect2">
+<h3 class="sect2">11.4.1. Using the TCP Wrapper Package to Protect Services</h3>
+
+
+
+
+
+<a name="INDEX-979" /><a name="INDEX-980" />
+<a name="INDEX-981" /><a name="INDEX-982" />The TCP Wrapper package, written by
+Wietse Venema, monitors incoming network traffic and controls network
+activity. It is a simple but very effective piece of publicly
+available software set up to run whenever certain ports
+(corresponding to certain services) are connected. TCP Wrapper
+provides simple access control list protection, as well as improved
+logging, for services that are started by <em class="emphasis">inetd</em>.</p><p>
+
+
+
+
+
+Using the TCP Wrapper package is easy. Here's what you do:</p><p>
+
+
+
+
+
+<ol><li>Install the package and set up a pair of simple access control files
+that define which hosts and networks are allowed to access which
+services.</p><p></li><li><a name="INDEX-983" />Reconfigure
+your <em class="emphasis">inetd</em> to run the main TCP Wrapper program
+(called <em class="emphasis">tcpd</em> ) instead of the "real"
+server.</p><p></li><li>When a request for a service comes in, <em class="emphasis">inetd</em>
+starts <em class="emphasis">tcpd</em>, which evaluates the request against
+the TCP Wrapper configuration files. This program decides whether or
+not to log the request, and whether or not to carry out the request.</p><p></li><li>If <em class="emphasis">tcpd</em> decides that the request is acceptable,
+it starts the "real" server to process the request.</p><p></li></ol>
+<a name="ch11-6-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.4.1.1. TCP Wrapper example</h3>
+
+
+
+
+
+For example, if you want to allow Telnet connections from a specific
+host (e.g., 172.16.1.2) to your machine, but deny Telnet connections
+from all other hosts, you would change the line for
+<em class="emphasis">telnetd</em> in your
+<em class="emphasis">/etc/inetd.conf</em> file to say something like:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">telnet stream tcp nowait root /usr/local/libexec/tcpd telnetd</pre></blockquote>
+
+
+
+
+
+You would also need to create an
+<em class="emphasis">/etc/hosts.allow</em> file that tells the TCP Wrapper
+package (the <em class="emphasis">tcpd</em> program) which host to allow
+connections from:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">telnetd : 172.16.1.2</pre></blockquote>
+
+
+
+
+
+<a name="INDEX-984" /> <a name="INDEX-985" />
+<a name="INDEX-986" />And finally, you'd need to create an
+<em class="emphasis">/etc/hosts.deny</em> file to tell the TCP Wrapper
+package to deny all connections from all hosts by default, and to
+send email to root about each probe:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">ALL : ALL : (/usr/local/etc/safe_finger -l @%h | \ 
+    /usr/ucb/Mail -s "PROBE %d from %c" root)&amp;</pre></blockquote>
+
+
+
+
+
+Note that the <em class="emphasis">/etc/hosts.deny</em> file only applies
+to services protected by the TCP Wrapper package (that is, services
+for which you've configured <em class="emphasis">inetd</em> to run
+<em class="emphasis">tcpd</em> instead of the real server). If you
+don't tell <em class="emphasis">inetd</em> to run the TCP Wrapper
+package (the <em class="emphasis">tcpd</em> program) for a given service,
+then the TCP Wrapper package won't do anything regarding that
+service.</p><p>
+
+
+
+
+
+Despite its name, the TCP Wrapper package supports UDP-based services
+in addition to TCP-based services. Be aware, however, that the TCP
+Wrapper package can only control when to <em class="emphasis">start</em>
+UDP-based servers; it cannot control access to those servers once
+they're started, and many UDP-based servers are designed to
+process requests for some period of time beyond the initial startup
+request. Many eventually time out and exit, but once they've
+been started through a legitimate request, they're vulnerable
+to illegitimate requests.</p><p>
+
+
+
+
+
+In addition, TCP Wrapper relies on the source IP address for
+authentication. It is relatively difficult to spoof source IP
+addresses when TCP is used, because the connection setup process
+requires a dialog between the source and the destination. It is much
+easier to spoof source IP addresses when using UDP, so TCP Wrapper
+provides less protection.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3612" /><div class="sect3">
+<h3 class="sect3">11.4.1.2. Using netacl to protect services</h3>
+
+
+
+
+
+<a name="INDEX-987" /><a name="INDEX-988" />The <em class="emphasis">netacl</em>
+component of TIS FWTK (described in some detail in <a href="ch09_01.html">Chapter 9, "Proxy Systems"</a>) provides much the same capability as the TCP
+Wrapper package. To implement the same example as the one shown in
+the previous section (except for the ability to trace probes from
+unauthorized systems) using <em class="emphasis">netacl</em>, you would
+change the line for <em class="emphasis">telnetd</em> in your
+<em class="emphasis">/etc/inetd.conf</em> file to:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">telnet stream tcp nowait root /usr/local/lib/netacl telnetd</pre></blockquote>
+
+
+
+
+
+Then, you would add the following lines to your FWTK
+<em class="emphasis">netperm</em> configuration file (wherever that is on
+your system):</p><p>
+
+<blockquote><pre class="code">netacl-telnetd: permit-hosts 172.16.1.2 -exec /usr/libexec/telnetd</pre></blockquote>
+<a name="INDEX-989" />
+<a name="INDEX-990" />
+<a name="INDEX-991" />
+<a name="INDEX-992" />
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.4.2. Evaluating and Configuring Unix Services</h3>
+
+
+
+
+
+If you need to install a new service on a bastion host, you will want
+to secure it as much as possible. You should not assume that services
+are safe; reputable software companies often ship unsafe packages,
+and in many cases, their worst problems are easy to find and repair.</p><p>
+
+
+
+
+
+Install a test copy of the service on a machine that is otherwise
+stable and will not change while you are doing the installation. Use
+<em class="filename">find</em> to identify all the files that were changed
+during the installation, and check to make sure that those files are
+acceptable. In particular:</p><p>
+
+
+
+
+
+<ul><li>Make sure that file permissions are as restrictive as possible;
+arbitrary users shouldn't be able to write to any executables,
+configuration files, or temporary directories. If possible, limit
+read and execute permissions as well.</p><p></li><li>Closely check all programs that have the <em class="emphasis">setuid</em>
+bit set, particularly if they are <em class="emphasis">setuid</em> to
+root. If they can run without <em class="emphasis">setuid</em>, or if it
+is at all possible to avoid running them, remove
+<em class="emphasis">setuid</em> permissions.</p><p></li><li>If the program installs a user account, make sure that the password
+is set to something other than the program's default. If
+possible, change the account name to something other than the
+program's default; attackers will often focus on well-known
+account names.</p><p></li><li>Make sure that all programs are run by users with appropriate
+permissions. Do not run services as root unless they need to be run
+as root (for instance, to use ports below 1024). If you must run
+services as root, try to run them under <em class="emphasis">chroot</em>
+to control what they can access.</p><p></li><li>If you add special user accounts for services, make sure that they
+cannot be used as normal login accounts; both the password and shell
+entries should be invalid, so that attackers cannot use the accounts
+as entry points.</p><p></li><li><a name="INDEX-993" />Check any
+additions the program has made to startup files or
+<em class="emphasis">crontab</em> files.<a name="INDEX-994" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.3. Disabling Nonrequired Services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.5. Reconfiguring for Production</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>

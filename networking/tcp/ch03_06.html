@@ -1,0 +1,414 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch03_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:25 GMT -->
+<head><title>Configuration Servers (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch03_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">3.6. Configuration Servers</h2>
+
+<p><a name="INDEX-751" />
+<a name="INDEX-752" />
+<a name="INDEX-753" />The powerful features that add to the
+utility and flexibility of TCP/IP also add to its complexity. TCP/IP
+is not as easy to configure as some other networking systems. TCP/IP
+requires that the configuration provide hardware, addressing, and
+routing information. It is designed to be independent of any specific
+underlying network hardware, so configuration information that can be
+built into the hardware in some network systems cannot be built in
+for TCP/IP. The information must be provided by the person
+responsible for the configuration. This assumes that every system is
+run by people who are knowledgeable enough to provide the proper
+information to configure the system. Unfortunately, this assumption
+does not always prove correct.
+</p>
+
+<p>Configuration servers make it possible for the network administrator
+to control TCP/IP configuration from a central point. This relieves
+the end user of some of the burden of configuration and improves the
+quality of the information used to configure systems.
+</p>
+
+<p>TCP/IP has used three protocols to simplify the task of
+configuration: RARP, BOOTP, and DHCP. We begin with RARP, the oldest
+and most basic of these configuration tools.
+</p>
+
+<a name="tcp3-CHP-3-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">3.6.1. Reverse Address Resolution Protocol</h3>
+
+<p><a name="INDEX-754" />RARP, <a name="INDEX-755" />defined
+<a name="INDEX-756" />
+<a name="INDEX-757" />
+<a name="INDEX-758" />in RFC 903,
+is a protocol that converts a physical network address into an IP
+address, which is the reverse of what Address Resolution Protocol
+(ARP) does. A Reverse Address Resolution Protocol server maps a
+physical address to an IP address for a client that doesn't
+know its own IP address. The client sends out a broadcast using the
+broadcast services of the physical network.<a href="#FOOTNOTE-30">[30]</a> The broadcast packet contains the client's physical
+network address and asks if any system on the network knows what IP
+address is associated with the address. The RARP server responds with
+a packet that contains the client's IP address.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-30" /><p>[30]Like ARP,
+RARP is a Network Access Layer protocol that uses physical network
+services residing below the Internet Layer. See the discussion of
+TCP/IP protocol layers in <a href="ch01_01.html">Chapter 1, "
+Overview of TCP/IP"</a>.</p>
+</blockquote>
+
+<p>The client knows its physical network address because it is encoded
+in the Ethernet interface hardware. On most systems, you can easily
+check the value with a command. For example, on a Solaris 8 system,
+the superuser
+<a name="INDEX-759" />can type:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ifconfig dnet0</b>
+dnet0: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4&gt; mtu 1500 index 2
+        inet 172.16.12.1 netmask ffffff00 broadcast 172.16.12.255
+        ether 0:0:c0:dd:d4:da</pre></blockquote>
+
+<p>The <tt class="literal">ifconfig</tt> command <a name="INDEX-760" />can set or display the configuration
+values for a network interface.<a href="#FOOTNOTE-31">[31]</a>
+<em class="emphasis">dnet0</em> is the device name of the Ethernet
+interface. The Ethernet address is displayed after the
+<em class="emphasis">ether</em> label. In the example, the address is
+0:0:c0:dd:d4:da. 
+</p><blockquote class="footnote"> <a name="FOOTNOTE-31" /><p>[31] See <a href="ch06_01.html">Chapter 6, "Configuring the Interface "</a> for information about the
+<tt class="literal">ifconfig</tt> command.</p> </blockquote>
+
+<p>The RARP server looks up the IP address that it uses in its response
+to the client in the <em class="emphasis">/etc/ethers</em>
+file.<a name="INDEX-761" /> The
+<em class="emphasis">/etc/ethers</em> file contains the client's
+Ethernet address followed by the client's hostname. For
+example:
+</p>
+
+<blockquote><pre class="code">2:60:8c:48:84:49        clock 
+0:0:c0:a1:5e:10         ring 
+0:80:c7:aa:a8:04        24seven 
+8:0:5a:1d:c0:7e         limulus 
+8:0:69:4:6:31           arthropod</pre></blockquote>
+
+<p>To respond to a RARP request, the server must also resolve the
+hostname found in the <em class="emphasis">/etc/ethers</em> file into an
+IP address. DNS or the <em class="emphasis">hosts</em> file is used for
+this task. The following <em class="emphasis">hosts</em> file entries
+could be used with the <em class="emphasis">ethers</em> file shown above:
+</p>
+
+<blockquote><pre class="code">clock           172.16.3.10 
+ring            172.16.3.16 
+24seven         172.16.3.4 
+limulus         172.16.3.7
+arthropod       172.16.3.21</pre></blockquote>
+
+<p>Given these sample files, if the server receives a RARP request that
+contains the Ethernet address 0:80:c7:aa:a8:04, it matches it to
+<em class="emphasis">24seven</em> in the <em class="emphasis">/etc/ethers</em>
+file. The server uses the name <em class="emphasis">24seven</em> to look
+up the IP address. It then sends the IP address 172.16.3.4 out as its
+ARP response.
+</p>
+
+<p>RARP is a useful tool, but it provides only the IP address. There are
+still several other values that need to be manually configured.
+Bootstrap Protocol (BOOTP) is a more flexible configuration tool that
+provides more values than just the IP address and can deliver those
+values via the network.
+</p>
+
+<p><a name="INDEX-762" />BOOTP is defined in RFCs 951 and 1532.
+The RFCs describe BOOTP as an alternative to RARP; when BOOTP is
+used, RARP is not needed. BOOTP, however, is a more comprehensive
+configuration protocol than RARP. It provides much more configuration
+information and has the potential to offer still more. The original
+specification allowed vendor extensions as a vehicle for the
+protocol's evolution. RFC 1048 first formalized the definition
+of these extensions, which have been updated over time and are
+currently defined in RFC 2132. BOOTP and its extensions became the
+basis for the Dynamic Host Configuration Protocol (DHCP). DHCP has
+superseded BOOTP, so DHCP is the configuration protocol that you will
+use on your network.
+</p>
+
+</div>
+<a name="tcp3-CHP-3-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">3.6.2. Dynamic Host Configuration Protocol</h3>
+
+<p><a name="INDEX-763" />Dynamic
+<a name="INDEX-764" />Host
+<a name="INDEX-765" />
+<a name="INDEX-766" />
+<a name="INDEX-767" />Configuration
+Protocol (DHCP) is defined in RFCs 2131 and 2132. It's designed
+to be compatible with BOOTP. RFC 1534 outlines interactions between
+BOOTP clients and DHCP servers and between DHCP clients and BOOTP
+servers. DHCP is the correct configuration protocol for your network
+because DHCP exceeds the capabilities of BOOTP while maintaining
+support for existing BOOTP clients.
+</p>
+
+<p>DHCP uses the same UDP ports as BOOTP (67 and 68) and the same
+<em class="emphasis">basic</em> packet format. But DHCP is more than just
+an update of BOOTP. The new protocol expands the function of
+<a name="INDEX-768" />BOOTP in
+two areas:
+</p>
+
+<ul><li>
+<p>The configuration parameters provided by a DHCP server include
+everything defined in the <em class="emphasis">Requirements for Internet
+Hosts</em> RFC. DHCP provides a client with a complete set of
+TCP/IP configuration values.
+</p>
+</li><li>
+<p>DHCP permits automated allocation of IP addresses.</p>
+</li></ul>
+<p>DHCP expands the original BOOTP packet in order to indicate the DHCP
+packet type and to carry a complete set of configuration information.
+DHCP calls the values in this part of the packet
+<em class="emphasis">options</em>. To handle the full set of configuration
+values from the <em class="emphasis">Requirements for Internet Hosts</em>
+RFC, the Options field is <a name="INDEX-769" />large and has a variable format.
+</p>
+
+<p>You don't usually need to use the full set of configuration
+values. Don't get me wrong; it's not that the values are
+unnecessary -- all the parameters are needed for a complete TCP/IP
+configuration. It's just that you don't need to
+<em class="emphasis">define</em> values for them. Default values are
+provided in most TCP/IP implementations, and the defaults need to be
+changed only in special circumstances. The expanded configuration
+parameters of DHCP make it a more complete protocol than BOOTP, but
+they are not the most useful features of DHCP.
+</p>
+
+<p>For most network administrators, automatic allocation of IP addresses
+is a more interesting feature. DHCP allows addresses to be assigned
+in <a name="INDEX-770" />four ways:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Permanent fixed addresses</em></i></dt>
+<dd>
+<p>As always, <a name="INDEX-771" />the
+administrator can continue to assign addresses without using the DHCP
+system. While this happens completely outside of DHCP, DHCP makes
+allowances for it by permitting addresses to be excluded from the
+range of addresses under the control of the DHCP server. Most
+networks have some permanently assigned addresses.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Manual allocation</em></i></dt>
+<dd>
+<p>The network <a name="INDEX-772" />administrator keeps complete control over
+addresses by specifically assigning them to clients in the DHCP
+configuration. This is exactly the same way that addresses are
+handled under BOOTP. Manual allocation fails to take full advantage
+of the power of DHCP but might be needed if you have BOOTP clients.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Automatic allocation</em></i></dt>
+<dd>
+<p><a name="INDEX-773" />The DHCP server permanently assigns an
+address from a pool of addresses. The administrator is not involved
+in the details of assigning a client an address. This technique fails
+to take advantage of the DHCP server's ability to collect and
+reuse addresses.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Dynamic allocation</em></i></dt>
+<dd>
+<p><a name="INDEX-774" />The server assigns an address to a
+DHCP client for a limited period of time. The limited life of the
+address is called a <em class="emphasis">lease</em>.
+<a name="INDEX-775" />The client can
+return the address to the server at any time but must request an
+extension from the server to retain the address longer than the time
+permitted. The server automatically reclaims the address after the
+lease expires if the client has not requested an extension. Dynamic
+allocation uses the full power of DHCP.
+</p>
+</dd>
+
+</dl>
+
+<p>Dynamic allocation is useful in any network, particularly a large
+distributed network where many systems are being added and deleted.
+Unused addresses are returned to the pool of addresses without
+relying on users or system administrators to deliberately return
+them. Addresses are used only when and where they're needed.
+Dynamic allocation allows a network to make the maximum use of a
+limited set of addresses. It is particularly well suited to mobile
+systems <a name="INDEX-776" />that move from subnet to subnet and
+therefore must be constantly reassigned addresses appropriate for
+their current network location. Even in the smallest network, dynamic
+allocation simplifies the network administrator's job.
+</p>
+
+<p>Dynamic address allocation does not work for every system. Name
+servers, email servers, login hosts, and other shared systems are
+always online, and they are not mobile. These systems are accessed by
+name, so a shared system's domain name must resolve to the
+correct address. Shared systems are manually allocated permanent,
+fixed addresses.
+</p>
+
+<p>Dynamic address assignment has major repercussions for DNS. DNS is
+required to map hostnames to IP addresses. It cannot perform this job
+if IP addresses are constantly changing and DNS is not informed of
+the changes. To make dynamic address assignment work for all types of
+systems, we need a DNS that can be dynamically updated by the DHCP
+server. <em class="emphasis">Dynamic DNS</em><a name="INDEX-777" /> <a name="INDEX-778" /> (DDNS) is available, but it is not yet
+widely used.<a href="#FOOTNOTE-32">[32]</a> When fully deployed,
+it will help make dynamic addresses available to systems that provide
+services and to those that use them.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-32" /><p>[32]See <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a> for
+more information about DDNS.</p> </blockquote>
+
+<p>Given the nature of dynamic addressing, most sites assign permanent
+fixed addresses to shared servers. This happens through traditional
+system administration and is not handled by DHCP. In effect, the
+administrator of the shared server is given an address and puts that
+address in the shared server's configuration. Using DHCP for
+some systems doesn't mean it must be used for all systems.
+</p>
+
+<p>DHCP servers can support BOOTP clients. However, a DHCP client is
+needed to take full advantage of the services offered by DHCP. BOOTP
+clients do not understand dynamic address leases. They do not know
+that an address can time out
+<a name="INDEX-779" />and that it must be renewed. BOOTP clients
+must be manually or automatically assigned permanent addresses. True
+dynamic address assignment is limited to DHCP clients.
+</p>
+
+<p>Therefore, most sites that use DHCP have a mixture of: </p>
+
+<ul><li>
+<p>Permanent addresses assigned to systems that can't use DHCP</p>
+</li><li>
+<p>Manual addresses assigned to BOOTP clients</p>
+</li><li>
+<p>Dynamic addresses assigned to all DHCP clients</p>
+</li></ul>
+<p>All of this begs the question of how a client that doesn't know
+its own address can communicate with a server. DHCP defines a simple
+packet exchange that allows the client to find a server and obtain a
+configuration.
+</p>
+
+<a name="tcp3-CHP-3-SECT-6.2.1" /><div class="sect3">
+<h3 class="sect3">3.6.2.1. How DHCP works</h3>
+
+<p>The DHCP <a name="INDEX-780" />client broadcasts a packet called a
+<em class="emphasis">DHCPDISCOVER</em><a name="INDEX-781" />
+<a name="INDEX-782" />
+message that contains, at a minimum, a transaction identifier and the
+client's DHCP identifier, which is normally the client's
+physical network address. The client sends the broadcast using the
+address 255.255.255.255, which is a special address called the
+<em class="emphasis">limited</em>
+<a name="INDEX-783" /> <a name="INDEX-784" /><em class="emphasis">broadcast
+address</em>.<a href="#FOOTNOTE-33">[33]</a> The client waits for a response from the server. If a
+response is not received within a specified time interval, the client
+retransmits the request. DHCP uses UDP as a transport protocol and,
+unlike RARP, does not require any special Network Access Layer
+protocols.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-33" /><p>[33]This address is useful because,
+unlike the normal broadcast address, it doesn't require the
+system to know the address of the network it is on.</p>
+</blockquote>
+
+<p>The server responds to the client's message with a
+<em class="emphasis">DHCPOFFER</em><a name="INDEX-785" />
+<a name="INDEX-786" />
+packet. DHCP uses two different well-known port numbers. UDP port
+<a name="INDEX-787" />number
+67 is used for the server, and UDP port number 68 is used for the
+client. This is very unusual. Most software uses a well-known port on
+the server side and a randomly generated port on the client side.
+(How and why random source port numbers are used is described in
+Chapter 1.) The random port number ensures that each pair of
+source/destination ports identifies a unique path for exchanging
+information. A DHCP client, however, is still in the process of
+booting. It probably does not know its IP address. Even if the client
+generates a source port for the <em class="emphasis">DHCPDISCOVER</em>
+packet, a server response that is addressed to that port and the
+client's IP address won't be read by a client that
+doesn't recognize the address. Therefore, DHCP sends the
+response to a specific port on all hosts. A broadcast sent to UDP
+port 68 is read by all hosts, even by a system that doesn't
+know its specific address. The system then determines if it is the
+intended recipient by checking the transaction identifier and the
+physical network address embedded in the response.
+</p>
+
+<p>The server fills in the <em class="emphasis">DHCPOFFER</em> packet with
+the configuration data it has for the client. A DHCP server can
+provide every TCP/IP configuration value a client needs, provided the
+server is properly configured. <a href="ch09_01.html">Chapter 9, "Local Network Services"</a> is a
+tutorial on setting up a DHCP server, and <a href="appd_01.html">Appendix D, "A dhcpd Reference"</a> is a complete list of all of the DHCP
+configuration parameters.
+</p>
+
+<p>As the name implies, the <em class="emphasis">DHCPOFFER</em> packet is an
+<em class="emphasis">offer</em> of configuration data. That offer has a
+limited lifetime -- typically 120 seconds. The client must respond
+to the offer before the lifetime expires. This is done because more
+than one server may hear the <em class="emphasis">DHCPDISCOVER</em> packet
+from the client and respond with a <em class="emphasis">DHCPOFFER</em>. If
+the servers did not require a response from the client, multiple
+servers might commit resources to a single client, thus wasting
+resources that could be used by other clients. If a client receives
+multiple <em class="emphasis">DHCPOFFER</em> packets, it responds to only
+one and ignores the others.
+</p>
+
+<p>The client responds to the <em class="emphasis">DHCPOFFER</em> with a
+<em class="emphasis">DHCPREQUEST</em> message. The
+<em class="emphasis">DHCPREQUEST</em> message asks the server to assign
+the client the configuration information that was offered. The server
+checks the information in the <em class="emphasis">DHCPREQUEST</em> to
+make sure that the client got everything right and that all of the
+offered data is still available. If everything is correct, the server
+sends the client a <em class="emphasis">DHCPACK</em> message letting the
+client know that it is now configured to use all of the information
+from the original <em class="emphasis">DHCPOFFER</em> packet. <a href="ch03_06.html#tcp3-CHP-3-FIG-5">Figure 3-5</a> shows the normal packet flow when DHCP is used
+to configure a client.
+</p>
+
+<a name="tcp3-CHP-3-FIG-5" /><div class="figure"><img height="256" alt="Figure 3-5" src="figs/tcp3_0305.gif" width="361" /></div><h4 class="objtitle">Figure 3-5. DHCP client/server protocol</h4>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.5. File and Print Servers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.7. Summary</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch03_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:26 GMT -->
+</html>

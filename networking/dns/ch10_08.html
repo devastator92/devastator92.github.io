@@ -1,0 +1,335 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+<head><title>Name Server Address Sorting (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.8. Name Server Address Sorting</h2>
+
+
+<a name="INDEX-1630" /> <a name="INDEX-1631" />
+<a name="INDEX-1632" />Sometimes, neither round robin nor another
+configurable order is what you want. When you are contacting a host
+that has multiple network interfaces and hence multiple IP addresses,
+choosing a particular interface based on your host's
+addressmay give you better performance. No
+<em class="emphasis">rrset-order</em> substatement can do that for you.</p><p>
+
+
+If the multihomed host is local and shares a network or subnet with
+your host, one of the multihomed host's addresses is
+"closer." If the multihomed host is remote, you may see
+better performance using one interface instead of another, but often
+it doesn't matter much which address is used. In days long
+past, net 10 (the former ARPAnet "backbone") was always
+closer than any other remote address. The Internet has improved
+drastically since those days, so you won't often see a marked
+performance improvement when using one network over another for
+remote multihomed hosts, but we'll cover that case anyway.</p><p>
+
+
+<a name="INDEX-1633" />Before we get into address sorting by a
+name server, you should first look at whether address sorting by the
+resolver better suits your needs. (See <a href="ch06_01.html#dns4-CHP-6-SECT-1.5">Section 6.1.5, "The sortlist Directive"</a> in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a>.) Since
+your resolver and name server may be on different networks, it often
+makes more sense for the resolver to sort addresses optimally for its
+host. Address sorting at the name server works fairly well, but it
+can be hard to optimize for every resolver it services. Resolver
+address sorting was added in BIND 4.9, though, so if your resolver
+(not your name server) is older than 4.9 or isn't BIND at all,
+you're out of luck. You'll have to make do with address
+sorting at the name server, which was introduced in 4.8.3.</p><p>
+
+
+In an uncommon turn of events, the name server's address
+sorting feature was <em class="emphasis">removed</em> in early versions of
+BIND 8, primarily because of the developers' insistence that it
+had no place in the name server. The feature was restored -- and
+in fact enhanced -- in BIND 8.2. BIND 9.1.0 is the first BIND 9
+release to support address sorting.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-8.1" /><div class="sect2">
+<h3 class="sect2">10.8.1. BIND 4 Address Sorting</h3>
+
+
+BIND 4's address sorting, while simpler to configure than BIND
+8's, is more complex to describe because it does quite a bit
+automatically, without any configuration. Let's cover it first.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-8.1.1" /><div class="sect3">
+<h3 class="sect3">10.8.1.1. Local multihomed hosts</h3>
+
+
+Let's deal with the local multihomed host first. Suppose you
+have a source host (i.e., a host that keeps your master source code)
+on two networks, cleverly called network A and network B, and this
+host uses NFS to export filesystems to hosts on both networks. Hosts
+on network A experience better performance if they use the source
+host's interface to network A. Likewise, hosts on network B
+benefit from using the source host's interface to network B for
+the address of the NFS mount.</p><p>
+
+
+In <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, we mentioned that BIND returns all
+the addresses for a multihomed host. There was no guarantee of the
+order in which a DNS server would return the addresses, so we
+assigned aliases (<em class="emphasis">wh249.movie.edu</em> and
+<em class="emphasis">wh253.movie.edu</em> for
+<em class="emphasis">wormhole.movie.edu</em>) to the individual
+interfaces. If one interface was preferable, you (or more
+realistically, a DNS client) could use an appropriate alias to get
+the correct address. You can use aliases to choose the
+"closer" interface (e.g., for setting up NFS mounts), but
+because of address sorting, that's not always necessary.</p><p>
+
+
+BIND 4 servers, by default, sort addresses if one condition holds: if
+the host that sent the query to the name server shares a network with
+the name server host (e.g., both are on network A), then BIND sorts
+the addresses in the response. How does BIND know when it shares a
+network with the querier? It knows because when BIND starts up, it
+finds all the interface addresses of the host it's running on.
+BIND extracts the network numbers from these addresses to create the
+default sort list. When a query is received, BIND checks whether the
+sender's address is on a network in the default sort list. If
+it is, then the query is local and BIND sorts the addresses in the
+response.</p><p>
+
+
+In <a href="ch10_08.html#dns4-CHP-10-FIG-3">Figure 10-3</a>, let's assume that there is a
+BIND 4 name server on <em class="emphasis">notorious</em>. The name
+server's default sort list would contain network A and network
+B. When <em class="emphasis">spellbound</em> sends a query to
+<em class="emphasis">notorious</em> looking up the addresses of
+<em class="emphasis">notorious</em>, it gets an answer back with
+<em class="emphasis">notorious</em> 's network A address first.
+That's because <em class="emphasis">notorious</em> and
+<em class="emphasis">spellbound</em> share network A. When
+<em class="emphasis">charade</em> looks up the addresses of
+<em class="emphasis">notorious</em>, it gets an answer back with
+<em class="emphasis">notorious</em> 's network B address first,
+because both hosts are on network B. In both these cases, the name
+server sorts the addresses in the response because the hosts share a
+network with the name server host. The sorted address list has the
+"closer" interface first.</p><p>
+
+
+<a name="dns4-CHP-10-FIG-3" /><div class="figure"><img height="331" alt="Figure 10-3" src="figs/dns4_1003.gif" width="423" /></div><h4 class="objtitle">Figure 10-3. Communicating with a local multihomed host</h4>
+
+Let's change the situation slightly. Suppose the name server is
+running on <em class="emphasis">gaslight</em>. When <em class="emphasis">spellbound
+</em>queries <em class="emphasis">gaslight</em> for
+<em class="emphasis">notorious</em> 's address,
+<em class="emphasis">spellbound</em> sees the same response as in the last
+case because <em class="emphasis">spellbound</em> and <em class="emphasis">gaslight
+</em>share network A, which means that the name server will
+sort the response. However, <em class="emphasis">charade</em> may see a
+differently ordered response, since it does not share a network with
+<em class="emphasis">gaslight</em>. The closer address for
+<em class="emphasis">notorious</em> may still be first in the response to
+<em class="emphasis">charade</em>, but only because of luck, not name
+server address sorting. In this case, you'd have to run an
+additional name server on network B for <em class="emphasis">charade
+</em>to benefit from BIND 4's default address sorting.</p><p>
+
+
+As you can see, you benefit by running a name server on each network;
+not only is your name server available if your router goes down, it
+also sorts addresses of multihomed hosts. Because the name server
+sorts addresses, you do not need to specify aliases for NFS mounts or
+network logins to get the best response.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-8.1.2" /><div class="sect3">
+<h3 class="sect3">10.8.1.2. Remote multihomed hosts</h3>
+
+
+Suppose that your site often contacts a particular remote site or a
+"distant" local site, and that you get better performance
+by favoring addresses on one of the remote site's networks. For
+instance, the <em class="emphasis">movie.edu</em> zone comprises the
+networks 192.249.249/24 and 192.253.253/24. Let's add a
+connection to network 10/8 (the old ARPAnet). The remote host being
+contacted has two network connections, one to network 10/8 and one to
+network 26/8. This host does not route to 26/8, but for special
+reasons it has a connection to it. Since the router to 26/8 is always
+overloaded, you'll get better performance using the remote
+host's 10/8 address. <a href="ch10_08.html#dns4-CHP-10-FIG-4">Figure 10-4</a> shows this
+situation.</p><p>
+
+
+<a name="dns4-CHP-10-FIG-4" /><div class="figure"><img height="318" alt="Figure 10-4" src="figs/dns4_1004.gif" width="411" /></div><h4 class="objtitle">Figure 10-4. Communicating with a remote multihomed host</h4>
+
+If a user on <em class="emphasis">terminator.movie.edu</em> contacts
+<em class="emphasis">reanimator.movie.edu</em>, it's preferable to
+use the 10/8 address because access through gateway B to the 26/8
+address is slower than the direct route. Unfortunately, the name
+server running on <em class="emphasis">terminator.movie.edu</em> will not
+intentionallyplace a 10/8 address first in the
+list when it looks up the addresses for
+<em class="emphasis">reanimator.movie.edu</em>; the only network that
+<em class="emphasis">terminator.movie.edu</em> is attached to is
+192.249.249/24, so it doesn't know that 10/8 is
+"closer" than 26/8. This is where the
+<a name="INDEX-1634" /><em class="emphasis">sortlist
+</em>directive comes into play. To indicate a preference for
+addresses on network 10/8, add the following line to
+<em class="emphasis">named.boot</em> :</p><p>
+
+
+<blockquote><pre class="code">sortlist 10.0.0.0</pre></blockquote>
+
+
+The <em class="emphasis">sortlist</em> arguments are
+<em class="emphasis">appended</em> to the default sort list. With this
+<em class="emphasis">sortlist</em> directive, the sort list on
+<em class="emphasis">terminator.movie.edu</em> now contains networks
+192.249.249/24 and 10/8. Now, when a user on
+<em class="emphasis">terminator.movie.edu</em> queries the name server on
+<em class="emphasis">terminator.movie.edu</em> and the name server sorts
+the response because the query is local, the name server will check
+for addresses on the 192.249.249/24 network and place them first in
+the response. If there are no addresses on 192.249.249/24, it will
+check for 10/8 addresses and place them first in the response. This
+solves the problem we described earlier; now when
+<em class="emphasis">reanimator.movie.edu</em> is looked up, its address
+on network 10/8 will be placed first in the response.<a name="INDEX-1635" /></p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-8.1.3" /><div class="sect3">
+<h3 class="sect3">10.8.1.3. Address sorting on subnetted networks</h3>
+
+
+<a name="INDEX-1636" />
+<a name="INDEX-1637" />Subnetted networks change address sorting
+only slightly. When the name server creates its default sort list, it
+adds both the subnet number and the network number to the list. Like
+before, when the query is local and the name server sorts the
+response, the common subnet address is placed first. Unfortunately,
+not everything is perfect -- you can't add
+<em class="emphasis">sortlist</em> entries for other subnets of your
+network. Here's why: the name server assumes all the
+<em class="emphasis">sortlist</em> entries are network numbers (not subnet
+numbers), and your network number is already on the sort list. Since
+your network number is already on the list, the
+<em class="emphasis">sortlist</em> entry for your subnet is discarded.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-8.1.4" /><div class="sect3">
+<h3 class="sect3">10.8.1.4. Multiple sortlist entries</h3>
+
+
+One last thing -- if you want to add more than one
+<em class="emphasis">sortlist</em> entry, you must specify them all on the
+same line, like this:</p><p>
+
+
+<blockquote><pre class="code">sortlist 10.0.0.0 26.0.0.0</pre></blockquote>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-8.2" /><div class="sect2">
+<h3 class="sect2">10.8.2. BIND 8 and 9 Address Sorting</h3>
+
+
+BIND 8.2 and later (as well as 9.1.0 and later) name servers can sort
+addresses, too. Unfortunately, this isn't automatic, nor is it
+particularly easy to configure. The key is an <em class="emphasis">options
+</em>substatement called, naturally,
+<em class="emphasis">sortlist</em>.</p><p>
+
+
+The <em class="emphasis">sortlist</em> <a name="INDEX-1638" />substatement takes an address match
+list as an argument. Unlike address match lists used as access
+control lists, though, <em class="emphasis">sortlist</em> 's has a
+very specialized interpretation. Each entry in the address match list
+is itself an address match list with either one or two elements.</p><p>
+
+
+If an entry has only one element, it's used to check the IP
+address of a querier. If the querier's address matches, then
+the name server sorts addresses in a response to that querier so that
+any addresses that match the element are first. Confusing?
+Here's an example:</p><p>
+
+
+<blockquote><pre class="code">options {
+	sortlist {
+		{ 192.249.249/24; };
+	};
+};</pre></blockquote>
+
+
+The only entry in this sort list has just one
+element. This sort list sorts addresses on the network 192.249.249/24
+to the front of responses to queriers that are also on that network.</p><p>
+
+
+If an entry has two elements, the first element is used to match the
+IP address of a querier. If the querier's address matches, the
+name server sorts addresses in a response to that querier so that any
+addresses that match the second element come first. The second
+element can actually be a whole address match list of several
+elements, in which case the first address added to the response is
+the one that matches first in the list. Here's a simple
+example:</p><p>
+
+
+<blockquote><pre class="code">options {
+	sortlist {
+		{ 192.249.249/24; { 192.249.249/24; 192.253.253/24; }; };
+	};
+};</pre></blockquote>
+
+
+This sort list applies to queriers on 192.249.249/24 and sends them
+addresses on their own network first, followed by addresses on
+192.253.253/24.</p><p>
+
+
+The elements in the sort list specification can just as easily be
+subnets or even individual hosts:</p><p>
+
+
+<a name="INDEX-1639" /><blockquote><pre class="code">options {
+	sortlist {
+		{ 15.1.200/21;       // if the querier is on 15.1.200/21
+			{ 15.1.200/21;  // then prefer addresses on that subnet
+			15/8; };        // or at least on 15/8
+		};
+	};
+};</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.7. Round Robin Load Distribution</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.9. Preferring Name Servers on Certain Networks</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

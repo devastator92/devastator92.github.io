@@ -1,0 +1,394 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Problem Symptoms (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch15_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.7. Problem Symptoms</h2>
+
+
+<a name="INDEX-2243" />Some problems, unfortunately,
+aren't as easy to identify as the ones we listed. You'll
+experience some misbehavior but won't be able to attribute it
+directly to its cause, often because any of a number of problems can
+cause the symptoms you see. For cases like this, we'll suggest
+some of the common causes of these symptoms and ways to isolate them.</p><p>
+
+
+<a name="dns4-CHP-14-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">14.7.1. Local Name Can't Be Looked Up</h3>
+
+
+<a name="INDEX-2244" /><a name="INDEX-2245" /> <a name="INDEX-2246" />The first thing to do when a program like
+<em class="filename">telnet</em> or <em class="filename">ftp </em>can't
+look up a local domain name is to use <em class="filename">nslookup</em>
+or <em class="filename">dig </em>to try to look up the same name. When we
+say "the same name," we mean
+<em class="emphasis">literally</em> the same name -- don't add
+labels and a trailing dot if the user didn't type either one.
+Don't query a different name server than the user did.</p><p>
+
+
+As often as not, the user mistyped the name or doesn't
+understand how the search list works and just needs direction.
+Occasionally, you'll turn up real host configuration errors:</p><p>
+
+
+<ul><li>Syntax errors in <em class="filename">resolv.conf</em> (problem 11 in the
+<a href="ch14_03.html#dns4-CHP-14-SECT-3">Section 14.3, "Potential Problem List"</a> earlier in this chapter)</p></li><li>An unset local domain name (problem 12)</p></li></ul>
+You can check for either of these using
+<em class="filename">nslookup</em>'s<a name="INDEX-2247" /> <em class="emphasis">set all</em>
+command.</p><p>
+
+
+If <em class="filename">nslookup</em> points to a problem with the name
+server rather than with the host configuration, check for the
+problems associated with the type of name server. If the name server
+is the primary master for the zone, but it isn't responding
+with data you think it should:</p><p>
+
+
+<ul><li>Check that the zone data file contains the data in question and that
+the name server has loaded it (problem 2). A database dump can tell
+you for sure whether the data was loaded.</p></li><li>Check the configuration file and the pertinent zone data file for
+syntax errors (problem 5). Check the name server's
+<em class="emphasis">syslog</em> output for indications of those errors.</p></li><li>Ensure that the records have trailing dots, if they require them
+(problem 6).</p></li></ul>
+If the name server is a slave server for the zone, you should first
+check whether or not its master has the correct data. If it does and
+the slave doesn't:</p><p>
+
+
+<ul><li>Make sure you've incremented the serial number on the primary
+master (problem 1).</p></li><li>Look for a problem on the slave in updating the zone (problem 3).</p></li></ul>
+If the primary master <em class="emphasis">doesn't</em> have the
+correct data, of course, diagnose the problem on the primary.</p><p>
+
+
+If the problem server is a caching-only name server:</p><p>
+
+
+<ul><li>Make sure it has its root hints (problem 7).</p></li><li>Check that your parent zone's delegation to your zone exists
+and is correct (problems 9 and 10). Remember that to a caching-only
+server, your zone looks just like any other remote zone. Even though
+the host it runs on may be inside your zone, the caching-only name
+server must be able to locate an authoritative server for your zone
+from your parent zone's servers.</p></li></ul>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.2" /><div class="sect2">
+<h3 class="sect2">14.7.2. Remote Names Can't Be Looked Up</h3>
+
+
+<a name="INDEX-2248" />If your local lookups succeed but you
+can't look up domain names outside your local zones, there is a
+different set of problems to check:</p><p>
+
+
+<ul><li>First, did you just set up your name servers? You might have omitted
+the root hints data (problem 7).</p></li><li>Can you <em class="filename">ping</em> the remote zone's name
+servers? Maybe you can't reach the remote zone's servers
+because of connectivity loss (problem 8).</p></li><li>Is the remote zone new? Maybe its delegation hasn't yet
+appeared (problem 9). Or the delegation information for the remote
+zone may be wrong or out of date due to neglect (problem 10).</p></li><li>Does the domain name actually exist on the remote zone's
+servers (problem 2)? On all of them (problems 1 and 3)?</p></li></ul>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.3" /><div class="sect2">
+<h3 class="sect2">14.7.3. Wrong or Inconsistent Answer</h3>
+
+
+<a name="INDEX-2249" /><a name="INDEX-2250" />If you get
+the wrong answer when looking up a local domain name, or an
+inconsistent answer depending on which name server you ask or when
+you ask, first check the synchronization between your name servers:</p><p>
+
+
+<ul><li>Are they all holding the same serial number for the zone? Did you
+forget to increment the serial number on the primary master after you
+made a change (problem 1)? If you did, the name servers may all have
+the same serial number, but they will answer differently out of their
+authoritative data.</p></li><li>Did you roll the serial number back to one (problem 1 again)? Then
+the primary master's serial number will appear much lower than
+the slaves' serial numbers.</p></li><li>Did you forget to reload the primary master (problem 2)? Then the
+primary will return (via <em class="filename">nslookup</em> or
+<em class="filename">dig</em>, for example) a different serial number from
+the one in the zone data file.</p></li><li>Are the slaves having trouble updating from their master(s) (problem
+3)? If so, they should have <em class="emphasis">syslog</em>ged
+appropriate error messages.</p></li><li>Is the name server's round robin feature rotating the addresses
+of the domain name you're looking up?</p></li></ul>
+If you get these results when looking up a domain name in a remote
+zone, you should check whether the remote zone's name servers
+have lost synchronization. You can use tools like
+<em class="filename">nslookup</em> and <em class="filename">dig </em>to
+determine whether the remote zone's administrator forgot to
+increment the serial number, for example. If the name servers answer
+differently from their authoritative data but show the same serial
+number, the serial number probably wasn't incremented. If the
+primary master's serial number is much lower than the
+slaves', the primary's serial number was probably
+accidentally reset. We usually assume a zone's primary master
+name server is running on the host listed in the MNAME (first) field
+of the SOA record.</p><p>
+
+
+You probably can't determine conclusively that the primary
+master hasn't been reloaded, though. It's also difficult
+to pin down updating problems between remote name servers. In cases
+like this, if you've determined that the remote name servers
+are giving out incorrect data, contact the zone administrator and
+(gently) relay what you've found. This will help the
+administrator track down the problem on the remote end.</p><p>
+
+
+If you can determine that a parent name server -- a remote
+zone's parent, your zone's parent, or even one in your
+zone -- is giving out a bad answer, check whether this is coming
+from old delegation information. Sometimes this requires contacting
+both the administrator of the remote zone and the administrator of
+its parent to compare the delegation and the current, correct list of
+authoritative name servers.</p><p>
+
+
+If you can't induce the administrator to fix the data or if you
+can't track down the administrator, you can always use the
+<em class="emphasis">bogus</em> substatement or
+<em class="emphasis">bogusns</em> directive to instruct your name server
+not to query that particular server.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.4" /><div class="sect2">
+<h3 class="sect2">14.7.4. Lookups Take a Long Time</h3>
+
+
+<a name="INDEX-2251" /><a name="INDEX-2252" /><a name="INDEX-2253" /><a name="INDEX-2254" />Slow name
+resolution is usually due to one of two problems:</p><p>
+
+
+<ul><li>Connectivity loss (problem 8), which you can diagnose with name
+server debugging output and tools like <em class="filename">ping</em></p></li><li>Incorrect delegation information (problem 10) pointing to the wrong
+name servers or the wrong IP addresses</p></li></ul>
+Usually, going over the debugging output and sending a few
+<em class="filename">ping</em>s will point to one or the other: either you
+can't reach the name servers at all, or you can reach the hosts
+but the name servers aren't responding.</p><p>
+
+
+Sometimes, though, the results are inconclusive. For example, the
+parent name servers delegate to a set of name servers that
+don't respond to <em class="filename">ping</em>s or queries, but
+connectivity to the remote network seems all right (a
+<em class="filename">traceroute</em>, for example, will get you to the
+remote network's "doorstep" -- the last router
+between you and the host). Is the delegation information so badly out
+of date that the name servers have long since moved to other
+addresses? Are the hosts simply down? Or is there really a remote
+network problem? Usually, finding out requires a call or a message to
+the administrator of the remote zone. (Remember,
+<em class="filename">whois</em> gives you phone numbers!)</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.5" /><div class="sect2">
+<h3 class="sect2">14.7.5. rlogin and rsh to Host Fails Access Check</h3>
+
+
+<a name="INDEX-2255" /><a name="INDEX-2256" />This is a problem you expect to see right
+after you set up your name servers. Users unaware of the change from
+the host table to domain name service won't know to update
+their <em class="filename">.rhosts</em> files. (We covered what needs to
+be updated in <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a>.) Consequently,
+<a name="INDEX-2257" /><em class="filename">rlogin</em>'s or
+<a name="INDEX-2258" /><em class="filename">rsh</em>'s access
+check will fail and deny the user access.</p><p>
+
+
+Other causes of this problem are missing or incorrect
+<a name="INDEX-2259" /><em class="emphasis">in-addr.arpa</em> delegation (problems 9 and
+10) or forgetting to add a PTR record for the client host (problem
+4). If you've recently upgraded to BIND Version 4.9 or newer
+and have PTR data for more than one <em class="emphasis">in-addr.arpa</em> zone in a single zone data
+file, your name server may be ignoring the out-of-zone data. Any of
+these situations will result in the same behavior:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rlogin wormhole</b></tt>
+Password:</pre></blockquote>
+
+
+In other words, the user is prompted for a password despite having
+set up password-less access with <em class="filename">.rhosts</em> or
+<em class="filename">hosts.equiv</em>. If you were to look at the
+<em class="emphasis">syslog</em> file on the destination host (<em class="emphasis">wormhole.movie.edu</em>, in this case),
+you'd probably see something like this:</p><p>
+
+
+<blockquote><pre class="code">May  4 18:06:22 wormhole inetd[22514]: login/tcp: Connection
+       from unknown (192.249.249.213)</pre></blockquote>
+
+
+You can tell which problem it is by stepping through the resolution
+process with yourfavorite query tool. First
+query one of your <em class="emphasis">in-addr.arpa</em>zone's parent name servers for NS records for your
+<em class="emphasis">in-addr.arpa</em> zone. If these
+are correct, query the name servers listed for the PTR record
+corresponding to the IP address of the <em class="filename">rlogin</em> or
+<em class="filename">rsh </em>client. Make sure they all have the PTR
+record and that the record maps to the right domain name. If not all
+the name servers have the record, check for a loss of synchronization
+between the primary master and the slaves (problems 1 and 3).</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.6" /><div class="sect2">
+<h3 class="sect2">14.7.6. Access to Services Denied</h3>
+
+
+<a name="INDEX-2260" /><a name="INDEX-2261" />Sometimes
+<em class="filename">rlogin</em> and <em class="filename">rsh </em>aren't
+the only services to go. Occasionally you'll install BIND on
+your server and your diskless hosts won't boot, and hosts
+won't be able to mount disks from the server, either.</p><p>
+
+
+If this happens, make sure that the case of the domain names your
+name servers return agrees with the case your previous name service
+returned. For example, if you are running NIS and your NIS host maps
+contain only lowercase names, you should make sure your name servers
+also return lowercase domain names. Some programs are case-sensitive
+and won't recognize names in a different case in a data file,
+such as <em class="filename">/etc/bootparams</em> or
+<em class="filename">/etc/exports</em>.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-14-SECT-7.7" /><div class="sect2">
+<h3 class="sect2">14.7.7. Can't Get Rid of Old Data</h3>
+
+
+<a name="INDEX-2262" /> <a name="INDEX-2263" /> <a name="INDEX-2264" />
+<a name="INDEX-2265" />Sometimes, after decommissioning a name
+server or changing a server's IP address, you'll find the
+old address record lingering around. An old record may show up in a
+name server's cache or in a zone data file weeks or even months
+later. The record clearly should have timed out of any
+<a name="INDEX-2266" />caches by now. So why's
+it still there? Well, there are a few reasons this happens.
+We'll describe the simpler cases first.</p><p>
+
+
+<a name="dns4-CHP-14-SECT-7.7.1" /><div class="sect3">
+<h3 class="sect3">14.7.7.1. Old delegation information</h3>
+
+
+<a name="INDEX-2267" /><a name="INDEX-2268" /><a name="INDEX-2269" />The first (and simplest) case
+occurs if a parent zone doesn't keep up with its children or if
+the children don't inform the parent of changes to the
+authoritative name servers for the zone. If the <em class="emphasis">edu</em> administrators have this old
+delegation information for <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN movie.edu.
+@    86400    IN    NS    terminator
+     86400    IN    NS    wormhole
+terminator    86400    IN    A    192.249.249.3
+wormhole      86400    IN    A    192.249.249.254 ; wormhole's former
+                                                  ; IP address</pre></blockquote>
+
+
+then the <em class="emphasis">edu</em> name servers
+will give out the bogus old address for <em class="emphasis">wormhole.movie.edu</em>.</p><p>
+
+
+This is easily corrected once it's isolated to the parent
+zone's name servers: just contact the parent zone's
+administrator and ask to have the delegation information updated. If
+your parent zone is one of the gTLDs, you may be able to fix the
+problem by filling out a form on your registrar's web site to
+modify the information about the name server. If any of the child
+zone's name servers have cached the bad data, kill them (to
+clear out their caches), delete any backup zone data files that
+contain the bad data, then restart them.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-14-SECT-7.7.2" /><div class="sect3">
+<h3 class="sect3">14.7.7.2. Registration of a non-name server</h3>
+
+
+This is a problem unique to the <a name="INDEX-2270" />gTLD zones: <em class="emphasis">com</em>, <em class="emphasis">net</em>, and <em class="emphasis">org</em>. Sometimes, you'll find the
+gTLD name servers giving out stale address information about a host
+in one of your zones -- and not even a name server! But why would
+the gTLD name servers have information about an arbitrary host in one
+of your zones?</p><p>
+
+
+Here's the answer: you can register hosts in the gTLD zones
+that aren't name servers at all, such as your web server. For
+example, you could register an address for <em class="emphasis">www.foo.com</em> through a <em class="emphasis">com</em> registrar, and the <em class="emphasis">com</em> name servers will give out that
+address. You shouldn't, though, because you'll lose a
+fair amount of control over the address. If you need to change the
+address, it could take a day or more to push the change through your
+registrar. If you run the <em class="emphasis">foo.com</em> primary master name server, you
+can make the change almost instantly.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-14-SECT-7.7.3" /><div class="sect3">
+<h3 class="sect3">14.7.7.3. What have I got?</h3>
+
+
+How do you determine which of these problems is plaguing you? Pay
+attention to which name servers are distributing the old data and
+which zones the data relates to:</p><p>
+
+
+<ul><li>Is the name server a gTLD name server? Check for a stale, registered
+address.</p></li><li>Is the name server your parent name server but not a gTLD name
+server? Check the parent for old delegation information.</p></li></ul>
+That's about all we can think to cover. It's certainly
+not a comprehensive list, but we hope it'll help you solve the
+more common problems you encounter with DNS and give you ideas about
+how to approach the rest. Boy, if we'd only had a
+troubleshooting guide when <em class="emphasis">we</em><a name="INDEX-2271" /> started!<a name="INDEX-2272" /></p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.6. TSIG Errors</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15. Programming with the Resolver and Name Server Library Routines</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

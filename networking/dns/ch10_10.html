@@ -1,0 +1,147 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_10.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>A Nonrecursive Name Server (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_11.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.10. A Nonrecursive Name Server</h2>
+
+
+<a name="INDEX-1642" /> <a name="INDEX-1643" />By
+default, BIND resolvers send recursive queries, and by default BIND
+name servers do the work required to answer them. (If you don't
+remember how recursion works, look in <a href="ch02_01.html">Chapter 2, "How Does DNS Work?"</a> )
+In the process of finding the answers to recursive queries, the name
+server builds up a cache of nonauthoritative information from other
+zones.</p><p>
+
+
+In some situations, it's undesirable for name servers to do the
+extra work required to answer a recursive query or to build up a
+cache of data. The <a name="INDEX-1644" /> <a name="INDEX-1645" />root name servers are an example of one of
+these situations. The root name servers are so busy that they
+can't expend the extra effort necessary to find the answers to
+recursive queries. Instead, they send a response based only on the
+authoritative data they have. The response may contain the answer,
+but it more likely contains a referral to other name servers. And
+since the root servers do not support recursive queries, they
+don't build up a cache of nonauthoritative data, which is good
+because their caches would be huge.<a href="#FOOTNOTE-76">[76]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-76" />[76]Note that a root
+name server doesn't normally receive recursive queries unless a
+name server's administrator configured it to use a root server
+as a forwarder, a host's administrator configured its resolver
+to use the root server as a name server, or a user pointed
+<em class="emphasis">nslookup</em> at the root server. All of these happen
+more often than you'd expect, though.</p><p>
+
+</blockquote>
+
+
+You can induce a BIND name server to run in nonrecursive mode with
+the following conf file statement:<a name="INDEX-1646" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	recursion no;
+};</pre></blockquote>
+
+
+On a BIND 4.9 server, that's the directive:</p><p>
+
+
+<a name="INDEX-1647" /><a name="INDEX-1648" /><blockquote><pre class="code">options no-recursion</pre></blockquote>
+
+
+Now the server will respond to recursive queries as if they were
+nonrecursive.</p><p>
+
+
+In conjunction with <em class="emphasis">recursion no</em>, there is one
+more configuration option necessary if you want to prevent your name
+server from building a cache:<a name="INDEX-1649" /><a name="INDEX-1650" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	fetch-glue no;
+};</pre></blockquote>
+
+
+Or, on BIND 4.9:</p><p>
+
+
+<a name="INDEX-1651" /><a name="INDEX-1652" /><blockquote><pre class="code">options no-fetch-glue</pre></blockquote>
+
+
+This stops the server from fetching missing glue when constructing
+the additional data section of a response. BIND 9 name servers
+don't fetch glue, so the <em class="emphasis">fetch-glue
+</em>substatement is obsolete in BIND 9.</p><p>
+
+
+If you choose to make one of your servers nonrecursive, don't
+list that name server in any host's <em class="emphasis">resolv.conf
+</em>file. While you can make your name server nonrecursive,
+there is no corresponding option to make your resolver work with a
+nonrecursive name server.<a href="#FOOTNOTE-77">[77]</a> If
+your name server needs to continue to serve one or more resolvers,
+you can use the <em class="emphasis">allow-recursion</em> substatement,
+available in BIND 8.2.1 and later (including BIND 9).
+<em class="emphasis">allow-recursion</em> takes an address match list as
+an argument; any queriers that match can send recursive queries, but
+everyone else is treated as if recursion were off:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-77" />[77]In general. Of course,
+programs designed to send nonrecursive queries, or programs that can
+be configured to send nonrecursive queries, like
+<em class="emphasis">nslookup</em>, will still work.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">options {
+	allow-recursion { 192.253.254/24; };  // Only resolvers on the FX
+                                          // subnet should be sending
+                                          // recursive queries
+};</pre></blockquote>
+
+
+<em class="emphasis">allow-recursion</em>'s default is to provide
+recursion to any IP address.</p><p>
+
+
+Also, don't list a nonrecursive name server as a forwarder.
+When a name server is using another server as a forwarder, it
+forwards <em class="emphasis">recursive</em> queries to the forwarder. Use
+<em class="emphasis">allow-recursion</em> to permit just authorized name
+servers to use your forwarder instead.</p><p>
+
+
+You <em class="emphasis">can</em> list a nonrecursive name server as one
+of the servers authoritative for your zone data (i.e., you can tell a
+parent name server to refer queries about your zone to this server).
+This works because name servers send nonrecursive queries between
+themselves.<a name="INDEX-1653" /> <a name="INDEX-1654" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_11.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.9. Preferring Name Servers on Certain Networks</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.11. Avoiding a Bogus Name Server</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_10.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

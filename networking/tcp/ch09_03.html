@@ -1,0 +1,843 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch09_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:29 GMT -->
+<head><title>Using Samba to Share Resources with Windows (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch09_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">9.3. Using Samba to Share Resources with Windows</h2>
+
+<p>NFS and <tt class="literal">lpd</tt> are file and
+<a name="INDEX-1952" />
+<a name="INDEX-1953" />
+<a name="INDEX-1954" />print sharing services for Unix
+systems, and are both native TCP/IP applications. Microsoft Windows
+printer and file sharing applications are based on NetBIOS (Network
+Basic Input Output System). <em class="emphasis">Samba</em> bridges these
+two worlds, providing file and print sharing for Unix and Windows
+systems. Samba is the key to integrating Unix and Windows because it
+allows a Unix system to be a file and print server for Windows
+clients, or to be a client of a Windows server.
+</p>
+
+<p>The protocol used between
+<a name="INDEX-1955" />NetBIOS clients and servers is Server
+essage Block Protocol (SMB). Originally, NetBIOS was a monolithic
+protocol that took data all the way from the application to the
+physical network. Today, NetBIOS runs over TCP/IP, which allows
+NetBIOS applications to run on Unix systems that use TCP/IP.
+</p>
+
+<p>Two things are needed to run NetBIOS on a TCP/IP network: a protocol
+to carry NetBIOS data over TCP/IP and a technique to map NetBIOS
+addresses to TCP/IP addresses. The protocol that transports NetBIOS
+is <a name="INDEX-1956" /> <a name="INDEX-1957" /><em class="emphasis">NetBIOS over TCP/IP</em>
+(NBT), which is defined by RFCs 1001 and 1002. Address mapping is
+handled by a special NetBIOS name server. Samba provides both of
+these services.
+</p>
+
+<p>Samba services are implemented as two daemons. The SMB daemon
+(<tt class="literal">smbd</tt><a name="INDEX-1958" /><a name="INDEX-1959" />),
+the heart of Samba, provides the file and printer sharing services.
+The NetBIOS name server daemon (<tt class="literal">nmbd</tt>) provides
+NetBIOS-to-IP-address name service. NBT requires some method for
+mapping NetBIOS computer names, which are the addresses of a NetBIOS
+network, to the IP addresses of a TCP/IP network.
+</p>
+
+<p>Samba is included in most Linux distributions and is installed during
+the initial system installation. On a Red Hat system, the
+<em class="emphasis">/etc/rc.d/init.d/smb</em> script runs at boot time,
+and starts both <tt class="literal">smbd</tt> and <tt class="literal">nmbd</tt>.
+Samba is not included in Solaris 8, but the software is available for
+download from the Internet. Go <a name="INDEX-1960" />to
+<a href="http://www.samba.org/">http://www.samba.org</a> to select your nearest
+download site.
+</p>
+
+<a name="tcp3-CHP-9-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">9.3.1. Configuring a Samba Server</h3>
+
+<p>The Samba server <a name="INDEX-1961" /> <a name="INDEX-1962" /> <a name="INDEX-1963" />is configured by the
+<em class="emphasis">smb.conf</em><a name="INDEX-1964" /><a name="INDEX-1965" /> file. Look in the startup
+script to see where <tt class="literal">smbd</tt> expects to find the
+configuration file. On a Red Hat system, it is
+<em class="emphasis">/etc/samba/smb.conf</em>. On a Caldera system, it is
+<em class="emphasis">/etc/samba.d/smb.conf</em>. The default used in most
+Samba documentation is
+<em class="emphasis">/usr/local/samba/lib/smb.conf</em>. Use
+<tt class="literal">find</tt> or check the startup script so you know where
+it is on your system.
+</p>
+
+<p>The <em class="emphasis">smb.conf</em> file is divided into sections.
+Except for the global section, which defines configuration parameters
+for the entire server, the sections are named after
+<em class="emphasis">shares</em>. A share is a resource offered by the
+server to the clients. It can be either a filesystem or a shared
+printer.
+</p>
+
+<p>The best way to learn about the <em class="emphasis">smb.conf</em> file is
+to look at one. Minus the printers share, which is covered later, the
+Red Hat <em class="emphasis">smb.conf</em> file contains these active
+lines:
+</p>
+
+<blockquote><pre class="code">[global]
+   workgroup = MYGROUP
+   server string = Samba Server
+   printcap name = /etc/printcap
+   load printers = yes
+   printing = lprng
+   log file = /var/log/samba/%m.log
+   max log size = 0
+   security = user
+   encrypt passwords = yes
+   smb passwd file = /etc/samba/smbpasswd
+   socket options = TCP_NODELAY SO_RCVBUF=8192 SO_SNDBUF=8192
+  dns proxy = no
+[homes]
+   comment = Home Directories
+   browseable = no
+   writable = yes
+   valid users = %S
+   create mode = 0664
+   directory mode = 0775</pre></blockquote>
+
+<p>Two sections of the Red Hat configuration file,
+<em class="emphasis">global</em> and <em class="emphasis">homes</em>, are
+listed above. The <a name="INDEX-1966" /> <a name="INDEX-1967" />global
+section defines parameters that affect the entire server:
+</p>
+
+<dl>
+<a name="INDEX-1968" /><dt><b><tt class="literal">workgroup</tt></b></dt>
+<dd>
+<p>Defines the hierarchical grouping of hosts, called a workgroup, of
+which this server is a member. Replace the MYGROUP name in the
+example with a meaningful workgroup name of 15 characters or less.
+ake sure you use a meaningful name. Never use the name MYGROUP or
+WORKGROUP.
+</p>
+</dd>
+
+
+<a name="INDEX-1969" /><dt><b><tt class="literal">server string</tt></b></dt>
+<dd>
+<p>Defines the descriptive comment for this server that is displayed by
+the <tt class="literal">net</tt> <tt class="literal">view</tt> command on DOS
+clients. Change the string in the example to something meaningful for
+your system.
+</p>
+</dd>
+
+
+<a name="INDEX-1970" /><dt><b><tt class="literal">printcap name</tt></b></dt>
+<dd>
+<p>Defines the location of the <em class="emphasis">printcap</em> file. The
+<em class="emphasis">printcap</em> file is used to identify the printers
+that are available to share. The default path is
+<em class="emphasis">/etc/printcap</em>.
+</p>
+</dd>
+
+
+<a name="INDEX-1971" /><dt><b><tt class="literal">load printers</tt></b></dt>
+<dd>
+<p>Specifies whether or not all the printers in the
+<em class="emphasis">printcap</em> file are to be shared. The default is
+<tt class="literal">yes</tt>, use all the printers defined in the
+<em class="emphasis">printcap</em> file. <tt class="literal">no</tt> means
+don't read the <em class="emphasis">printcap</em> file at all. If
+<tt class="literal">no</tt> is specified, all shared printers must be
+defined individually.
+</p>
+</dd>
+
+
+<a name="INDEX-1972" /><dt><b><tt class="literal">printing</tt></b></dt>
+<dd>
+<p>Identifies the Unix printing system used by the server. In the
+example, it is LPR Next Generation (<tt class="literal">lprng</tt>), which
+is an implementation of the standard LPR/LPD system described earlier
+in this chapter.
+</p>
+</dd>
+
+
+<a name="INDEX-1973" /><dt><b><tt class="literal">log file</tt></b></dt>
+<dd>
+<p>Defines the location of the log file. The example contains the
+<tt class="literal">%m</tt> variable,<a href="#FOOTNOTE-104">[104]</a> which varies according to the client's NetBIOS
+name. This creates a different log file for each client with a file
+extension that is the client's NetBIOS name. If the NetBIOS
+name of the client is <em class="emphasis">crab</em>, the log file is
+named <em class="emphasis">/var/log/samba/log.crab</em>. If the
+client's NetBIOS name is <em class="emphasis">rodent</em>, the log
+file is <em class="emphasis">/var/log/samba/log.rodent</em>.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-104" /><p>[104]Samba has about 20
+different variables. See the manpage for a full list.</p>
+</blockquote>
+</dd>
+
+
+<a name="INDEX-1974" /><dt><b><tt class="literal">max log size</tt></b></dt>
+<dd>
+<p>Defines the maximum size of a log file in kilobytes. The default is 5
+B, or 5000 KB. (If the maximum size is exceeded,
+<tt class="literal">smbd</tt> closes the log and renames it with the
+extension <em class="emphasis">.old</em>.) In the sample configuration,
+this is set to 0, which means that no maximum size is set for log
+files.
+</p>
+</dd>
+
+
+<a name="INDEX-1975" /><dt><b><tt class="literal">security</tt></b></dt>
+<dd>
+<p>Defines the type of security used. There are four possible settings:</p>
+
+<dl>
+<a name="INDEX-1976" /><dt><b><tt class="literal">share</tt></b></dt>
+<dd>
+<p>Requests share-level security. This is the lowest level of security.
+The resource is shared with everyone. It is possible to associate a
+password with a share, but the password is the same for everyone.
+</p>
+</dd>
+
+
+<a name="INDEX-1977" /><dt><b><tt class="literal">user</tt></b></dt>
+<dd>
+<p>Requests user-level security. Every user is required to enter a
+username and an associated password. By default, this is the username
+and password defined in <em class="emphasis">/etc/passwd</em>. The default
+values for passwords can be changed. See the discussion of passwords
+later in this section.
+</p>
+</dd>
+
+
+<a name="INDEX-1978" /><dt><b><tt class="literal">server</tt></b></dt>
+<dd>
+<p>Defines server-level security. This is similar to user-level
+security, but an external server is used to authenticate the username
+and password. The external server must be defined by the password
+server option.
+</p>
+</dd>
+
+
+<a name="INDEX-1979" /><dt><b><tt class="literal">domain</tt></b></dt>
+<dd>
+<p>Defines domain-level security. In this scheme, the Linux server joins
+a Windows NT/2000 domain and uses the Windows NT/2000 domain
+controller as the server that approves usernames and passwords. Use
+the password server option to point to the Windows NT/2000 Primary
+Domain Controller (PDC). Log into the PDC and create an account for
+the Linux system. Finally, add these lines to the global section on
+the Linux system:
+</p>
+
+<blockquote><pre class="code">domain master = no
+local master = no
+preferred master = no
+os level = 0</pre></blockquote>
+</dd>
+</dl>
+</dd>
+
+
+<a name="INDEX-1980" /><dt><b><tt class="literal">encrypt passwords</tt></b></dt>
+<dd>
+<p>Setting this option to <tt class="literal">yes</tt> causes Samba to encrypt
+passwords before they are sent across the network. This makes the
+server more compatible with Windows clients from Windows 98 on, which
+default to encrypted passwords, and makes it harder for intruders to
+sniff passwords from the network. By default, Samba uses clear-text
+Unix passwords.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">smb passwd file</tt></b></dt>
+<dd>
+<p>This option points to the location of the
+<em class="emphasis">smbpasswd</em> file, where encrypted Samba passwords
+are stored. When encrypted passwords are used, the Samba server must
+maintain two password files: <em class="emphasis">passwd</em> and
+<em class="emphasis">smbpasswd</em>. Use the
+<em class="emphasis">mksmbpasswd</em>.<em class="emphasis">sh</em> script to
+build the initial <em class="emphasis">smbpasswd</em> file from the
+<em class="emphasis">passwd</em> file.
+</p>
+</dd>
+
+
+<a name="INDEX-1981" /><dt><b><tt class="literal">socket options</tt></b></dt>
+<dd>
+<p>Defines performance tuning parameters. This option is not required,
+although setting the send and receive buffers to 8 KB may slightly
+increase performance. In the case of this sample Red Hat
+configuration, the <tt class="literal">TCP_NODELAY</tt> setting, which
+causes Samba to send multiple packets with each transfer, has no
+effect because it is the default for versions of Samba 2.0.4 or
+higher. See Appendix B of <em class="emphasis">Using Samba</em>, by Kelly,
+Eckstein, and Collier-Brown (O'Reilly) for a good discussion of
+Samba performance tuning.
+</p>
+</dd>
+
+
+<a name="INDEX-1982" /><dt><b><tt class="literal">dns proxy</tt></b></dt>
+<dd>
+<p>Specifies whether or not <tt class="literal">nmbd</tt> should forward
+unresolved NBNS queries to DNS.
+</p>
+</dd>
+
+</dl>
+
+<p><a name="INDEX-1983" />
+<a name="INDEX-1984" /><a name="INDEX-1985" /><a name="INDEX-1986" /><a name="INDEX-1987" /><a name="INDEX-1988" />In addition to the options described above,
+several other parameters are commonly used in the global section;
+they are shown in <a href="ch09_03.html#tcp3-CHP-9-TABLE-3">Table 9-3</a>.
+</p>
+
+<a name="tcp3-CHP-9-TABLE-3" /><h4 class="objtitle">Table 9-3. Other global section parameters  </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Option</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>deadtime</p>
+</td>
+<td>
+<p>Defines the timeout for inactive connections.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>debug level</p>
+</td>
+<td>
+<p>Sets the level of messages written to the log.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>keepalive</p>
+</td>
+<td>
+<p>Uses keepalives to check on the state of the clients.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>lock directory</p>
+</td>
+<td>
+<p>Defines the path of the directory where
+<em class="emphasis">wins.dat</em>, status files, and lock files are
+stored.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>message command</p>
+</td>
+<td>
+<p>Defines how smbd handles WinPopup messages.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>name resolve order</p>
+</td>
+<td>
+<p>Defines the order in which services are queried to resolve NetBIOS
+names. Possible values are: lmhosts, hosts, wins, and bcast.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>netbios aliases</p>
+</td>
+<td>
+<p>Defines other names the server will answer to.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>netbios name</p>
+</td>
+<td>
+<p>Defines the server's NetBIOS name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>syslog</p>
+</td>
+<td>
+<p>Maps debug levels to syslog levels.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>syslog only</p>
+</td>
+<td>
+<p>Uses syslog instead of Samba log files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>time server</p>
+</td>
+<td>
+<p>Tells the server to advertise itself as a Windows time server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>wins support</p>
+</td>
+<td>
+<p>Enables the WINS name server.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>As the Red Hat sample configuration demonstrates, many servers come
+preconfigured with reasonable global parameters to begin running a
+simple server system. In addition to a preconfigured
+<em class="emphasis">global</em> section, the Red Hat configuration comes
+with a preconfigured <em class="emphasis">homes</em> section.
+</p>
+
+<a name="tcp3-CHP-9-SECT-3.1.1" /><div class="sect3">
+<h3 class="sect3">9.3.1.1. The smb.conf homes section</h3>
+
+<p>The <em class="emphasis">homes</em> <a name="INDEX-1989" /> <a name="INDEX-1990" />section
+is a special share section. It tells <tt class="literal">smbd</tt> to
+permit users to access their home directories through SMB. Unlike
+other share sections, which we cover later, this section does not
+tell <tt class="literal">smbd</tt> the specific path of the directory being
+shared. Instead, <tt class="literal">smbd</tt> uses the home directory from
+the <em class="emphasis">/etc/passwd</em> file based on the username of
+the user requesting the share. The configuration parameters in the
+Red Hat <em class="emphasis">homes</em> section are:
+</p>
+
+<dl>
+<a name="INDEX-1991" /><dt><b><tt class="literal">comment</tt></b></dt>
+<dd>
+<p>Provides a description of the share that is displayed in the comment
+field of the Network Neighborhood window when this share is viewed on
+a Windows PC.
+</p>
+</dd>
+
+
+<a name="INDEX-1992" /><dt><b><tt class="literal">browseable</tt></b></dt>
+<dd>
+<p>Specifies whether or not all users may browse the contents of this
+share. <tt class="literal">no</tt> means that only users with the correct
+user ID are allowed to browse this share. <tt class="literal">yes</tt>
+means all users, regardless of UID, can browse the share. This
+parameter controls only browsing; actual access to the contents of
+the share is controlled by standard Linux file permissions.
+</p>
+</dd>
+
+
+<a name="INDEX-1993" /><dt><b><tt class="literal">writable</tt></b></dt>
+<dd>
+<p>Specifies whether or not files can be written to this share. If
+<tt class="literal">yes</tt>, the share can be written to. If
+<tt class="literal">no</tt>, the share is read-only. This parameter defines
+the actions permitted by Samba. Actual permission to write to the
+directory defined by the share is still controlled by standard Linux
+file <a name="INDEX-1994" />
+<a name="INDEX-1995" />
+<a name="INDEX-1996" />permissions. 
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">valid users</tt></b></dt>
+<dd>
+<p>This option lists the users who are allowed to use this share. In
+this example, <tt class="literal">%S</tt> contains the name of the user
+allowed to access this share.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">create mode</tt></b></dt>
+<dd>
+<p>This option defines the file permissions used when a client creates a
+file within the <em class="emphasis">homes</em> share.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">directory mode</tt></b></dt>
+<dd>
+<p>This option defines the permissions used when a client creates a
+directory within the <em class="emphasis">homes</em> share.
+</p>
+</dd>
+
+</dl>
+
+</div>
+
+<a name="tcp3-CHP-9-SECT-3.1.2" /><div class="sect3">
+<h3 class="sect3">9.3.1.2. Sharing directories through Samba</h3>
+
+<p>To share a directory <a name="INDEX-1997" />
+<a name="INDEX-1998" />through Samba, create a share section
+in <em class="emphasis">smb.conf</em><a name="INDEX-1999" />
+that describes the directory and the conditions under which it will
+be shared. To share a new directory named
+<em class="emphasis">/usr/doc/pcdocs</em> and the
+<em class="emphasis">/home/research</em> directory used in the NFS
+examples, add the following two share sections to the sample
+<em class="emphasis">smb.conf</em> file:
+</p>
+
+<blockquote><pre class="code">[pcdocs]
+     comment = PC Documentation
+     path = /usr/doc/pcdocs
+     browseable = yes
+     writable = no
+     public = yes
+
+[research]
+     comment = Research Deptment Shared Directory
+     path = /home/research
+     browseable = no
+     writable = yes
+     create mode = 0750
+     hosts allow = horseshoe,jerboas,crab,rodent</pre></blockquote>
+
+<p>Each share section is labeled with a meaningful name. This name is
+displayed as a folder in the Network Neighborhood window on client
+PCs. The example contains some commands we have already covered and a
+few new commands. The first new command is <tt class="literal">path</tt>,
+which defines the path of the directory being offered by this share.
+</p>
+
+<p>The <em class="emphasis">pcdocs</em> share also contains the command
+<tt class="literal">public</tt>, which grants everyone access, even if they
+don't have a valid username or password. These public users are
+granted "guest account" access to the share. On a Linux
+system, this means they run as user <em class="emphasis">nobody</em> and
+group <em class="emphasis">nobody</em> and are limited to world
+permissions.
+</p>
+
+<p>Files may be written to the research share. The
+<tt class="literal">create</tt> <tt class="literal">mode</tt> command controls
+the Unix permissions used when a client writes a file to the share.
+In the example, the permission 0750 specifies that files will be
+created as read/write/execute for the owner, read/execute for the
+group, and no permissions for the world. A related command,
+<tt class="literal">directory mode</tt>, defines the permission used when a
+client creates a directory within a share. For example:
+</p>
+
+<blockquote><pre class="code">directory mode = 0744</pre></blockquote>
+
+<p>This sets the permissions for new directories to read/write/execute
+for the owner, read/execute for the group, and read/execute for the
+world. This is a reasonable setting that allows <tt class="literal">cd</tt>
+and <tt class="literal">ls</tt> to work as expected.
+</p>
+
+<p>The <em class="emphasis">research</em> share section also contains a
+<tt class="literal">hosts</tt> <tt class="literal">allow</tt> command, which
+defines the clients that are allowed to access this share. Even if a
+user has the correct username and password, that user is allowed to
+access this share only from the specified hosts. By default, all
+hosts are granted access, and specific access is controlled by the
+username and password.
+</p>
+
+<p>In addition to the <tt class="literal">hosts</tt> <tt class="literal">allow</tt>
+command, there is a <tt class="literal">hosts</tt> <tt class="literal">deny</tt>
+command that defines computers that are explicitly denied access to
+the share. Its syntax is similar to that of the <tt class="literal">hosts
+allow</tt> command.
+</p>
+
+<p>Combining these two new share sections with the section that came
+with the Red Hat configuration creates a server that provides access
+to user home directories, to public directories, and to private
+directories limited to members of a group. This provides the same
+services as NFS in a manner that is simpler for Microsoft Windows
+clients to use. Samba can also be used to share printers with Windows
+clients.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-9-SECT-3.1.3" /><div class="sect3">
+<h3 class="sect3">9.3.1.3. Sharing printers through Samba</h3>
+
+<p>Shared <a name="INDEX-2000" /> <a name="INDEX-2001" />printers are configured through the
+<em class="emphasis">smb.conf</em><a name="INDEX-2002" />
+file. The Red Hat system comes with a <em class="emphasis">smb.conf</em>
+file that is preconfigured for sharing printers. The following lines
+occur right after the <em class="emphasis">global</em> and
+<em class="emphasis">homes</em> sections in the Red Hat
+<em class="emphasis">smb.conf</em> file:
+</p>
+
+<blockquote><pre class="code">[printers]
+   comment = All Printers
+   path = /var/spool/samba
+   browseable = no
+   guest ok = no
+   writable = no
+   printable = yes</pre></blockquote>
+
+<p>The <tt class="literal">printcap</tt> and <tt class="literal">load printers</tt>
+lines in the global section prepare the server to share the printers
+defined in the <em class="emphasis">printcap</em> file. This
+<em class="emphasis">printers</em> section makes those printers available
+to the clients in a manner similar to the way the
+<em class="emphasis">homes</em> section makes every home directory
+available to the appropriate user. The Red Hat
+<em class="emphasis">printers</em> share section contains five parameters.
+</p>
+
+<p>Three of the parameters, <tt class="literal">comment</tt>,
+<tt class="literal">browseable</tt>, and <tt class="literal">path</tt>, were
+explained previously. Here, however, <tt class="literal">path</tt> does not
+define the path of a shared file. Instead, it defines the path of the
+spool directory for the SMB printers.
+</p>
+
+<p>We introduce two new parameters in this configuration, the first of
+which is <tt class="literal">printable</tt>, which identifies this share as
+a printer. The default for this option is <tt class="literal">no</tt>,
+meaning that by default, shares are considered to be file shares
+instead of printer shares. To create a printer share, set this option
+to <tt class="literal">yes</tt>. Setting <tt class="literal">printable = yes</tt>
+permits clients to write printer files to the spool directory defined
+by the <tt class="literal">path</tt> option. Use a <tt class="literal">create
+mode</tt> command to limit the permissions of the files created
+by clients in the spool directory. For example, <tt class="literal">create mode
+= 0700</tt>.
+</p>
+
+<p>The other new line, <tt class="literal">guest</tt> <tt class="literal">ok</tt>,
+defines whether or not guest accounts are permitted access to the
+resource. This is exactly the same as the <tt class="literal">public</tt>
+option discussed earlier, so these two options are used
+interchangeably. <tt class="literal">no</tt> means that the user
+<em class="emphasis">nobody</em> cannot send a print job to the printer. A
+user must have a valid user account to use the printer. This is
+designed to prevent guest users from abusing the printer, but it is
+also useful to have a valid username for sorting out print jobs if
+you use banner pages and accounting on the server.
+</p>
+
+<p>Generally, a print server offers all of its printers to all of its
+clients. However, individual share sections can be created for each
+printer in the same way that they are created for file sharing. If
+you don't want to share every printer, remove the printers
+section, set the <tt class="literal">load printers</tt> option to
+<tt class="literal">no</tt>, and add individual share sections for just
+those printers that you want to share.
+</p>
+
+<p>An <em class="emphasis">smb.conf</em> file with a share section for a
+specific printer might contain:
+</p>
+
+<blockquote><pre class="code">[global]
+   workgroup = BOOKS
+   server string = Print Server
+   load printers = no  
+   security = user
+[homes]
+   comment = Home Directories
+   browseable = no
+   writable = yes
+[hp5m]
+   comment = PostScript Laser Printer
+   path = /var/spool/samba
+   browseable = no
+   public = no
+   create mode = 0700
+   printable = yes
+   printer = lp</pre></blockquote>
+
+<p>This sample file has no printers section. Instead, a share section
+named <em class="emphasis">hp5m</em> is added that shares a printer named
+<em class="emphasis">lp</em>. The printer name must be found in the
+<em class="emphasis">printcap</em> file for this to work. The
+<tt class="literal">printcap</tt> option is allowed to default to
+<em class="emphasis">/etc/printcap</em>.
+</p>
+
+<p><tt class="literal">smbd</tt> is the component of Samba that provides file
+and printer sharing. The other component of Samba is <a name="INDEX-2003" /> <a name="INDEX-2004" /><tt class="literal">nmbd</tt>. 
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-9-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">9.3.2. NetBIOS Name Service</h3>
+
+<p>The NetBIOS name <a name="INDEX-2005" />
+<a name="INDEX-2006" /> <a name="INDEX-2007" /> <a name="INDEX-2008" />
+<a name="INDEX-2009" />server daemon (<tt class="literal">nmbd</tt>)
+is the part of the basic Samba software distribution that turns a
+Unix server into a NetBIOS name server (NBNS).
+<tt class="literal">nmbd</tt> can handle queries from LanManager clients,
+and it can be configured to act as a Windows Internet Name Server
+(WINS).
+</p>
+
+<p><tt class="literal">nmbd</tt> is configured in the global section of the
+<em class="emphasis">smb.conf</em><a name="INDEX-2010" /> file. The options that relate
+to running WINS are:
+</p>
+
+<dl>
+<a name="INDEX-2011" /><dt><b><tt class="literal">wins support</tt></b></dt>
+<dd>
+<p>Set to <tt class="literal">yes</tt> or <tt class="literal">no</tt>. This option
+determines whether or not <tt class="literal">nmbd</tt> runs as a WINS
+server. <tt class="literal">no</tt> is the default, so by default,
+<tt class="literal">nmbd</tt> provides browsing controls but does not
+provide WINS service.
+</p>
+</dd>
+
+
+<a name="INDEX-2012" /><dt><b><tt class="literal">dns proxy</tt></b></dt>
+<dd>
+<p>Set to <tt class="literal">yes</tt> or <tt class="literal">no</tt>. This option
+tells <tt class="literal">nmbd</tt> to use DNS to resolve WINS queries that
+it cannot resolve any other way. This is significant only if
+<tt class="literal">nmbd</tt> is running as a WINS server. The default is
+<tt class="literal">yes</tt>. DNS can help with NetBIOS name resolution
+only if NetBIOS names and DNS hostnames are the same.
+</p>
+</dd>
+
+
+<a name="INDEX-2013" /><dt><b><tt class="literal">wins server</tt></b></dt>
+<dd>
+<p>Set to the IP address of an external WINS server. This option is
+useful only if you're not running a WINS server on your Linux
+system. This option tells Samba the address of the external WINS
+server to which it should send NetBIOS name queries.
+</p>
+</dd>
+
+
+<a name="INDEX-2014" /><dt><b><tt class="literal">wins proxy</tt></b></dt>
+<dd>
+<p>Set to <tt class="literal">yes</tt> or <tt class="literal">no</tt>. The default
+is <tt class="literal">no</tt>. When set to <tt class="literal">yes</tt>,
+<tt class="literal">nmbd</tt> resolves broadcast NetBIOS name queries by
+turning them into unicast queries and sending them directly to the
+WINS server. If <tt class="literal">wins support = yes</tt> is set, these
+queries are handled by <tt class="literal">nmbd</tt> itself. If instead
+<tt class="literal">wins</tt> <tt class="literal">server</tt> is set, these
+queries are sent to the external server. The <tt class="literal">wins
+proxy</tt> option is needed only if clients don't know the
+address of the server or don't understand the WINS protocol.
+</p>
+</dd>
+
+</dl>
+
+<p>The NetBIOS name server is generally started at boot time with the
+following command:
+</p>
+
+<blockquote><pre class="code">nmbd -D</pre></blockquote>
+
+<p>When started with the -<tt class="literal">D</tt> option,
+<tt class="literal">nmbd</tt> runs continuously as a daemon listening for
+NetBIOS name service requests on port 137. The server answers
+requests using registration data collected from its clients and the
+NetBIOS name-to-address mappings it has learned from other servers.
+</p>
+
+<p>The <em class="emphasis">lmhosts</em> file is used to manually map
+addresses when that is necessary. Most WINS servers do not need an
+<em class="emphasis">lmhosts</em> file because the servers learn address
+mappings dynamically from clients and other servers. NetBIOS names
+are self-registered; clients register their NetBIOS names with the
+server when they boot. The addresses and names are stored in the WINS
+database, <em class="emphasis">wins.dat</em>. The
+<em class="emphasis">lmhosts</em> file is only a small part of the total
+database.
+</p>
+
+<p>The <em class="emphasis">lmhosts</em> file is similar to the
+<em class="emphasis">hosts</em> file described in <a href="ch04_01.html">Chapter 4, "Getting Started"</a>. Each entry begins with an IP address that is
+followed by a hostname. However, this time, the hostname is the
+NetBIOS name. Here is a sample <em class="emphasis">lmhosts</em> file:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">cat /etc/lmhosts</b>
+172.16.12.3       horseshoe
+172.16.12.1       crab
+172.16.12.2       rodent
+172.16.12.4       jerboas</pre></blockquote>
+
+<p>Given this <em class="emphasis">lmhosts</em> file, the NetBIOS name
+<em class="emphasis">rodent</em> maps to IP address 172.16.12.2. Notice
+that these NetBIOS names are the same as the TCP/IP hostnames
+assigned to these clients. Use the same hostnames for both NetBIOS
+and TCP/IP. Doing otherwise limits configuration choices and creates
+confusion.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.2. Sharing Unix Printers </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.4. Network Information Service </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch09_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:29 GMT -->
+</html>

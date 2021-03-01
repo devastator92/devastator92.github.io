@@ -1,0 +1,1048 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:06 GMT -->
+<head><title>X Forwarding (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.3. X Forwarding</h2>
+
+
+
+Now that you've seen general TCP port forwarding, we move to a
+new topic: forwarding of X protocol connections. X is a popular
+window system for Unix workstations, and one of its best features is
+its transparency. Using X, you can run remote X applications that
+open their windows on your local display (and vice versa, running
+local applications on remote displays). Unfortunately, the
+inter-machine communication is insecure and wide open to snoopers.
+But there's good news: SSH <em class="emphasis">X forwarding</em>
+makes the communication secure by tunneling the X protocol.</p>
+
+
+
+X forwarding also addresses some <a name="INDEX-1437" />firewall-related difficulties.
+Suppose you're a system administrator with a set of exposed
+production machines on the other side of a firewall from you. You log
+into one of these machines using SSH, and want to run an graphical
+performance-monitoring tool, such as Solaris's
+<tt class="command">perfmon</tt>, that uses the X Window System. You
+can't, though, because to do that, the external machine needs
+to make a TCP connection back to the internal machine you started on,
+and the firewall blocks it (as it should, since X is quite insecure).
+X forwarding solves this problem, permitting X protocol connections
+to pass through the firewall, securely tunneled via SSH.</p>
+
+
+
+Our discussion begins with a brief overview of X and then explains
+the details of X forwarding. In addition to explaining how to use X
+forwarding, we also expose the internals of X authentication and how
+it interacts with SSH, as well as other technical topics.</p>
+
+
+
+<a name="ch09-20-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">VNC Forwarding: An Alternative to X Forwarding</h4>
+
+
+
+X forwarding is problematic from a security point of view, for the
+same reason as X itself. As we will see, the design of X means that
+remote programs must make separate network connections back to the
+user; this requires yet another layer of authentication and
+authorization, complicating the situation and opening an avenue of
+attack. SSH X forwarding tries to secure this as much as possible,
+but it may still be unacceptable in some environments.</p>
+
+
+
+An alternative technique is to use <a name="INDEX-1438" />Virtual Network Computing
+(VNC) over SSH. VNC is free software developed by AT&amp;T
+Laboratories in the United Kingdom, which provides remote GUI access
+for Unix and Windows platforms. With VNC, you can open a window on
+your Unix machine running X and have the desktop of a remote Windows
+machine appear there, so you can operate the Windows box remotely.
+Conversely, you can run the VNC client on a Windows machine and
+connect to a remote X display running on a Unix host. Since VNC
+involves only a single outbound connection, it is easier and safer to
+tunnel through SSH than X. You can find out more about VNC (and
+download the software) at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="http://www.uk.research.att.com/vnc/">http://www.uk.research.att.com/vnc/</a></p>
+
+</blockquote>
+
+
+</td></tr></table><p></blockquote>
+
+<a name="ch09-21-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.3.1. The X Window System</h3>
+
+
+
+The <a name="INDEX-1439" />X Window
+System, or X, is the most widely used graphical display system for
+Unix machines. Like SSH, X has clients and servers. X clients are
+windowing application programs, such as terminal emulators, paint
+programs, graphical clocks, and so forth. An X server is the
+underlying display engine that processes requests from X clients,
+communicating via a network protocol called the <em class="emphasis">X
+protocol</em>. A machine typically runs a single X server but
+possibly many X clients.</p>
+
+
+
+Most important to our discussion, X supports sophisticated window
+management over a network. X clients can open windows not only on
+their local machine but also on other computers on the network,
+whether they are down the hall or across the globe. To accomplish
+this, an X client makes a network connection to a remote X server and
+carries on a conversation, using the X protocol to draw on the remote
+screen, receive remote keyboard events, learn the remote mouse
+location, and so on. This obviously requires some type of security,
+which we discuss soon.</p>
+
+
+
+A central concept of X is the
+<em class="emphasis">display</em><a name="INDEX-1440" />,
+an abstraction for the screen managed by an X server. When an X
+client is invoked, it needs to know which display to use. Displays
+are named by strings of the form <em class="emphasis">HOST:n.v</em>,
+where:</p>
+
+
+
+<ul><li><em class="emphasis">HOST</em> is the name of the machine running the X
+server controlling the display.</p></li><li><em class="emphasis">n</em> is the <em class="emphasis">display</em> number, an
+integer, usually 0. X allows for multiple displays controlled by a
+single server; additional displays are numbered 1, 2, and so on.</p></li><li><em class="emphasis">v</em> is the <em class="emphasis">visual</em> number,
+another integer. A visual is a virtual display. X supports multiple
+virtual displays on a single, physical display. If there's only
+one virtual display (which is the most common scenario), you omit the
+".v", and the default is visual 0.</p></li></ul>
+For example, on the machine <em class="emphasis">server.example.com,</em>
+display 0, visual 1 is represented by the display string
+"server.example.com:0.1".</p>
+
+
+
+Under Unix, most X client programs let you specify the display string
+in two ways: the <span class="option">-d</span> or <span class="option">-display</span>
+command-line option, or the environment variable
+<a name="INDEX-1441" />DISPLAY. For
+example, to run the X client program <tt class="command">xterm</tt> on the
+only X display of the workstation anacreon, use the command-line
+option:</p>
+
+
+
+<blockquote><pre class="code">$ xterm -d anacreon:0 &amp;</pre></blockquote>
+
+
+
+or the environment variable:</p>
+
+
+
+<blockquote><pre class="code">$ setenv DISPLAY anacreon:0
+$ xterm &amp;</pre></blockquote>
+
+
+
+X is a large, deep software product whose documentation fills a dozen
+O'Reilly books. We've barely scratched the surface with
+our explanation, but you've now seen enough to understand X
+forwarding.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.3.2. How X Forwarding Works</h3>
+
+
+
+<a name="INDEX-1442" />Although X clients can communicate
+with remote X servers, this communication isn't secure. All
+interactions between the X client and server, such as keystrokes and
+displayed text, can be easily monitored by network snooping because
+the connection isn't encrypted. In addition, most X
+environments use primitive authentication methods for connecting to a
+remote display. A knowledgeable attacker can get a connection to your
+display, monitor your keystrokes, and control other programs
+you're running.</p>
+
+
+
+Once again, SSH comes to the rescue. An X protocol connection can be
+routed through an SSH connection to provide security and stronger
+authentication. This feature is called X forwarding.</p>
+
+
+
+X forwarding works in the following way. (As illustration, please
+refer to <a href="ch09_03.html#ch09-45601">Figure 9-10</a>.) An SSH client requests X
+forwarding when it connects to an SSH server (assuming X forwarding
+is enabled in the client). If the server allows X forwarding for this
+connection, your login proceeds normally, but the server takes some
+special steps behind the scenes. In addition to handling your
+terminal session, it sets itself up as a proxy X server running on
+the remote machine and sets the DISPLAY environment variable in your
+remote shell to point to the proxy X display:</p>
+
+
+
+<blockquote><pre class="code">syrinx$ ssh sys1
+Last login: Sat Nov 13 01:10:37 1999 from blackberry
+Sun Microsystems Inc.   SunOS 5.6       Generic August 1997
+You have new mail.
+sys1$ echo $DISPLAY 
+sys1:10.0
+sys1$ xeyes
+<i class="lineannotation">The "xeyes" X client appears on the screen</i></pre></blockquote>
+
+
+
+<a name="ch09-45601" /><div class="figure"><img height="161" alt="Figure 9-10" src="figs/ssh_0910.gif" width="413" /></div><h4 class="objtitle">Figure 9-10. X forwarding</h4>
+
+The DISPLAY value appears to refer to X display #10 on sys1, but
+there's no such display. (In fact, there might be no true
+displays on sys1 at all.) Instead, the DISPLAY value points to the X
+proxy established by the SSH server, i.e., the SSH server is
+masquerading as an X server. If you now run an X client program, it
+connects to the proxy. The proxy behaves just like a
+"real" X server, and in turn instructs the SSH client to
+behave as a proxy X client, connecting to the X server on your local
+machine. The SSH client and server then cooperate to pass X protocol
+information back and forth over the SSH pipe between the two X
+sessions, and the X client program appears on your screen just as if
+it had connected directly to your display. That's the general
+idea of X forwarding.</p>
+
+
+
+X forwarding can even solve the <a name="INDEX-1443" />firewall problem mentioned earlier,
+as long as the firewall permits SSH connections to pass through. If a
+firewall sits between your local and remote machines, and you run an
+X client on the remote machine, X forwarding tunnels the X connection
+through the firewall's SSH port to the local machine.
+Therefore, the X client's windows can open on your local
+display. If X forwarding isn't present, the firewall blocks the
+connection.</p>
+
+
+
+Some aspects of X forwarding probably sound familiar from our earlier
+explanation of port forwarding. In fact, X forwarding is just a
+special case of port forwarding for which SSH has special support.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-26230" /><div class="sect2">
+<h3 class="sect2">9.3.3. Enabling X Forwarding</h3>
+
+
+
+<a name="INDEX-1444" />X
+forwarding is on by default in SSH1 and SSH2, but off in OpenSSH. If
+you need to enable or disable X forwarding for your clients,
+here's how to do it. Unlike general port forwarding, which
+requires you to fiddle with TCP port numbers, X forwarding has only
+an on/off switch. In your SSH client configuration file, use the
+keyword <tt class="literal">ForwardX11</tt> with a value
+<tt class="literal">yes</tt> (the default, to enable) or
+<tt class="literal">no</tt> (to disable):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+ForwardX11 yes</pre></blockquote>
+
+
+
+On the command line, you may also use <span class="option">-x</span> to disable
+X forwarding:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ ssh -x server.example.com</pre></blockquote>
+
+
+
+SSH2 and OpenSSH enables X forwarding with the following options:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh2 +x server.example.com
+
+# OpenSSH only
+$ ssh -X server.example.com</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-23-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.3.4. Configuring X Forwarding</h3>
+
+
+
+The behavior of X forwarding can be modified through compile-time
+configuration, serverwide configuration, and per-account
+configuration.</p>
+
+
+
+<a name="ch09-24-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.4.1. Compile-time configuration</h3>
+
+
+
+<a name="INDEX-1445" /><a name="INDEX-1446" />SSH1 and SSH2 can be compiled
+with or without X support. The compile-time flags
+<tt class="literal">--with-x</tt> and
+<tt class="literal"> -- without-x</tt> make this
+determination:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+$ configure ... --without-x ...</pre></blockquote>
+
+
+
+In addition, if you compile with X support, you may set the default
+behavior for X forwarding. In SSH1, you can enable or disable
+forwarding by default in the client and the server separately, using
+the <a name="INDEX-1447" />compile-time flags
+<tt class="literal"> -- enable-client-x11-forwarding</tt> (or
+<tt class="literal"> -- disable-client-x11-forwarding</tt>) and
+<tt class="literal"> -- enable-server-x11-forwarding</tt> (or
+<tt class="literal"> -- disable-server-x11-forwarding</tt>):</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ configure ... --disable-server-x11-forwarding ...</pre></blockquote>
+
+
+
+In SSH2, you can enable or disable all X forwarding by default with
+<tt class="literal"> -- enable-X11-forwarding</tt> or
+<tt class="literal"> -- disable-X11-forwarding</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ configure ... --enable-X11-forwarding ...</pre></blockquote>
+
+
+
+Remember, enable/disable flags simply set the default behavior. You
+can override these defaults with serverwide and per-account
+configuration.</p>
+</div>
+
+
+
+
+
+<a name="ch09-94172" /><div class="sect3">
+<h3 class="sect3">9.3.4.2. Serverwide configuration</h3>
+
+
+
+<a name="INDEX-1448" />The serverwide configuration
+keywords
+<tt class="literal">X11Forwarding</tt><a name="INDEX-1449" />
+(SSH1, SSH2, OpenSSH) and its synonyms
+<tt class="literal">ForwardX11</tt><a name="INDEX-1450" />
+(SSH2) and
+<tt class="literal">AllowX11Forwarding</tt><a name="INDEX-1451" />
+(SSH2) enable or disable X forwarding in the SSH server. By default,
+it is enabled:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+X11Forwarding no
+
+# SSH2 only: either will work
+ForwardX11 no
+AllowX11Forwarding no</pre></blockquote>
+
+
+
+The
+<tt class="literal">X11DisplayOffset</tt><a name="INDEX-1452" />
+keyword lets you reserve some X11 display numbers so
+<tt class="command">sshd</tt> can't use them. This keyword specifies
+the lowest display number SSH may use, preventing
+<tt class="command">sshd</tt> from clashing with real X servers on the
+lower-numbered displays. For example, if you normally run actual X
+servers on displays
+and 1, set:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+X11DisplayOffset 2</pre></blockquote>
+
+
+
+The
+<tt class="literal">XAuthLocation</tt><a name="INDEX-1453" />
+keyword specifies the path to the <tt class="command">xauth</tt> program,
+which manipulates authorization records for X. We describe this
+keyword later, after we discuss <tt class="command">xauth</tt>. [<a href="ch09_03.html#ch09-13568">Section 9.3.6.4, "Location of the xauth program"</a>]</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+XAuthLocation /usr/local/bin/xauth</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch09-25-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.4.3. Per-account configuration</h3>
+
+
+
+<a name="INDEX-1454" />In your SSH1 or OpenSSH
+<em class="emphasis">authorized_keys</em> file, you may disallow X
+forwarding for incoming SSH connections that use a particular key for
+authentication. This is done with the option
+<tt class="literal">no-X11-forwarding</tt><a name="INDEX-1455" />:
+[<a href="ch08_02.html#ch08-38411">Section 8.2.8, "Disabling Forwarding "</a>]</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-X11-forwarding <em class="replaceable">...rest of key...</em></pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-42088" /><div class="sect2">
+<h3 class="sect2">9.3.5. X Authentication</h3>
+
+
+
+<a name="INDEX-1456" /><a name="INDEX-1457" />We've
+mentioned in passing that X performs its own authentication when X
+clients connect to X servers. Now we're going to dive into
+technical detail on the inner workings of X authentication, why
+it's insecure, and how SSH X forwarding builds on it to create
+a secure solution.</p>
+
+
+
+In most cases, X forwarding simply works, and you don't have to
+think about it. The following material is to aid your understanding
+and satisfy any intense cravings for tech talk (both yours and ours).</p>
+
+
+
+<a name="ch09-26-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.5.1. How X authentication works</h3>
+
+
+
+When an X client requests a connection to an X server, the server
+authenticates the client. That is, the X server determines the
+client's identity to decide whether to allow a connection to
+the server's display. The current release of the X Window
+system (X11R6) provides two categories of authentication: host-based
+and key-based:</p>
+
+
+
+<dl>
+<dt><i>Host-based X authentication</i></dt>
+<dd><a name="INDEX-1458" />The simpler method. Using the program
+<tt class="command">xhost</tt>, you indicate a list of hosts that may
+connect to your X display. Notice that connections are authenticated
+only by hostname, not by username. That is, any user on a listed host
+may connect to your display.</p></dd>
+
+
+
+<dt><i>Key-based X authentication</i></dt>
+<dd><a name="INDEX-1459" />Uses the <em class="emphasis">xauth</em>
+program to maintain a list of X authentication keys, or
+<em class="emphasis">display keys</em>, for X clients. Keys are kept in a
+file, usually <em class="filename">~/.Xauthority</em>, along with other
+data associated with the various displays the client wants to access.
+When an X client connects to a server requiring authentication, the
+client supplies the appropriate credentials for that display from the
+<em class="emphasis">xauth</em> data. If authentication is successful, the
+X client can then connect to the display managed by the X server.</p></dd>
+
+</dl>
+
+
+
+Display keys are obtained from the X server in various ways depending
+on the environment. For example, if you start the server directly on
+the console of a machine using <tt class="command">xinit</tt> or
+<tt class="command">startx</tt>, these programs invoke an X server and
+insert a copy of the server's key directly into your
+<em class="emphasis">xauth</em> data. Alternatively, if you connect to a
+remote machine that runs the X Display Manager (XDM), the key is sent
+to your remote account when establishing your XDM session.</p>
+</div>
+
+
+
+
+
+<a name="ch09-33857" /><div class="sect3">
+<h3 class="sect3">9.3.5.2. xauth and the SSH rc files</h3>
+
+
+
+<a name="INDEX-1460" />SSH has startup
+files that can be set to execute on the server side when a client
+logs in. These are the systemwide
+<em class="filename">/etc/sshrc</em><a name="INDEX-1461" /> and the per-account
+<em class="filename">~/.ssh/rc</em>. These can be shell scripts or any
+kind of executable program.</p>
+
+
+
+An important thing to note is that <tt class="command">sshd</tt> runs
+<tt class="command">xauth</tt><a name="INDEX-1462" />
+only to add the proxy display key if it doesn't run an
+<em class="emphasis">rc</em> program. If it does run an
+<em class="emphasis">rc</em> program, it feeds the key type and data to
+the program on a single line to its standard input, and it is up to
+the <em class="emphasis">rc</em> program to store the display key. This
+feature provides a way to customize handling the display key, in case
+just running <tt class="command">xauth</tt> isn't the right thing to
+do in your situation.</p>
+</div>
+
+
+
+
+
+<a name="ch09-27-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.5.3. Problems with X authentication</h3>
+
+
+
+<a name="INDEX-1463" />If you've used X, the
+authentication was probably transparent and seemed to work fine.
+Behind the scenes, however, the mechanism is insecure. Here are the
+major problems:</p>
+
+
+<a name="INDEX-1464" />
+<dl>
+<dt><i>xhost is insecure</i></dt>
+<dd>Once you give permission for a remote host to connect to your
+display, any user on that host can connect. As with the r-commands,
+this authentication method depends on the network address of the
+connecting host, which can be easy for an attacker to usurp.</p></dd>
+
+
+
+<dt><i>Key transfer may be manual and insecure</i></dt>
+<dd>Some remote-login protocols, such as <em class="emphasis">telnet</em>,
+don't assist with X authentication. If your display keys
+aren't available on a remote machine, you have to transfer them
+yourself, either manually or by automating the transfer, perhaps in
+your login script. This isn't only a nuisance but also
+insecure, since you're sending the key in plaintext over the
+network.</p></dd>
+
+<a name="INDEX-1465" />
+
+<dt><i>The most common key-based method, MIT-MAGIC-COOKIE-1, is insecure</i></dt>
+<dd>Although it uses a random string of bits, or
+<em class="emphasis">cookie</em>, as the <em class="emphasis">xauth</em>
+display key, this key is transmitted in plaintext at the beginning of
+every connection, where it can be intercepted and read.</p></dd>
+
+
+
+<dt><i>The remote host might not support your chosen X authentication method</i></dt>
+<dd>X11R6 supports other, more secure authentication methods. SUN-DES-1
+employs Sun's secure RPC system, XDM-AUTHORIZATION-1 uses DES,
+and MIT-KERBEROS-5 involves Kerberos user-to-user
+authentication.<a href="#FOOTNOTE-126">[126]</a> Unfortunately, these
+methods are often not available in particular instances of the X
+software. Sometimes they aren't compiled into X installations
+due to cryptographic export restrictions; other times, the X version
+is too old to support the more secure methods.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-126" />[126]See the X11R6 <em class="emphasis">Xsecurity
+</em>(1) manpage for details on these methods. Also, remember
+that this is authentication only, not encryption. The contents of
+your X connection remain unencrypted and open to snooping or
+modification on the network.</p>
+
+
+</blockquote></dd>
+
+
+
+<dt><i>If the remote host is insecure, your display key can be compromised</i></dt>
+<dd>In the best scenario, where the X server supports strong
+authentication and your key can be copied securely to the remote
+machine, you still have to store your sensitive display key there. If
+that machine is untrustworthy, your key can be at risk. (SSH
+doesn't have this problem, since only your public key is stored
+on the SSH server machine.)</p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+<a name="ch09-28-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.5.4. SSH and authentication spoofing</h3>
+
+
+
+<a name="INDEX-1466" /><a name="INDEX-1467" />Through X forwarding, SSH provides
+transparent, secure authentication and key transfer for X sessions.
+This is done by a technique called <em class="emphasis">authentication
+spoofing</em>, as depicted in <a href="ch09_03.html#ch09-10753">Figure 9-11</a>.
+Authentication spoofing involves a fake display key, which we call
+the <em class="emphasis">proxy key</em><a name="INDEX-1468" />, that authenticates access to the SSH X
+proxy server on the remote side. When relaying X traffic containing a
+key, SSH cleverly substitutes the real display key. Here's how
+it works.</p>
+
+
+
+<a name="ch09-10753" /><div class="figure"><img height="284" alt="Figure 9-11" src="figs/ssh_0911.gif" width="460" /></div><h4 class="objtitle">Figure 9-11. Authentication of forwarded X connections</h4>
+
+The players begin in the following positions. You are logged into a
+local machine with a local display. The local machine runs an X
+server and SSH clients. On the other side of the network connection,
+an SSH server is running on a remote machine, where you invoke X
+clients. The goal is for the remote X clients to appear on your local
+display by way of SSH.</p>
+
+
+
+First, you run a local SSH client, asking it to set up X forwarding.
+The SSH client requests X forwarding from the remote SSH server, and
+it also reads your local display key from your <a name="INDEX-1469" />.<tt class="command">Xauthority</tt> file.</p>
+
+
+
+Next, the SSH client generates a proxy key. This is a string of
+random data of the same length as your local display key. The SSH
+client then sends the proxy key and its key type (e.g.,
+<a name="INDEX-1470" />MIT-MAGIC-COOKIE-1)
+to the remote machine, and the SSH server runs the
+<em class="emphasis">xauth</em> program on your behalf to associate the
+proxy key with your local display. The stage is now set for X
+forwarding.</p>
+
+
+
+When you start a remote X client, your local SSH client connects to
+your local X display. It then watches for the first X protocol
+message sent over the forwarded connection and treats it specially.
+Specifically, the SSH client parses the message, finds the X
+authentication key inside it, and compares it to the proxy key. If
+the keys don't match, the SSH client rejects and closes the
+connection. Otherwise, if the keys match, the SSH client substitutes
+the real display key in place of the proxy key and relays the
+modified message to your local X server. The X server, blissfully
+unaware that a key switch has taken place, reads the display key and
+proceeds normally with X authentication. The forwarded X connection
+is now established.</p>
+
+
+
+<a name="INDEX-1471" /><a name="INDEX-1472" />X
+forwarding with authentication spoofing solves all but one of the X
+authentication problems we raised earlier:</p>
+
+
+<a name="INDEX-1473" />
+<dl>
+<dt><i>xhost</i></dt>
+<dd>X forwarding doesn't use <em class="emphasis">xhost</em>. (By the
+way, make sure to disable all <em class="emphasis">xhost</em> permissions
+when using X forwarding, or you will undermine the X security
+provided by SSH.)</p></dd>
+
+
+
+<dt><i>Key transfer</i></dt>
+<dd>SSH transfers the X display key automatically and runs
+<em class="emphasis">xauth</em> on your behalf to install it on the remote
+side. The transfer is secure since the key travels over the encrypted
+SSH connection.</p></dd>
+
+
+<a name="INDEX-1474" />
+<dt><i>MIT-MAGIC-COOKIE-1 insecurity</i></dt>
+<dd>The key transmitted at the beginning of every X session is now
+encrypted, along with the rest of the X traffic, inside the SSH
+session. This greatly increases the operational security of this
+common X authentication scheme.</p></dd>
+
+
+
+<dt><i>Untrustworthy remote hosts</i></dt>
+<dd>With authentication spoofing, only the proxy key, not the true
+display key, is sent to the remote host. The proxy key is good only
+for connecting to your display through SSH, not for connecting to
+your display directly. As soon as your SSH session ends, the proxy
+key becomes useless. Since SSH sessions come and go, but some people
+leave their X sessions up (with the same key) for days, X forwarding
+can be a great improvement.</p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+<a name="ch09-29-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.5.5. Improving authentication spoofing</h3>
+
+
+
+<a name="INDEX-1475" /><a name="INDEX-1476" />The
+remaining problem with X forwarding is the possibility of unsupported
+X authentication mechanisms. The local side can use a more
+sophisticated authentication method a remote host might not support.</p>
+
+
+
+In theory, SSH X forwarding can solve this problem by always
+installing a proxy key of type MIT-MAGIC-COOKIE-1, no matter what
+local authentication method is actually in use. After the SSH client
+has checked the X client's key against the proxy key for a
+match, its client could then generate and substitute whatever local
+authenticator is required using the true authentication type and key.</p>
+
+
+
+Unfortunately, SSH implementations don't go this far. The
+server compares keys literally as bit strings, and the SSH client
+substitutes keys verbatim, regardless of the key types. As a result,
+if you use a stronger X authentication method such as
+<a name="INDEX-1477" />XDM-AUTHORIZATION-1,
+<tt class="command">sshd</tt> blindly compares an encrypted authenticator
+with the proxy key, rightly determine that they don't match,
+and invalidly rejects the connection. The failure is silent and
+mysterious; we wish the software would detect the presence of an
+unsupported mode and issue a warning when setting up the connection.</p>
+
+
+
+If SSH knew the details of all X authentication modes, it could check
+the proxy authenticators on one side and generate correct ones for
+the X server on the other. However, this is a significant development
+effort, though perhaps one could link SSH against the X11 libraries
+to obtain the necessary algorithms. SSH would also have to deal with
+differing key data lengths, constructing a new X message to hold the
+proxy key instead of copying it to an existing message.</p>
+
+
+
+It would also be useful if X forwarding could be used without
+authentication spoofing. Then you could arrange your own security for
+the connection by, say, using <em class="emphasis">xhost</em> to allow any
+connection from your local machine (and hence the SSH X proxy), while
+still applying key-based authentication to X connections originating
+from elsewhere. You can accomplish this with general port forwarding,
+as discussed in the next section, but direct support is more
+convenient.</p>
+</div>
+
+
+
+
+
+<a name="ch09-30-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.5.6. Nonstandard X clients</h3>
+
+
+
+<a name="INDEX-1478" />X clients generally do X
+<tt class="command">xauth</tt>-style authentication by virtue of having
+been linked against Xlib, the common X programming library.
+Occasionally, though, you run across particular X client programs
+that don't use Xlib and simply ignore authentication issues.
+Since you can't turn off SSH X authentication spoofing, you
+can't use such programs across SSH X forwarding; you get this
+message:</p>
+
+
+
+<blockquote><pre class="code">X11 connection requests different authenticationprotocol: 'MIT-MAGIC-COOKIE-1' 
+vs. ''</pre></blockquote>
+
+
+
+ You can, however, use a general port forwarding instead. For example:</p>
+
+
+
+<blockquote><pre class="code">foo% ssh -R6010:localhost:6000 bar
+bar% setenv DISPLAY bar:10</pre></blockquote>
+
+
+
+Note that this bypasses the discipline imposed by X forwarding, of
+requiring <tt class="command">xauth</tt> authentication on forwarded X
+connections. If your real X server is using <tt class="command">xhost</tt>
+for access control, this port forwarding allows anyone on host foo to
+connect to your X server. Use this sort of thing with caution if you
+need to.<a name="INDEX-1479" /><a name="INDEX-1480" /> <a name="INDEX-1481" /><a name="INDEX-1482" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.3.6. Further Issues</h3>
+
+
+
+As we've said, X forwarding usually works fine without any
+special effort on your part. In some special situations, however, you
+might need to take some extra steps.</p>
+
+
+
+<a name="ch09-32-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.6.1. X server configuration</h3>
+
+
+
+<a name="INDEX-1483" />In order for X forwarding to
+work, your X server must accept the proxy X connections from your SSH
+client. This is sometimes not set up to begin with, because normal
+use doesn't require it. For example, if you're using an X
+server on a PC to access a remote Unix machine via XDM, you might
+never run local X clients at all, and they may not be allowed by
+default. You can run <tt class="literal">xhost</tt>
+<tt class="literal">+localhost</tt> to allow all connections from the your
+PC, while still applying key-based authentication to connections from
+other sources. This allows SSH-forwarded (and authenticated)
+connections to be accepted.</p>
+</div>
+
+
+
+
+
+<a name="ch09-33-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.6.2. Setting your DISPLAY environment variable</h3>
+
+
+
+<a name="INDEX-1484" />SSH
+sets the DISPLAY variable automatically only if X forwarding is in
+effect. If you don't use X forwarding but want to use X on a
+remote machine you logged into via SSH, remember that you have to set
+the DISPLAY variable yourself. You should only do this when the both
+machines are on the same, trusted network, as the X protocol by
+itself is quite insecure.</p>
+
+
+
+Be careful not to set DISPLAY unintentionally!
+It is common for people to set the DISPLAY variable in a login
+command file or by other means. If you're not careful, this can
+make your X connections insecure without your noticing. If you use
+SSH to tunnel through a firewall that blocks normal X connections,
+then of course you'll notice because your X clients won't
+work. But if normal X connections are possible but undesirable, and X
+forwarding isn't in effect, your X programs will work but will
+(silently) not be secured. This is a good reason to block X traffic
+at the firewall if it presents a security risk or to configure your X
+server to accept connections only from the local host (the source of
+the SSH-forwarded X connections). If that's not feasible, you
+may want to put something like this in your login script:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/csh
+if ($?DISPLAY) then
+   set display_host   = `expr "$DISPLAY" : '\(.*\):'`
+   set display_number = `expr "$DISPLAY" : '.*:\([^.]*\)'`
+   set my_host = `hostname`
+   set result  = `expr '(' "$display_host" = "$my_host" ')' '&amp;' '(' \
+                 "$display_number" '&gt;' "0" ')'`
+   if ($result == 0) then
+      echo "WARNING: X display $DISPLAY does not appear to be protected by SSH!"
+      echo "unsetting DISPLAY variable just to be safe"
+      unsetenv DISPLAY
+   endif
+endif</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch09-34-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.6.3. Shared accounts</h3>
+
+
+
+<a name="INDEX-1485" />If you share a single account among
+multiple people, you may have some trouble with X forwarding. For
+example, it is common for a group of sysadmins to share use of the
+root account. For each person to retain their own environment when
+using the root account, they may set their USER, LOGNAME, and HOME
+environment variables explicitly to reflect their personal accounts
+rather than the root account. If you use SSH to log into the root
+account with X forwarding turned on, though, it adds the proxy
+<em class="emphasis">xauth</em> key to root's
+<em class="filename">.Xauthority</em> file before the shell reads your
+login script and resets these environment variables. The result is
+that once you're logged in and try to use X, it fails: the X
+client looks in your <em class="filename">.Xauthority</em> file (because
+of the setting of your HOME variable), but the key isn't there.</p>
+
+
+
+You can deal with this problem by setting the XAUTHORITY variable to
+point to root's <em class="filename">.Xauthority</em> file, or by
+using code like the following in your login script to copy the needed
+key into your personal one:</p>
+
+
+
+<blockquote><pre class="code">if (($uid == 0) &amp;&amp; ($?SSH_CLIENT) &amp;&amp; ($?DISPLAY)) then
+# If I do ssh -l root with X forwarding, the X proxy server's xauth key
+# gets added to root's xauth db, not mine.  See if there's an entry for my
+# display in root's xauth db...
+  set key = `bash -c "xauth -i -f /.Xauthority list $DISPLAY 2&gt; /dev/null"`
+# ... and if so, copy it into mine.
+  if ($? == 0) then
+    xauth -bi add $key
+    chown res ~res/.Xauthority &gt;&amp; /dev/null
+  endif
+endif</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch09-13568" /><div class="sect3">
+<h3 class="sect3">9.3.6.4. Location of the xauth program</h3>
+
+
+
+<a name="INDEX-1486" />Remember that
+<tt class="command">sshd</tt> runs the <em class="emphasis">xauth</em> program
+on your behalf, to add the proxy key to your
+<em class="filename">.Xauthority</em><a name="INDEX-1487" /> file
+on the remote side. The location of the <em class="emphasis">xauth</em>
+program is discovered when you configure the SSH package and compiled
+into the <tt class="command">sshd</tt> executable. If
+<em class="emphasis">xauth</em> is subsequently moved, X forwarding
+won't work (<tt class="command">ssh -v</tt> reveals this explicitly).
+For SSH1 and OpenSSH, the system administrator on the server side can
+use the serverwide configuration keyword
+<a name="INDEX-1488" />XAuthLocation
+to set the path to the <tt class="command">xauth</tt> program without
+having to recompile <tt class="command">sshd1</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, Open SSH
+XAuthLocation /usr/local/bin/xauth</pre></blockquote>
+
+
+
+<tt class="literal">XAuthLocation</tt> can also appear in the client
+configuration file (OpenSSH only); the client uses
+<em class="emphasis">xauth</em> to get the local X display key.</p>
+</div>
+
+
+
+
+
+<a name="ch09-35-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.3.6.5. X forwarding and the GatewayPorts feature</h3>
+
+
+
+The <tt class="literal">GatewayPorts</tt> (<span class="option">-g</span>) feature
+discussed earlier applies only to general port forwarding, not to X
+forwarding. The X proxies in SSH1, SSH2, and OpenSSH always listen on
+all network interfaces and accept connections from anywhere, though
+those connections are then subject to X authentication as described
+earlier. To restrict X client source addresses, use TCP-wrappers,
+which we discuss in the next section. <a name="INDEX-1489" /></p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.2. Port Forwarding</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.4. Forwarding Security: TCP-wrappers and libwrap</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:06 GMT -->
+</html>

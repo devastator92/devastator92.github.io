@@ -1,0 +1,265 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:29 GMT -->
+<head><title>Configuring a Packet Filtering Router (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.2. Configuring a Packet Filtering Router</h2>
+
+
+
+
+
+<a name="INDEX-511" /><a name="INDEX-512" /><a name="INDEX-513" />To configure a packet
+filtering router, you first need to decide what services you want to
+allow or deny, and then you need to translate your decisions into
+rules about packets. In reality, you probably don't care about
+the details of packets at all. What you want is to get your work
+done. For example, you want to receive mail from the Internet, and
+whether that's managed by packets or by Murphy's ghost is
+irrelevant to you. The router, on the other hand, cares only about
+packets, and only about very limited parts of them. In constructing
+the rules for your routers, you have to translate the general
+statement "Receive mail from the Internet" into a
+description of the particular kinds of packets you want the router to
+allow to pass.</p><p>
+
+
+
+
+
+The following sections outline the general concepts you need to keep
+in mind when translating decisions about services into rules about
+packets. The specific details for each service are described in <a href="part1.html">Part I, "Network Security"</a> of this book.</p><p>
+
+
+
+
+
+<a name="ch08-4211" /><div class="sect2">
+<h3 class="sect2">8.2.1. Protocols Are Usually Bidirectional</h3>
+
+
+
+
+
+<a name="INDEX-514" /><a name="INDEX-515" />Protocols are usually bidirectional;
+they almost always involve one side's sending an inquiry or a
+command, and the other side's sending a response of some kind.
+When you're planning your packet filtering rules, you need to
+remember that packets go both ways. For example, it doesn't do
+any good to allow outbound Telnet packets that carry your keystrokes
+to a remote host, if you don't also allow the incoming packets
+for that connection that carry the screen display back to you.</p><p>
+
+
+
+
+
+Conversely, it also won't do you any good to block only half a
+connection. Many attacks can be carried out if attackers can get
+packets into your network, even if the attackers can't get any
+responses back. This can be possible for several reasons. For
+instance, attackers may only be interested in issuing a particular
+command which does not require a response (like "shut down your
+network interface" for a denial of service attack, using an
+SNMP set command). Or, the responses may be predictable enough to
+allow attackers to carry on their side of the conversation without
+having to actually see the responses at all. If the responses are
+predictable, an attacker doesn't need to see them. They
+won't be able to extract any information directly if they
+don't see the responses, but they may be able to do something
+that gives them the data indirectly. For example, even if they
+can't see your <em class="emphasis">/etc/passwd</em> file directly,
+they can probably issue a command to mail a copy.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-4221" /><div class="sect2">
+<h3 class="sect2">8.2.2. Be Careful of  "Inbound"  Versus "Outbound" Semantics</h3>
+
+
+
+
+
+<a name="INDEX-516" /><a name="INDEX-517" /><a name="INDEX-518" />When
+you're planning your packet filtering strategy, you need to be
+careful in your discussions of "inbound" versus
+"outbound". You need to carefully distinguish between
+inbound and outbound <em class="emphasis">packets,</em> and inbound and
+outbound <em class="emphasis">services</em>. An outbound service (e.g.,
+the Telnet service mentioned previously) involves both outbound
+packets (your keystrokes) and inbound packets (the responses to be
+displayed on your screen). Although most people habitually think in
+terms of <em class="emphasis">services</em>, you need to make sure you
+think in terms of <em class="emphasis">packets</em> when you're
+dealing with packet filtering. When you talk to others about
+filtering, be sure to communicate clearly whether you're
+talking about inbound versus outbound packets, or inbound versus
+outbound services.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-4237" /><div class="sect2">
+<h3 class="sect2">8.2.3. Default Permit Versus Default Deny</h3>
+
+
+
+
+
+<a name="INDEX-519" /><a name="INDEX-520" /><a name="INDEX-521" /><a name="INDEX-522" />In <a href="ch03_01.html">Chapter 3, "Security Strategies"</a>, we
+distinguished between the two stances you can choose in putting
+together your security policy: the default deny stance (that which is
+not expressly permitted is prohibited) and the default permit stance
+(that which is not explicitly prohibited is permitted). From a
+security point of view, it is far safer to take the attitude that
+things should be denied by default. Your packet filtering rules
+should reflect this stance. As we discussed earlier, start from a
+position of denying everything and then set rules that allow only
+protocols that you need, that you understand the security
+implications of, and that you feel that you can provide safely enough
+(according to your own particular definition of "safely
+enough") for your purposes.</p><p>
+
+
+
+
+
+The default deny stance is much safer and more effective than the
+default permit stance, which involves permitting everything by
+default and trying to block those things that you know are problems.
+The reality is that with such an approach, you'll never know
+about all the problems, and thus you'll never be able to do a
+complete job.</p><p>
+
+
+
+
+
+In practical terms, the default deny stance means that your filtering
+rules should be a small list of specific things that you allow,
+perhaps with a few very specific things you deny scattered throughout
+to make the logic come out right, followed by a default deny that
+covers everything else. We'll explain in detail how these rules
+work later in this chapter.<a name="INDEX-523" /></p><p>
+
+
+
+
+
+<a name="ch08-5025" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Filtering by Interface</h4>
+
+
+
+
+
+<a name="INDEX-524" /><a name="INDEX-525" />One key piece of
+information is useful when you are making a packet filtering
+decision, but it can't be found in the headers of the packet;
+this is the interface on which the packet came into the router or is
+going out of the router. This is important information because it
+allows the router to detect forged packets.</p><p>
+
+
+
+
+
+If the sole router between your internal net and the external world
+receives a packet with an internal source address from the internal
+interface, there is no problem; all packets coming from the inside
+will have internal source addresses. If, however, the router receives
+a packet with an internal source address from the external interface,
+it means either that someone is forging the packet (probably in an
+attempt to circumvent security), or that something is seriously wrong
+with your network configuration.</p><p>
+
+
+
+
+
+You can get these packets without forgery. For example, someone might
+have set up a second connection between your net and the outside
+world, such as a dial-up PPP link from a user's desk, probably
+with little or no thought to security. As a result, the traffic that
+should be staying internal to your net is "leaking" out
+through this second connection, going across the Internet, and trying
+to come back in through your "front door". There's
+little you can do to detect such illicit "back door"
+connections except by detecting internal packets arriving from the
+outside; about the best you can do is have a strong and
+well-publicized policy against them, and provide as many as possible
+of the services your users desire through the front door (the
+firewall), so that they don't feel a compelling need to create
+their own back door.</p><p>
+
+
+
+
+
+These packets should be logged and treated as urgent issues. If
+someone is forging them, that person is attacking you with some
+seriousness. If the packets are leaked from a back door, you have a
+security problem because of the extra Internet connection. You may
+also have a routing problem: a host that claims to be internal and
+advertises routes for itself is in danger of getting all of your
+internal network's traffic. This is bad if it's a PPP
+link, which is probably not going to handle the load. It's much
+worse if it's not connected to your network at all because some
+or all of your network's traffic is going to disappear.</p><p>
+
+
+
+
+</td></tr></table><p></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8. Packet Filtering</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.3. What Does the Router Do with Packets?</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:29 GMT -->
+</html>

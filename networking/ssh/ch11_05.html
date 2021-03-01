@@ -1,0 +1,580 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:14 GMT -->
+<head><title>Connecting Through a GatewayHost (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.5. Connecting Through a GatewayHost</h2>
+
+
+
+<a name="INDEX-1760" /><a name="INDEX-1761" />All along we've assumed that
+your outgoing connectivity is unlimited: that you can establish any
+outgoing TCP connection you desire. Even our discussions of firewalls
+have assumed that they restrict only incoming traffic. In more secure
+(or simply more regimented) environments, this might not be the case:
+in fact, you might not have direct IP connectivity at all to the
+outside world.</p>
+
+
+
+In the corporate world, companies commonly require all outgoing
+connections to pass through a proxy server or <em class="emphasis">gateway
+host</em> : a machine connected to both the company network and
+the outside. Although connected to both networks, a gateway host
+doesn't act as a router, and the networks remain separated.
+Rather, it allows limited, application-level access between the two
+networks.</p>
+
+
+
+In this case study, we discuss issues of SSH in this environment:</p>
+
+
+
+<ul><li>Connecting transparently to external hosts using
+<tt class="command">ssh</tt></p></li><li>Making <tt class="command">scp</tt> connections</p></li><li>Running SSH-within-SSH by port forwarding</p></li></ul>
+<a name="ch11-38883" /><div class="sect2">
+<h3 class="sect2">11.5.1. Making Transparent SSH Connections</h3>
+
+
+
+Suppose your company has a gateway host, G, which is your only
+gateway to the Internet. You are logged into a client host C and want
+to reach a server host S outside the company network, as shown in
+<a href="ch11_05.html#ch11-79968">Figure 11-14</a>. We assume that all three machines have
+SSH installed.</p>
+
+
+
+<a name="ch11-79968" /><div class="figure"><img height="103" alt="Figure 11-14" src="figs/ssh_1114.gif" width="410" /></div><h4 class="objtitle">Figure 11-14. Proxy gateway</h4>
+
+To make a connection from client C to server S now requires two steps:</p>
+
+
+
+<ol><li>Connect from C to gateway G:</p>
+
+<blockquote><pre class="code"># Execute on client C
+$ ssh G</pre></blockquote>
+
+</li>
+
+<li>Connect from G to server S:</p>
+<blockquote><pre class="code"># Execute on gateway G
+$ ssh S</pre></blockquote>
+</li></ol>
+
+
+This works, of course, but it requires an extra manual step on the
+gateway, a machine you don't care about. Using agent forwarding
+and public-key authentication, you can avoid entering a passphrase on
+gateway G, but even so, the additional hop ideally should be
+transparent.</p>
+
+
+
+Worse, you can't transparently execute remote commands on
+server S from client C. Instead of the usual:</p>
+
+
+
+<blockquote><pre class="code"># Execute on client C
+$ ssh S /bin/ls</pre></blockquote>
+
+
+
+you must run a remote <tt class="command">ssh</tt> on gateway G that in
+turn contacts server S:</p>
+
+
+
+<blockquote><pre class="code"># Execute on client C
+$ ssh G "ssh S /bin/ls"</pre></blockquote>
+
+
+
+This isn't only annoying but also can complicate automation.
+Imagine rewriting all your SSH-based scripts to accommodate this
+environment.</p>
+
+
+
+Fortunately, SSH configuration is flexible enough to afford a neat
+solution, which we now present using SSH1 features and syntax. We use
+public-key authentication to take advantage of the options of the
+<em class="filename">authorized_keys</em> file, and
+<tt class="command">ssh-agent</tt> with agent forwarding so that
+authentication passes on transparently to the second SSH connection
+(see <a href="ch11_05.html#ch11-33037">Figure 11-15</a>).</p>
+
+
+
+<a name="ch11-33037" /><div class="figure"><img height="206" alt="Figure 11-15" src="figs/ssh_1115.gif" width="361" /></div><h4 class="objtitle">Figure 11-15. Chained SSH connections through a proxy gateway</h4>
+
+Suppose your account on gateway G is gilligan, and on server S it is
+skipper. First, set up your SSH client configuration file so the name
+S is a nickname for accessing your account on gateway G:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/config on client C
+host S
+  hostname G
+  user gilligan</pre></blockquote>
+
+
+
+Next, on gateway G, associate a <a name="INDEX-1762" /><a name="INDEX-1763" />forced command with your chosen key to
+invoke an SSH connection to server <em class="emphasis">S</em>: [<a href="ch08_02.html#ch08-22858">Section 8.2.4, "Forced Commands "</a>]</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/authorized_keys on gateway G
+command="ssh -l skipper S" <em class="replaceable">...key..</em></pre></blockquote>
+
+
+
+Now, when you invoke the command <tt class="command">ssh</tt><em class="emphasis">
+S</em> on client C, it connects to gateway G, runs the forced
+command automatically, and establishes a second SSH session to server
+S. And thanks to agent forwarding, authentication from G to S happens
+automatically, assuming you've loaded the appropriate key. This
+can be the same key you used to access
+gilligan@ <em class="emphasis">G</em> or a different one.<a href="#FOOTNOTE-144">[144]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-144" />[144]Note that if you want to use this setup for an interactive
+connection, you need to use the <span class="option">-t </span>option to
+<tt class="command">ssh</tt>, to force it to allocate a tty on <em class="emphasis">G</em>. It doesn't normally do that,
+because it doesn't have any way to know that the remote
+command -- in this case, another instance of
+<tt class="command">ssh</tt> -- needs one.</p>
+
+
+</blockquote>
+
+
+
+This trick not only provides a transparent connection from client C
+to server S, it also sidesteps the fact that the name S might not
+have any meaning on client C. Often in this kind of network
+situation, your internal network naming scheme is cut off from the
+outside world (e.g., split DNS with internal roots). After all,
+what's the point of allowing you to name hosts you can't
+reach? Thanks to the <tt class="literal">Host</tt> configuration keyword
+for SSH clients, you can create a nickname S that instructs SSH to
+reach that host transparently via G. [<a href="ch07_01.html#ch07-66753">Section 7.1.3.5, "Making nicknames for hosts"</a>]</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-54-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.5.2. Using SCP Through a Gateway</h3>
+
+
+
+<a name="INDEX-1764" /><a name="INDEX-1765" />Recall that the command:</p>
+
+
+
+<blockquote><pre class="code">$ scp ... S:<em class="replaceable">file</em> ...</pre></blockquote>
+
+
+
+actually runs <tt class="command">ssh</tt> in a subprocess to connect to S
+and invoke a remote <tt class="command">scp</tt> server. <a href="ch03_08.html#ch03-64996">Section 3.8.1, "scp1 Details"</a> Now that we've gotten
+<tt class="command">ssh</tt> working from client C to server S, you'd
+expect that <tt class="command">scp</tt> would work between these machines
+with no further effort. Well, it almost does, but it wouldn't
+be software if there weren't a couple of small problems to work
+around:</p>
+
+
+
+<ul><li>Problems invoking the <tt class="command">ssh</tt> subprocess, due to the
+forced command</p></li><li>Authentication difficulties due to lack of a tty</p></li></ul>
+<a name="ch11-55-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.5.2.1. Passing along the remote command</h3>
+
+
+
+The first problem is that the <tt class="command">ssh</tt> command on
+client C sends a command to be executed on server S, that starts the
+<tt class="command">scp</tt> server, but now that command is ignored in
+favor of our forced command. You have to find a way to relay the
+intended <tt class="command">scp</tt> server command to S. To accomplish
+this, modify the <em class="filename">authorized_keys</em> file on gateway
+G, instructing <tt class="command">ssh</tt> to invoke the command contained
+in the environment variable
+<a name="INDEX-1766" />SSH_ORIGINAL_COMMAND:
+[<a href="ch08_02.html#ch08-92539">Section 8.2.4.4, "Examining the client's original command"</a>]</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/authorized_keys on gateway G
+command="ssh -l skipper S $SSH_ORIGINAL_COMMAND" <em class="replaceable">...key...</em></pre></blockquote>
+
+
+
+<a name="INDEX-1767" />Now the forced command
+invokes the proper <tt class="command">scp</tt>-related command on server
+S. You aren't quite done, however, because this forced command
+unfortunately breaks our existing setup. It works fine for
+<tt class="command">ssh</tt> invocations on client C that run a remote
+command (e.g., <tt class="command">ssh S
+</tt><em class="filename">/bin/ls</em>), but it fails when
+<tt class="command">ssh S</tt> is invoked alone to run a remote shell. You
+see, SSH_ORIGINAL_COMMAND is set only if a remote command is
+specified, so <tt class="command">ssh S</tt> dies because
+SSH_ORIGINAL_COMMAND is undefined.</p>
+
+
+
+You can work around this problem using the Bourne shell and its
+parameter substitution operator <tt class="literal">:-</tt> as follows:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/authorized_keys on gateway G
+command="sh -c 'ssh -l skipper S ${SSH_ORIGINAL_COMMAND:-}'" <em class="replaceable">...key...</em></pre></blockquote>
+
+
+
+The expression <tt class="literal">${SSH_ORIGINAL_COMMAND:-}</tt> returns
+the value of $SSH_ORIGINAL_COMMAND if it is set, or the empty string
+otherwise. (In general, <tt class="literal">${V:-D}</tt> means
+"return the value of the environment variable V or the string D
+if V isn't set." See the <em class="emphasis">sh</em> manpage
+for more information.) This produces precisely the desired behavior,
+and <tt class="command">ssh</tt> and <tt class="command">scp</tt> commands both
+work properly now from client C to server S.</p>
+</div>
+
+
+
+
+
+<a name="ch11-59307" /><div class="sect3">
+<h3 class="sect3">11.5.2.2. Authentication</h3>
+
+
+
+<a name="INDEX-1768" />The second <tt class="command">scp</tt>-related
+problem is authentication for the second SSH connection, from gateway
+G to server S. You can't provide a password or passphrase to
+the second <tt class="command">ssh</tt> program, since it has no tty
+allocated.<a href="#FOOTNOTE-145">[145]</a> So you need a form of authentication that doesn't
+require user input: either RhostsRSA, or public-key authentication
+with agent forwarding. RhostsRSA works as is, so if you plan to use
+it, you can skip to the next section. Public-key authentication,
+however, has a problem: <tt class="command">scp</tt> runs
+<tt class="command">ssh</tt> with the <span class="option">-a</span> switch to disable
+agent forwarding. [<a href="ch06_03.html#ch06-29354">Section 6.3.5.3, "Enabling agent forwarding"</a>] You need to reenable
+agent forwarding for this to work, and this is surprisingly tricky.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-145" />[145]Actually, you can hack your way around
+this, but it's ugly and we won't go into it.</p>
+
+
+</blockquote>
+
+
+
+Normally you could turn on agent forwarding in your client
+configuration file:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/config on client C, but this FAILS
+ForwardAgent yes</pre></blockquote>
+
+
+
+but this doesn't help because the <span class="option">-a</span> on the
+command line takes precedence. Alternatively, you might try the
+<span class="option">-o</span> option of <tt class="command">scp</tt>, which can pass
+along options to <tt class="command">ssh</tt>, such as <tt class="command">-o
+ForwardAgent
+yes</tt><a name="INDEX-1769" />.
+But in this case, <tt class="command">scp</tt> places the
+<span class="option">-a</span> after any <span class="option">-o</span> options it passes
+where it takes precedence, so that doesn't work either.</p>
+
+
+
+There is a solution, though. <tt class="command">scp</tt> has a
+<span class="option">-S</span> option to indicate a path to the SSH client
+program it should use, so you create a "wrapper" script
+that tweaks the SSH command line as needed, and then make
+<tt class="command">scp</tt> use it with <span class="option">-S</span>. Place the
+following script in an executable file on client C, say
+<em class="filename">~/bin/ssh-wrapper </em>:</p>
+
+
+
+<blockquote><pre class="code">#!/usr/bin/perl
+exec '/usr/local/bin/ssh1', map {$_ eq '-a' ? (  ) : $_} @ARGV;</pre></blockquote>
+
+
+
+This runs the real <tt class="command">ssh</tt>, removing
+<span class="option">-a</span> from the command line if it's there. Now,
+give your <tt class="command">scp</tt> command like this:</p>
+
+
+
+<blockquote><pre class="code">scp -S ~/bin/ssh-wrapper
+... <i class="lineannotation">S:file</i> ...</pre></blockquote>
+
+
+
+and it should work.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-56-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.5.3. Another Approach: SSH-in-SSH(Port Forwarding)</h3>
+
+
+
+<a name="INDEX-1770" />Instead
+of using a forced command, here's another way to connect by SSH
+through a gateway: forward a port on client C to the SSH server on S,
+using an SSH session from C to G, and then run a second SSH session
+through the first (see <a href="ch11_05.html#ch11-81815">Figure 11-16</a>).</p>
+
+
+
+<a name="ch11-81815" /><div class="figure"><img height="207" alt="Figure 11-16" src="figs/ssh_1116.gif" width="428" /></div><h4 class="objtitle">Figure 11-16. Forwarded SSH connection through a proxy gateway</h4>
+
+That is:</p>
+
+
+
+<blockquote><pre class="code"># Execute on client C
+$ ssh -L2001:S:22 G
+
+# Execute on client C in a different shell
+$ ssh -p 2001 localhost</pre></blockquote>
+
+
+
+This connects to server S by carrying the second SSH connection (from
+C to S) inside a port-forwarding channel of the first (from C to G ).
+You can make this more transparent by creating a nickname S in your
+client configuration file:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/config on client C
+host S
+  hostname localhost
+  port 2001</pre></blockquote>
+
+
+
+Now the earlier commands become:</p>
+
+
+
+<blockquote><pre class="code"># Execute on client C
+$ ssh -L2001:S:22 G
+
+# Execute on client C in a different shell
+$ ssh S</pre></blockquote>
+
+
+
+Because this technique requires a separate, manual step to establish
+the port forwarding, it is less transparent than the one in [<a href="ch11_05.html#ch11-38883">Section 11.5.1, "Making Transparent SSH Connections"</a>]. However, it has some advantages. If you plan
+to use port or X forwarding between C and S with the first method,
+it's a little complicated. <tt class="command">scp</tt> not only
+gives the <span class="option">-a</span> switch to <tt class="command">ssh</tt> to
+turn off agent forwarding, but also it gives <span class="option">-x</span> and
+<span class="option">-o</span>
+"<a name="INDEX-1771" />ClearAllForwardings
+yes", turning off X and port forwarding. So you need to modify
+the earlier wrapper script to remove these unwanted options as well.
+[<a href="ch11_05.html#ch11-59307">Section 11.5.2.2, "Authentication"</a>] Then, for port forwarding you need to
+set up a chain of forwarded ports that connect to one another. For
+example, to forward port 2017 on client C to port 143 (the IMAP port)
+on server S:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/config on client C
+host S
+  hostname G
+  user gilligan
+
+# ~/.ssh/authorized_keys on gateway G
+command="ssh -L1234:localhost:143 skipper@S" <em class="replaceable">...key...</em>
+
+# Execute on client C
+$ ssh -L2017:localhost:1234 S</pre></blockquote>
+
+
+
+This works, but it's difficult to understand, error-prone, and
+fragile: if you trigger the
+<a name="INDEX-1772" />TIME_WAIT problem
+[<a href="ch09_02.html#ch09-83769">Section 9.2.9.1, "The TIME_WAIT problem"</a>], you have to edit files and redo the
+tunnel just to pick a new ephemeral port to replace 1234.</p>
+
+
+
+Using the SSH-in-SSH technique instead, your port and X-forwarding
+options operate directly between client C and server S in the usual,
+straightforward manner. The preceding example becomes:</p>
+
+
+
+<blockquote><pre class="code"># ~/.ssh/config on client C
+host S
+  hostname localhost
+  port 2001
+
+# Execute on client C
+$ ssh -L2001:S:22 G
+
+# Execute on client C in a different shell
+$ ssh -L2017:localhost:143 S</pre></blockquote>
+
+
+
+This final command connects to server S, forwarding local port 2017
+to the IMAP port on S.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-57-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.5.4. Security Differences</h3>
+
+
+
+The two methods just discussed differ in their security properties.
+Again, we assume the situation with machines <em class="emphasis">C</em>, <em class="emphasis">G</em>, and <em class="emphasis">S</em> as used earlier.</p>
+
+
+
+<a name="ch11-58-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.5.4.1. "Server-in-the-middle" attack</h3>
+
+
+
+The first method was a chain of two SSH connections in series. The
+weakness with this is that if the SSH server in the middle (on G )
+has been compromised, the session data is exposed. Data from C is
+decrypted by that server and passed to the second SSH client (also on
+G ), which then reencrypts it for transmission to S. So the session
+plaintext is recovered on G: a compromised server there has access to
+it and can read and alter it at will.</p>
+
+
+
+The second method, with port forwarding, doesn't suffer from
+this weakness. The server on G is in no special position with regard
+to observing the forwarded SSH connection from C to S. Any attempt to
+read or alter that session will fail, in the same way that network
+snooping or an active network attack will fail.</p>
+</div>
+
+
+
+
+
+<a name="ch11-59-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.5.4.2. Server authentication</h3>
+
+
+
+On the other hand, the port forwarding method is weaker than the
+chain-of-connections when implemented with SSH1 or OpenSSH, because
+it lacks server authentication. The reason for this is that the SSH1
+and OpenSSH clients both behave specially when the server address is
+127.0.0.1 ("localhost"): they force acceptance of the
+host key, regardless of what key is actually provided. More
+precisely: they omit checking the host key against the known-hosts
+list, behaving always as if the server-provided host key were
+associated with "localhost" in the list.</p>
+
+
+
+The reason for this feature is convenience. If a user's home
+directory is shared between machines, the SSH client on each machine
+sees the same per-user known-hosts file. But the name
+"localhost" is special, in that on each machine it means
+something different: that same host. So if the user employs
+<tt class="command">ssh localhost</tt> on multiple machines, she will
+constantly get spurious warnings about the host key having changed.
+The known-hosts file maps "localhost" to the host key of
+the last host on which she did this, not the current one.</p>
+
+
+
+So the problem here is that, since the remote IP address of the SSH
+session from C to S is actually localhost, it effectively omits
+server authentication, and is thus vulnerable to a man-in-the-middle
+or spoofed server attack.</p>
+
+
+
+SSH2 doesn't have this special treatment of localhost and so
+doesn't exhibit the weakness. Its known-hosts list is also more
+fine-grained: it maps server <em class="emphasis">sockets</em>
+([host,port] pairs) to keys, rather than server hosts. This means you
+can have separate keys for each locally forwarded port. So, to be as
+secure as possible, you don't just accept the server host key
+the first time you use <tt class="command">ssh2</tt> to connect from C to S
+over the forwarded port 2001 on C. Doing so circumvents server
+authentication for that first connection. Instead, before making the
+first connection, you should copy S 's host key into this file
+on <em class="emphasis">C</em>:
+<em class="filename">~/.ssh2/hostkeys/key_2001_localhost.pub</em>. This
+associates S 's host key with the socket (localhost,2001), and
+you will have proper server authentication for the initial forwarded
+connection.<a name="INDEX-1773" /><a name="INDEX-1774" /></p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.4. Kerberos and SSH</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12. Troubleshooting and FAQ</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:15 GMT -->
+</html>

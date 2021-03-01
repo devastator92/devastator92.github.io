@@ -1,0 +1,315 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch04_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+<head><title>Replacing R-Commands with SSH (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch04_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.5. Replacing R-Commands with SSH</h2>
+
+
+
+SSH and the <a name="INDEX-706" />r-commands (<tt class="command">rsh</tt>,
+<tt class="command">rcp</tt>, <tt class="command">rlogin</tt>) can coexist
+peacefully on the same machine. Since the r-commands are insecure,
+however, some system administrators prefer to replace them by their
+SSH counterparts (<tt class="command">ssh</tt>, <tt class="command">scp</tt>,
+<tt class="command">slogin</tt>). This replacement has two parts:</p>
+
+
+
+<ul><li>Installing SSH and removing <tt class="command">rsh</tt>,
+<tt class="command">rcp</tt>, and <tt class="command">rlogin</tt>; requires some
+user retraining</p></li><li>Modifying other programs or scripts that invoke the r-commands</p></li></ul>
+The r-commands are so similar to their analogous SSH commands, you
+might be tempted to rename the SSH commands as the r-commands (e.g.,
+rename <tt class="command">ssh</tt> as <tt class="command">rsh</tt>, etc.). After
+all, common commands like these are practically identical in syntax:</p>
+
+
+
+<blockquote><pre class="code">$ rsh -l jones remote.example.com
+$ ssh -l jones remote.example.com
+
+$ rcp myfile remote.example.com:
+$ scp myfile remote.example.com:</pre></blockquote>
+
+
+
+Why not just rename? Well, the two sets of programs are incompatible
+in some ways. For example, not all versions of <tt class="command">ssh</tt>
+support the "hostname link" feature of
+<tt class="command">rsh</tt> [<a href="ch02_07.html#ch02-78300">Section 2.7.3, "Hostname Links"</a>], and some old
+versions of <tt class="command">rcp</tt> use a different syntax for
+specifying remote filenames.</p>
+
+
+
+In the following sections, we discuss some common Unix programs that
+invoke the r-commands and how to adapt them to use SSH instead.</p>
+
+
+
+<a name="ch04-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">4.5.1. The /usr/hosts Directory</h3>
+
+
+
+<a name="INDEX-707" />The program
+<tt class="command">rsh</tt><a name="INDEX-708" /> has an interesting feature called
+<em class="emphasis">hostname links</em><a name="INDEX-709" />. [<a href="ch02_07.html#ch02-78300">Section 2.7.3, "Hostname Links"</a>] If you
+rename the executable from "rsh" to something else, the
+program treats its new name as a hostname and connects to it by
+default. For example, if you rename <tt class="command">rsh</tt> as
+"petunia," on invocation it executes <tt class="command">rsh
+petunia</tt>. The renaming may be done literally or by creating
+a hard link or symbolic link to <tt class="command">rsh</tt>:</p>
+
+
+
+<blockquote><pre class="code">$ ls -l petunia
+lrwxrwxrwx  1 root      12 Jan 31  1996 petunia -&gt; /usr/ucb/rsh
+$ petunia
+Welcome to petunia!
+Last login was Wed Oct 6 21:38:14 from rhododendron
+You have mail.</pre></blockquote>
+
+
+
+Some Unix machines have a directory, commonly
+<em class="filename">/usr/hosts</em>, that contains symbolic links to
+<tt class="command">rsh</tt> representing various hosts on the local
+network (or beyond):</p>
+
+
+
+<blockquote><pre class="code">$ ls -l /usr/hosts
+lrwxrwxrwx  1 root      12 Jan 31  1996 lily -&gt; /usr/ucb/rsh
+lrwxrwxrwx  1 root      12 Jan 31  1996 petunia -&gt; /usr/ucb/rsh
+lrwxrwxrwx  1 root      12 Jan 31  1996 rhododendron -&gt; /usr/ucb/rsh
+...</pre></blockquote>
+
+
+
+If you eliminate <em class="filename">/usr/ucb/rsh</em> from such a
+machine, obviously these links become orphaned. Delete them and
+replace them with links to <tt class="command">ssh</tt>, perhaps with a
+shell script like this:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+SSH=/usr/local/bin/ssh
+cd /usr/hosts
+for file in *
+do
+  rm -f $file
+  ln -s $SSH $file
+  echo "Linked $file to $SSH"
+done</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch04-23-fm2xml" /><div class="sect2">
+<h3 class="sect2">4.5.2. Concurrent Version System (CVS)</h3>
+
+
+
+<a name="INDEX-710" />CVS is a <em class="emphasis">version-control
+system.</em><a name="INDEX-711" /> It maintains a history of changes to
+sets of files, and helps coordinate the work of multiple people on
+the same files. It can use <tt class="command">rsh</tt> to connect to
+repositories on remote hosts. For example, when you check in a new
+version of a file:</p>
+
+
+
+<blockquote><pre class="code">$ cvs commit myfile</pre></blockquote>
+
+
+
+if the repository is located on a remote machine, CVS may invoke
+<tt class="command">rsh</tt> to access the remote repository. For a more
+secure solution, CVS can run <tt class="command">ssh</tt> instead of
+<tt class="command">rsh</tt>. Of course, the remote machine must be running
+an SSH server, and if you use public-key authentication, your remote
+account must contain your key in the appropriate place.<a href="#FOOTNOTE-54">[54]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-54" />[54]CVS also has a remote-access method involving its own server,
+called <em class="emphasis">pserver</em>. This mechanism can be secured
+using SSH port forwarding instead; see <a href="ch09_01.html">Chapter 9, "Port Forwarding and X Forwarding"</a>.</p>
+
+
+</blockquote>
+
+
+
+To make CVS use <em class="emphasis">ssh</em>, simply set the environment
+variable CVS_RSH to contain the path to your <em class="emphasis">ssh</em>
+client:</p>
+
+
+
+<blockquote><pre class="code"># Bourne shell family
+# Put in ~/.profile to make permanent.
+CVS_RSH=/usr/local/bin/ssh
+export CVS_RSH
+
+# C shell family
+# Put in ~/.login to make permanent.
+setenv CVS_RSH /usr/local/bin/ssh</pre></blockquote>
+
+
+
+This approach has one problem: each time you check in a file, the
+logger's name is the remote account owner, which might not be
+your own. The problem is solved by manually setting the remote
+<a name="INDEX-712" />LOGNAME variable using the
+"environment=" option in your remote
+<em class="filename">authorized_keys</em> file. [<a href="ch08_02.html#ch08-65720">Section 8.2.6.1, "Example: CVS and $LOGNAME "</a>]</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch04-24-fm2xml" /><div class="sect2">
+<h3 class="sect2">4.5.3. GNU Emacs</h3>
+
+
+
+The <a name="INDEX-713" />Emacs variable
+<tt class="literal">remote-shell-program</tt> contains the
+path to any desired program for invoking a remote shell. Simply
+redefine it to be the full path to your <tt class="command">ssh</tt>
+executable. Also, the <em class="emphasis">rlogin</em> package,
+<em class="filename">rlogin.el</em>, defines a variable
+<tt class="literal">rlogin-program</tt> you can redefine to
+use <tt class="command">slogin</tt>.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch04-58541" /><div class="sect2">
+<h3 class="sect2">4.5.4. Pine</h3>
+
+
+
+The <a name="INDEX-714" />Pine mail reader uses <tt class="command">rsh</tt>
+to invoke mail-server software on remote machines. For example, it
+might invoke the IMAP daemon, <tt class="command">imapd</tt>, on a remote
+mail server. Another program may be substituted for
+<tt class="command">rsh</tt> by changing the value of a Pine configuration
+variable, <tt class="literal">rsh-path</tt>. This variable
+holds the name of the program for opening remote shell connections,
+normally <em class="filename">/usr/ucb/rsh</em>. A new value may be
+assigned in an individual user's Pine configuration file,
+<em class="filename">~/.pinerc</em>, or in the system-wide Pine
+configuration file, typically
+<em class="filename">/usr/local/lib/pine.conf</em>. For example:</p>
+
+
+
+<blockquote><pre class="code"># Set in a Pine configuration file
+rsh-path=/usr/local/bin/ssh</pre></blockquote>
+
+
+
+A second variable, <tt class="literal">rsh-command</tt>,
+constructs the actual command string to be executed for the remote
+mail server. The value is a pattern in the style of the C function
+<tt class="function">printf( )</tt>. Most likely, you won't need to
+change the value because both <tt class="command">rsh</tt> and
+<tt class="command">ssh</tt> fit the default pattern, which is:</p>
+
+
+
+<blockquote><pre class="code">"%s %s -l %s exec /etc/r%sd"</pre></blockquote>
+
+
+
+The first three "%s" pattern substitutions refer to the
+<tt class="literal">rsh-path</tt> value, the remote hostname,
+and the remote username. (The fourth forms the remote mail daemon
+name, which doesn't concern us.) So by default, if your
+username is <em class="emphasis">alice</em> and the remote mail server is
+<em class="emphasis">mail.example.com</em>,
+<tt class="literal">rsh-command</tt> evaluates to:</p>
+
+<blockquote><pre class="code">/usr/ucb/rsh mail.example.com -l alice ...</pre></blockquote>
+
+By changing the <tt class="literal">rsh-path</tt>, it
+becomes instead:</p>
+
+
+
+<blockquote><pre class="code">/usr/local/bin/ssh mail.example.com -l alice ...</pre></blockquote>
+
+
+
+As we said, you probably don't need to do anything with
+<tt class="literal">rsh-command</tt>, but just in case,
+we've included it for reference. We present a detailed case
+study of integrating Pine and SSH1 later. [<a href="ch11_03.html#ch11-42819">Section 11.3, "Pine, IMAP, and SSH"</a>]</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch04-25-fm2xml" /><div class="sect2">
+<h3 class="sect2">4.5.5. rsync, rdist</h3>
+
+
+
+<tt class="command">rsync</tt><a name="INDEX-715" />
+and
+<tt class="command">rdist</tt><a name="INDEX-716" />
+are software tools for synchronizing sets of files between different
+directories on the same machine or on two different hosts. Both can
+call <tt class="command">rsh</tt> to connect to a remote host, and both can
+easily use SSH instead: simply set the RSYNC_RSH for
+<tt class="command">rsync</tt> and use the <span class="option">-P</span> option with
+<tt class="command">rdist</tt>. <tt class="command">rsync</tt> with SSH is a
+particularly simple and effective method to securely maintain remote
+mirrors of whole directory trees.<a name="INDEX-717" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.4. Software Inventory</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.6. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch04_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+</html>

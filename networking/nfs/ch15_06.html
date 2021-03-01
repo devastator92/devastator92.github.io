@@ -1,0 +1,264 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Asynchronous NFS error messages (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch16_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<a name="INDEX-2364" /><a name="INDEX-2365" /><h2 class="sect1">15.6. Asynchronous NFS error messages</h2>
+
+
+This final section provides an in-depth<a name="INDEX-2366" /> <a name="INDEX-2367" /> <a name="INDEX-2368" />
+look at how an NFS client does write-behind, and what happens if one
+of the write operations fails on the remote server. It is intended as
+an introduction to the more complex issues of performance analysis
+and tuning, many of which revolve around similar subtleties in the
+implementation of NFS.</p>
+
+
+When an application calls <em class="emphasis">read( )</em> or
+<em class="emphasis">write( )</em> on a <a name="INDEX-2369" />
+<a name="INDEX-2370" />local or Unix filesystem (UFS) file, the
+kernel uses inode and indirect block pointers to translate the offset
+in the file into a physical block number on the disk. A low-level
+physical I/O operation, such as "write this buffer of 1024
+bytes to physical blocks 5678 and 5679" is then passed to the
+disk device driver. The actual disk operation is scheduled, and when
+the disk interrupts, the driver interrupt routine notes the
+completion of the current operation and schedules the next. The block
+device driver queues the requests for the disk, possibly reordering
+them to minimize disk head movement.</p>
+
+
+Once the disk device driver has a read or write request, only a media
+failure causes the operation to return an error status. Any other
+failures, such as a permission problem, or the filesystem running out
+of space, are detected by the filesystem management routines before
+the disk driver gets the request. From the point of view of the
+<em class="emphasis">read( )</em> and <em class="emphasis">write( )</em> system
+calls, everything from the filesystem write routine down is a black
+box: the application isn't necessarily concerned with how the
+data makes it to or from the disk, as long as it does so reliably.
+The actual write operation occurs asynchronously to the application
+calling <em class="emphasis">write( )</em>. If a media error occurs
+ --  for example, the disk has a bad sector brewing  --  then
+the media-level error will be reported back to the application during
+the next <em class="emphasis">write( )</em> call or during the
+<em class="emphasis">close( )</em> of the file containing the bad block.
+When the driver notices the error returned by the disk controller, it
+prints a media failure message on the console.</p>
+
+
+A similar mechanism is used by NFS to report errors on the
+"virtual media" of the remote fileserver. When
+<em class="emphasis">write( )</em> is called on an NFS-mounted file, the
+data buffer and offset into the file are handed to the NFS write
+routine, just as a UFS write calls the lower-level disk driver write
+routine. Like the disk device driver, NFS has a driver routine for
+scheduling write requests: each new request is put into the page
+cache. When a full page has been written, it is handed to an NFS
+async thread that performs the RPC call to the remote server and
+returns a result code. Once the request has been written into the
+local page cache, the <em class="emphasis">write( )</em> system call
+returns to the application  --  just as if the application was
+writing to a local disk. The actual NFS write is synchronous to the
+NFS async thread, allowing these threads to perform write-behind. A
+similar process occurs for reads, where the NFS async thread performs
+some read-ahead by fetching NFS buffers in anticipation of future
+<em class="emphasis">read( )</em> system calls. See <a href="ch07_03.html#nfs2-CHP-7-SECT-3.2">Section 7.3.2, "Client I/O system"</a> for details on the operation of the NFS async
+threads.</p>
+
+
+Occasionally, an NFS async thread detects an error when attempting to
+write to a remote server, and the error is printed (by the NFS async
+thread) on the client's console. The scenario is identical to
+that of a failing disk: the <em class="emphasis">write( )</em> system call
+has already returned, so the error must be reported on the console in
+the next similar system call.</p>
+
+
+The format of these error messages is:</p>
+
+
+<blockquote><pre class="code">NFS write error on host mahimahi: No space left on device.
+(file handle: 800006 2 a0000 3ef 12e09b14 a0000 2 4beac395)</pre></blockquote>
+
+
+The number of potential failures when writing to an NFS-mounted disk
+exceeds the few media-related errors that would cause a UFS write to
+fail. <a href="ch15_06.html#nfs2-CHP-15-TABLE-1">Table 15-1</a> gives some examples.</p>
+
+
+<a name="nfs2-CHP-15-TABLE-1" /><h4 class="objtitle">Table 15-1. NFS-related errors </h4><table border="1">
+
+
+
+<tr>
+<th>
+Error</p></th>
+<th>
+Typical Cause</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Permission denied</p></td>
+<td>
+Superuser cannot write to remote filesystem.</p></td>
+</tr>
+
+<tr>
+<td>
+No space left on device</p></td>
+<td>
+Remote disk is full.</p></td>
+</tr>
+
+<tr>
+<td>
+Stale filehandle</p></td>
+<td>
+File or directory has been removed on the server without the
+client's knowledge.</p></td>
+</tr>
+
+
+</table><p>
+
+
+Both the "Permission denied" and the "No space left
+on device" errors <a name="INDEX-2371" /> <a name="INDEX-2372" />would have been detected on
+a local filesystem, but the NFS client has no way to determine if a
+write operation will succeed at some future time (when the NFS async
+thread eventually sends it to the server). For example, if a client
+writes out 1KB buffers, then its NFS async threads write out 8KB
+buffers to the server on every 8th call to <em class="emphasis">write(
+)</em>. Several seconds may go by between the time the first
+<em class="emphasis">write( )</em> system call returns to the application
+and the time that the eighth call forces the NFS async thread to
+perform an RPC to the NFS server. In this interval, another process
+may have filled up the server's disk with some huge write
+requests, so the NFS async thread's attempt to write its 8-KB
+buffer will fail.</p>
+
+
+If you are consistently seeing NFS writes fail due to full
+filesystems or permission problems, you can usually chase down the
+user or process that is performing the writes by identifying the file
+being written. Unfortunately, Solaris does not provide any utility to
+correlate the filehandles printed in the error messages with the
+pathname of the file on the remote server. Filehandles are generated
+by the NFS server and handed opaquely to the NFS client. The NFS
+client cannot make any assumptions as to the structure or contents of
+the filehandle, enabling servers to change the way they generate the
+filehandle at any time. In practice, the structure of a Solaris NFS
+filehandle has changed little over time. The following script takes
+as input the filehandle printed by the NFS client and generates the
+corresponding server filename:<a href="#FOOTNOTE-42">[42]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-42" />[42]Thanks to Brent
+Callaghan for providing the basis for this script.</p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">#!/bin/sh
+
+ if [ $# -ne 8 ]; then
+            echo "Usage: fhfind &lt;filehandle&gt; e.g."
+            echo
+            echo "fhfind 1540002 2 a0000 4d 48df4455 a0000 2 25d1121d"
+            exit 1
+fi
+
+FSID=$1
+INUMHEX='echo $4 | tr [a-z] [A-Z]'
+
+ENTRY='grep ${FSID} /etc/mnttab | grep -v lofs'
+if [ "${ENTRY}" = "" ] ; then
+            echo "Cannot find filesystem for devid ${FSID}"
+            exit 1
+fi
+set - ${ENTRY}
+ MNTPNT=$2
+
+INUM='echo "ibase=16;${INUMHEX}" | bc'
+
+echo "Searching ${MNTPNT} for inode number ${INUM} ..."
+echo
+
+find ${MNTPNT} -mount -inum ${INUM} -print 2&gt;/dev/null</pre></blockquote>
+
+
+The script takes the expanded filehandle string from the NFS write
+error and maps it to the full pathname of the file on the server. The
+script is to be executed on the NFS server:</p>
+
+
+<blockquote><pre class="code">mahimahi# <tt class="userinput"><b>fhfind 800006 2 a0000 3ef 12e09b14 a0000 2 4beac395</b></tt>
+Searching /spare for inode number 1007 ...
+
+/spare/test/info/data</pre></blockquote>
+
+
+The eight values on the command line are the eight hex digits in the
+filehandle reported in the NFS error message. The script makes strict
+assumptions about the contents of the Solaris server filehandle. As
+mentioned before, the OS vendor is free to change the structure of
+the filehandle at any time, so there's no guarantee this script
+will work on your particular configuration. The script takes
+advantage of the fact that the filehandle contains the inode number
+of the file in question, as well as the device id of the filesystem
+in which the file resides. The script uses the device id in the
+filehandle (<em class="emphasis">FSID</em> in line 10) to obtain the
+filesystem entry from <em class="emphasis">/etc/mnttab</em> (line 13). In
+line 11, the script obtains the inode number of the file (in hex)
+from the filehandle, and applies the <em class="emphasis">tr</em> utility
+to convert all lowercase characters into uppercase characters for use
+with the <em class="emphasis">bc</em> calculator. Line 18 and 19 extract
+the mount point from the filesystem entry, to later use it as the
+starting point of the search. Line 21 takes the hexadecimal inode
+number obtained from the filehandle, and converts it to its decimal
+equivalent for use by <em class="emphasis">find</em>. In line 26, we
+finally begin the search for the file matching the inode number.
+Although <em class="emphasis">find</em> uses the mount point as the
+starting point of the search, a scan of a large filesystem may take a
+long time. Since there's no way to terminate the
+<em class="emphasis">find</em> upon finding the file, you may want to kill
+the process after it prints the path.</p>
+
+
+Throughout this chapter, we used tools presented in previous chapters
+to debug network and local problems. Once you determine the source of
+the problem, you should be able to take steps to correct and avoid
+it. For example, you can avoid delayed client write problems by
+having a good idea of what your clients are doing and how heavily
+loaded your NFS servers are. Determining your NFS workload and
+optimizing your clients and servers to make the best use of available
+resources requires tuning the network, the clients, and the servers.
+The next few chapters present NFS tuning and<a name="INDEX-2373" /> <a name="INDEX-2374" /> <a name="INDEX-2375" /> benchmarking
+techniques. <a name="INDEX-2376" /><a name="INDEX-2377" /><a name="INDEX-2378" /><a name="INDEX-2379" /></p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">15.5. Incorrect mount point permissions</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16. Server-Side Performance Tuning</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

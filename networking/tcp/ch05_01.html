@@ -1,0 +1,1256 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:51 GMT -->
+<head><title>Basic Configuration  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+
+<h1 class="chapter">Chapter 5. Basic Configuration </h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <p> <a href="#tcp3-CHP-5-SECT-1">Kernel Configuration </a><br />
+<a href="ch05_02.html">Startup Files </a><br />
+<a href="ch05_03.html">The Internet Daemon </a><br />
+<a href="ch05_04.html">The Extended Internet Daemon</a><br />
+<a href="ch05_05.html">Summary </a><br /></p></div>
+
+
+<p>Every Unix computer that runs TCP/IP has a technique for
+incorporating the basic transport and IP datagram services into its
+operating system. This chapter discusses two techniques for
+incorporating the basic TCP/IP configuration into a Unix system:
+recompiling the kernel, and loading dynamically linked kernel
+modules. We'll study these techniques and the role they play in
+linking TCP/IP and Unix. With this information, you should be able to
+understand how the vendor builds the basic configuration and how to
+modify it to create your own custom configuration.
+</p>
+
+<p>The transport and datagram services installed in the operating system
+are used by the application services described in <a href="ch03_01.html">Chapter 3, "Network Services"</a>. There are two different techniques for
+starting application services: they are either run at boot time or
+launched on an on-demand basis. This chapter covers both of these
+techniques and shows you how to configure and control this startup
+process. But first let's look at how TCP/IP is incorporated
+into the Unix operating system.
+</p>
+
+
+<div class="sect1"><a name="tcp3-CHP-5-SECT-1" /></a>
+<h2 class="sect1">5.1. Kernel Configuration </h2>
+
+<p>Kernel
+<a name="INDEX-949" /></a>
+<a name="INDEX-950" /></a>configuration
+is not really a network administration task -- rather, it is a
+basic part of Unix system administration, whether or not the computer
+is connected to a network. But TCP/IP networking, like other system
+functions, is integrated into the kernel.
+</p>
+
+<p>There are two very different approaches to kernel configuration. Some
+systems are designed to eliminate the need for you to recompile the
+kernel, while others encourage you to compile your own custom kernel.
+Linux <a name="INDEX-951" /></a>is an example of the latter
+philosophy: its documentation encourages you to create your own
+configuration. Solaris is an example of the former.
+</p>
+
+<p>The Solaris system
+<a name="INDEX-952" /></a>comes with a generic kernel that
+supports all basic system services. When a Solaris
+<a name="INDEX-953" /></a>
+<a name="INDEX-954" /></a>system
+boots, it detects all system hardware and uses dynamically loadable
+modules to support that hardware. Solaris can rely on this technique
+because Sun is primarily a hardware vendor. Sun designs its hardware
+to work with the Solaris kernel, and has a well-defined device driver
+interface so that third-party hardware vendors can design hardware
+that clearly identifies itself to the kernel.
+</p>
+
+<a name="tcp3-CHP-5-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">5.1.1. Using Dynamically Loadable Modules</h3>
+
+<p>Most <a name="INDEX-955" /></a> <a name="INDEX-956" /></a> <a name="INDEX-957" /></a> <a name="INDEX-958" /></a>versions of Unix support
+dynamically loadable modules, which are kernel modules that can be
+dynamically linked into the kernel at runtime. These modules provide
+the system with a great deal of flexibility because the kernel is
+able to load support for new hardware when the hardware is detected.
+Dynamically loadable modules are used to add new features to the
+system without requiring the system administrator to perform a manual
+reconfiguration.
+</p>
+
+<p>Solaris <a name="INDEX-959" /></a>depends on dynamically
+loadable modules. Solaris does have a kernel configuration file,
+defined in the
+<em class="emphasis">/etc/system</em><a name="INDEX-960" /></a> file, but this file is
+very small, has only limited applicability, and is not directly
+edited by the system administrator. When a new software package is
+added to the system, the script that installs that package makes any
+changes it requires to the <em class="emphasis">/etc/system</em> file. But
+even that is rare. Most drivers that are delivered with third-party
+hardware carry their own <a name="INDEX-961" /></a>configuration
+files.
+</p>
+
+<p>On a Solaris system, optional device drivers are installed using the
+<a name="INDEX-962" /></a> <a name="INDEX-963" /></a>
+<a name="INDEX-964" /></a><tt class="literal">pkgadd</tt> command.
+The syntax of the command is:
+</p>
+
+<blockquote><pre class="code">pkgadd -d <em class="replaceable">device packagename</em></pre></blockquote>
+
+<p><em class="replaceable">device</em> is the device name.
+<em class="replaceable">packagename</em> is the name of the driver
+software package provided by the vendor.
+</p>
+
+<p>The device driver installation creates the proper entry in the
+<em class="emphasis">/dev</em> directory as well as in the
+<em class="emphasis">/kernel/drv</em> directory. As an example, look at
+the Ethernet device driver for adapters that use the DEC 21140
+chipset. The name of the driver is dnet.<a href="#FOOTNOTE-41">[41]</a> There is a device named <em class="emphasis">/dev/dnet</em>
+defined in the device directory. There is a dynamically loadable
+module named <em class="emphasis">/kernel/drv/dnet</em> in the kernel
+driver directory, and there is a configuration file for the driver
+named <em class="emphasis">/kernel/drv/dnet.conf</em>. dnet is a standard
+driver, but the installation of an optional driver will create
+similar files.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-41" /></a><p>[41]dnet is not
+an optional device. It is a standard part of Solaris and it is the
+Ethernet device we use in all of our Solaris examples.</p>
+</blockquote>
+
+<p>After installing a new device driver, create an empty file
+<a name="INDEX-965" /></a>named
+<em class="emphasis">/reconfigure</em>. Shut down the system and install
+the new hardware. Then restart the system. The
+<em class="emphasis">/reconfigure</em> file is a flag to the system to
+check for new
+<a name="INDEX-966" /></a>hardware. When the
+Solaris system reboots, it will detect the new hardware and load the
+dynamic module that provides the device driver for that hardware.
+</p>
+
+<p>The Solaris <tt class="literal">ifconfig</tt><a name="INDEX-967" /></a> command, which is covered in extensive
+detail in <a href="ch06_01.html">Chapter 6, "Configuring the Interface "</a>, provides the
+<tt class="literal">modlist</tt><a name="INDEX-968" /></a>
+option to let you see the kernel modules that are associated with a
+TCP/IP network interface. For example:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ifconfig dnet0 modlist</b>
+0 arp
+1 ip
+2 dnet</pre></blockquote>
+
+<p>The purpose of each kernel module in this list is clear. arp provides
+the ARP protocol for the Ethernet interface. ip provides the TCP/IP
+protocols used for this network. Each of these modules has a
+configuration file in the
+<em class="emphasis">/kernel/drv</em><a name="INDEX-969" /></a> directory. There is an
+<em class="emphasis">arp.conf</em> file, an <em class="emphasis">ip.conf</em>
+file, and a <em class="emphasis">dnet.conf</em> file. However, these files
+provide very limited capacity for controlling the function of the
+modules. On Solaris systems, use the <tt class="literal">ndd</tt> command
+to control the module.
+</p>
+
+<p>To see what configuration options are available for a module, use the
+<a name="INDEX-970" /></a><tt class="literal">ndd</tt> command with a
+<tt class="literal">?</tt> as an argument. For example, use the following
+command to see the variables available for the arp module:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ndd /dev/arp ?</b>
+?                             (read only)
+arp_cache_report              (read only)
+arp_debug                     (read and write)
+arp_cleanup_interval          (read and write)
+arp_publish_interval          (read and write)
+arp_publish_count             (read and write)</pre></blockquote>
+
+<p>The arp module offers <a name="INDEX-971" /></a>
+<a name="INDEX-972" /></a>six values:
+</p>
+
+<dl>
+<dt><b><tt class="literal">?</tt></b></dt>
+<dd>
+<p>A read-only <a name="INDEX-973" /></a>value that displays this list.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">arp_cache_report</tt></b></dt>
+<dd>
+<p>A read-only value that displays the permanent values in the ARP
+cache. The <tt class="literal">arp</tt> command gives a better display of
+the cache. See the description of the <tt class="literal">arp</tt> command
+in <a href="ch02_01.html">Chapter 2, "Delivering the Data"</a>.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">arp_debug</tt></b></dt>
+<dd>
+<p>A variable that enables ARP protocol debugging. By default, it is set
+to 0 and debugging is disabled. Setting it to 1 enables debugging.
+The ARP protocol is very old and very reliable. ARP debugging is
+never needed.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">arp_cleanup_interval</tt></b></dt>
+<dd>
+<p>A variable that defines how long temporary entries are kept in the
+cache.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">arp_publish_interval</tt></b></dt>
+<dd>
+<p>A variable that defines how long the system waits between broadcasts
+of an Ethernet address that it is configured to publish.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">arp_publish_count</tt></b></dt>
+<dd>
+<p>A variable that defines how many ARP broadcasts are sent in response
+to a query for an address that this system publishes.
+</p>
+</dd>
+
+</dl>
+
+<p>The default configuration values set for the arp module have worked
+well for every Solaris system I have ever worked with. I have never
+had a need to change any of these settings. The second module
+displayed by <tt class="literal">modlist</tt> provides a slightly more
+interesting example.
+</p>
+
+<p>Use the <tt class="literal">ndd /dev/ip ?</tt> command to list the
+configuration options for the ip module. There are almost 60 of them!
+Of all of these, there is only one that I have ever needed to adjust:
+<tt class="literal">ip_forwarding</tt>.
+</p>
+
+<p>The <a name="INDEX-974" /></a> <a name="INDEX-975" /></a><tt class="literal">ip_forwarding</tt>
+variable specifies whether the ip module should act as if the system
+is a router and forward packets to other hosts. By default, systems
+with one network interface are hosts that do not forward packets, and
+systems with more than one interface are routers that do forward
+packets. Setting <tt class="literal">ip_forwarding</tt> to 0 turns off
+packet forwarding, even if the system has more than one network
+interface. Setting <tt class="literal">ip_forwarding</tt> to 1 turns on
+packet forwarding, even if the system has only one network interface.
+</p>
+
+<p>On occasion you will have a multi-homed host, which is a host
+connected to more than one network. Despite multiple network
+connections, the system is a host, not a router. To prevent that
+system from acting as a router and potentially interfering with the
+real routing configuration, disable IP forwarding as follows:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ndd /dev/ip ip_forwarding</b>
+1
+# <b class="emphasis-bold">ndd -set /dev/ip ip_forwarding 0</b>
+# <b class="emphasis-bold">ndd /dev/ip ip_forwarding</b>
+0</pre></blockquote>
+
+<p>The first <tt class="literal">ndd</tt> command in this example queries the
+ip module for the value set in <tt class="literal">ip_forwarding</tt>. In
+this example it is set to 1, which enables forwarding. The second
+<tt class="literal">ndd</tt> command uses the -<tt class="literal">set</tt>
+option to write the value 0 into the <tt class="literal">ip_forwarding</tt>
+variable. The last command in the example redisplays the variable to
+show that it has indeed been changed.
+</p>
+
+<p>The <tt class="literal">pkgadd</tt> command, the
+<tt class="literal">ifconfig</tt> <tt class="literal">modlist</tt> option, and
+the <tt class="literal">ndd</tt> command are all specific to Solaris. Other
+systems use dynamically loadable modules but use a different set of
+commands to control them.
+</p>
+
+<p>Linux also uses
+<a name="INDEX-976" /></a>loadable modules. Linux derives the
+same benefit from loadable modules as Solaris does, and like Solaris
+usually you have very little involvement with loadable modules.
+Generally the Linux system detects the hardware and determines the
+correct modules needed during the initial installation without any
+input from the system administrator. But not always. Sometimes
+hardware is not detected during the installation, and other times new
+hardware is added to a running system. To handle these situations,
+you need to know the Linux commands used to work with loadable
+modules.
+</p>
+
+<p>Use the <tt class="literal">lsmod</tt><a name="INDEX-977" /></a>
+<a name="INDEX-978" /></a>
+<a name="INDEX-979" /></a>
+command to check which modules are installed in a Linux system.
+Here's an example from a Red Hat system:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">lsmod</b>
+odule                  Size  Used by
+ide-cd                 26848   0  (autoclean)
+cdrom                  27232   0  (autoclean) [ide-cd]
+autofs                 11264   1  (autoclean)
+smc-ultra               6048   1  (autoclean)
+8390                    6816   0  (autoclean) [smc-ultra]
+ipchains               38976   0  (unused)
+nls_iso8859-1           2880   1  (autoclean)
+nls_cp437               4384   1  (autoclean)
+vfat                    9392   1  (autoclean)
+fat                    32672   0  (autoclean) [vfat]</pre></blockquote>
+
+<p>Loadable modules perform a variety of tasks. Some modules are
+hardware device drivers, such as the smc-ultra module for the SMC
+Ultra Ethernet card. Other modules provide support for the wide array
+of filesystems available in Linux, such as the ISO8859 filesystem
+used on CD-ROMs or the DOS FAT filesystem with long filename support
+(vfat).
+</p>
+
+<p>Each entry in the listing produced by the <tt class="literal">lsmod</tt>
+command begins with the name of the module followed by the size of
+the module. As the <a name="INDEX-980" /></a>size field indicates, modules are
+small. Often modules depend on other modules to get the task done.
+The interrelationships of modules are called
+<a name="INDEX-981" /></a><em class="emphasis">module
+dependencies</em>, which are shown in the listing. In the
+sample, the smc-ultra driver depends on the 8390 module, as indicated
+by the 8390 entry ending with the string "[smc-ultra]".
+The 8390 entry lists the modules that depend on it under the heading
+<em class="emphasis">Used by</em>. The listing shows other dependencies,
+including that vfat depends on fat and cdrom depends on ide-cd.
+</p>
+
+<p>Most of the lines in the sample include the string
+"(autoclean)". This indicates that the specified module
+can be removed from memory
+<a name="INDEX-982" /></a>automatically
+if it is unused. autoclean is an option. You can select different
+options by manually loading modules with the
+<tt class="literal">insmod</tt> command.
+</p>
+
+<p>Modules can be manually loaded using the
+<tt class="literal">insmod</tt><a name="INDEX-983" /></a>
+<a name="INDEX-984" /></a>
+command. This command is very straightforward -- it's just
+the command and the module name. For example, to load the 3c509
+device driver, enter <tt class="literal">insmod 3c509</tt>. This does not
+install the module with the autoclean option. If you want this driver
+removed from memory when it is not in use, add the
+<tt class="literal">-k</tt> option to the <tt class="literal">insmod</tt>
+command: <tt class="literal">insmod</tt> <tt class="literal">-k 3c509</tt>.
+</p>
+
+<p>A critical limitation with the <tt class="literal">insmod</tt> command is
+that it does not understand module dependencies. If you used it to
+load the smc-ultra module, it would not automatically load the
+required 8390 module. For this reason,
+<tt class="literal">modprobe</tt><a name="INDEX-985" /></a>
+<a name="INDEX-986" /></a>
+is a better command for manually loading modules. As with the
+<tt class="literal">insmod</tt> command, the syntax is simple. To load the
+smc-ultra module, simply enter <tt class="literal">modprobe smc-ultra</tt>.
+</p>
+
+<p><tt class="literal">modprobe</tt> reads the module dependencies file that
+is produced by the
+<tt class="literal">depmod</tt><a name="INDEX-987" /></a>
+<a name="INDEX-988" /></a>
+command. Whenever the kernel or the module libraries are updated, run
+<tt class="literal">depmod</tt> to produce a new file containing the module
+dependencies. The command <tt class="literal">depmod</tt>
+<tt class="literal">-a</tt> searches all of the standard module libraries
+and creates the necessary file. After it is run, you can use
+<tt class="literal">modprobe</tt> to install any modules and have the other
+modules it depends on automatically installed.
+</p>
+
+<p>Use the <tt class="literal">rmmod</tt><a name="INDEX-989" /></a>
+<a name="INDEX-990" /></a>
+<a name="INDEX-991" /></a>
+command to remove unneeded modules. Again, the syntax is simple:
+<tt class="literal">rmmod appletalk</tt> removes the appletalk driver from
+your system. There is rarely any need to remove unneeded modules
+because, as noted in the discussion of autoclean, the system
+automatically removes unused modules.
+</p>
+
+<p>The smc-ultra module is an Ethernet device driver. It is in fact the
+device driver used for the network interface on our sample Linux
+system. Device drivers can be compiled into the kernel, as described
+later, or they can be dynamically loaded from a module. Most
+<a name="INDEX-992" /></a>
+<a name="INDEX-993" /></a>Ethernet device drivers are handled as
+dynamically loadable modules. The Ethernet driver modules are found
+in the
+<em class="emphasis">/lib/modules</em><a name="INDEX-994" /></a> directory. On a
+<a name="INDEX-995" /></a>
+<a name="INDEX-996" /></a>Red
+Hat 7.2 system, Ethernet device drivers are in the
+<em class="emphasis">/lib/modules/2.4.7-10/kernel/drivers/net</em>
+directory, as the following listing shows:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ls /lib/modules/2.4.7-10/kernel/drivers/net</b>
+3c501.o             atp.o       eexpress.o  ni5010.o       smc-ultra.o
+3c503.o             bcm         epic100.o   ni52.o         starfire.o
+3c505.o             bonding.o   eql.o       ni65.o         strip.o
+3c507.o             bsd_comp.o  es3210.o    pcmcia         sundance.o
+3c509.o             cipe        eth16i.o    pcnet32.o      sunhme.o
+3c515.o             cs89x0.o    ethertap.o  plip.o         tlan.o
+3c59x.o             de4x5.o     ewrk3.o     ppp_async.o    tokenring
+8139too.o           de600.o     fc          ppp_deflate.o  tulip
+82596.o             de620.o     hamachi.o   ppp_generic.o  tun.o
+8390.o              defxx.o     hp100.o     ppp_synctty.o  via-rhine.o
+ac3200.o            depca.o     hp.o        rcpci.o        wan
+acenic.o            dgrs.o      hp-plus.o   sb1000.o       wavelan.o
+aironet4500_card.o  dmfe.o      irda        shaper.o       wd.o
+aironet4500_core.o  dummy.o     lance.o     sis900.o       winbond-840.o
+aironet4500_proc.o  e1000.o     lne390.o    sk98lin        yellowfin.o
+appletalk           e100.o      natsemi.o   skfp
+arlan.o             e2100.o     ne2k-pci.o  sk_g16.o
+arlan-proc.o        eepro100.o  ne3210.o    slip.o
+at1700.o            eepro.o     ne.o        smc-ultra32.o</pre></blockquote>
+
+<p>All loadable network device drivers are listed here. Some, such as
+<em class="filename">plip.o</em>, are not for Ethernet devices. Most are
+easily identifiable as Ethernet drivers, such as the 3COM drivers,
+the SMC drivers, the NE2000 drivers, and the Ethernet Express
+drivers.
+</p>
+
+<p>The Linux system detects the Ethernet
+<a name="INDEX-997" /></a>hardware during the initial
+installation, and if Linux has the correct driver for that hardware,
+it installs the appropriate driver. If the Ethernet adapter is not
+detected during the operating system installation or if it is added
+after the system is installed, use the <tt class="literal">modprobe</tt>
+command to load the device driver manually. If the correct driver for
+the adapter is not included with your Linux system, you may need to
+compile the module yourself.
+</p>
+
+<p>For a device driver to operate correctly, it must be compiled with
+the correct libraries for your kernel. Sometimes this means
+downloading the driver source code and compiling it yourself on your
+system. Ethernet driver source code is available for many adapters
+from <a name="INDEX-998" /></a><a href="http://www.scyld.com/">http://www.scyld.com</a>,
+which has a great repository of Linux network driver software. The
+comments in the driver source code includes the correct compiler
+command to compile the module.
+</p>
+
+<p>After compiling, copy the object file to the correct
+<em class="emphasis">/lib/modules</em> directory. Then use
+<tt class="literal">modprobe</tt> to load and test the driver.
+Alternatively, most device drivers are now available in RPM format,
+eliminating the need for compilation.
+</p>
+
+<p>Linux frequently uses dynamically loadable modules for device
+drivers. But most other components of TCP/IP are not loaded at
+runtime; they are compiled into the kernel. Next we look at how Unix
+kernels are <a name="INDEX-999" /></a> <a name="INDEX-1000" /></a> <a name="INDEX-1001" /></a> <a name="INDEX-1002" /></a>recompiled. 
+</p>
+
+</div>
+<a name="tcp3-CHP-5-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">5.1.2. Recompiling the Kernel</h3>
+
+<p>This text
+<a name="INDEX-1003" /></a>uses
+Linux and FreeBSD as examples of systems that encourage you to
+compile a custom kernel.<a href="#FOOTNOTE-42">[42]</a> This chapter's examples of
+kernel configuration statements come from these two Unix systems.
+While kernel configuration involves all aspects of system
+configuration, we include only statements that directly affect TCP/IP
+configuration.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-42" /></a><p>[42]The kernel configuration
+process of other BSD systems, such as SunOS 4.1.3, is similar to the
+FreeBSD example.</p> </blockquote>
+
+<p>Both of the Unix systems used in the examples come with a kernel
+configuration file preconfigured for TCP/IP. During the initial
+installation, you may need to select a preconfigured kernel that
+includes network support, but you probably won't need to modify
+the kernel configuration for networking. The kernel configuration
+file is normally changed only when you wish to:
+</p>
+
+<ul><li>
+<p>Produce a smaller, more efficient kernel by removing unneeded items</p>
+</li><li>
+<p>Add a new device</p>
+</li><li>
+<p>Modify a system parameter</p>
+</li></ul>
+<p>While there is rarely any need to modify the kernel network
+statements, it is useful to understand what these statements do.
+Looking into the kernel configuration file shows how Unix is tied to
+the hardware and software of the network.
+</p>
+
+<a name="ch05-5-fm2xml" /></a><blockquote><b>WARNING:</b> The procedures and files used for kernel configuration vary
+dramatically depending on Unix implementation. These variations make
+it essential that you refer to your system documentation before
+trying to configure the kernel on your system. Only your system
+documentation can provide you with the accurate, detailed
+instructions required to successfully complete this task.
+</p>
+</blockquote>
+
+</div>
+<a name="tcp3-CHP-5-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">5.1.3. Linux Kernel Configuration </h3>
+
+<p>The source code <a name="INDEX-1004" /></a>
+<a name="INDEX-1005" /></a>
+<a name="INDEX-1006" /></a>for the Linux kernel is normally
+delivered with a Linux distribution. If your system does not have the
+source code or you want a newer version of the Linux kernel, it can
+be downloaded from <a name="INDEX-1007" /></a><a href="http://www.kernel.org/">http://www.kernel.org</a> as a compressed tar
+file. If you already have a directory named
+<em class="emphasis">/usr/src/linux</em>, rename it before you unpack the
+tarball:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">cd /usr/src</b>
+# <b class="emphasis-bold">tar -zxvf linux-2.1.14.tar.gz</b></pre></blockquote>
+
+<p>The Linux kernel is a C program compiled and installed by
+<tt class="literal">make</tt>. The
+<tt class="literal">make</tt><a name="INDEX-1008" /></a> command customizes the kernel configuration
+and generates the files (including the Makefile) needed to compile
+and link the kernel. There are three variations of the command:
+</p>
+
+<dl>
+<dt><b><tt class="literal">make config</tt></b></dt>
+<dd>
+<p>This form <a name="INDEX-1009" /></a>of the <tt class="literal">make</tt> command
+is entirely text-based. It takes you through a very long sequence of
+questions that ask about every aspect of the kernel configuration.
+Because it asks every question in a sequential manner, this can be
+the most cumbersome way to reconfigure the kernel, particularly if
+you wish to change only a few items.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make menuconfig</tt></b></dt>
+<dd>
+<p>This form <a name="INDEX-1010" /></a>of the <tt class="literal">make</tt> command
+uses <tt class="literal">curses</tt> to present a menu of configuration
+choices. It provides all of the capabilities of the
+<tt class="literal">make</tt> <tt class="literal">config</tt> command but is much
+easier to use because it allows you to jump to specific areas of
+interest. The <tt class="literal">make</tt> <tt class="literal">menuconfig</tt>
+command works from any terminal and on any system, even one that does
+not support X Windows.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make xconfig</tt></b></dt>
+<dd>
+<p>This form of <a name="INDEX-1011" /></a>the <tt class="literal">make</tt> command uses
+X Windows to provide a "point and click" interface for
+kernel configuration. It has all the power of the other commands and
+is very easy to use.
+</p>
+</dd>
+
+</dl>
+
+<p>Choose the form of the command you like best. In this example we use
+<tt class="literal">make xconfig</tt>.
+</p>
+
+<p>On Linux systems, the kernel source is found in
+<em class="emphasis">/usr/src/linux</em>. To start the configuration
+process, change to the source directory and run
+<tt class="literal">make</tt> <tt class="literal">xconfig</tt>:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">cd /usr/src/linux</b>
+# <b class="emphasis-bold">make xconfig</b></pre></blockquote>
+
+<p>The <tt class="literal">make</tt> <tt class="literal">xconfig</tt> command
+displays the screen shown in <a href="ch05_01.html#tcp3-CHP-5-FIG-1">Figure 5-1</a>.
+</p>
+
+<a name="tcp3-CHP-5-FIG-1" /></a><div class="figure"><img height="217" alt="Figure 5-1" src="figs/tcp3_0501.gif" width="481" /></div><h4 class="objtitle">Figure 5-1. Linux xconfig main menu</h4>
+
+<p>The menu displays more than 30 buttons that represent different
+configuration categories. Click on a button to view and set the
+configuration options in that category. Because our focus is on the
+kernel configuration options that affect TCP/IP, the two menu items
+we're interested in are <em class="emphasis">Networking options</em>
+and <em class="emphasis">Network device support</em>. <a href="ch05_01.html#tcp3-CHP-5-FIG-2">Figure 5-2</a> shows the window that appears if the
+<em class="emphasis">Network device support</em> button is selected.
+</p>
+
+<a name="tcp3-CHP-5-FIG-2" /></a><div class="figure"><img height="271" alt="Figure 5-2" src="figs/tcp3_0502.gif" width="481" /></div><h4 class="objtitle">Figure 5-2. Linux kernel network device support</h4>
+
+<p>This window lists the network device drivers that can be compiled
+into or loaded by the kernel and shows the three choices for
+<a name="INDEX-1012" /></a>
+<a name="INDEX-1013" /></a>
+<a name="INDEX-1014" /></a>most
+<a name="INDEX-1015" /></a>configuration
+options:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">y</em></i></dt>
+<dd>
+<p>Selecting <em class="emphasis">y</em>
+<a name="INDEX-1016" /></a>compiles the option into the new
+kernel.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">m</em></i></dt>
+<dd>
+<p>Selecting <em class="emphasis">m</em><a name="INDEX-1017" /></a> causes the option to be
+loaded as a dynamically loadable module by the kernel. Not every
+option is available as a loadable module. When a configuration
+question must be answered yes or no, the module selection is not
+available. Notice the <em class="emphasis">FDDI driver support</em>
+option. Choosing <em class="emphasis">y</em> for that option enables FDDI
+driver support and highlights a selection of possible FDDI interface
+adapters, which are "grayed-out" in <a href="ch05_01.html#tcp3-CHP-5-FIG-2">Figure 5-2</a>. Frequently, interface support must be
+selected before an individual adapter can be selected.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">n</em></i></dt>
+<dd>
+<p>Selecting <em class="emphasis">n</em><a name="INDEX-1018" /></a> tells the kernel not to
+use the configuration option.
+</p>
+</dd>
+
+</dl>
+
+<p>Each <a name="INDEX-1019" /></a>configuration
+<a name="INDEX-1020" /></a>
+<a name="INDEX-1021" /></a>
+<a name="INDEX-1022" /></a>option also
+has a <em class="emphasis">Help</em> button. Clicking on the
+<em class="emphasis">Help</em> button provides additional information
+about the option and advice about when the option should be set. Even
+if you think you know what the option is about, you should read the
+description displayed by the <em class="emphasis">Help</em> button before
+you change the default setting.
+</p>
+
+<p>Two items shown in <a href="ch05_01.html#tcp3-CHP-5-FIG-2">Figure 5-2</a>, <em class="emphasis">Ethernet
+(10 or 100 Mbit)</em> and <em class="emphasis">Ethernet (1000
+bit)</em>, open separate windows with extensive menu
+selections because Linux supports a very large number of Ethernet
+<a name="INDEX-1023" /></a>adapters. The
+<a name="INDEX-1024" /></a>
+<a name="INDEX-1025" /></a>Ethernet
+adapters available through those windows are selected using the same
+<em class="emphasis">y</em>, <em class="emphasis">m</em>, and
+<em class="emphasis">n</em> settings described above.
+</p>
+
+<p>The <em class="emphasis">Network device support</em> window
+<a name="INDEX-1026" /></a>and the <em class="emphasis">Ethernet
+adapter</em> windows show that it is possible to compile
+specific adapter support into the kernel, but it is not necessary. As
+we saw in the previous section on dynamically loadable modules,
+network interfaces are usually controlled by loadable modules. All
+Linux systems need a network interface to run TCP/IP, but that
+interface does not need to be compiled into the kernel.
+</p>
+
+<p>Selecting <em class="emphasis">Networking options</em> from
+<a name="INDEX-1027" /></a>the main menu in <a href="ch05_01.html#tcp3-CHP-5-FIG-1">Figure 5-1</a> opens the <em class="emphasis">Network options</em>
+window, which contains over 60 menu selections because
+Linux supports a wide range of network services. Some of these are
+experimental and some relate to protocols other than IPv4. Here we
+limit ourselves to those options that directly relate to IPv4. Yet
+there are still a substantial number of options. They are:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Packet socket</em></i></dt>
+<dd>
+<p>This service allows applications to communicate directly with the
+network device. It is required for applications such as
+<tt class="literal">tcpdump</tt> that do packet capture and packet
+filtering. If <em class="emphasis">Packet
+socket</em><a name="INDEX-1028" /></a> is enabled,
+<em class="emphasis">Packet socket: mmapped IO</em> can be selected to use
+memory-mapped I/O for the packet socket service. Packet socket
+service is usually enabled while packet socket memory mapped I/O is
+usually disabled.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Kernel/User netlink socket</em></i></dt>
+<dd>
+<p>This service <a name="INDEX-1029" /></a>provides
+communication between the kernel and user space programs. If enabled,
+<em class="emphasis">Routing messages</em> and <em class="emphasis">Netlink device
+emulation</em> can also be selected. Netlink sockets permit
+user space programs to interface with IPv4 routing and ARP tables and
+with kernel firewall code.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Network packet filtering</em></i></dt>
+<dd>
+<p>This service <a name="INDEX-1030" /></a>provides the IP
+packet filtering services that are required to make the system
+function as a firewall or a network address translation box. If
+<em class="emphasis">Network packet filtering</em> is enabled,
+<em class="emphasis">Network packet filtering debugging</em> can also be
+selected. Network packet filtering is normally enabled on routers and
+disabled on hosts, although it can be used to improve server security
+as described in the <tt class="literal">iptables</tt> section of <a href="ch12_01.html">Chapter 12, "Network Security "</a>. 
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">TCP/IP networking</em></i></dt>
+<dd>
+<p>This selection <a name="INDEX-1031" /></a>installs kernel support
+for TCP/IP. It provides all basic TCP/IP transport and datagram
+protocols. Once TCP/IP networking is selected, many other optional
+TCP/IP services become available, listed below:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">IP: multicasting</em></i></dt>
+<dd>
+<p>This provides <a name="INDEX-1032" /></a>IP multicasting support.
+ulticasting is described in <a href="ch02_01.html">Chapter 2, "Delivering the Data"</a>.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: advanced router</em></i></dt>
+<dd>
+<p>This menu <a name="INDEX-1033" /></a>selection highlights several
+options that configure the kernel for advanced routing protocols.
+Advanced routing does not need to be enabled for basic routing to
+work, and is not needed for a host or a small interior router.
+Advanced routing is used only if the Linux system is configured as
+the primary router or an exterior router between autonomous systems.
+<a href="ch07_01.html">Chapter 7, "Configuring Routing "</a> describes how <tt class="literal">gated</tt>
+is used to run advanced routing protocols on Unix systems. The kernel
+configuration advanced routing options are:
+</p>
+
+
+<p><em class="emphasis">IP: policy routing</em> enables kernel-level
+policy-based routing, which is discussed in <a href="ch07_01.html">Chapter 7, "Configuring Routing "</a> in relationship to the BGP routing protocol,
+and in <a href="ch02_01.html">Chapter 2, "Delivering the Data"</a> in relationship to the Policy
+Routing Database (PRDB). This option is not needed by
+<tt class="literal">gated</tt>, which implements policy-based routing at
+the user level.
+</p>
+
+<p><em class="emphasis">IP: equal cost multipath</em> enables kernel support
+for multiple routes to the same destination. Multipath routing is
+described in <a href="ch07_01.html">Chapter 7, "Configuring Routing "</a> in relationship to the OSPF
+routing protocol.
+</p>
+
+<p><em class="emphasis">IP use TOS value as routing key</em> enables a type
+of tag switching (also called label switching) that uses the Type of
+Service (TOS) field of the IP header to hold the tag. Both OSPF and
+RIP version 2 can use a tag field. <a href="appb_01.html">Appendix B, "A gated Reference"</a>
+touches upon the <tt class="literal">gated</tt> syntax used for tag fields.
+</p>
+
+<p><em class="emphasis">IP: verbose route monitoring</em> increases the
+number and length of the routing table update messages.
+</p>
+
+<p><em class="emphasis">IP: large routing tables</em> increases the memory
+reserved for the routing table.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: kernel level autoconfiguration</em></i></dt>
+<dd>
+<p>This service <a name="INDEX-1034" /></a>is used on diskless
+clients. When selected, two additional selections become available,
+<em class="emphasis">IP: BOOTP support</em> and <em class="emphasis">IP: RARP
+support</em>, that are used to specify whether the
+configuration comes from BOOTP or RARP. See <a href="ch03_01.html">Chapter 3, "Network Services"</a> for a description of BOOTP and RARP.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: tunneling</em></i></dt>
+<dd>
+<p>This service <a name="INDEX-1035" /></a>encapsulates IPv4 datagrams
+within an IP tunnel, which makes a host appear to be on a different
+network than the one to which it is physically connected. This
+service is occasionally used on laptop machines to facilitate
+mobility.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: GRE tunnels over IP</em></i></dt>
+<dd>
+<p>This <a name="INDEX-1036" /></a>enables the
+<a name="INDEX-1037" /></a><a name="INDEX-1038" /></a>Generic Routing Encapsulation
+(GRE) protocol that is used to encapsulate IPv4 or IPv6 datagrams in
+an IPv4 tunnel. Selecting this option makes the <em class="emphasis">IP:
+broadcast GRE over IP</em><a name="INDEX-1039" /></a>
+option available, which provides support for multicasting with the
+tunnel. GRE is the preferred encapsulation protocol when dealing with
+Cisco routers.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: multicast routing</em></i></dt>
+<dd>
+<p>This <a name="INDEX-1040" /></a>selection provides support for
+multicast routing. It is needed only if your system acts as a
+multicast router, i.e., runs <tt class="literal">mrouted</tt>. When
+selected, you are given the options <em class="emphasis">IP: PIM-SM version 1
+support</em> and <em class="emphasis">IP: PIM-SM version 2
+support</em> that set the level of the PIM-SM protocol used by
+your system.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: TCP Explicit Congestion Notification support</em></i></dt>
+<dd>
+<p>This <a name="INDEX-1041" /></a>enables
+Explicit Congestion Notification (ECN). ECN messages are sent from a
+router to a client to alert the client of congestion. This would be
+enabled only if the Linux system is a router. Because many firewalls
+are incompatible with ECN, it is recommended that ECN not be enabled.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: TCP syncookie support</em></i></dt>
+<dd>
+<p>This <a name="INDEX-1042" /></a>enables support for <em class="emphasis">SYN
+cookies</em>, which are used to counteract <em class="emphasis">SYN
+flooding</em> denial-of-service attacks.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">IP: Netfilter Configuration</em></i></dt>
+<dd>
+<p>Selecting <a name="INDEX-1043" /></a>this menu item opens a
+window that allows you to select a range of services for the
+kernel's Netfilter firewall. The <tt class="literal">iptables</tt>
+discussion in <a href="ch12_01.html">Chapter 12, "Network Security "</a> describes how the
+Netfilter service is used.
+</p>
+</dd>
+
+</dl>
+</dd>
+
+
+<dt><i><em class="emphasis">QoS and/or fair queueing</em></i></dt>
+<dd>
+<p><a name="INDEX-1044" /></a>This specifies options that
+change the way network packets are handled by the server. Because it
+is experimental, this option should be set to n for an operational
+server. The optional packet handlers require special software to
+administer them.
+</p>
+</dd>
+
+</dl>
+
+<p>After completing the network configuration, run
+<tt class="literal">make</tt> <tt class="literal">dep;</tt>
+<tt class="literal">make</tt> <tt class="literal">clean</tt> to build the
+dependencies and clean up the odds and ends. When the makes are
+complete, compile the kernel. The <tt class="literal">make</tt>
+<tt class="literal">bzImage</tt> command builds a compressed kernel and
+puts it into the <em class="emphasis">/usr/src/linux/i386/boot</em>
+directory.<a href="#FOOTNOTE-43">[43]</a> When you're sure that the new kernel is ready to
+run, simply copy the new kernel file, <em class="emphasis">bzImage</em>,
+to the <em class="emphasis">vmlinuz</em> file your system uses to boot.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-43" /></a><p>[43]Most Linux systems use a compressed kernel
+that is automatically decompressed during the system boot.</p>
+</blockquote>
+
+<p>Linux's list of network configuration options is
+long.<a href="#FOOTNOTE-44">[44]</a> Linux is yin to the
+Solaris yang: Linux permits the system administrator to configure
+everything while Solaris configures everything for the administrator.
+BSD kernel configuration lies somewhere between these two extremes.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-44" /></a><p>[44]Not only is this list long, it is bound to
+change. Always check the system documentation before starting a
+kernel reconfiguration.</p> </blockquote>
+
+</div>
+<a name="tcp3-CHP-5-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">5.1.4. The BSD Kernel Configuration File </h3>
+
+<p>Like Linux, <a name="INDEX-1045" /></a>
+<a name="INDEX-1046" /></a>
+<a name="INDEX-1047" /></a>the BSD Unix kernel is a C program
+compiled and installed by <tt class="literal">make</tt>. The
+<tt class="literal">config</tt> command reads the kernel configuration file
+and generates the files (including the Makefile) needed to compile
+and link the kernel. On FreeBSD systems, the kernel configuration
+file is located in the directory
+<em class="emphasis">/usr/src/sys/i386/conf</em>.<a href="#FOOTNOTE-45">[45]</a>
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-45" /></a><p>[45]<em class="emphasis">/usr/src/sys</em> is symbolically linked to
+<em class="emphasis">/sys</em>. We use <em class="emphasis">/usr/src/sys</em>
+only as an example. Your system may use another directory.</p>
+</blockquote>
+
+<p>A large kernel configuration file named <em class="emphasis">GENERIC</em>
+is delivered with the FreeBSD system. The
+<em class="emphasis">GENERIC</em><a name="INDEX-1048" /></a> kernel file configures all of the
+standard devices for your system -- including everything necessary
+for TCP/IP. In this section, we look at just those items found in the
+<em class="emphasis">GENERIC</em> file that relate to TCP/IP. No
+modifications are necessary for the <em class="emphasis">GENERIC</em>
+kernel to run basic TCP/IP services. The reasons for modifying the
+BSD kernel are the same as those discussed for the Linux kernel: to
+make a smaller, more efficient kernel, or to add new features.
+</p>
+
+<p>There is no standard name for a BSD kernel configuration file. When
+you create a configuration file, choose any name you wish. By
+convention, BSD kernel configuration filenames use uppercase letters.
+To create a new configuration, copy <em class="emphasis">GENERIC</em> to
+the new file and then edit the newly created file. The following
+creates a new configuration file called <em class="emphasis">FILBERT</em>:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">cd /usr/src/sys/i386/conf</b>
+# <b class="emphasis-bold">cp GENERIC FILBERT</b></pre></blockquote>
+
+<p>If the kernel has been modified on your system, the system
+administrator will have created a new configuration file in the
+<em class="emphasis">/usr/src/sys/i386/conf</em> directory. The kernel
+configuration file contains many configuration commands that cover
+all aspects of the system configuration. This text discusses only
+those parameters that directly affect TCP/IP configuration. See the
+documentation that comes with the FreeBSD system for information
+about the other configuration commands.<a href="#FOOTNOTE-46">[46]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-46" /></a><p>[46]The book
+<em class="emphasis">The Complete FreeBSD</em> by Greg Lehey (published by
+Walnut Creek CDROM Books) is a good source for information on
+recompiling a BSD kernel.</p> </blockquote>
+
+</div>
+<a name="tcp3-CHP-5-SECT-1.5" /></a><div class="sect2">
+<h3 class="sect2">5.1.5. TCP/IP in the BSD Kernel </h3>
+
+<p>For a network administrator, it is more important to understand which
+kernel statements are necessary to configure TCP/IP than to
+understand the detailed structure of each statement. Three types of
+statements are used to configure TCP/IP in the BSD kernel: options,
+pseudo-device, and device statements.
+</p>
+
+<a name="tcp3-CHP-5-SECT-1.5.1" /></a><div class="sect3">
+<h3 class="sect3">5.1.5.1. The options statement </h3>
+
+<p>The options <a name="INDEX-1049" /></a>
+<a name="INDEX-1050" /></a>
+<a name="INDEX-1051" /></a> <a name="INDEX-1052" /></a>statement tells the kernel to
+compile a software option into the system. The options statement that
+is most important to TCP/IP is:
+</p>
+
+<blockquote><pre class="code"> options INET # basic networking support--mandatory</pre></blockquote>
+
+<p>Every BSD-based system running TCP/IP has an <tt class="literal">options
+INET</tt> statement in its kernel configuration file. The
+statement produces a <tt class="literal">-DINET</tt> argument for the C
+compiler, which in turn causes the IP, ICMP, TCP, UDP, and ARP
+modules to be compiled into the kernel. This single statement
+incorporates the basic transport and IP datagram services into the
+system. Never remove this statement from the configuration file.
+</p>
+
+<blockquote><pre class="code">options ICMP_BANDLIM #Rate limit bad replies</pre></blockquote>
+
+<p>This option limits the amount of bandwidth that can be consumed by
+ICMP error messages. Use it to protect your system from
+denial-of-service attacks that deliberately cause errors to overload
+your network.
+</p>
+
+<blockquote><pre class="code">options "TCP_COMPAT_43" # Compatible with BSD 4.3 [KEEP THIS!]</pre></blockquote>
+
+<p>This option prevents connections between BSD 4.3 and FreeBSD systems
+from hanging by adjusting FreeBSD to ignore mistakes made by 4.3. In
+addition, setting this parameter prevents some applications from
+malfunctioning. For these reasons, keep this parameter as is.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-5-SECT-1.5.2" /></a><div class="sect3">
+<h3 class="sect3">5.1.5.2. The pseudo-device statement </h3>
+
+<p>The second <a name="INDEX-1053" /></a> <a name="INDEX-1054" /></a>
+<a name="INDEX-1055" /></a> <a name="INDEX-1056" /></a>statement type required by TCP/IP
+in all BSD configurations is a pseudo-device statement. A
+<em class="emphasis">pseudo-device</em> is a device driver not directly
+associated with an actual piece of hardware. The pseudo-device
+statement creates a header (<em class="emphasis">.h</em>) file that is
+identified by the pseudo-device name in the kernel directory. For
+example, the statement shown below creates the file
+<em class="emphasis">loop.h</em>:
+</p>
+
+<blockquote><pre class="code">pseudo-device   loop           # loopback network--mandatory</pre></blockquote>
+
+<p>The loop pseudo-device is necessary to create the loopback device
+(lo0). This device is associated with the loopback address 127.0.0.1;
+it is defined as a pseudo-device because it is not really a piece of
+hardware.
+</p>
+
+<p>Another pseudo-device that is used on many FreeBSD TCP/IP systems is:</p>
+
+<blockquote><pre class="code">pseudo-device   ether          # basic Ethernet support</pre></blockquote>
+
+<p>This statement is necessary to support
+<a name="INDEX-1057" /></a>Ethernet. The ether pseudo-device is
+required for full support of ARP and other Ethernet specific
+functions. While it is possible that a system that does not have
+Ethernet may not require this statement, it is usually configured and
+should remain in your kernel configuration.
+</p>
+
+<p>Other commonly configured pseudo-devices used by TCP/IP are those
+that support SLIP and PPP.
+</p>
+
+<blockquote><pre class="code">pseudo-device   sl        2    # Serial Line IP</pre></blockquote>
+
+<p>This statement defines the interface for the
+<a name="INDEX-1058" /></a>Serial Line IP protocol. The number, 2
+in the example, defines the number of SLIP pseudo-devices created by
+the kernel. The two devices created here would be addressed as
+devices sl0 and sl1.
+</p>
+
+<blockquote><pre class="code">pseudo-device   ppp       2    # Point-to-point protocol</pre></blockquote>
+
+<p>The ppp pseudo-device is the interface for the
+<a name="INDEX-1059" /></a>Point-to-Point Protocol. The number, 2
+in the example, defines the number of PPP pseudo-devices created by
+the kernel. The two devices created here would be addressed as
+devices ppp0 and ppp1. One other pseudo-device is directly related to
+PPP.
+</p>
+
+<blockquote><pre class="code">pseudo-device   tun        1   # Tunnel driver(user process ppp)</pre></blockquote>
+
+<p>The tun pseudo-device is a tunnel driver used by user-level PPP
+software. <em class="emphasis">Tunneling</em> is when a system passes one
+protocol through another protocol; tun is a FreeBSD feature for doing
+this over PPP links. The number, 1 in the example, is the number of
+tunnels that will be supported by this kernel.
+</p>
+
+<p>One pseudo-device is used for troubleshooting and testing. </p>
+
+<blockquote><pre class="code">pseudo-device   bpfilter   4   # Berkeley packet filter</pre></blockquote>
+
+<p>The bpfilter statement adds the support necessary for capturing
+<a name="INDEX-1060" /></a>packets. Capturing packets is an
+essential part of protocol analyzers such as
+<tt class="literal">tcpdump</tt>; see <a href="ch13_01.html">Chapter 13, "
+Troubleshooting TCP/IP"</a>. When
+the bpfilter statement is included in the BSD kernel, the Ethernet
+interface can be placed into <em class="emphasis">promiscuous
+mode</em>.<a href="#FOOTNOTE-47">[47]</a> An interface
+in promiscuous mode passes all packets, not just those addressed to
+the local system, up to the software at the next layer. This feature
+is useful for a system administrator troubleshooting a network. But
+it can also be used by intruders to steal passwords and compromise
+security. Use the bpfilter pseudo-device only if you really need it.
+The number, 4 in the example, indicates the maximum number of
+Ethernet interfaces that can be monitored by bpfilter.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-47" /></a><p>[47]This assumes that the Ethernet
+hardware is capable of functioning in promiscuous mode. Not all
+Ethernet boards support this feature.</p> </blockquote>
+
+</div>
+
+<a name="tcp3-CHP-5-SECT-1.5.3" /></a><div class="sect3">
+<h3 class="sect3">5.1.5.3. The device statement </h3>
+
+<p>Real <a name="INDEX-1061" /></a>
+<a name="INDEX-1062" /></a>
+<a name="INDEX-1063" /></a> <a name="INDEX-1064" /></a>hardware devices are defined
+using the device statement. Every host connected to a TCP/IP network
+requires some physical hardware for that attachment. The hardware is
+declared with a device statement in the kernel configuration file.
+There are many possible network interfaces for TCP/IP, but the most
+common are Ethernet interfaces. The device statements for Ethernet
+interfaces found in the GENERIC kernel are listed below:
+</p>
+
+<blockquote><pre class="code">device de     # DEC/Intel DC21x4x (``Tulip'')
+device fxp    # Intel EtherExpress PRO/100B (82557, 82558)
+device tx     # SMC 9432TX (83c170 ``EPIC'')
+device vx     # 3Com 3c590, 3c595 (``Vortex'')
+device wx     # Intel Gigabit Ethernet Card (``Wiseman'')
+device dc     # DEC/Intel 21143 and various workalikes
+device rl     # RealTek 8129/8139
+device sf     # Adaptec AIC-6915 (``Starfire'')
+device sis    # Silicon Integrated Systems SiS 900/SiS 7016
+device ste    # Sundance ST201 (D-Link DFE-550TX)
+device tl     # Texas Instruments ThunderLAN
+device vr     # VIA Rhine, Rhine II
+device wb     # Winbond W89C840F
+device xl     # 3Com 3c90x (``Boomerang'', ``Cyclone'')
+device ed0 at isa? port 0x280 irq 10 iomem 0xd8000
+device ex
+device ep 
+device wi      # WaveLAN/IEEE 802.11 wireless NIC
+device an      # Aironet 4500/4800 802.11 wireless NICs
+device ie0 at isa? port 0x300 irq 10 iomem 0xd0000
+device fe0 at isa? port 0x300
+device le0 at isa? port 0x300 irq 5 iomem 0xd0000
+device lnc0 at isa? port 0x280 irq 10 drq 0
+device cs0 at isa? port 0x300
+device sn0 at isa? port 0x300 irq 10 </pre></blockquote>
+
+<p>The device statement used to configure an Ethernet interface in the
+FreeBSD kernel comes in two general formats:
+</p>
+
+<blockquote><pre class="code">device ed0 at isa? port 0x280 net irq 10 iomem 0xd8000
+device de0</pre></blockquote>
+
+<p>The format varies depending on whether the device is an ISA device or
+a PCI device. The ed0 device statement defines the bus type (isa),
+the I/O base address (port 0x280), the interrupt number (irq 10) and
+the memory address (iomem 0xd8000). These values should match the
+values configured on the adapter card. All of these are standard
+items for configuring PC ISA hardware. On the other hand, the de0
+device statement requires very little configuration because it
+configures a card attached to the PCI bus. The PCI is an intelligent
+bus that can determine the configuration directly from the hardware.
+</p>
+
+<p>Ethernet is not the only TCP/IP network
+<a name="INDEX-1065" /></a>interface supported by FreeBSD. It
+supports several other interfaces. The serial line interfaces
+<a name="INDEX-1066" /></a> <a name="INDEX-1067" /></a>necessary for SLIP and PPP are
+shown below:
+</p>
+
+<blockquote><pre class="code">device sio0 at isa? port IO_COM1 flags 0x10 irq 4
+device sio1 at isa? port IO_COM2 irq 3
+device sio2 at isa? disable port IO_COM3 irq 5
+device sio3 at isa? disable port IO_COM4 irq 9 </pre></blockquote>
+
+<p>The four serial interfaces, sio0 through sio3, correspond to the
+S-DOS interfaces COM1 to COM4. These are needed for SLIP and PPP.
+<a href="ch06_01.html">Chapter 6, "Configuring the Interface "</a> covers other aspects of configuring PPP.
+</p>
+
+<p>The device statement
+<a name="INDEX-1068" /></a>
+<a name="INDEX-1069" /></a>varies according to the
+interface being configured. But how do you know which hardware
+interfaces are installed in your system? Remember that the
+<em class="emphasis">GENERIC</em> kernel that comes with your FreeBSD
+system is configured for a large number of devices. A simple way to
+tell which hardware interfaces are installed in your system is to
+look at the messages displayed on the console at boot time. These
+messages show all of the devices, including network devices, that the
+kernel found during initialization. Look at the output of the
+<tt class="literal">dmesg</tt> command. It displays a copy of the console
+messages generated during the last boot. Customizing the kernel for
+your network device more often than not means removing unneeded
+devices from the kernel configuration.
+</p>
+
+<p>The options, pseudo-device, and device statements found in the kernel
+configuration file tell the system to include the TCP/IP hardware and
+software in the kernel. The statements in your configuration may vary
+somewhat from those shown in the previous examples. But you have the
+same basic statements in your kernel configuration file. With these
+basic statements, FreeBSD Unix is ready to run TCP/IP.
+</p>
+
+<p>You may never change any of the variables discussed in this section.
+Like everything else in the kernel configuration file, they usually
+come correctly configured to run TCP/IP. You will, however,
+frequently be called upon to control the network services your server
+runs over TCP/IP. We'll now look at how network services are
+started and how you control which ones are started.
+</p>
+
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.7. Summary </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.2. Startup Files </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:54 GMT -->
+</html>

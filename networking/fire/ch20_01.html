@@ -1,0 +1,2819 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:03 GMT -->
+<head><title>Naming and Directory Services (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch19_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch20_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 20. Naming and Directory Services</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch20-13126">Domain Name System (DNS)</a><br />
+<a href="ch20_02.html">Network Information Service (NIS)</a><br />
+<a href="ch20_03.html">NetBIOS for TCP/IP Name Service and Windows Internet Name Service</a><br />
+<a href="ch20_04.html">The Windows Browser</a><br />
+<a href="ch20_05.html">Lightweight Directory Access Protocol (LDAP)</a><br />
+<a href="ch20_06.html">Active Directory</a><br />
+<a href="ch20_07.html">Information Lookup Services</a><br /></p><p></div>
+
+
+
+
+
+
+
+This chapter discusses services used to distribute information about
+machines, people and network addresses. This includes naming
+services, which translate hostnames to IP addresses (and vice versa)
+and more general directory services. The Internet standard for name
+service is the Domain Name System (DNS), but other protocols,
+including the Network Information Service (NIS) and the Windows
+Internet Name Service (WINS), are used to distribute this information
+within individual networks. In addition, this chapter discusses the
+Windows Browser, which is also used by human beings to find machines;
+the Lightweight Directory Access Protocol (LDAP), which is used for a
+wide range of directory information; the <em class="emphasis">finger</em>
+program, which provides information about people; and the
+<em class="emphasis">whois</em> program, which provides information about
+network ownership.</p><p>
+
+
+
+
+
+
+<div class="sect1"><a name="ch20-13126" /></a>
+<h2 class="sect1">20.1. Domain Name System (DNS)</h2>
+
+
+
+
+The Domain Name System (DNS) is an Internet-wide system for the
+resolution of hostnames and IP addresses. You will also see it called
+Domain Name Service. Unfortunately for the sanity of administrators,
+the Domain Name System and Microsoft Windows domains are different
+things. Microsoft Windows machines can and do use DNS (and it is
+required for Windows 2000), but a Windows domain is fundamentally a
+unit of authority that may or may not control the name of a machine.
+(Windows domains are discussed further in <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a> ; they are also relevant to the Browser, which
+is discussed later in this chapter.)</p><p>
+
+
+
+
+
+<a name="INDEX-1828" /></a>DNS is a distributed
+database system that translates hostnames to IP addresses and IP
+addresses to hostnames (for instance it might translate hostname
+<em class="emphasis">miles.somewhere.example</em> to IP address
+192.168.244.34). DNS is also the standard Internet mechanism for
+storing and accessing several other kinds of information about hosts;
+it provides information about a particular host to the world at
+large. For example, if a host cannot receive mail directly, but
+another machine will receive mail for it and pass it on, that
+information is communicated with an MX record in DNS.</p><p>
+
+
+
+
+
+DNS clients include any program that needs to do any of the following:</p><p>
+
+
+
+
+
+<ul><li>Translate a hostname to an IP address</p><p></li><li>Translate an IP address to a hostname<p></p></li><li><p>Obtain other published information about a host (such as its MX
+record)</p><p></li></ul>
+Fundamentally, any program that uses hostnames can be a DNS client.
+This includes essentially every program that has anything to do with
+networking, including both client and server programs for Telnet,
+SMTP, FTP, and almost any other network service. DNS is thus a
+fundamental networking service, upon which other network services
+rely. DNS service is a complicated subject, which we cannot discuss
+fully here. For more information about DNS, consult a DNS reference
+(for instance, <em class="emphasis">DNS and BIND</em> by Paul Albitz and
+Cricket Liu, O'Reilly &amp; Associates, 1998).</p><p>
+
+
+
+
+
+<a name="INDEX-1829" /></a>Other protocols may be used to provide
+this kind of information. For example, NIS and WINS are used to
+provide host information within a network. However, DNS is the
+service used for this purpose across the Internet, and clients that
+need to access Internet hosts will have to use DNS, directly or
+indirectly. On networks that use WINS, NIS, or other methods
+internally, the server for the other protocol usually acts as a DNS
+proxy for the client. Many clients can also be configured to use
+multiple services, so that if a host lookup fails, it will retry
+using another method. Thus, it might start by looking in NIS, which
+will show only local hosts but try DNS if that fails, or it might
+start by looking in DNS and then try a file on its own disk if that
+fails (so that you can put in personal favorite names, for example).
+We'll discuss this later in this chapter. (One debugging tool
+that is very useful in this situation is
+<em class="emphasis">nslookup</em>, which is a pure DNS client. If the
+information you get from <em class="emphasis">nslookup</em> is not the
+same as the information you get when you try to resolve a hostname in
+another program, you know that the other program is not getting its
+information from DNS.)</p><p>
+
+
+
+
+
+<a name="INDEX-1830" /></a> <a name="INDEX-1831" /></a>In Unix, DNS is
+implemented by the Berkeley Internet Name Domain (BIND). On the
+client side is the resolver, a library of routines called by network
+processes. On the server side is a daemon called
+<em class="emphasis">named</em> (also known as
+<em class="emphasis">in.named</em> on some systems). In Microsoft Windows,
+the client-side libraries are less localized because of the complex
+possibilities for mixing native Microsoft protocols for name
+resolution with DNS. The server side is a server called Microsoft DNS
+Server, which is designed to be highly interoperable with BIND. BIND
+and Microsoft DNS Server are never perfectly interoperable -- each
+one has its own special features and interpretations of the standards
+that are changed with each release -- but they have a large
+overlap and are rarely actually incompatible.</p><p>
+
+
+
+
+
+DNS is designed to forward queries and responses between clients and
+servers, so that servers may act on behalf of clients or other
+servers. This capability is very important to your ability to build a
+firewall that handles DNS services securely.</p><p>
+
+
+
+
+
+How does DNS work? Essentially, the most common procedure goes like
+this: When a client needs a particular piece of information (e.g.,
+the IP address of host <em class="emphasis">ftp.somewhere.example</em>),
+it asks its local DNS server for that information. The local DNS
+server first examines its own cache to see if it already knows the
+answer to the client's query. If not, the local DNS server asks
+other DNS servers, in turn, to discover the answer to the
+client's query. When the local DNS server gets the answer (or
+decides that it can't for some reason), it caches any
+information it got<a href="#FOOTNOTE-112">[112]</a> and
+answers the client. For example, to find the IP address for
+<em class="emphasis">ftp.somewhere.example</em>, the local DNS server
+first asks one of the public root name servers which machines are
+name servers for the <em class="emphasis">example</em> domain. It then
+asks one of those <em class="emphasis">example</em> name servers which
+machines are name servers for the
+<em class="emphasis">somewhere.example</em> domain and then it asks one of
+those name servers for the IP address of
+<em class="emphasis">ftp.somewhere.example</em>.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-112" /></a>[112]On some types of failures, some
+servers will cache the fact that the query failed. Others cache only
+information retrieved on a successful query.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+This asking and answering is all transparent to the client. As far as
+the client is concerned, it has communicated only with the local
+server. It doesn't know or care that the local server may have
+contacted several other servers in the process of answering the
+original question.</p><p>
+
+
+
+
+
+The DNS protocol does not require servers to act like this. Servers
+do not have to maintain local caches, and they do not have to pass
+queries to other servers (they can refer the client to another server
+instead). In practice, however, all name servers in widespread use
+provide both caching and recursion (which is the term used in DNS
+circles to refer to the process where the server asks other servers
+if it cannot find the answer).</p><p>
+
+
+
+
+
+<a name="ch20-13203" /></a><div class="sect2">
+<h3 class="sect2">20.1.1. Packet Filtering Characteristics of DNS</h3>
+
+
+
+
+
+<a name="INDEX-1832" /></a><a name="INDEX-1833" /></a>There are two types of DNS network
+activities: lookups and zone transfers. <em class="emphasis">Lookups</em>
+occur when a DNS client (or a DNS server acting on behalf of a
+client) queries a DNS server for information -- for example, the
+IP address for a given hostname, the hostname for a given IP address,
+the name server for a given domain, or the mail exchanger for a given
+host. <em class="emphasis">Zone transfers</em> occur when a DNS server
+(the secondary server) requests from another DNS server (the primary
+server) everything the primary server knows about a given piece of
+the DNS naming tree (the zone). Zone transfers happen only among
+servers that are supposed to be providing the same information; a
+server won't try to do a zone transfer from a random other
+server under normal circumstances. You will sometimes see random zone
+transfer requests because people occasionally do zone transfers in
+order to gather information (which is OK when they're
+calculating what the most popular hostname on the Internet is, but
+bad when they're trying to find out what hosts to attack at
+your site). Some DNS servers allow access control lists to restrict
+which hosts can perform zone transfers. Adding an access control list
+doesn't really gain you very much; it might give you some
+protection against bugs in the implementation of zone transfers or
+may hinder an attacker using a script. However, the information can
+still be obtained by performing lots of individual DNS lookups.</p><p>
+
+
+
+
+
+For performance reasons, DNS lookups are usually executed using UDP.
+If some of the data is lost in transit by UDP (remember that UDP
+doesn't guarantee delivery), the lookup may be redone using
+TCP. There may be other exceptions (nothing actually requires clients
+to try UDP first or to ever try TCP at all). <a href="ch20_01.html#ch20-44660">Figure 20-1</a> shows a DNS name lookup.</p><p>
+
+
+
+
+
+<a name="ch20-44660" /></a><div class="figure"><img height="400" alt="Figure 20-1" src="figs/fire2.2001.gif" width="482" /></div><h4 class="objtitle">Figure 20-1. DNS name lookup</h4>
+
+A DNS server uses well-known port 53 as its server port for TCP and
+UDP. It uses a port above 1023 for TCP requests. Some servers use 53
+as a source port for UDP requests, while others will use a port above
+1023. A DNS client uses a random port above 1023 for both UDP and
+TCP. You can thus differentiate between the following:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>A client-to-server query </i></dt>
+<dd>Source port is above 1023, destination port is 53.</p><p></dd>
+
+
+
+
+
+<dt><i>A server-to-client response</i></dt>
+<dd>Source port is 53, destination port is above 1023.</p><p></dd>
+
+
+
+
+
+<dt><i>A server-to-server query or response</i></dt>
+<dd>At least with UDP on some servers where both source and destination
+port are 53; with TCP, the requesting server will use a port above
+1023. Servers that do not use UDP source port 53 are
+indistinguishable from clients.</p><p></dd>
+
+</dl>
+
+
+
+
+
+DNS zone transfers are performed using TCP. The connection is
+initiated from a random port above 1023 on the secondary server
+(which requests the data) to port 53 on the primary server (which
+sends the data requested by the secondary). In order to figure out
+when to transfer the zone, a secondary server must be able to do a
+regular DNS query of a primary server or to get a notification update
+(called a <em class="emphasis">DNS NOTIFY</em>) from the primary server.
+These notifications behave like normal server-server queries, except
+that they go from the primary to the secondary. <a href="ch20_01.html#ch20-16359">Figure 20-2</a> shows a DNS zone transfer.</p><p>
+
+
+
+
+
+If your primary and secondary servers both support DNS NOTIFY so that
+the primary server can notify the secondary server of changes, you
+only need to allow TCP between them. DNS NOTIFY is required to be
+able to use TCP when UDP is unavailable, although it defaults to UDP.
+If you cannot use DNS NOTIFY, you may have to allow UDP between the
+two servers because the secondary server must be able to query the
+primary server and is not required to use TCP to do so. Most servers
+will fail over to TCP if UDP is unavailable, but the only way to be
+sure is to check what the servers you are running actually do. Note
+that DNS NOTIFY is a relatively recent addition and not all servers
+support it.</p><p>
+
+
+
+
+
+<a name="ch20-2-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+<a href="#FOOTNOTE-113">[113]</a></p><p>
+</td>
+<td>
+Query via UDP, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-113">[113]</a></td>
+<td>
+Response via UDP, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+<a href="#FOOTNOTE-114">[114]</a></p><p>
+</td>
+<td>
+Query via TCP, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response via TCP, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-113">[113]</a></td>
+<td>
+Query via UDP, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-113">[113]</a></td>
+<td>
+Response via UDP, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-114">[114]</a></td>
+<td>
+Query via TCP, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response via TCP, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-113">[113]</a></td>
+<td>
+Query or response between two servers<a href="#FOOTNOTE-115">[115]</a> via UDP</p><p>
+</td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-113">[113]</a></td>
+<td>
+Query or response between two servers<a href="#FOOTNOTE-115">[115]</a> via UDP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-114">[114]</a></td>
+<td>
+Query or zone transfer request from external server to internal
+server via TCP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response (including zone transfer response) from internal server to
+external server via TCP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-114">[114]</a></td>
+<td>
+Query or zone transfer request from internal server to external
+server via TCP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response (including zone transfer response) from external server to
+internal server via TCP</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-113" /></a>[113]UDP has no ACK equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-114" /></a>[114]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-115" /></a>[115]Not all servers use 53 as a source port for UDP; some will use a port above 1023, like other clients.</p><p>
+</blockquote>
+
+<a name="ch20-16359" /></a><div class="figure"><img height="338" alt="Figure 20-2" src="figs/fire2.2002.gif" width="457" /></div><h4 class="objtitle">Figure 20-2. DNS zone transfer</h4>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">20.1.2. Proxying Characteristics of DNS</h3>
+
+
+
+
+
+DNS is structured so that servers normally act as proxies for
+clients. It's also possible to use a DNS feature called
+<em class="emphasis">forwarding</em> so that a DNS server is effectively a
+proxy for another server. The remainder of this DNS discussion
+describes the use of these built-in proxying features of DNS.</p><p>
+
+
+
+
+
+In most implementations, it would be possible to modify the DNS
+libraries to use a modified-client proxy. On machines that do not
+support dynamic linking, using a modified-client proxy for DNS would
+require recompiling every network-aware program. Because users
+don't directly specify server information for DNS,
+modified-procedure proxies seem nearly impossible.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-13596" /></a><div class="sect2">
+<h3 class="sect2">20.1.3. DNS Data</h3>
+
+
+
+
+
+<a name="INDEX-1834" /></a><a name="INDEX-1835" /></a><a name="INDEX-1836" /></a>DNS is a tree-structured database, with
+servers for various subtrees scattered throughout the Internet. A
+number of defined record types are in the tree, including the
+following.<a href="#FOOTNOTE-116">[116]</a></p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-116" /></a>[116]For detailed information about DNS record
+types, what they mean, and how to use them, see the <em class="emphasis">DNS and
+BIND</em> book, referenced earlier in this chapter.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="ch20-4-fm2xml" /></a><table border="1">
+
+
+
+<tr>
+<th>
+Record Type</p><p></th>
+<th>
+Usage</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+Translates hostname to IP address</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+PTR</p><p></td>
+<td>
+Translates IP address to hostname</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+CNAME</p><p></td>
+<td>
+Translates host alias to hostname ("canonical" name)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+HINFO</p><p></td>
+<td>
+Gives hardware/software information about a host</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+NS</p><p></td>
+<td>
+Delegates a zone of the DNS tree to some other server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+SOA</p><p></td>
+<td>
+Denotes start of authority for a zone of the DNS tree</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+X</p><p></td>
+<td>
+Specifies another host to receive mail for this hostname (a mail
+exchanger)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+In fact, there are two separate DNS data trees: one for obtaining
+information by hostname (such as the IP address, CNAME record, HINFO
+record, or MX record that corresponds to a given hostname), and one
+for obtaining information by IP address (the hostname for a given
+address).</p><p>
+
+
+
+
+
+For example, the following is a sample of the DNS data for a fake
+domain <em class="emphasis">somebody.example</em> :</p><p>
+
+
+
+
+
+<blockquote><pre class="code">somebody.example. IN SOA tiger.somebody.example. root.tiger.somebody.example. (
+                        1001        ; serial number 
+                        36000       ; refresh (10 hr) 
+                        3600        ; retry (1 hr) 
+                        3600000     ; expire (1000 hr) 
+                        36000       ; default ttl (10 hr) 
+                        ) 
+               IN  NS       tiger.somebody.example. 
+               IN  NS       lion.somebody.example. 
+tiger          IN  A        192.168.2.34 
+               IN  MX       5 tiger.somebody.example. 
+               IN  MX       10 lion.somebody.example. 
+               IN  HINFO    INTEL-486 BSDI 
+ftp            IN  CNAME    tiger.somebody.example. 
+lion           IN  A        192.168.2.35 
+               IN  MX       5 lion.somebody.example. 
+               IN  MX       10 tiger.somebody.example. 
+               IN  HINFO    SUN-3 SUNOS 
+www            IN  CNAME    lion.somebody.example. 
+wais           IN  CNAME    lion.somebody.example. 
+alaska         IN  NS       bear.alaska.somebody.example. 
+bear.alaska    IN  A        192.168.2.81</pre></blockquote>
+
+
+
+
+
+This domain would also need a corresponding set of PTR records to map
+IP addresses back to hostnames. To translate an IP address to a
+hostname, you reverse the components of the IP address, append
+<em class="emphasis">.IN-ADDR.ARPA</em>, and look up the DNS PTR record
+for that name. For example, to translate IP address 1.2.3.4, you
+would look up the PTR record for
+<em class="emphasis">4.3.2.1.IN-ADDR.ARPA</em>.</p><p>
+
+
+
+
+
+<blockquote><pre class="code">2.168.192.IN-ADDR.ARPA. IN SOA tiger.somebody.example.root.tiger.somebody.example. (
+                                 1001     ; serial number 
+                                 36000    ; refresh (10 hr) 
+                                 3600     ; retry (1 hr) 
+                                 3600000  ; expire (1000 hr) 
+                                 36000    ; default ttl (10 hr) 
+                                  ) 
+                         IN  NS  tiger.somebody.example. 
+                         IN  NS  lion.somebody.example. 
+34                       IN  PTR tiger.somebody.example. 
+35                       IN  PTR lion.somebody.example. 
+81                       IN  PTR bear.alaska.somebody.example.</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-13686" /></a><div class="sect2">
+<h3 class="sect2">20.1.4. DNS Security Problems</h3>
+
+
+
+
+
+<a name="INDEX-1837" /></a>Some security problems
+with DNS are described in the following sections.</p><p>
+
+
+
+
+
+<a name="ch20-13694" /></a><div class="sect3">
+<h3 class="sect3">20.1.4.1. Bogus answers to DNS queries</h3>
+
+
+
+
+
+The first security problem with DNS is that many DNS servers and
+clients can be tricked by an attacker into believing bogus
+information. Many clients and servers don't check to see
+whether all the answers they get relate to questions they actually
+asked, or whether the answers they get are coming from the server
+they asked. A machine that asks for the IP address of
+"malicioushost" and gets back the requested information
+plus a false IP address for "trustedhost", as well, may
+cache the extra answer without really thinking about it and answer
+later queries with this bogus cached data. This lack of checking can
+allow an attacker to give false data to your clients and servers. For
+example, an attacker could use this capability to load your
+server's cache with information that says that the IP address
+of a machine the attacker controls maps to the hostname of a host you
+trust for password-less access via <em class="emphasis">rlogin</em>. (This
+reason is only one of several why you shouldn't allow the BSD
+"r" commands across your firewall; see the full
+discussion of these commands in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>.)</p><p>
+
+
+
+
+
+<a name="ch20-5-fm2xml" /></a><blockquote><b>TIP:</b>
+Later versions of DNS for Unix (BIND 4.9 and later) check for bogus
+answers and are less susceptible to these problems. Earlier versions,
+and DNS clients and servers for other platforms, may still be
+susceptible.</p><p>
+
+
+
+
+</blockquote>
+
+Some Unix DNS implementations will accept and cache answers even when
+they haven't made a query; some Microsoft implementations will
+crash if they receive an unrequested answer. Both of these behaviors
+are undesirable and have been eliminated by recent releases. Windows
+2000 by default will only accept answers to queries but will accept
+those answers from any server. It can be configured to require the
+response to come from a queried server and should be on
+security-critical machines.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-6-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">20.1.4.2. Malicious DNS queries</h3>
+
+
+
+
+
+Not only are some DNS implementations vulnerable to hostile answers,
+some are vulnerable to hostile questions. In particular, some DNS
+servers have problems with buffer overflows and may crash or execute
+hostile code if a query is too long. (See <a href="ch13_01.html">Chapter 13, "Internet Services and Firewalls"</a>, for more information about buffer overflow
+attacks.) If your log files show queries that contain very long
+"hostnames" containing control characters, people are
+probably attempting buffer overflow attacks. Again, vendors have been
+working on eliminating these vulnerabilities, but you should check to
+make certain the appropriate patches have been made in the version
+you are running. There are known problems with versions of BIND 4
+prior to 4.9.7 and BIND 8 prior to 8.1.2 (note that this does not
+guarantee that later versions don't also have problems that
+haven't been found yet).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-13709" /></a><div class="sect3">
+<h3 class="sect3">20.1.4.3. Mismatched data between the hostname and IP address DNS trees</h3>
+
+
+
+
+<a name="INDEX-1838" /></a>
+
+<a name="INDEX-1839" /></a>The attack that
+uses bad cached data to give you an apparently trustworthy hostname
+for an untrusted host points out the problem of mismatched data
+between the hostname and IP address trees in DNS. In a case like the
+one we've described, if you look up the hostname corresponding
+to the attacker's IP address (this is called a
+<em class="emphasis">reverse lookup</em>), you get back the name of a host
+you trust. If you then look up the IP address of this hostname (which
+is called a <em class="emphasis">double-reverse lookup</em>), you should
+see that the IP address doesn't match the one the attacker is
+using, which should alert you that something suspicious is going on.
+Reverse and double-reverse lookups are described in more detail later
+in this DNS discussion.<a name="INDEX-1840" /></a> <a name="INDEX-1841" /></a></p><p>
+
+
+
+
+
+There are perfectly valid reasons for these checks to return
+inconsistent values; no rules require a forward and reverse lookup to
+return consistent information. In fact, when DNS is used for load
+balancing between servers, it is difficult to arrange for this
+consistency. In these situations, DNS is being used to determine the
+location of a service rather than the IP address of an individual
+host.</p><p>
+
+
+
+
+
+Any program that makes authentication or authorization decisions
+based on the hostname information it gets from DNS should be very
+careful to validate the data with this reverse lookup/double-reverse
+lookup method. In some operating systems (for example, SunOS 4.x and
+later), this check is automatically done for you by the
+<em class="emphasis">gethostbyaddr( )</em> library function. In most other
+operating systems, you have to do the check yourself. Make sure that
+you know which approach your own operating system takes and that the
+daemons that are making such decisions in your system do the
+appropriate validation. (And be sure you're preserving this
+functionality if you modify or replace the vendor's
+<em class="emphasis">libc</em>.) Better yet, don't do any
+authentication or authorization based solely on hostname or even on
+IP address; there is no way to be sure that a packet comes from the
+IP address it claims to come from, unless some kind of cryptographic
+authentication is within the packet that only the true source could
+have generated.</p><p>
+
+
+
+
+
+Some implementations of double-reverse lookup fail on hosts with
+multiple addresses, (e.g., dual-homed hosts used for proxying). If
+both addresses are registered at the same name, a DNS lookup by name
+will return both of them, but many programs will read only the first.
+If the connection happened to come from the second address, the
+double-reverse will incorrectly fail even though the host is
+correctly registered. Although you should avoid using double-reverse
+implementations that have this flaw, you may also want to ensure that
+on your externally visible multi-homed hosts, lookup by address
+returns a different name for each address, and that those names have
+only one address returned when it is looked up. For example, for a
+host named "foo" with two interfaces named
+"e0" and "e1", have lookups of
+"foo" return both addresses, lookups of
+"foo-e0" and "foo-e1" return only the address
+of that interface, and lookups by IP address return
+"foo-e0" or "foo-e1" (but not simply
+"foo") as appropriate.</p><p>
+
+
+
+
+
+<a name="ch20-7-fm2xml" /></a><blockquote><b>TIP:</b> 
+For internal multi-homed hosts, you probably don't want to set
+things up in the way we've described; if you do, you may end up
+needing to list them by multiple names anywhere you want to give them
+permissions, such as in <em class="emphasis">/etc/exports</em> files.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-8-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">20.1.4.4. Dynamic update</h3>
+
+
+
+
+
+It's very convenient for clients to be able to update DNS
+servers. For instance, at sites that use DHCP to dynamically assign
+addresses to computers, dynamic updates allow clients to have
+consistent names. When a client gets an address from DHCP, it can
+then register that address with the name server under the
+client's usual name. There is a standard for dynamic updates of
+DNS, but it isn't very widely used because it provides no kind
+of authentication. Some servers do provide authentication methods for
+dynamic updates (for instance, Windows 2000 allows you to integrate
+DNS with Active Directory and use Kerberos to authenticate update
+requests), but there is no widespread and interoperable standard for
+this.</p><p>
+
+
+
+
+
+Without authentication, dynamic update of DNS is extremely risky. You
+can't keep hostile clients from stealing addresses from each
+other or swamping the server in changes. Therefore, dynamic updates
+in DNS can be used only inside networks where there is a very high
+degree of trust.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-13744" /></a><div class="sect3">
+<h3 class="sect3">20.1.4.5. Revealing too much information to attackers</h3>
+
+
+
+
+
+<a name="INDEX-1842" /></a><a name="INDEX-1843" /></a>Another problem you may encounter
+when supporting DNS with a firewall is that it may reveal information
+that you don't want revealed. Some organizations view internal
+hostnames (as well as other information about internal hosts) as
+confidential information. They want to protect these hostnames much
+as they do their internal telephone directories. They're
+nervous because internal hostnames may reveal project names or other
+product intelligence, or because these names may reveal the type of
+the hosts (which may make an attack easier). For example, it's
+easy to guess what kind of system something is if its name is
+"lab-sun" or "cisco-gw".</p><p>
+
+
+
+
+
+Even the simplest hostname information can be helpful to an attacker
+who wants to bluff his or her way into your site, physically or
+electronically. Using information in this way is an example of what
+is commonly called a <em class="emphasis">social engineering</em> attack.
+The attacker first examines the DNS data to determine the name of a
+key host or hosts at your site. Such hosts will often be listed as
+DNS servers for the domain or as MX gateways for lots of other hosts.
+Next, the attacker calls or visits your site, posing as a service
+technician, and claims to need to work on these hosts. The attacker
+will then ask for the passwords for the hosts (on the telephone) or
+ask to be shown to the machine room (in person). Because the attacker
+seems legitimate and seems to have inside information about the site
+ --  after all, the machine names are right  --  people will
+often grant access. Social engineering attacks like this takes a lot
+of brazenness on the part of the attacker, particularly if
+they're carried out in person, but you'd be amazed at how
+often such attacks succeed.</p><p>
+
+
+
+
+
+Besides internal hostnames, other information is often placed within
+the DNS -- information that is useful locally but you'd
+really rather an attacker not have access to. DNS HINFO and TXT
+resource records are particularly revealing:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>HINFO (host information records)</i></dt>
+<dd><a name="INDEX-1844" /></a>These name the
+hardware and operating system release that a machine is running:
+it's very useful information for system and network
+administrators but also tells an attacker exactly which list of bugs
+to try on that machine.</p><p></dd>
+
+
+
+
+
+<dt><i>TXT (textual information records)</i></dt>
+<dd><a name="INDEX-1845" /></a>These are
+essentially short unformatted text records used by a variety of
+different services to provide various information. For example, some
+versions of Kerberos and related tools use these records to store
+information that, at another site, might be handled by NIS.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Attackers will often obtain DNS information about your site wholesale
+by contacting your DNS server and asking for a zone transfer, as if
+they were a secondary server for your site. You can prevent this
+either with packet filtering (by blocking TCP-based DNS queries,
+which will block more than just zone transfers) or by configuring
+your DNS server to control which hosts it is willing to do zone
+transfers to (although it will use the IP address to validate hosts
+and will be vulnerable to IP spoofing). The various versions of BIND
+control this in different ways (consult your BIND documentation for
+more information), while the Microsoft DNS server allows you to
+specify that only hosts that receive notifications may do zone
+transfers.</p><p>
+
+
+
+
+
+The question to keep in mind when considering what DNS data to reveal
+is, "Why give attackers any more information than
+necessary?" The following sections provide some suggestions to
+help you reveal only the data you want people to have.<a name="INDEX-1846" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-13792" /></a><div class="sect2">
+<h3 class="sect2">20.1.5. Setting Up DNS to Hide Information, Without Subdomains</h3>
+
+
+
+
+
+<a name="INDEX-1847" /></a>We've mentioned that DNS has a
+query-forwarding capability. By taking advantage of this capability,
+you can give internal hosts an unrestricted view of both internal and
+external DNS data, while restricting external hosts to a very limited
+("sanitized") view of internal DNS data. You might want
+to do this for such reasons as the following:</p><p>
+
+
+
+
+
+<ul><li>Your internal DNS data is too sensitive to show to everybody.</p><p></li><li>You know that your internal DNS servers don't all work
+perfectly, and you want a better-maintained view for the outside
+world.</p><p></li><li>You want to give certain information to external hosts and different
+information to internal hosts (for example, you want internal hosts
+to send mail directly to internal machines but external hosts to see
+an MX record directing the mail to a bastion host).</p><p></li></ul>
+<a href="ch20_01.html#ch20-10704">Figure 20-3</a> shows one way to set up DNS to hide
+information; the following sections describe all the details. This
+mechanism will work only for sites that use a single domain (all
+hosts are named something like <em class="emphasis">host.foo.example</em>, rather than <em class="emphasis">host.sillywalks.foo.example</em> and <em class="emphasis">host.engineering.foo.example</em>). If you have subdomains, you will need a more complicated configuration, which we discuss in the next section.</p><p>
+
+
+
+
+
+<a name="ch20-10704" /></a><div class="figure"><img height="281" alt="Figure 20-3" src="figs/fire2.2003.gif" width="464" /></div><h4 class="objtitle">Figure 20-3. A firewall can be used to hide DNS information</h4>
+
+<a name="ch20-13827" /></a><div class="sect3">
+<h3 class="sect3">20.1.5.1. Set up a "fake" DNS server on the bastion host for the outside world to use</h3>
+
+
+
+
+
+<a name="INDEX-1848" /></a><a name="INDEX-1849" /></a><a name="INDEX-1850" /></a>The first step in hiding DNS
+information from the external world is to set up a fake DNS server on
+a bastion host. This server claims to be authoritative for your
+domain. Make it the server for your domain that is named by the NS
+records maintained by your parent domain. If you have multiple such
+servers for the outside world to talk to (which you should  -- 
+some or all of the rest may belong to your service provider), make
+your fake server the primary server of the set of authoritative
+servers; make the others secondaries of this primary server.</p><p>
+
+
+
+
+
+As far as this fake server on the bastion host is aware, it knows
+everything about your domain. In fact, though, all it knows about is
+whatever information you want revealed to the outside world. This
+information typically includes only basic hostname and IP address
+information about the following hosts:</p><p>
+
+
+
+
+
+<ul><li>The machines on your perimeter network (i.e., the machines that make
+up your firewall).</p><p></li><li>Any machines that somebody in the outside world needs to be able to
+contact directly. One example of such a machine is an internal Usenet
+news (NNTP) server that is reachable from your service provider. (See
+the section on NNTP in <a href="ch16_01.html">Chapter 16, "Electronic Mail and News"</a>, for an example of
+why you might want to allow this.) Another example is any host
+reachable over the Internet from trusted affiliates. External
+machines need an externally visible name for such an internal
+machine; it need not be the internal machine's real name,
+however, if you feel that the real name is somehow sensitive
+information, or you just want to be able to change it on a whim.</p><p></li></ul>
+<a name="INDEX-1851" /></a>In addition,
+you'll need to publish MX records for any host or domain names
+that are used as part of addresses in electronic mail messages and
+Usenet news postings, so that people can reply to these messages.
+Keep in mind that people may reply to messages days, weeks, months,
+or even years after they were sent. If a given host or domain name
+has been widely used as part of an electronic mail address, you may
+need to preserve an MX record for that host or domain forever, or at
+least until well after it's dead and gone, so that people can
+still reply to old messages. If it has appeared in print,
+"forever" may be all too accurate; sites still receive
+electronic mail for machines decommissioned five and ten years ago.</p><p>
+
+
+
+
+
+You can create a wildcard MX record that redirects mail for any
+hostname that there is no other record for. It looks like a normal MX
+record for a host named "*". However, you should be aware
+that wildcard MX records do not apply to names that have other
+records of their own. Any host that has an A record will require an
+individual MX record, even if there is a wildcard MX record; the same
+holds true for names of subdomains that have NS records.</p><p>
+
+
+
+
+
+You will also need to publish fake information for any machines that
+can contact the outside world directly. Many servers on the Internet
+(for example, most major anonymous FTP servers) insist on knowing the
+hostname (not just the IP address) of any machines that contact them,
+even if they do nothing with the hostname but log it. In the DNS
+resource records, A (name-to-address mapping) records and PTR
+(address-to-name mapping) records handle lookups for names and
+addresses.</p><p>
+
+
+
+
+
+<a name="INDEX-1852" /></a>As
+we've mentioned earlier, machines that have IP addresses and
+need hostnames do reverse lookups. With a reverse lookup, the server
+starts with the remote IP address of the incoming connection and
+looks up the hostname that the connection is coming from. It takes
+the IP address (for example, 172.16.19.67), permutes it in a
+particular way (reverses the parts and adds
+<em class="emphasis">.IN-ADDR.ARPA</em> to get
+<em class="emphasis">67.19.16.172.IN-ADDR.ARPA</em>), and looks up a PTR
+record for that name. The PTR record should return the hostname for
+the host with that address (e.g.,
+<em class="emphasis">mycroft.somewhere.example</em>), which the server
+then uses for its logs or whatever.</p><p>
+
+
+
+
+
+How can you deal with these reverse lookups? If all these servers
+wanted was a name to log, you could simply create a wildcard PTR
+record. That record would indicate that a whole range of addresses
+belongs to an unknown host in a particular domain. For example, you
+might have a lookup for <em class="emphasis">*.19.16.172.IN-ADDR.ARPA</em>
+return <em class="emphasis">unknown.somewhere.example</em>. Returning this
+information would be fairly helpful; it would at least tell the
+server administrator whose machine it was
+(<em class="emphasis">somewhere.example</em> 's). Anyone who had a
+problem with the machine could pursue it through the published
+contacts for the <em class="emphasis">somewhere.example</em> domain.</p><p>
+
+
+
+
+
+<a name="INDEX-1853" /></a>There
+is a problem with doing only this, however. In an effort to validate
+the data returned by the DNS, more and more servers (particularly
+anonymous FTP servers) are now doing a double-reverse lookup and
+won't talk to you unless the double-reverse lookup succeeds. It
+is the same kind of lookup we mentioned previously; it's
+certainly necessary for people who provide a service where they use
+IP addresses to authenticate requests. Whether or not anonymous FTP
+is such a service is another question. Some people believe that once
+you put a file up for anonymous FTP, you no longer have reason to try
+to authenticate hosts; after all, you're trying to give
+information away. People running anonymous FTP servers that do
+double-reverse lookup argue that people who want services have a
+responsibility to be members of the network community and that
+requires being identifiable. Whichever side of the argument
+you're on, it is certainly true that the maintainers of several
+of the largest and best-known anonymous FTP servers are on the side
+that favors double-reverse lookup and will not provide service to you
+unless double-reverse lookup succeeds.</p><p>
+
+
+
+
+
+In a double-reverse lookup, a DNS client:</p><p>
+
+
+
+
+
+<ul><li>Performs a reverse lookup to translate an IP address to a hostname</p><p></li><li>Does a regular lookup on that hostname to determine its nominal IP
+address</p><p></li><li>Compares this nominal IP address to the original IP address<p></p></li></ul>
+The regular lookup can return different information from the original
+IP address in several situations. As we've discussed, they may
+return different information for legitimate reasons (the host is
+multi-homed or is using a wildcard PTR record) or because an attacker
+has provided illegitimate cached data. They may also be different if
+the attacker legitimately controls the name server with the PTR data
+in it but is returning other people's hostnames in the hope
+that services will use the results without checking them.</p><p>
+
+
+
+
+
+In order to make double-reverse lookups work, your fake server needs
+to provide consistent fake data for all hosts in your domain whose IP
+addresses are going to be seen by the outside world. For every IP
+address you own, the fake server must publish a PTR record with a
+fake hostname, as well as a corresponding A record that maps the fake
+hostname back to the IP address. For example, for the address
+172.16.1.2, you might publish a PTR record with the name
+<em class="emphasis">host-172-16-1-2.somewhere.example</em> and a
+corresponding A record that maps
+<em class="emphasis">host-172-16-1-2.somewhere.example</em> back to the
+corresponding IP address (172.16.1.2). When you connect to some
+remote system that attempts to do a reverse lookup of your IP address
+(e.g., 172.16.1.2) to determine your hostname, that system will get
+back the fake hostname (e.g., <em class="emphasis">host-172-16-1-2</em>).
+If the system then attempts to do a double-reverse lookup to
+translate that hostname to an IP address, it will get back
+172.16.1.2, which matches the original IP address and satisfies the
+consistency check.</p><p>
+
+
+
+
+
+If you are strictly using proxying to connect internal hosts to the
+external world, you don't need to set up the fake information
+for your internal hosts; you simply need to put up information for
+the host or hosts running the proxy server. The external world will
+see only the proxy server's address. For a large network, this
+by itself may make using proxy service for FTP worthwhile.<a name="INDEX-1854" /></a><a name="INDEX-1855" /></a><a name="INDEX-1856" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-13919" /></a><div class="sect3">
+<h3 class="sect3">20.1.5.2. Set up a real DNS server on an internal system for internal hosts to use</h3>
+
+
+
+
+
+<a name="INDEX-1857" /></a><a name="INDEX-1858" /></a>Your internal machines need to use the
+real DNS information about your hosts, not the fake information
+presented to the outside world. You do this through a standard DNS
+server setup on some internal system. Your internal machines may also
+want to find out about external machines, though (e.g., to translate
+the hostname of a remote anonymous FTP site to an IP address).</p><p>
+
+
+
+
+
+One way to accomplish this is to provide access to external DNS
+information by configuring your internal DNS server to query remote
+DNS servers directly, as appropriate, to resolve queries from
+internal clients about external hosts. Such a configuration, however,
+would require opening your packet filtering to allow your internal
+DNS server to talk to these remote DNS servers (which might be on any
+host on the Internet). This is a problem because DNS is UDP-based,
+and as we discuss in <a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>, you need to block
+UDP altogether in order to block outside access to vulnerable
+RPC-based services like NFS and NIS.</p><p>
+
+
+
+
+
+<a name="INDEX-1859" /></a>
+<a name="INDEX-1860" /></a>Fortunately, the most common DNS server
+(the Unix <em class="emphasis">named</em> program) provides a solution to
+this dilemma: the <em class="emphasis">forwarders</em> directive in the
+<em class="emphasis">/etc/named.boot</em> server configuration file. The
+<em class="emphasis">forwarders</em> directive tells the server that, if
+it doesn't know the information itself already (either from its
+own zone information or from its cache), it should forward the query
+to a specific server and let this other server figure out the answer,
+rather than try to contact servers all over the Internet in an
+attempt to determine the answer itself. In the
+<em class="emphasis">/etc/named.boot</em> configuration file, you set up
+the <em class="emphasis">forwarders</em> line to point to the fake server
+on the bastion host; the file also needs to contain a
+"slave" line to tell it to use only the servers on the
+<em class="emphasis">forwarders</em> line, even if the
+<em class="emphasis">forwarders</em> are slow in answering.</p><p>
+
+
+
+
+
+The use of the <em class="emphasis">forwarders</em> mechanism
+doesn't really have anything to do with hiding the information
+in the internal DNS server; it has everything to do with making the
+packet filtering as strict as possible (i.e., applying the principle
+of least privilege), by making it so that the internal DNS server can
+talk only to the bastion host DNS server, not to DNS servers
+throughout the whole Internet.</p><p>
+
+
+
+
+
+If internal hosts can't contact external hosts, you may not
+want to bother setting things up so that they can resolve external
+hostnames. SOCKS proxy clients can be set up to use the external name
+server directly. This simplifies your name service configuration
+somewhat, but it complicates your proxying configuration, and some
+users may want to resolve hostnames even though they can't
+reach them (for example, they may be interested in knowing whether
+the hostname in an electronic mail address is valid).</p><p>
+
+
+
+
+
+<a href="ch20_01.html#ch20-85718">Figure 20-4</a> shows how DNS works with forwarding;
+<a href="ch20_01.html#ch20-68050">Figure 20-5</a> shows how it works without forwarding.</p><p>
+
+
+<a name="ch20-85718" /></a><div class="figure"><img height="377" alt="Figure 20-4" src="figs/fire2.2004.gif" width="481" /></div><h4 class="objtitle">Figure 20-4. DNS with forwarding</h4>
+
+<a name="ch20-68050" /></a><div class="figure"><img height="357" alt="Figure 20-5" src="figs/fire2.2005.gif" width="480" /></div><h4 class="objtitle">Figure 20-5. DNS without forwarding</h4>
+
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-13979" /></a><div class="sect3">
+<h3 class="sect3">20.1.5.3. Internal DNS clients query the internal server</h3>
+
+<a name="INDEX-1861" /></a> <a name="INDEX-1862" /></a>
+<a name="INDEX-1863" /></a>The next
+step is to configure your internal DNS clients to ask all their
+queries of the internal server. On Unix systems, you do this through
+the <em class="emphasis">resolv.conf</em> file.<a href="#FOOTNOTE-117">[117]</a> There are two
+cases:</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-117" /></a>[117]These
+days, clients may also keep DNS configuration information
+elsewhere -- for instance, under IRIX 6.5 and above, DNS
+configuration parameters can also be put in the <em class="filename">nsswitch
+</em>file that will override the equivalent parameters in
+<em class="filename">resolv.conf</em>.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<ul><li>When the internal server receives a query about an internal system,
+or about an external system that is in its cache, it answers directly
+and immediately because it already knows the answers to such queries.</p><p></li><li>When the internal server receives a query about an external system
+that isn't in its cache, the internal server forwards this
+query to the bastion host server (because of the
+<em class="emphasis">forwarders</em> line described previously). The
+bastion host server obtains the answer from the appropriate DNS
+servers on the Internet and relays the answer back to the internal
+server. The internal server then answers the original client and
+caches the answer.</p><p></li></ul>
+In either case, as far as the client is concerned, it asked a
+question of the internal server and got an answer from the internal
+server. The client doesn't know whether the internal server
+already knew the answer or had to obtain the answer from other
+servers (indirectly, via the bastion server). Therefore, the
+<em class="emphasis">resolv.conf</em> file will look perfectly standard on
+internal clients.</p><p>
+
+
+
+
+
+In this arrangement special care is needed when configuring internal
+SMTP servers. Because such services have access to address
+information, they may try to deliver mail directly rather than
+through your mail gateway.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-13995" /></a><div class="sect3">
+<h3 class="sect3">20.1.5.4. Bastion DNS clients also query the internal server</h3>
+
+
+
+
+
+<a name="INDEX-1864" /></a>The
+key to this whole information-hiding configuration is that DNS
+clients on the bastion host must query the internal server for
+information, not the server on the bastion host. This way, DNS
+clients on the bastion host (such as Sendmail, for example) can use
+the real hostnames and so on for internal hosts, but clients in the
+outside world can't access the internal data.</p><p>
+
+
+
+
+
+DNS server and client configurations are completely separate. Many
+people assume that they must have configuration files in common, that
+the clients will automatically know about the local server, and that
+pointing them elsewhere will also point the server elsewhere. In
+fact, there is no overlap. Clients never read
+<em class="emphasis">/etc/named.boot</em>, which tells the server what to
+do, and the server never reads <em class="emphasis">/etc/resolv.conf</em>,
+which tells the clients what to do.</p><p>
+
+
+
+
+
+Again, there are two cases:</p><p>
+
+
+
+
+
+<ul><li>When a DNS client on the bastion host asks about an internal system,
+it gets the real answer directly from the internal server.</p><p></li><li>When a DNS client on the bastion host asks about an external system,
+the internal DNS server forwards the query to the bastion DNS server.
+The bastion server obtains the answer from the appropriate DNS
+servers on the Internet and then relays the answer back to the
+internal server. The internal server, in turn, answers the original
+client on the bastion host.</p><p></li></ul>
+DNS clients on the bastion host could obtain information about
+external hosts more directly by asking the DNS server on the bastion
+host instead of the one on the internal host. However, if they did
+that, they'd be unable to get the "real" internal
+information, which only the server on the internal host has.
+They're going to need that information because they're
+talking to the internal hosts as well as the external hosts.</p><p>
+
+
+
+
+
+Since it is possible to configure a DNS client with multiple server
+names, it is tempting to configure DNS clients on the bastion host to
+query both the internal and the external server, in the hope that
+they will try one and then try the other if the first one returns
+"host unknown". In fact, this will not work; a DNS client
+will try a second server only if the first one does not respond. It
+will accept "host unknown" as a valid answer.<a name="INDEX-1865" /></a> <a name="INDEX-1866" /></a> <a name="INDEX-1867" /></a> <a name="INDEX-1868" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-14019" /></a><div class="sect3">
+<h3 class="sect3">20.1.5.5. What your packet filtering system needs to allow</h3>
+
+
+
+
+
+In order for this DNS forwarding scheme to work, any packet filtering
+system between the bastion host and the internal systems has to allow
+all of the following (see the table for details):</p><p>
+
+
+
+
+
+<ul><li>DNS queries from the internal server to the bastion host server: UDP
+packets from port 53 or ports above 1023 on the internal server to
+port 53 on the bastion host (rule A), and TCP packets from ports
+above 1023 on the internal server to port 53 on the bastion host
+(rule B)</p><p></li><li>Responses to those queries from the bastion host to the internal
+server: UDP packets from port 53 on the bastion host to port 53 or
+ports above 1023 on the internal server (rule C), and TCP packets
+with the ACK bit set from port 53 on the bastion host to ports above
+1023 on the internal server (rule D)</p><p></li><li>DNS queries from the bastion host DNS clients to the internal server:
+UDP and TCP packets from ports above 1023 on the bastion host to port
+53 on the internal server (rules E and F)</p><p></li><li>Responses from the internal server to those bastion host DNS clients:
+UDP packets, as well as TCP packets with the ACK bit set, from port
+53 on the internal server to ports above 1023 on the bastion host
+(Rules G and H)</p><p></li></ul>
+<a name="ch20-9-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Addr.</p><p></th>
+<th>
+Dest. Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+<a href="#FOOTNOTE-118">[118]</a></p><p>
+</td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-118">[118]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+D</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+E</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-118">[118]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+F</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+G</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-118">[118]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+H</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-118" /></a>[118]UDP has no ACK equivalent.</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-10-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">20.1.6. Setting Up DNS to Hide Information, with Subdomains</h3>
+
+
+
+
+
+<a name="INDEX-1869" /></a>If your site has subdomains, you
+cannot simply set up a server for each subdomain and have it forward
+queries to a bastion host that has only external information. If you
+do this, a host in one subdomain will not be able to get information
+on hosts in other subdomains. When <em class="emphasis">host.sillywalks.foo.example</em> queries for
+<em class="emphasis">host.engineering.foo.example</em>, the
+name server for <em class="emphasis">sillywalks.foo.example</em> will notice that it does not have the information and
+will forward the query to the bastion host, which does not contain
+internal information and will not be able to respond to the query.</p><p>
+
+
+
+
+
+There are a number of solutions to this problem, which are discussed
+in detail in <em class="emphasis">DNS and BIND</em>, by Paul Albitz and
+Cricket Liu, referenced earlier in this chapter. None of them are
+perfect. One option is to set up every server so that it knows about
+every subdomain; this removes many of the advantages of having the
+subdomains in the first place. Another is to set up the bastion host
+so that it has correct internal information but refuses to give it
+out to external queriers (you use the
+<em class="emphasis">secure_zones</em> directive for this). This removes
+much of the security of having a separate bastion host name server.</p><p>
+
+
+
+
+
+You can also avoid the problem by avoiding query forwarding. If there
+is no forwarding, normal resolution will take place, and all of the
+subdomains will work. On the other hand, internal machines will not
+be able to resolve external hostnames to IP addresses and will need
+to have carefully configured proxying solutions to reach external
+hosts.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-14248" /></a><div class="sect2">
+<h3 class="sect2">20.1.7. Setting Up DNS Without Hiding Information</h3>
+
+
+
+
+
+<a name="INDEX-1870" /></a>The approach we've described
+in the previous section is not the only option. Suppose that you
+don't feel it's necessary to hide your internal DNS data
+from the world. In this case, your DNS configuration is similar to
+the one we've described previously, but it's somewhat
+simpler. <a href="ch20_01.html#ch20-48650">Figure 20-6</a> shows how DNS works without
+information hiding.</p><p>
+
+
+
+
+
+<a name="ch20-48650" /></a><div class="figure"><img height="281" alt="Figure 20-6" src="figs/fire2.2006.gif" width="464" /></div><h4 class="objtitle">Figure 20-6. DNS without information hiding</h4>
+
+With this alternate approach, you should still have a bastion host
+DNS server and an internal DNS server; however, one of these can be a
+secondary server of the other. Generally, it's easier to make
+the bastion DNS server a secondary of the internal DNS server and to
+maintain your DNS data on the internal server. You should still
+configure the internal DNS server to forward queries to the bastion
+host DNS server, but the bastion host DNS clients can be configured
+to query the bastion host server instead of the internal server.</p><p>
+
+
+
+
+
+You need to configure any packet filtering system between the bastion
+host and the internal server to allow the following (see the table
+for details):</p><p>
+
+
+
+
+
+<ul><li>DNS queries from the internal DNS server to the bastion DNS server:
+UDP packets from port 53 or ports above 1023 on the internal server
+to port 53 on the bastion host (rule A), and TCP packets from ports
+above 1023 on the internal server to port 53 on the bastion host
+(rule B)</p><p></li><li>Responses from the bastion DNS server to the internal DNS server: UDP
+packets from port 53 on the bastion host to port 53 or ports above
+1023 on the internal server (rule C), and TCP packets with the ACK
+bit set from port 53 on the bastion host to ports above 1023 on the
+internal server (rule D)</p><p></li></ul>
+If the bastion host is also a DNS secondary server and the internal
+host is the corresponding DNS primary server, you also have to allow
+the following:</p><p>
+
+
+
+
+
+<ul><li>DNS queries from the bastion host DNS server to the internal DNS
+server: UDP packets from port 53 or ports above 1023 on the bastion
+host to port 53 on the internal server (rule E), and TCP packets from
+ports above 1023 on the bastion host to port 53 on the internal
+server (rule F)</p><p></li><li>Responses from the internal DNS server back to the bastion DNS
+server: UDP packets from port 53 or ports above 1023 on the internal
+server to port 53 or ports above 1023 on the bastion host (rule G),
+and TCP packets with the ACK bit set from port 53 on the internal
+server to ports above 1023 on the bastion host (rule H)</p><p></li><li>DNS zone transfer requests from the bastion host to the internal
+server: TCP packets from ports above 1023 on the bastion host to port
+53 on the internal server (note that this is the same as rule F)</p><p></li><li>DNS zone transfer responses from the internal server to the bastion
+host: TCP packets with the ACK bit set from port 53 on the internal
+server to ports above 1023 on the bastion host (note that this is the
+same as rule H)<a name="INDEX-1871" /></a></p><p></li></ul>
+<a name="ch20-11-fm2xml" /></a><table border="1">
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Addr.</p><p></th>
+<th>
+Dest. Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+<a href="#FOOTNOTE-119">[119]</a></p><p>
+</td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-119">[119]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+D</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+E</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+<a href="#FOOTNOTE-119">[119]</a></p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+F</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+G</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+53, &gt;1023</p><p></td>
+<td>
+<a href="#FOOTNOTE-119">[119]</a></p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+H</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal server</p><p></td>
+<td>
+Bastion host</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-119" /></a>[119]UDP has no ACK equivalent.</p><p>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-14469" /></a><div class="sect2">
+<h3 class="sect2">20.1.8. Windows 2000 and DNS</h3>
+
+
+
+
+
+<a name="INDEX-1872" /></a> <a name="INDEX-1873" /></a>Windows 2000 uses DNS extensively; it is
+the primary method for name resolution, replacing Windows native
+modes of name resolution, which are supported only for older clients.
+Windows 2000 requires some DNS extensions that currently are in the
+standards process but are not yet accepted or widely used.</p><p>
+
+
+
+
+
+In particular, Windows 2000 consistently uses names that contain
+underscores. Traditionally, DNS names have been allowed to contain
+only letters, numbers, or hyphens (-). The underscore ( _ ) has been
+forbidden by the standard. In practice, most name servers did not
+enforce these name restrictions. Although the underscore has been
+theoretically forbidden for many years, name servers that do not
+allow underscores became popular fairly late in the development of
+Windows 2000. At about the same time, a push to loosen the
+restrictions on allowable names began. This situation has not been
+resolved as of this writing; a standard under discussion would allow
+almost any character in a DNS name, but it has not yet been accepted.
+In the meantime, some servers enforce strict name rules and reject
+names with underscores; some servers follow tradition and accept
+almost any ASCII character; and some servers accept even more
+characters, including those outside the ASCII range (for instance,
+accented letters). Windows 2000 minimally requires a DNS server that
+will allow underscores. Windows 2000 allows machine names that use
+other characters outside the normally permitted types, and those
+names may create mysterious failures unless you use a DNS server that
+accepts them.</p><p>
+
+
+
+
+
+Windows 2000 also uses a record type, the SRV record, which has not
+yet been standardized. A number of DNS servers support SRV, including
+versions of BIND starting with 4.9.6 (and all versions of BIND 8).</p><p>
+
+
+
+
+
+Windows 2000 relies on the ability to do dynamic updates of DNS
+information. When machines boot, they need to be able to register
+names in the DNS server. Dynamic updates are supported by BIND 8 but
+not with the authentication mechanisms used by Windows 2000. Using
+BIND 8 to support Windows 2000 therefore requires using unsecured
+dynamic updates.</p><p>
+
+
+
+
+
+Windows 2000 DNS can use Active Directory as a storage and
+replication method. In this configuration, the DNS information is
+stored in Active Directory, and DNS is simply used as a method of
+accessing it. A DNS server that is integrated with Active Directory
+must be a primary server; it can send updates to other DNS servers
+via normal zone transfers but cannot accept them because it is not
+controlling the data. However, when Windows 2000 DNS is integrated
+with Active Directory, it supports secure dynamic update using
+Kerberos for authentication.<a name="INDEX-1874" /></a> <a name="INDEX-1875" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-12-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">20.1.9. Network Address Translation Characteristics of DNS</h3>
+
+
+
+
+
+There is no particular difficulty using network address translation
+with a DNS client that is having its address translated; the
+client's address is not embedded in the DNS transaction.
+Putting a DNS server behind an address translator is a different
+proposition. If the data in the server is about machines that are
+also behind the address translator, the address translator will need
+to operate on the data inside the DNS packets, not just on the source
+and destination addresses. Otherwise, the server will be handing out
+useless information. Some network address translation systems are
+capable of doing this, although some of them will translate only
+responses to queries, not zone transfers.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-13-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">20.1.10. Summary of Recommendations for DNS</h3>
+
+
+
+
+
+<ul><li>Set up an external DNS server on a bastion host for the outside world
+to access.</p><p></li><li>Do not make HINFO records visible to the outside world; either
+don't use them, or configure DNS for information hiding as
+described earlier.</p><p></li><li>Use an up-to-date BIND implementation and double-reverse lookups to
+avoid spoofing.</p><p></li><li>Consider hiding all internal DNS data and using forwarding and fake
+records; this doesn't make sense for all sites, but it might
+for yours.</p><p></li><li>Disable zone transfers to anyone but your secondaries, using packet
+filtering or the mechanism supported by your DNS server. Even if
+you've chosen not to hide your DNS information, there's
+probably no valid reason for anyone but your secondaries to do a zone
+transfer, and disallowing zone transfers makes life a bit harder for
+attackers.<a name="INDEX-1876" /></a></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch19_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch20_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">19.6. Multicast and the Multicast Backbone </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">20.2. Network Information Service </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:07 GMT -->
+</html>

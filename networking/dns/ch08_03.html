@@ -1,0 +1,179 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Registering Name Servers (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.3. Registering Name Servers</h2>
+
+
+<a name="INDEX-1360" />
+<a name="INDEX-1361" />When you get around to setting up more
+and more name servers, a question may strike you -- do I need to
+register <em class="emphasis">all</em> of my primary master and slave name
+servers with my parent zone? No, only those servers you want to make
+available to name servers outside your zone need to be registered
+with your parent. For example, if you run nine name servers for your
+zone, you may choose to tell the parent zone about only four of them.
+Within your network, you use all nine servers. Five of those nine
+servers, however, are queried only by resolvers on hosts that are
+configured to query them (in <em class="filename">resolv.conf</em>, for
+example). Their parent zone's name servers don't delegate
+to them, so they'll never be queried by remote name servers.
+Only the four servers registered with your parent zone are queried by
+other name servers, including caching-only and partial-slave name
+servers on your network. This setup is shown in <a href="ch08_03.html#dns4-CHP-8-FIG-2">Figure 8-2</a>.</p><p>
+
+
+<a name="dns4-CHP-8-FIG-2" /><div class="figure"><img height="334" alt="Figure 8-2" src="figs/dns4_0802.gif" width="436" /></div><h4 class="objtitle">Figure 8-2. Registering only some of your name servers</h4>
+
+Besides being able to pick and choose which of your name servers are
+hammered by outside queries, there's a technical motivation for
+registering only some of your zone's name servers:
+there's a limit to how many servers will fit in a
+<a name="INDEX-1362" />UDP
+response message. In practice, around 10 name server records should
+fit. Depending on the data (how many servers are in the same domain),
+you could get more or fewer.<a href="#FOOTNOTE-63">[63]</a>
+There's not much point in registering more than 10 name
+servers, anyway -- if none of the 10 servers can be reached,
+it's unlikely the destination host can be reached.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-63" />[63]The<sup class="superscript">
+</sup>domain names of the Internet's root name servers
+were changed because of this. All of the roots were moved into the
+same domain, <em class="filename">root-servers.net</em>, to take the most
+advantage of domain name compression and store information about as
+many roots as possible in a single UDP packet.</p><p>
+
+</blockquote>
+
+
+<a name="INDEX-1363" /> <a name="INDEX-1364" />If you set up a new
+authoritative name server and decide it should be registered, make a
+list of the parents of the zones it's authoritative for.
+You'll need to contact the administrators for each of these
+parent zones. For example, let's say we want to register the
+name server we just set up on <em class="emphasis">zardoz.movie.edu</em>. In order to get this
+slave registered in all the right zones, we'll need to contact
+the administrators of <em class="emphasis">edu</em>and <em class="emphasis">in-addr.arpa</em>. (For help determining who
+runs your parent zones, turn back to <a href="ch03_01.html">Chapter 3, "Where Do I Start?"</a> )</p><p>
+
+
+When you contact the administrators of a parent zone, be sure to
+follow the process they specify (if any) on their web site. If
+there's no standard modification process, you'll have to
+send them the domain name of the zone (or zones) that the new name
+server is authoritative for. If the new name server is in the new
+zone, you'll also need to give them the IP address(es) of the
+new name server. In fact, if there's no official format for
+submitting the information, it's often best just to send your
+parent the complete list of registered name servers for the zone,
+plus any addresses necessary, in zone data file format. That avoids
+any potential confusion.</p><p>
+
+
+Since our networks were originally assigned by the InterNIC, we used
+the web-based process at <a href="http://www.arin.net/cgi-bin/amt.pl">http://www.arin.net/cgi-bin/amt.pl</a> to change
+our registration. (If we'd preferred to do things manually, we
+could have sent them the form at <a href="http://www.arin.net/regserv/templates/modifytemplate.txt">http://www.arin.net/regserv/templates/modifytemplate.txt</a>.)
+If they hadn't had a template for us to use, our message to the
+administrator of <em class="emphasis">in-addr.arpa</em> might have read something
+like this:</p><p>
+
+
+<blockquote><pre class="code">Howdy!
+
+I've just set up a new slave name server on
+zardoz.movie.edu for the 249.249.192.in-addr.arpa
+and 253.253.192.in-addr.arpa zones.  Would you
+please add NS records for this name server to the
+in-addr.arpa zone?  That would make our delegation
+information look like:
+
+253.253.192.in-addr.arpa. 86400 IN NS terminator.movie.edu.
+253.253.192.in-addr.arpa. 86400 IN NS wormhole.movie.edu.
+253.253.192.in-addr.arpa. 86400 IN NS zardoz.movie.edu.
+
+249.249.192.in-addr.arpa. 86400 IN NS terminator.movie.edu.
+249.249.192.in-addr.arpa. 86400 IN NS wormhole.movie.edu.
+249.249.192.in-addr.arpa. 86400 IN NS zardoz.movie.edu.
+
+Thanks!
+
+Albert LeDomaine
+al@robocop.movie.edu</pre></blockquote>
+
+
+Notice that we specified explicit TTLs on the NS and A records?
+That's because our parent name servers aren't
+authoritative for those records; <em class="emphasis">our</em> name
+servers are. By including them, we're indicating our choice of
+a TTL for our zone's delegation. Of course, our parent may have
+other ideas about what the TTL should be.</p><p>
+
+
+In this case, glue data -- A records for each of the name
+servers -- isn't necessary, since the domain names of the
+name servers aren't within the <em class="emphasis">in-addr.arpa</em> zones. They're within
+<em class="emphasis">movie.edu</em>, so a name server
+that was referred to <em class="emphasis">terminator.movie.edu</em> or <em class="emphasis">wormhole.movie.edu</em> could still find
+their addresses by following delegation to the <em class="emphasis">movie.edu</em> name servers.</p><p>
+
+
+Is a <a name="INDEX-1365" />partial-slave name server a good name
+server to register with your parent zone? Actually, it's not
+ideal, because it's only authoritative for some of your
+<em class="emphasis">in-addr.arpa</em> zones.
+Administratively, it may be easier to register only servers that back
+up <em class="emphasis">all</em> the local zones; that way, you
+don't need to keep track of which name servers are
+authoritative for which zones. All of your parent zones can delegate
+to the same set of name servers: your primary master and your
+"full" slaves.</p><p>
+
+
+However, if you don't have many name servers or if you're
+good at remembering which name servers are authoritative for what, go
+ahead and register a partial-slave.</p><p>
+
+
+<a name="INDEX-1366" />Caching-only name servers, on the other
+hand, must <em class="emphasis">never</em> be registered. A caching-only
+name server rarely has complete information for any given zone, just
+the bits and pieces of it that it has looked up recently. If a parent
+zone's name server were mistakenly to refer a foreign name
+server to a caching-only name server, the foreign name server would
+send the caching-only name server a nonrecursive query. The
+caching-only name server might have the data cached, but then again,
+it might not. If it didn't have the data, it would refer the
+querier to the best name servers it knew (those closest to the domain
+name in the query) -- which might include the caching-only name
+server itself! The poor foreign name server might never get an
+answer. This kind of misconfiguration -- actually, delegating a
+zone to any name server not authoritative for that zone -- is
+known <a name="INDEX-1367" />
+<a name="INDEX-1368" />as <a name="INDEX-1369" /><em class="firstterm">lame
+delegation</em>.<a name="INDEX-1370" /> <a name="INDEX-1371" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.2. Adding More Name Servers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.4. Changing TTLs</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

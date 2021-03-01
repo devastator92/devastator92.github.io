@@ -1,0 +1,261 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+<head><title>Incremental Zone Transfer (IXFR) (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.4. Incremental Zone Transfer (IXFR)</h2>
+
+
+<a name="INDEX-1570" /> <a name="INDEX-1571" />With dynamic update and NOTIFY, our
+zones are updated according to the changing state of the network, and
+those changes quickly propagate to all the authoritative name servers
+for those zones. The picture's complete, right?</p><p>
+
+
+Not quite. Imagine you run a large zone that's dynamically
+updated with frightening frequency. That's easy to envision:
+you might have a big zone to begin with, including thousands of
+clients, when all of a sudden management decides to implement Windows
+2000 and DHCP. Now each of your clients updates its own address
+record in the zone, and the Domain Controllers update the records
+that tell clients which services they run. (There's much more
+to come on Windows 2000 in <a href="ch16_01.html">Chapter 16, "Miscellaneous"</a>.)</p><p>
+
+
+Each time your primary master name server receives an update that
+increments the zone's serial number, it sends a NOTIFY
+announcement to its slaves. And each time they receive NOTIFY
+announcements, the slaves check the serial number of the zone on
+their master server and, possibly, transfer the zone. If that zone is
+large, the transfer will take some time -- another update could
+arrive in the interim. Your slaves could be transferring zones in
+perpetuity! At the very least, your name servers will spend a lot of
+time transferring the whole zone when the change to the zone is
+probably very small (e.g., the addition of a client's address
+record).</p><p>
+
+
+Incremental zone transfer, or IXFR for short, solves this problem by
+allowing slave name servers to tell their master servers which
+version of a zone they currently hold and to request just the changes
+to the zone between that version and the current one. This can reduce
+the size and duration of a zone transfer dramatically.</p><p>
+
+
+An incremental zone transfer request has a query type of IXFR instead
+of <a name="INDEX-1572" />AXFR (the type of
+query that initiates a full zone transfer), and it contains the
+slave's current SOA record from the zone in the authority
+section of the message. When the master name server receives an
+incremental zone transfer request, it looks for the record of the
+changes to the zone between the slave's version of the zone and
+the version the master holds. If that record is missing, the master
+sends a full zone transfer. Otherwise, it sends just the differences
+between the versions of the zone.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">10.4.1. IXFR Limitations</h3>
+
+
+Sound good? It is! But IXFR has a few <a name="INDEX-1573" />limitations that you should know about.
+First, IXFR didn't work well until BIND 8.2.3. All BIND 9 name
+servers have IXFR implementations that work well and interoperate
+with BIND 8.2.3.</p><p>
+
+
+Next, IXFR works best when you're only modifying your zone data
+with dynamic updates. Dynamic updates leave a record of the changes
+made to the zone and the serial number changes they correspond
+to -- exactly what a master name server needs to send to a slave
+that requests IXFR. But a BIND primary master name server that
+reloads an entire zone data file can't compute the differences
+between that zone and the previous zone. Nor can a BIND slave that
+gets a full zone transfer figure out what changed between that zone
+and the last.</p><p>
+
+
+This means that, to take maximum advantage of IXFR, you should modify
+your zone only by using dynamic update, and never edit the zone data
+file by hand.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">10.4.2. IXFR Files</h3>
+
+
+BIND 8 name servers maintain an IXFR log of changes to the zone
+separate from the dynamic update log file. Like the dynamic update
+log file, the IXFR log file is updated every time the name server
+receives an update. Unlike the dynamic update log file, the IXFR log
+file is never deleted, though the name server can be configured to
+trim it when it exceeds a particular size. The name of the BIND 8
+IXFR log file, by default, is the name of the zone data file with
+<em class="emphasis">.ixfr</em> appended to it.</p><p>
+
+
+BIND 9 name servers use the dynamic update <a name="INDEX-1574" />log file, or<a name="INDEX-1575" /> <em class="emphasis">journal file</em>, to
+assemble IXFR responses and to maintain the integrity of the zone.
+Since a primary master name server never knows when it may need the
+record of a particular change to the zone, it doesn't delete
+the journal file. A BIND 9 slave deletes the journal file if it
+receives an AXFR of the zone, since it now has a fresh full zone
+transfer and no longer needs to keep track of incremental changes to
+the last full zone transfer.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">10.4.3. BIND 8 IXFR Configuration</h3>
+
+
+<a name="INDEX-1576" />Configuring IXFR in BIND 8 is fairly
+straightforward. First, you need an <em class="emphasis">options</em>
+substatement called
+<em class="emphasis">maintain-ixfr-base</em><a name="INDEX-1577" /> on your master name server that
+tells it to maintain IXFR log files for all zones -- even those
+the name server is a slave for, since those in turn may have slaves
+that want IXFRs:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	maintain-ixfr-base yes;
+};</pre></blockquote>
+
+
+Then you need to tell your slaves to request IXFRs from that master
+name server. You do that with a new <em class="emphasis">server
+</em>substatement, <em class="emphasis">support-ixfr
+</em><a name="INDEX-1578" />:</p><p>
+
+
+<blockquote><pre class="code">server 192.249.249.3 {
+	support-ixfr yes;
+};</pre></blockquote>
+
+
+That's about it, unless you want to rename the IXFR log file on
+the master. That's done with a new <em class="emphasis">zone</em>
+statement, <em class="emphasis">ixfr-base
+</em><a name="INDEX-1579" />:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	ixfr-base "ixfr.movie.edu";
+};</pre></blockquote>
+
+
+Oh, and you can configure the name server to trim the IXFR log file
+after it exceeds a particular size:<a href="#FOOTNOTE-74">[74]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-74" />[74]Before BIND
+8.2.3, you need to specify the number of bytes, rather than just
+"1M," because of a bug.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	maintain-ixfr-base yes;
+	max-ixfr-log-size 1M;     // trim IXFR log to 1 megabyte
+};</pre></blockquote>
+
+
+Once the IXFR log file exceeds the specified limit by 100 KB, the
+name server trims it back to that size. The 100 KB of
+"slush" prevents the log file from reaching the limit and
+then being trimmed back after each successive update.</p><p>
+
+
+Using the <em class="emphasis">many-answers</em> zone transfer format can
+make zone transfers even more efficient. Take a look at <a href="ch10_12.html#dns4-CHP-10-SECT-12.1.6">Section 10.12.1.6, "More efficient zone transfers"</a> for details.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">10.4.4. BIND 9 IXFR Configuration</h3>
+
+
+<a name="INDEX-1580" />It's even easier to configure IXFR in a
+BIND 9 master name server because you don't have to do a thing:
+it's on by default. If you need to turn it off for a particular
+slave server (and you probably won't, since a slave must
+<em class="emphasis">request</em> an incremental zone transfer), use the
+<em class="emphasis">provide-ixfr server
+</em><a name="INDEX-1581" />substatement, which defaults to
+<em class="emphasis">yes</em> :</p><p>
+
+
+<blockquote><pre class="code">server 192.249.249.1 {
+	provide-ixfr no;
+};</pre></blockquote>
+
+
+You can also use <em class="emphasis">provide-ixfr</em> as an
+<em class="emphasis">options</em> substatement, in which case it applies
+to all slaves that don't have an explicit
+<em class="emphasis">provide-ixfr</em> substatement of their own in a
+<em class="emphasis">server</em> statement.</p><p>
+
+
+Since BIND 9 master name servers send
+<em class="emphasis">many-answers</em> zone transfers by default, you
+don't need any special <em class="emphasis">transfer-format
+</em>configuration.</p><p>
+
+
+More useful is the <em class="emphasis">request-ixfr
+</em><a name="INDEX-1582" />substatement, which can be used in
+either an <em class="emphasis">options</em> or a <em class="emphasis">server
+</em>statement. If you have a mix of IXFR-capable and
+IXFR-impaired masters, you can tailor your slave's zone
+transfer requests to match the capabilities of its masters:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	request-ixfr no;
+};
+
+server 192.249.249.3 {
+	request-ixfr yes;     // of our masters, only terminator supports IXFR
+};</pre></blockquote>
+
+
+BIND 9 doesn't support the
+<em class="emphasis">max-ixfr-log-size</em><a name="INDEX-1583" />substatement.<a name="INDEX-1584" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.3. DNS NOTIFY </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.5. Forwarding</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+</html>

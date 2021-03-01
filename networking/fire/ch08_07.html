@@ -1,0 +1,594 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:29 GMT -->
+<head><title>Filtering by Service (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.7. Filtering by Service</h2>
+
+
+
+
+
+<a name="INDEX-573" /><a name="INDEX-574" />Blocking incoming forged packets, as
+discussed previously, is just about the only common use of filtering
+solely by address. Most other uses of packet filtering involve
+filtering by service, which is somewhat more complicated.</p><p>
+
+
+
+
+
+From a packet filtering point of view, what do the packets associated
+with particular services look like? As an example, we're going
+to take a detailed look at Telnet. Telnet allows a user to log in to
+another system, as if the user had a terminal directly connected to
+that system. We use Telnet as an example because it is fairly common,
+fairly simple, and from a packet filtering point of view,
+representative of several other protocols such as SMTP and NNTP. We
+show both outbound and inbound Telnet service.</p><p>
+
+
+
+
+
+For detailed discussions of the packet filtering characteristics of
+other protocols, see the chapters in <a href="part3.html">Part III, "Internet Services"</a>.</p><p>
+
+
+
+
+
+<a name="ch08-5361" /><div class="sect2">
+<h3 class="sect2">8.7.1. Outbound Telnet Service</h3>
+
+
+
+
+
+<a name="INDEX-575" /><a name="INDEX-576" /><a name="INDEX-577" />Let's
+look first at outbound Telnet service, in which a local client (a
+user) is talking to a remote server. We need to handle both outgoing
+and incoming packets. (<a href="ch08_07.html#ch08-18075">Figure 8-3</a> shows a
+simplified view of outbound Telnet.)</p><p>
+
+
+
+
+
+<a name="ch08-18075" /><div class="figure"><img height="168" alt="Figure 8-3" src="figs/fire2.0803.gif" width="459" /></div><h4 class="objtitle">Figure 8-3. Outbound Telnet</h4>
+
+The outgoing packets for this outbound service contain the
+user's keystrokes and have the following characteristics:</p><p>
+
+
+
+
+
+<ul><li>The IP source address of the outgoing packets is the local
+host's IP address.</p><p></li><li>The IP destination address is the remote host's IP address.</p></li><li>Telnet is a TCP-based service, so the IP packet type is TCP.</p></li><li><p>The TCP destination port is 23; that's the well-known port
+number Telnet servers use.</p><p></li><li>The TCP source port number (which we'll call "Y" in
+this example) is some seemingly random number greater than 1023.</p><p></li><li>The first outgoing packet, establishing the connection, will not have
+the ACK bit set; the rest of the outgoing packets will.</p><p></li></ul>
+The incoming packets for this outbound service contain the data to be
+displayed on the user's screen (for example, the
+"login:" prompt) and have the following characteristics:</p><p>
+
+
+
+
+
+<ul><li>The IP source address of the incoming packets is the remote
+host's IP address.</p><p></li><li>The IP destination address is the local host's IP address.</p></li><li>The IP packet type is TCP.</p></li><li><p>The TCP source port is 23; that's the port the server uses.</p></li><li><p>The TCP destination port is the same "Y" we used as the
+source port for the outgoing packets.</p><p></li><li>All incoming packets will have the ACK bit set (again, only the first
+packet, establishing a connection, has the ACK bit off; in this
+example, that first packet was an outgoing packet, not an incoming
+packet).</p><p></li></ul>
+Note the similarities between the header fields of the outgoing and
+incoming packets for Telnet. The same addresses and port numbers are
+used; they're just exchanged between source and destination. If
+you compare an outgoing packet to an incoming packet, the source and
+destination addresses are exchanged, and the source and destination
+port numbers are exchanged.</p><p>
+
+
+
+
+
+Why is the client port  --  the source port for the outgoing
+packets, and the destination port for the incoming packets  -- 
+restricted to being greater than 1023? This is a legacy of the BSD
+versions of Unix, the basis for almost all Unix networking code. BSD
+Unix reserved ports from
+to 1023 for local use only by root. These ports are normally used
+only by servers, not clients, because servers are run by the
+operating system as privileged users, while clients are run by users.
+(The major exceptions are the BSD "r" commands like
+<em class="emphasis">rcp</em> and <em class="emphasis">rlogin</em>, as
+we'll discuss in <a href="ch18_01.html#ch18-9800">Section 18.1, "Terminal Access (Telnet)"</a>.) Because TCP/IP
+first became popular on Unix, this convention spread to other
+operating systems, even those that don't have a privileged root
+user (for instance, Macintosh and MS-DOS systems). No actual standard
+requires this behavior, but it is still consistent on almost every
+TCP/IP implementation. When client programs need a port number for
+their own use, and any old port number will do, the programs are
+assigned a port above 1023. Different systems use different methods
+to allocate the numbers, but most of them are either pseudo-random or
+sequential.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-5440" /><div class="sect2">
+<h3 class="sect2">8.7.2. Inbound Telnet Service</h3>
+
+
+
+
+
+<a name="INDEX-578" /><a name="INDEX-579" />Next,
+let's look at inbound Telnet service, in which a remote client
+(a remote user) communicates with a local Telnet server. Again, we
+need to handle both incoming and outgoing packets.</p><p>
+
+
+
+
+
+The incoming packets for the inbound Telnet service contain the
+user's keystrokes and have the following characteristics:</p><p>
+
+
+
+
+
+<ul><li>The IP source address of these packets is the remote host's
+address.</p><p></li><li>The IP destination address is the local host's address.</p></li><li>The IP packet type is TCP.</p></li><li><p>The TCP source port is some random port number greater than 1023
+(which we'll call "Z" in this example).</p><p></li><li>The TCP destination port is 23.</p></li><li>The TCP ACK bit will not be set on the very first inbound packet,
+establishing the connection, but it will be set on all other inbound
+packets.</p><p></li></ul>
+The outgoing packets for this inbound Telnet service contain the
+server responses (the data to be displayed for the user) and have the
+following characteristics:</p><p>
+
+
+
+
+
+<ul><li>The IP source address is the local host's address.</p><p></li><li>The IP destination address is the remote host's address.</p></li><li><p>The IP packet type is TCP.</p></li><li><p>The TCP source port is 23 (these packets are from the Telnet server).</p></li><li><p>The TCP destination port is the same random port "Z" that
+was used as the source port for the inbound packets.</p><p></li><li>The TCP ACK bit will be set on all outgoing packets.</p></li></ul>
+Again, note the similarities between the relevant headers of the
+incoming and the outgoing packets: the source and destination
+addresses are exchanged, and the source and destination ports are
+exchanged.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-5494" /><div class="sect2">
+<h3 class="sect2">8.7.3. Telnet Summary</h3>
+
+
+
+
+
+The following table illustrates the various types of packets involved
+in inbound and outbound Telnet services.</p><p>
+
+
+
+
+
+<a name="ch08-16-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Service Direction</p><p></th>
+<th>
+Packet Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Packet Type</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+Outbound</p><p></td>
+<td>
+Outgoing</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Y</p><p></td>
+<td>
+23</p><p></td>
+<td>
+<a href="#FOOTNOTE-18">[18]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Outbound</p><p></td>
+<td>
+Incoming</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+23</p><p></td>
+<td>
+Y</p><p></td>
+<td>
+Yes</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Inbound</p><p></td>
+<td>
+Incoming</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Z</p><p></td>
+<td>
+23</p><p></td>
+<td>&nbsp;</td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Inbound</p><p></td>
+<td>
+Outgoing</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+23</p><p></td>
+<td>
+Z</p><p></td>
+<td>
+Yes</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+<blockquote class="FOOTNOTE">
+<a name="FOOTNOTE-18" />[18]The TCP ACK bit will be set on all but the first of
+these packets, which establishes the connection.</p><p>
+
+
+
+
+</blockquote>
+
+Note that Y and Z are both random (from the packet filtering
+system's point of view) port numbers above 1023.</p><p>
+
+
+
+
+
+If you want to allow outgoing Telnet, but nothing else, you would set
+up your packet filtering as follows.</p><p>
+
+
+
+
+
+<a name="ch08-17-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+ACK Set</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+23</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+In</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+23</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<ul><li>Rule A allows packets out to remote Telnet servers.</p><p></li><li>Rule B allows the returning packets to come back in. Because it
+verifies that the ACK bit is set, rule B can't be abused by an
+attacker to allow incoming TCP connections from port 23 on the
+attacker's end to ports above 1023 on your end (e.g., an X11
+server on port 6000).</p><p></li><li>Rule C is the default rule. If none of the preceding rules apply, the
+packet is blocked. Remember from our previous discussion that any
+blocked packet should be logged, and that it may or may not cause an
+ICMP message to be returned to the originator.<a name="INDEX-580" /></p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch08-5650" /><div class="sect2">
+<h3 class="sect2">8.7.4. Risks of Filtering by Source Port</h3>
+
+
+
+
+
+<a name="INDEX-581" /><a name="INDEX-582" /><a name="INDEX-583" />Making filtering decisions based on
+source port is not without its risks. There is one fundamental
+problem with this type of filtering: you can trust the source port
+only as much as you trust the source machine.</p><p>
+
+
+
+
+
+Suppose you mistakenly assume that the source port is associated with
+a particular service. Someone who is in control of the source machine
+(e.g., someone with root access on a Unix system, or anyone at all
+with a networked PC) could run whatever client or server he or she
+wanted on a "source port" that you're allowing
+through your carefully configured packet filtering system.
+Furthermore, as we've discussed previously, you can't
+necessarily trust the source address to tell you for certain what the
+source machine is; you can't tell for sure if you're
+talking to the real machine with that address, or to an attacker who
+is pretending to be that machine.</p><p>
+
+
+
+
+
+What can you do about this situation? You want to restrict the local
+port numbers as much as possible, regardless of how few remote ports
+you allow to access them. If you only allow inbound connections to
+port 23, and if port 23 has a Telnet server on it that is trustworthy
+(a server that will only do things that a Telnet client should be
+able to tell it to do), it doesn't actually matter whether or
+not the program that is talking to it is a genuine Telnet client.
+Your concern is to limit inbound connections to only ports where you
+are running trustworthy servers, and to be sure that your servers are
+genuinely trustworthy. <a href="part3.html">Part III, "Internet Services"</a> discusses how you can achieve these
+goals for various services.</p><p>
+
+
+
+
+
+This problem is particularly bad for servers that use ports above
+1023 because you need to allow packets in to those ports in order to
+let in traffic bound for clients. For instance, in the preceding
+example, we allow inbound packets for any port over 1023 from source
+port 23. This would allow an attacker to run anything at all on port
+23 (for instance, an X Window System client) and send packets to any
+server above port 1023 (for instance, an X Window System server). We
+avoided this problem in our example by using the ACK bit to accept
+inbound packets but not inbound connections. With UDP, you have no
+such option, because there is no equivalent to the ACK bit.
+Fortunately, relatively few important UDP-based protocols are used
+across the Internet. (The notable exception is DNS, which is
+discussed further in <a href="ch20_01.html#ch20-13126">Section 20.1, "Domain Name System (DNS)"</a>.)<a name="INDEX-584" /><a name="INDEX-585" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.6. Filtering by Address</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.8. Choosing a Packet Filtering Router</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:30 GMT -->
+</html>

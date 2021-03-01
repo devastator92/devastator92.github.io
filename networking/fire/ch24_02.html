@@ -1,0 +1,2652 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch24_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+<head><title>Merged Routers and Bastion Host Using General-Purpose Hardware (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch24_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="part4.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">24.2. Merged Routers and Bastion Host Using General-Purpose Hardware</h2>
+
+
+
+The merged interior and exterior router architecture, described in
+<a href="ch06_01.html">Chapter 6, "Firewall Architectures"</a>, and shown in <a href="ch06_05.html#ch06-2094">Figure 6-10</a>, is a lower security, lower cost alternative to
+the screened subnet architecture discussed in the previous section.
+It can be a very useful architecture for small sites that are facing
+significant cost constraints, particularly when it is built around a
+general-purpose computer that can provide not only routing but also
+flexible packet filtering and proxying. <a href="ch24_02.html#ch24-65069">Figure 24-2</a>
+shows this architecture.</p><p>
+
+
+
+<a name="ch24-65069" /><div class="figure"><img height="314" alt="Figure 24-2" src="figs/fire2.2402.gif" width="478" /></div><h4 class="objtitle">Figure 24-2. Merged routers using general-purpose hardware</h4>
+
+This architecture is typical of commercial single-box firewalls,
+where the perimeter network is often referred to as the
+<em class="emphasis">services net</em>.</p><p>
+
+
+
+In this example, there is a perimeter net but no interior and
+exterior routers. One machine provides routing and filtering and some
+normal bastion host functions as well. The perimeter net provides
+only external services, and there are no connections from the
+perimeter net into the internal network.</p><p>
+
+
+
+This architecture obviously reduces the cost of the firewall by
+requiring one router instead of two, but it provides other advantages
+as well. For instance, it requires only one assigned Internet-visible
+address; the merged router's external interface must be a
+legitimate address, but if the merged router can do network address
+translation, all the other addresses can be selected from private
+address space. This architecture also makes a clean separation
+between the firewall and the perimeter services host, allowing them
+to be managed by different people with different attitudes towards
+security and only minimal interaction with each other.</p><p>
+
+
+
+Although this architecture closely resembles a condensed version of
+the previous one, the constraints are significantly different.
+Because you are putting all the functions on the same machine, there
+are limits on what you can expect that machine to do. You're
+going to need to move all noncritical functionality off the firewall
+itself. On the other hand, you have much more flexibility in what you
+do on the perimeter services host because it is not critical to the
+security of the internal hosts (in the screened subnet architecture,
+the bastion hosts on the perimeter network were security-critical for
+internal hosts).</p><p>
+
+
+
+In this example, we're going to assume:</p><p>
+
+
+
+<ul><li>That the firewall is not the only server at the site. In particular,
+another machine is located on the perimeter network that provides
+public HTTP and, if the filtering software is adequate, FTP services.
+There is also a system on the internal network to accept SMTP
+(possibly providing mailbox services) and to provide internal network
+DNS service.</p><p></li><li>As in the previous example, that internal users are trusted not to
+actively try to circumvent the firewall, and that we have no
+particular need to monitor or log their Internet activities.</p><p></li><li>That an address that has been properly assigned to your site and that
+is being properly routed and advertised to the rest of the Internet
+by your service provider is available for the external interface on
+the firewall. (If the firewall supports network address translation,
+private address space can be used for both the perimeter network and
+the internal network.)</p><p></li><li>That the perimeter net is untrusted, and that it is unacceptable to
+make connections from it to the internal net.</p><p></li><li>That we wish to hide internal addresses (this could be because
+they're private, unroutable addresses or just because
+we're paranoid).</p><p></li><li>That we do not want internal machines to be dependent on the firewall
+for anything except Internet access; the internal network should
+continue to function if the firewall stops working.</p><p></li></ul>
+<a name="ch24-19253" /><div class="sect2">
+<h3 class="sect2">24.2.1. Service Configuration</h3>
+
+
+
+How do we provide the basic Internet services with this architecture?</p><p>
+
+
+
+<a name="ch24-10-fm2xml" /><div class="sect3">
+<h3 class="sect3">24.2.1.1. HTTP and HTTPS</h3>
+
+
+
+<a name="INDEX-2230" />
+<a name="INDEX-2231" /><a name="INDEX-2232" />We
+have several options for providing internal users with access to the
+Web:</p><p>
+
+
+
+<ul><li>We could simply allow them to go out directly, using packet
+filtering.</p><p></li><li>We could run a simple proxy server.</p></li><li>We could run a caching proxy server.</p></li></ul>
+As we discussed earlier, using packet filtering means either limiting
+the servers that people can access or permitting almost all outbound
+connections. It's an acceptable choice but places a lot of
+trust in the users. Running a simple proxy server, like SOCKS, on the
+firewall itself would give us extra logging and control without
+significantly limiting what users can do or putting a large load on
+the firewall. Running a caching proxy server on the firewall itself
+would probably be a mistake. Caching proxy servers are relatively
+complex, and they require disk space for the caching. However,
+caching proxy servers provide a lot of benefits, and we could safely
+put one on the internal services host.</p><p>
+
+
+
+By contrast, we don't want to publish web pages on an internal
+services host, which is full of our internal data. We don't
+want to publish them directly from the firewall either because a web
+server will add both significant risk and significant load.
+Publishing web pages will require a separate server on the perimeter
+network.</p><p>
+
+
+
+Therefore, we will use an HTTP server on the perimeter network to
+provide service to the Internet. For internal users accessing the
+Internet, we will use a caching proxy server on the internal services
+host. Packet filtering on the firewall will allow the caching proxy
+server to make requests.</p><p>
+
+
+
+We could use the perimeter net web server for HTTPS as well as HTTP;
+this would require only small changes to the filtering rules. On the
+other hand, there's no reason to do HTTPS on a simple,
+noninteractive web server, and a complex server that required HTTPS
+(e.g., a server that supported e-commerce) would almost certainly
+require other support services as well (e.g., a database). Since we
+aren't configuring those other servers in this example,
+there's no apparent reason to allow HTTPS to the perimeter net,
+and we will leave it disabled.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-19292" /><div class="sect3">
+<h3 class="sect3">24.2.1.2. SMTP</h3>
+
+
+
+<a name="INDEX-2233" /><a name="INDEX-2234" />Here
+we have two reasonable choices. First, we could choose to use a
+dual-server setup like the one discussed previously, with a
+security-oriented SMTP server on the firewall and a mail server on
+the services host inside. This will require disk space on the
+firewall to spool the mail, as well as the CPU power to process it.
+Second, for more performance at slightly more risk, we could simply
+pass SMTP to the services host. (We could use an SMTP server on the
+perimeter net, but we don't consider that a reasonable choice
+because it would require the perimeter net to create connections to
+the internal net, which we don't want to allow.)</p><p>
+
+
+
+In order for SMTP to go directly to the services host, either the
+firewall needs to do network address translation, or the services
+host needs to have a valid externally visible address.</p><p>
+
+
+
+We will assume that the firewall has disk space and enough CPU power
+and run a security-oriented SMTP server on the firewall. All incoming
+mail will be directed (via DNS MX records) to the firewall, which
+will then pass mail to the internal services host. Similarly,
+outgoing mail will be sent from the internal services host to the
+security-oriented SMTP server on the firewall. As we've
+discussed previously, it's never advisable to let incoming mail
+go directly to all of your internal machines. Also, once you're
+directing incoming mail through a single point, it's actually
+easier  --  not to mention safer  --  to route outgoing mail
+through there than to send it direct.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-19256" /><div class="sect3">
+<h3 class="sect3">24.2.1.3. Telnet</h3>
+
+
+
+We allow only outgoing Telnet from the internal network to the
+Internet through packet filtering; incoming Telnet is too risky to
+allow at all. Instead, we will support incoming connections via SSH.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">24.2.1.4. SSH</h3>
+
+
+
+We can improve security somewhat over the screened subnet
+architecture by limiting inbound and outbound SSH to just the
+internal network services host. This will allow us to control the SSH
+servers and clients that people use, preventing the use of SSH
+tunneling.</p><p>
+
+
+
+We will also allow SSH from the internal network to the perimeter
+network, so that it can be used to administer servers there. It is
+the only connection between the internal network and the perimeter
+network, and it is a one-way connection (the perimeter network cannot
+create it). It is therefore a reasonably safe way to give people
+administrative access to servers. File transfer protocols like
+<em class="emphasis">scp</em> and <em class="emphasis">rsync</em> that can use
+SSH for transport can be used to load files on the server.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-19267" /><div class="sect3">
+<h3 class="sect3">24.2.1.5. FTP</h3>
+
+
+
+As in the screened subnet architecture, outgoing passive-mode FTP can
+be safely and conveniently provided via packet filtering from the
+internal network. Normal-mode FTP cannot because you would have to
+allow incoming connections. If you want to use normal-mode FTP, you
+will need an FTP proxy. That proxy should not run on the internal
+services host because in order to support the proxy there, we'd
+still need to allow incoming connections to a machine on the internal
+network. However, we could run an FTP proxy on the firewall, and many
+systems suitable for this kind of firewall will supply appropriate
+proxies.</p><p>
+
+
+
+For the sake of example, we'll assume that we don't have
+FTP proxying software on the firewall, and we'll use packet
+filtering to allow outgoing FTP, but only in passive mode. Since most
+FTP comes from web browsers, which use passive mode by default, this
+is unlikely to be a problem.</p><p>
+
+
+
+Incoming FTP is more difficult. Supporting incoming passive-mode FTP
+with pure packet filtering would require allowing all TCP connections
+from all Internet hosts on any port &gt;1023 to the perimeter
+services host on any port &gt;1023. For this architecture, it is an
+unacceptable risk to the perimeter services host. It is possible to
+safely support normal-mode FTP to the perimeter network, but as we
+mentioned previously, most FTP comes from web browsers, which will
+default to using passive mode and will not work. Unless the packet
+filtering system we are using supports a transparent proxy for FTP,
+we will not be able to offer FTP services to the Internet.</p><p>
+
+
+
+If the packet filtering system does support a transparent FTP proxy,
+then you could configure it to direct connections to a server on the
+perimeter net. We will assume that it does not and that we will not
+be providing incoming FTP service.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-19307" /><div class="sect3">
+<h3 class="sect3">24.2.1.6. NNTP</h3>
+
+
+
+<a name="INDEX-2235" /><a name="INDEX-2236" />At
+most sites this size, the best option (assuming that NNTP service is
+important) is to purchase NNTP from an external server and allow
+clients to connect directly to that server. Many Internet service
+providers will provide this service for a small surcharge. It would
+be possible to provide NNTP internally if we wanted to dedicate an
+internal machine to be an NNTP server. It would be unwise to make
+either the internal services host or the firewall an NNTP server;
+instead, we'd need to dedicate another internal services host.
+We will assume that an external Internet-based NNTP service will be
+used.</p><p>
+
+
+
+Unfortunately, this will keep us from having private newsgroups that
+are visible only to internal users, unless we set up a separate
+internal news server for only those groups. Many news clients
+(particularly those that are part of web browsers) can easily access
+newsgroups from multiple servers.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-19322" /><div class="sect3">
+<h3 class="sect3">24.2.1.7. DNS</h3>
+
+
+<a name="INDEX-2237" /><a name="INDEX-2238" />
+
+Because we wish to hide the internal addresses, we will need to have
+two DNS servers: one for the Internet and one for the internal users.
+The Internet-visible DNS server could go on the firewall or on the
+perimeter services host (the two places we put externally visible
+services). The internal DNS server could go on the firewall or on the
+internal services host (the two places we put internally visible
+services).</p><p>
+
+
+
+Putting the Internet-visible DNS server on the perimeter services
+host is not a good idea. The perimeter is an untrusted network, but
+DNS is critical to the functioning of the Internet connection. The
+Internet-visible DNS server should therefore be on the firewall.</p><p>
+
+
+
+The internal DNS server, on the other hand, should not be on the
+firewall for two reasons. First, putting it on the firewall will make
+internal hosts dependent on the firewall for otherwise internal
+functions, which we want to avoid. Second, we've already got
+the external DNS server there, and it's going to be complicated
+to administer them both on the same machine.</p><p>
+
+
+
+We'll assume the following configuration:</p><p>
+
+
+
+<ul><li>The firewall is the primary external DNS server for your domain.</p><p></li><li>You have an external DNS secondary server for your domain, (e.g., one
+of your service provider's machines).</p><p></li><li>The internal services host is the primary internal DNS server.</p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch24-19363" /><div class="sect2">
+<h3 class="sect2">24.2.2. Packet Filtering Rules</h3>
+
+
+
+<a name="INDEX-2239" />Let's look at the packet filtering
+rules necessary to support the configuration we've described in
+the previous sections. As in the first example of the screened subnet
+architecture, we're going to assume an "ideal"
+router. In this case, because we're providing services on the
+firewall itself and to a perimeter network, we need to consider the
+interfaces separately, so we have an extra column indicating which of
+the network interfaces the rule applies to. "Ext" is the
+interface to the external world, "Int" is the interface
+to the internal network, and "Pmtr" is the perimeter
+network.</p><p>
+
+
+
+"Internal" and "Perimeter" mean the range of
+IP addresses for those networks. "Int Service" and
+"Pmtr Service" are the IP addresses of the internal
+network and perimeter network services machines, respectively, while
+"Firewall Ext" is the firewall's external
+interface, "Firewall Int" is the firewall's
+internal interface, and "Firewall Pmtr" is the
+firewall's perimeter interface.</p><p>
+
+
+
+Because this firewall has multiple interfaces, we need to specify
+slightly different information from what we've been providing.
+On a two-interface firewall, it's clear exactly what happens to
+a packet that's going "In"; it goes from the
+Internet to the internal network. On a three-interface firewall,
+there are two possible routes for such a packet: it could be going
+from the Internet to the internal network, or from the Internet to
+the perimeter network. These two options need different rules.</p><p>
+
+
+
+In order to deal with this situation, we have to specify a direction
+for each interface, not for the whole firewall. A packet that crosses
+the firewall will go in on an interface and out on an interface,
+regardless of the direction it is traveling. Packets that come from
+the Internet to the internal network will be going
+"Inward" on the external interface and
+"Outward" on the internal interface; packets that go from
+the internal network to the Internet will go "Inward" on
+the internal interface and "Outward" on the external
+interface.</p><p>
+
+
+
+In general, when looking at the following table, you will notice that
+the "Inward" filtering rule for one interface will be
+identical to an "Outward" rule for another interface.
+This pairing of rules and interfaces ensures that the filtering rules
+are not dependent on packet routing decisions.</p><p>
+
+
+
+<a name="ch24-12-fm2xml" /><blockquote><b>TIP:</b> 
+In the following table, directions are relative to the specific
+interface, not to the firewall as a whole. This is different from the
+other tables in the book, which do not show individual interfaces.</p><p>
+
+
+</blockquote>
+
+The firewall needs the following rules to support the configuration
+we've outlined:</p><p>
+
+
+
+<a name="ch24-13-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Interface</p><p></th>
+<th>
+RelativeDir.</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+Spoof-1</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Spoof-2</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Perimeter Net</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Spoof-3</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Spoof-4</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Perimeter Net</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Spoof-5</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Spoof-6</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Cross-1</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Cross-2</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Cross-3</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-1</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+80</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-2</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+80</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-3</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+80</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-4</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+80</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-5</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-6</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-7</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+HTTP-8</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Telnet-1</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+23</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Telnet-2</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+23</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Telnet-3</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+23</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Telnet-4</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+23</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-1</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-2</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-3</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-4</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-5</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-6</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-7</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-8</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-9</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-10</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-11</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+ANY</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH-12</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-1</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-2</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-3</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-4</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-5</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-6</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-7</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-8</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-9</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+SMTP-10</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+NNTP-1</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+NNTP server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+119</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+NNTP-2</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+NNTP server</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+119</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+NNTP-3</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+NNTP server</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+119</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+NNTP-4</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+NNTP server</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+119</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-1</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-2</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-3</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-4</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Ext</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-5</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-6</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-7</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-8</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Int</p><p></td>
+<td>
+Int Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-9</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-10</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td><a href="#FOOTNOTE-182">[182]</a></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-11</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+DNS-12</p><p></td>
+<td>
+Pmtr</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Firewall Pmtr</p><p></td>
+<td>
+Pmtr Services</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+53</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-1</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+21</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-2</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+21</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-3</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+21</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-4</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+21</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-5</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-6</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-7</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+FTP-8</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Default-1</p><p></td>
+<td>
+All</p><p></td>
+<td>
+Outward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+<tr>
+<td>
+Default-2</p><p></td>
+<td>
+All</p><p></td>
+<td>
+Inward</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+
+</table><p>
+<a name="FOOTNOTE-182" />[182]UDP has no ACK equivalent.</p><p>
+</blockquote>
+
+
+
+
+Here is some additional information about each set of rules in this
+table:</p><p>
+
+
+
+<dl>
+<dt><i>Spoof-1 and Spoof-2</i></dt>
+<dd>Block packets from the Internet that claim to have source IP
+addresses that you are using at your site -- that is, forged
+packets, presumably sent by an attacker.</p><p></dd>
+
+
+
+<dt><i>Spoof-3 and Spoof-4</i></dt>
+<dd>Block packets from the internal network that claim to have source
+addresses on an external network or the perimeter network. Spoof-3
+may be difficult to implement on some packet filtering systems
+because they can be easily written only if you can use negation on
+source addresses (to specify addresses that are not in the internal
+range). It would be acceptable to omit them in this situation; they
+are mostly there to protect other people, not to protect your site.</p><p></dd>
+
+
+
+<dt><i>Spoof-5 and Spoof-6</i></dt>
+<dd>Block packets from the perimeter network that claim to have source
+addresses on an external network or the internal network. Spoof-5 may
+be difficult to implement on some packet filtering systems because
+they can be easily written only if you can use negation on source
+addresses (to specify addresses that are not in the internal range).
+It would be acceptable to omit them in this situation; they are
+mostly there to protect other people, not to protect your site.</p><p></dd>
+
+
+
+<dt><i>Cross-1 through Cross-3</i></dt>
+<dd>Block packets sent from the outside world to the firewall's
+internal and perimeter interfaces. These addresses would otherwise be
+considered legitimate addresses in the ranges for the internal and
+perimeter networks, and rules that were meant to allow traffic to
+these networks would also allow the firewall to be attacked on those
+ports. Rather than excluding the interfaces explicitly for each rule
+that allows traffic to those networks, we will make a blanket
+exclusion for traffic that's trying to cross the firewall.
+Should the perimeter network services host be compromised, there is a
+rule that prevents it from being used to attack the internal
+interface of the firewall. (If the internal network is compromised,
+it can be used to attack the perimeter network; since the internal
+network is more security-critical than the perimeter network, this is
+not a major problem, but you could easily add a Cross-4 to prevent
+it.)</p><p></dd>
+
+
+
+<dt><i>HTTP-1 through HTTP-4</i></dt>
+<dd>Allow incoming HTTP to the perimeter network services host. These
+rules allow traffic from the Internet to the site's public HTTP
+service. Because each interface has a separate default deny rule, we
+need to explicitly permit the traffic on each interface that it
+crosses. HTTP-1 and HTTP-3 both permit the same incoming traffic,
+while HTTP-2 and HTTP-4 are both required to permit the responses.</p><p></dd>
+
+
+
+<dt><i>HTTP-5 through HTTP-8</i></dt>
+<dd>Allow outgoing HTTP and HTTPS from the internal services host. These
+rules allow the HTTP proxy to contact any Internet host on any port.
+Depending on the HTTP proxy server, this could allow users to
+circumvent firewall rules preventing direct TCP connections (for
+example, direct delivery of SMTP mail). Some HTTP proxy servers can
+be configured to prevent the connection to certain port numbers.</p><p></dd>
+
+
+
+<dt><i>Telnet-1 through Telnet-4</i></dt>
+<dd>Allow outgoing Telnet from any internal host.</p><p></dd>
+
+
+
+<dt><i>SSH-1 through SSH-4</i></dt>
+<dd>Allow outgoing SSH connections from the internal network services
+host. We have the client port set to "Any" (instead of
+"&gt;1023" like most of the other protocols) because some
+forms of authentication require SSH clients to use ports at or below
+1023.</p><p></dd>
+
+
+
+<dt><i>SSH-5 through SSH-8</i></dt>
+<dd>Allow incoming SSH connections to the internal network services host.
+We have the client port set to "Any" (instead of
+"&gt;1023" like most of the other protocols) because some
+forms of authentication require SSH clients to use ports at or below
+1023.</p><p></dd>
+
+
+
+<dt><i>SSH-9 through SSH-12</i></dt>
+<dd>Allow outgoing SSH connections from the internal network to the
+perimeter network for administration.</p><p></dd>
+
+
+
+<dt><i>SMTP-1 through SMTP-4</i></dt>
+<dd>Allow electronic mail between the firewall and the internal services
+host. SMTP-1 and SMTP-2 permit mail to the firewall, while SMTP-3 and
+SMTP-4 permit mail from the firewall.</p><p></dd>
+
+
+
+<dt><i>SMTP-5 through SMTP-8</i></dt>
+<dd>Allow electronic mail between the firewall and the Internet.</p><p></dd>
+
+
+
+<dt><i>SMTP-9 and SMTP-10,</i></dt>
+<dd>Allow electronic mail only from the perimeter network to the firewall
+host. We do not allow mail to be delivered to the perimeter network
+services host.</p><p></dd>
+
+
+
+<dt><i>NNTP-1 through NNTP-4</i></dt>
+<dd>Allow your clients to reach your service provider's news server.</p><p></dd>
+
+
+
+<dt><i>DNS-1 through DNS-4</i></dt>
+<dd>Allow external UDP- and TCP-based DNS clients to query the DNS server
+on the firewall host, and it to answer them. In the process, they
+also permit the server-to-server queries, which are always from port
+53 to port 53. These rules also allow the DNS server on the firewall
+host to make DNS queries to the Internet and to support secondary DNS
+servers to perform zone transfers.</p><p></dd>
+
+
+
+<dt><i>DNS-5 through DNS-8</i></dt>
+<dd>Allow the internal services host to make UDP- and TCP-based DNS
+queries to the firewall DNS server. The DNS service on the internal
+services host is configured as a forwarder to the firewall host.</p><p></dd>
+
+
+
+<dt><i>DNS-9 through DNS-12</i></dt>
+<dd>Allow the perimeter network services host to make UDP- and TCP-based
+DNS queries to the firewall DNS server. The DNS service on the
+perimeter network services host is configured as a forwarder to the
+firewall host.</p><p></dd>
+
+
+
+<dt><i>FTP-1 through FTP-8</i></dt>
+<dd>Allow outgoing passive-mode FTP connections. The FTP-1 through FTP-4
+rules allow the command channel, and the FTP-5 through FTP-8 rules
+allow the data channel. In fact, FTP-5 through FTP-8 allow any TCP
+connection to be opened from the internal machines to any host on the
+Internet, as long as the port numbers used on both ends are above
+1023.</p><p></dd>
+
+
+
+<dt><i>Default-1 and Default-2</i></dt>
+<dd>Block all packets not specifically allowed by one of the preceding
+rules.<a name="INDEX-2240" /></p><p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch24-14-fm2xml" /><div class="sect2">
+<h3 class="sect2">24.2.3. Other Configuration Work</h3>
+
+
+
+If you are using Linux and <em class="emphasis">ipchains</em> as your
+packet filtering system, you will also need to add rules for the
+FORWARD chain so that the system will forward packets between the
+interfaces. You could add a single allow rule to the FORWARD chain
+and rely on the specified interface rules to protect you. For a more
+secure but harder to maintain configuration, you could duplicate all
+the rules that pass traffic from one interface to another in the
+FORWARD chain.</p><p>
+
+
+
+In addition to setting up the packet filtering rules, we need to do
+various other kinds of configuration work, as follows:</p><p>
+
+
+
+<dl>
+<dt><i>On all of the internal machines</i></dt>
+<dd>Configure electronic mail so that it gets sent to the internal
+services host. We're also going to need to install passive-mode
+FTP clients, if they're available, and configure web browsers
+to use the proxy server on the internal services host.</p><p></dd>
+
+
+
+<dt><i>On the internal services host</i></dt>
+<dd>Configure the mail server to send mail to the firewall. Set up a
+caching HTTP proxy server. Set up the internal DNS server.</p><p></dd>
+
+
+
+<dt><i>On the firewall</i></dt>
+<dd>Set up the externally visible DNS server.</p><p></dd>
+
+
+
+<dt><i>On the perimeter services host</i></dt>
+<dd>Set up the externally visible web server.</p><p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch24-20100" /><div class="sect2">
+<h3 class="sect2">24.2.4. Analysis</h3>
+
+
+
+Just how good a firewall is this? It's not great, but
+it's functional. Let's consider it in relation to the
+strategies and principles discussed in <a href="ch03_01.html">Chapter 3, "Security Strategies"</a>,
+and in comparison to the screened subnet architecture we configured
+in the first example.</p><p>
+
+
+
+<a name="ch24-20104" /><div class="sect3">
+<h3 class="sect3">24.2.4.1. Least privilege</h3>
+
+
+
+<a name="INDEX-2241" /><a name="INDEX-2242" />You can see the principle of least
+privilege in action in some places in this setup. For example,
+configuring SMTP so that outgoing mail goes out via the internal
+network services host rather than directly to remote systems is an
+application of least privilege. Why? Because it lets you control more
+tightly how internal systems connect to external systems. (In this
+case, it makes it unnecessary for internal systems to talk directly
+to external systems in order to provide this service.)</p><p>
+
+
+
+Similarly, we've very carefully applied least privilege to the
+perimeter network, giving it the minimum access needed to provide web
+services to external hosts. On the other hand, merging the interior
+and exterior routers clearly fails to enforce least privilege,
+particularly when the resulting host also provides services like DNS
+and SMTP. In order to perform all of these functions, the routing
+host ends up with a very large number of privileges. To some extent,
+we've moved privilege from the perimeter to the firewall host.</p><p>
+
+
+
+We've also created an internal services host with multiple
+levels of privilege; it's providing several services, and
+it's sitting on the internal network, which is a kind of
+privilege in itself. This host is a second place where least
+privilege is violated.</p><p>
+
+
+
+The screened subnet architecture we described earlier in this chapter
+does a somewhat better job of applying the principle of least
+privilege than the architecture described in this section.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20115" /><div class="sect3">
+<h3 class="sect3">24.2.4.2. Defense in depth</h3>
+
+
+
+<a name="INDEX-2243" /><a name="INDEX-2244" />The principle of defense in depth is
+almost missing from this setup. Internal hosts are protected from the
+outside world by the firewall host and the internal services host,
+but nothing protects them from the firewall host; if that one host is
+compromised, all of the internal hosts are compromised. A small
+amount of defense in depth is present in the separation between the
+services hosts and the router; the router protects the internal
+services host from the Internet and protects the internal hosts from
+the perimeter services host. However, the defense of the internal
+services host isn't all that good.</p><p>
+
+
+
+The screened subnet architecture we described earlier in this chapter
+does a much better job of applying the principle of defense in depth.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20124" /><div class="sect3">
+<h3 class="sect3">24.2.4.3. Choke point</h3>
+
+
+
+<a name="INDEX-2245" /><a name="INDEX-2246" />The principle of a choke point is
+clearly applied in this example because everything between internal
+clients and the Internet comes through at least the firewall host.
+Further, most of it comes through the internal services host via
+proxies.</p><p>
+
+
+
+The screened subnet architecture described earlier in the chapter
+does a slightly better job of applying the principle of a choke
+point, but not by much.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20133" /><div class="sect3">
+<h3 class="sect3">24.2.4.4. Weakest link</h3>
+
+
+
+<a name="INDEX-2247" /><a name="INDEX-2248" />The obvious weak link to attack in this
+architecture is the firewall host; the internal services host runs a
+close second because we allow incoming SSH. If either of these hosts
+is compromised, it is going to severely affect the security of the
+rest of the internal hosts because they are on the same network as
+the internal hosts and because nothing protects the internal hosts
+from them. With the screened subnet architecture, on the other hand,
+the interior router protects the internal hosts from the bastion
+host.</p><p>
+
+
+
+The screened subnet architecture presents a much stronger weakest
+link to an attacker.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20143" /><div class="sect3">
+<h3 class="sect3">24.2.4.5. Fail-safe stance</h3>
+
+
+
+<a name="INDEX-2249" /><a name="INDEX-2250" />You can see the principle of a
+fail-safe stance applied through the packet filtering rules specified
+for the merged routers architecture. In general, the rules specify
+what you're going to allow and deny everything else by default.
+This approach is fail-safe because if something unanticipated comes
+along (for example, a new service), it won't be allowed through
+your firewall, unless, of course, it mimics or is tunneled through
+some other service that you do allow.</p><p>
+
+
+
+However, the design of the architecture itself is not fail-safe. If
+the firewall or internal services hosts are compromised, your whole
+site's security is severely compromised. The screened subnet
+architecture is much better at implementing a fail-safe stance.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20152" /><div class="sect3">
+<h3 class="sect3">24.2.4.6. Universal participation</h3>
+
+
+
+<a name="INDEX-2251" /> <a name="INDEX-2252" />If this is your site's only
+connection to the Internet, you've got involuntary universal
+participation: everybody has to go through the firewall to get to the
+Internet. Voluntary universal participation would be better, but it
+would require some user education concerning the goals of and the
+need for your security measures.</p><p>
+
+
+
+In terms of the universal participation principle, there really
+isn't much difference between the first and second sample
+architectures.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-20156" /><div class="sect3">
+<h3 class="sect3">24.2.4.7. Diversity of defense</h3>
+
+
+
+<a name="INDEX-2253" />There are few opportunities here to
+apply the principle of diversity of defense because you pretty much
+have only one of everything: there is only one firewall host and only
+one internal services host.</p><p>
+</div>
+
+
+
+
+
+<a name="ch24-15-fm2xml" /><div class="sect3">
+<h3 class="sect3">24.2.4.8. Simplicity</h3>
+
+
+
+Although this firewall initially appears simpler than our first
+example, it actually adds complexity by combining functions. In
+particular, the packet filtering rules are more complex because we
+have chosen to use a single three-interface router and filtering
+system. For example, rather than being able to simply think about
+"in" and "out" relative to the site, we have to think
+about "inward" and "outward" relative to each
+of three interfaces; for packets inbound to the site, we have to set
+up an inbound filter on one interface and an outbound filter on
+another, which is tedious and error-prone. Another example of
+complexity is the decision to implement packet filtering, proxy
+servers, and application servers all on the same firewall host; there
+may be unexpected interactions and dependencies between these
+services, which an attacker can take advantage of. On the other hand,
+putting the external server on a perimeter network and preventing it
+from talking to the internal network significantly simplifies the
+configuration of that bastion host.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch24-20163" /><div class="sect2">
+<h3 class="sect2">24.2.5. Conclusions</h3>
+
+
+
+The merged router architecture can be cheaper to implement than the
+screened subnet architecture, but it's less secure. There is
+little or no redundancy in the design, and it's not really
+fail-safe. On the other hand, it provides an effective way to use a
+single Internet address to provide reasonably safe and full-featured
+access to and from the Internet.</p><p>
+
+
+
+It may be cheaper than the screened subnet architecture, but not by
+much. The screened subnet architecture requires a minimum of three
+dedicated machines (two routers and a bastion host). This
+architecture really also requires a minimum of three dedicated
+machines (one firewall and two services hosts). One advantage of this
+architecture is that you can use similar hardware for the firewall
+host and the internal and perimeter network hosts. It is possible to
+build all of these systems using spare PC equipment and freely
+available software.</p><p>
+
+
+
+If you don't need to provide web service to external clients
+(for instance, if you choose to out-source your web site to a web
+hosting service), you could make this architecture significantly
+cheaper and simpler by eliminating the perimeter network altogether.
+Or, if you don't need to keep the price down, you could combine
+this architecture with the screened subnet architecture; to do so,
+you would put a perimeter network on a third interface on the
+external router in the screened subnet architecture. This extra
+network would be the untrusted network that handled services for
+clients on the Internet.</p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch24_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="part4.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">24. Two Sample Firewalls</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">IV. Keeping Your Site Secure</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch24_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:41 GMT -->
+</html>

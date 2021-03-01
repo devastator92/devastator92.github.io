@@ -1,0 +1,443 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:19 GMT -->
+<head><title>IP (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.2. IP</h2>
+
+
+
+
+
+<a name="INDEX-280" />IP serves as a common middle
+ground for the Internet. It can have many different layers below it,
+such as Ethernet, token ring, FDDI, PPP, or carrier pigeon.<a href="#FOOTNOTE-8">[8]</a> IP can have many other protocols layered
+on top of it, with TCP, UDP, and ICMP being by far the most common,
+at least outside of research environments. In this section, we
+discuss the special characteristics of IP relevant to packet
+filtering.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-8" />[8]See RFC 1149, dated 1 April 1990, which defines the Avian
+Transport Protocol; RFCs dated 1 April are usually worth
+reading.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="ch04-2-fm2xml" /><div class="sect2">
+<h3 class="sect2">4.2.1. IP Multicast and Broadcast</h3>
+
+
+
+
+
+ost IP packets are what are called <em class="emphasis">unicast</em>;
+they are sent to an individual destination host. IP packets may also
+be <em class="emphasis">multicast</em> (sent to a group of hosts) or
+<em class="emphasis">broadcast</em> (intended for every host that can
+receive them). Multicast packets are like memos, which are sent to a
+group of people ("Employees in the purchasing department"
+or "People working on the Ishkabibble project" or
+"Potential softball players"); their destination is a
+group of hosts that ought to be interested in the information.
+Broadcast packets are like announcements made on overhead speakers;
+they are used when everybody needs the information ("The
+building is on fire, evacuate now") or when the message's
+sender can't determine which particular destination should get
+the message, but believes that the destination will be able to figure
+it out ("The green Honda with license plate 4DZM362 has its
+lights on").</p><p>
+
+
+
+
+
+The purpose of multicasting is to create efficiency. Unlike a memo, a
+multicast packet is a single object. If 7, or 17, or 70 hosts want
+the same information, a multicast packet allows you to get it to them
+by sending just one packet, instead of one packet each. A broadcast
+packet would give you the same savings in network resources, but it
+would waste computing time on the uninterested machines that would
+have to process the packet in order to decide it was irrelevant and
+reject it.</p><p>
+
+
+
+
+
+Note that multicast and broadcast addresses are meant as destination
+addresses, not as source addresses. A machine may use a broadcast
+address as a source address only if it does not have a legitimate
+source address and is trying to get one (see <a href="ch22_01.html">Chapter 22, "Administrative Services"</a>, for more information about DHCP, which may
+use this mechanism). Otherwise, multicast and broadcast source
+addresses are generally signs of an attacker who is using a
+destination machine as an amplifier. If a packet has a broadcast
+source address and a unicast destination address, any reply to it
+will have a unicast source address and a broadcast destination; thus,
+an attacker who uses a broadcast source can cause another machine to
+do the broadcasting.</p><p>
+
+
+
+
+
+This is a good deal for the attacker because it's rare that
+packets with a broadcast destination are allowed to cross a firewall
+(or, in fact, any router). The attacker probably wouldn't be
+able to get at a large number of hosts without using this kind of
+dirty trick. You don't want broadcast information from other
+networks; it's not relevant to your life, and it may be
+dangerous (either because it's incorrect for your network, or
+because it allows attackers to gather information about your
+network). Routers are sometimes configured to pass some or all
+broadcasts between networks that are part of the same organization,
+because some protocols rely on broadcasts to distribute information.
+This is tricky to get right and tends to result in overloaded
+networks and hosts, but it is more acceptable than passing broadcasts
+to or from the Internet.</p><p>
+
+
+
+
+
+Your firewall should therefore refuse to pass packets with broadcast
+destinations and packets with multicast or broadcast source
+addresses.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch04-4472" /><div class="sect2">
+<h3 class="sect2">4.2.2. IP Options</h3>
+
+
+
+
+
+As we saw in the previous discussion of the IP layer, IP headers
+include an options field, which is usually empty. In its design, the
+IP options field was intended as a place for special information or
+handling instructions that didn't have a specific field of
+their own in the header. However, TCP/IP's designers did such a
+good job of providing fields for everything necessary that the
+options field is almost always empty. In practice, IP options are
+very seldom used except for break-in attempts and (very rarely) for
+network debugging.</p><p>
+
+
+
+
+
+<a name="INDEX-281" /><a name="INDEX-282" />
+<a name="INDEX-283" />The
+most common IP option a firewall would be confronted with is the IP
+source route option. Source routing lets the source of a packet
+specify the route the packet is supposed to take to its destination,
+rather than letting each router along the way use its routing tables
+to decide where to send the packet next. Source routing is supposed
+to override the instructions in the routing tables. In theory, the
+source routing option is useful for working around routers with
+broken or incorrect routing tables; if you know the route that the
+packet should take, but the routing tables are broken, you can
+override the bad information in the routing tables by specifying
+appropriate IP source route options on all your packets. In practice
+though, source routing is commonly used only by attackers who are
+attempting to circumvent security measures by causing packets to
+follow unexpected paths.</p><p>
+
+
+
+
+
+This is in fact a circular problem; several researchers have proposed
+interesting uses of source routing, which are impossible to use
+widely because source routing is commonly disabled -- because
+it's useful for nothing but attacks. This situation interferes
+considerably with widespread use of most solutions for mobile IP
+(allowing machines to move from place to place while keeping a fixed
+IP address).</p><p>
+
+
+
+
+
+Some packet filtering systems take the approach of dropping any
+packet that has any IP option set, without even trying to figure out
+what the option is or what it means; this doesn't usually cause
+significant problems.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch04-4492" /><div class="sect2">
+<h3 class="sect2">4.2.3. IP Fragmentation</h3>
+
+
+
+
+
+<a name="INDEX-284" /><a name="INDEX-285" /><a name="INDEX-286" />Another
+IP-level consideration for packet filtering is fragmentation. One of
+the features of IP is its ability to divide a large packet that
+otherwise couldn't traverse some network link (because of
+limitations on packet size along that link) into smaller packets,
+called <em class="emphasis">fragments</em>, which can traverse that link.
+The fragments are then reassembled into the full packet by the
+destination machine (not by the machine at the other end of the
+limited link; once a packet is fragmented, it normally stays
+fragmented until it reaches its destination).</p><p>
+
+
+
+
+
+Normally, any router can decide to fragment a packet. A flag in the
+IP header can be used to prevent routers from fragmenting packets.
+Originally, this wasn't much used, because a router that needs
+to fragment a packet but is forbidden to do so will have to reject
+the packet, and communication will fail, which is generally less
+desirable than having the packet fragmented. However, there is now a
+system called path maximum transmission unit (MTU) discovery that
+uses the flag that prevents fragmentation.</p><p>
+
+
+
+
+
+Path MTU discovery is a way for systems to determine what is the
+largest packet that can be sent to another machine without getting
+fragmented. Large unfragmented packets are more efficient than small
+packets, but if packets have to be broken up later in the process,
+this will significantly decrease transfer speed. Therefore, maximum
+efficiency depends on knowing how big to make the packets, but that
+depends on all the network links between the machines. Neither
+machine has any way to know what the answer is (and, in fact, it may
+vary from moment to moment). In order to discover the limit, systems
+can send out packets with "don't fragment" set and
+look for the error response that says that the packet has been
+dropped because it was too big but could not be fragmented. If
+there's an error, the machine reduces the packet size; if
+there's no error, it increases it. This adds some extra expense
+at the beginning of a connection, but for a connection that transmits
+a significant amount of data across a network that includes a limited
+link, the overall transmission time will probably be improved despite
+the intentionally lost packets. However, path MTU discovery will fail
+catastrophically if the error messages (which are ICMP messages,
+discussed later in this chapter) are not correctly returned (for
+instance, if your firewall drops them).</p><p>
+
+
+
+
+
+IP fragmentation is illustrated in <a href="ch04_02.html#ch04-63867">Figure 4-3</a>.</p><p>
+
+
+
+
+
+<a name="ch04-63867" /><div class="figure"><img height="261" alt="Figure 4-3" src="figs/fire2.0403.gif" width="436" /></div><h4 class="objtitle">Figure 4-3. Data fragmentation</h4>
+
+From a packet filtering point of view, the problem with fragmentation
+is that only the first fragment will contain the header information
+from higher-level protocols, like TCP, that the packet filtering
+system needs in order to decide whether or not to allow the full
+packet. Originally, the common packet filtering approach to dealing
+with fragmentation was to allow any non-first fragments through and
+to do packet filtering only on the first fragment of a packet. This
+was considered safe because if the packet filtering decides to drop
+the first fragment, the destination system will not be able to
+reassemble the rest of the fragments into the original packet,
+regardless of how many of the rest of the fragments it receives. If
+it can't reconstruct the original packet, the partially
+reassembled packet will not be accepted.</p><p>
+
+
+
+
+
+However, there are still problems with fragmented packets. If you
+pass all non-first fragments, the destination host will hold the
+fragments in memory for a while, waiting to see if it gets the
+missing piece; this makes it possible for attackers to use fragmented
+packets in a denial of service attack. When the destination host
+gives up on reassembling the packet, it will send an ICMP
+"packet reassembly time expired" message back to the
+source host, which will tell an attacker that the host exists and why
+the connection didn't succeed.</p><p>
+
+
+
+
+
+In addition, attackers can use specially fragmented packets to
+conceal data. Each fragment contains information about where the data
+it contains starts and ends. Normally, each one starts after the last
+one ended. However, an attacker can construct packets where fragments
+actually overlap, and contain the same data addresses. This does not
+happen in normal operation; it can happen only when bugs or attackers
+are involved, and attackers are by far the most likely cause.</p><p>
+
+
+
+
+
+Operating systems differ in their response to overlapping fragments.
+Because overlapping fragments are abnormal, many operating systems
+respond very badly to them and may reassemble them into invalid
+packets, with the expected sorts of unfortunate results up to and
+including operating system crashes. When they are reassembled, there
+are differences in whether the first or second fragment's data
+is kept; these differences can be increased by sending the fragments
+out of order. Some machines prefer the first version received, others
+the most recent version received, others the numerically first, and
+still others the numerically last. This makes it nearly impossible
+for packet filtering or intrusion detection systems to figure out
+what data the receiving system will actually see if and when the
+fragments are reassembled.</p><p>
+
+
+
+
+
+Three kinds of attacks are made possible by overlapping fragments:</p><p>
+
+
+
+
+
+<ul><li>Simple denial of service attacks against hosts with poor responses to
+overlapping fragments.</p><p></li><li>Information-hiding attacks. If an attacker knows that virus
+detectors, intrusion detection systems, or other systems that pay
+attention to the content of packets are in use and can determine what
+assembly method the systems use for overlapping fragments, the
+attacker can construct overlapping fragments that will obscure
+content from the watching systems.</p><p></li><li>Attacks that get information to otherwise blocked ports. An attacker
+can construct a packet with acceptable headers in the first fragment
+but then overlap the next fragment so that it also has headers in it.
+Since packet filters don't expect TCP headers in non-first
+fragments, they won't filter on them, and the headers
+don't need to be acceptable. <a href="ch04_02.html#ch04-96254">Figure 4-4</a> shows
+overlapped fragments.</p><p></li></ul>
+<a name="ch04-96254" /><div class="figure"><img height="375" alt="Figure 4-4" src="figs/fire2.0404.gif" width="441" /></div><h4 class="objtitle">Figure 4-4. Overlapping fragments</h4>
+
+There are other, special problems with passing outbound fragments.
+Outbound fragments could conceivably contain data you don't
+want to release to the world. For example, an outbound NFS packet
+would almost certainly be fragmented, and if the file were
+confidential, that information would be released. If this happens by
+accident, it's unlikely to be a problem; people do not
+generally hang around looking at the data in random packets going by
+just in case there's something interesting in them. You could
+wait a very long time for somebody to accidentally send a fragment
+out with interesting data in it.</p><p>
+
+
+
+
+
+If somebody inside intentionally uses fragmentation to transmit data,
+you have hostile users within the firewall, and no firewall can deal
+successfully with insiders. (They probably aren't very clever
+hostile users, though, because there are easier ways to get data
+out.)</p><p>
+
+
+
+
+
+However, there is one other situation in which outbound fragments
+could carry data: if you have decided to deal with some vulnerability
+by blocking outbound responses to something (instead of attempting to
+block the original request on the incoming side, which would be a
+better idea), and the reply is fragmented. In this situation,
+non-first fragments of the reply will get out, and the attacker has
+reason to expect them and look for them. You can deal with this by
+being careful to filter out requests and by not relying on filtering
+out the replies.</p><p>
+
+
+
+
+
+Because of these many and varied problems with fragmentation, you
+should look for a packet filter that does fragment reassembly; rather
+than either permitting or denying fragments, the packet filter should
+reassemble the packet locally (and, if necessary, refragment it
+before sending it on). This will increase the load on the firewall
+somewhat, but it protects against all fragmentation-based risks and
+attacks, except those the firewall itself is vulnerable to (for
+instance, denial of service attacks based on sending non-first
+fragments until the firewall runs out of memory).</p><p>
+
+
+
+
+
+If you cannot do fragment reassembly, your safest option is to reject
+all non-first fragments. This may destroy connections that otherwise
+would have succeeded, but it is the lesser of two evils. Denying
+fragments will cause some connections to fail mysteriously, which is
+extremely unpleasant to debug. On the other hand, allowing them will
+open you to a variety of attacks that are widely exploited on the
+Internet. Fortunately, fragmented packets are becoming rarer as the
+use of path MTU discovery increases.<a name="INDEX-287" /><a name="INDEX-288" /><a name="INDEX-289" /><a name="INDEX-290" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4. Packets and Protocols </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.3. Protocols Above IP</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:20 GMT -->
+</html>

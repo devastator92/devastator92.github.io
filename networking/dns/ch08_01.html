@@ -1,0 +1,599 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:22 GMT -->
+<head><title>Growing Your Domain (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 8. Growing Your Domain</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-8-SECT-1">How Many Name Servers?</a><br />
+<a href="ch08_02.html">Adding More Name Servers</a><br />
+<a href="ch08_03.html">Registering Name Servers</a><br />
+<a href="ch08_04.html">Changing TTLs</a><br />
+<a href="ch08_05.html">Planning for Disasters</a><br />
+<a href="ch08_06.html">Coping with Disaster</a><br /><p></p></div>
+
+
+<em>"What size do you want to be?" it asked.</p><p>
+
+
+"Oh, I'm not particular as to size," Alice hastily
+replied; "only one doesn't like changing so often, you
+know..."</p><p>
+
+
+"Are you content now?" said the Caterpillar.</p><p>
+
+
+"Well, I should like to be a little larger, sir, if you
+wouldn't mind...."</em></p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-8-SECT-1" /></a>
+<h2 class="sect1">8.1. How Many Name Servers?</h2>
+
+
+<a name="INDEX-1279" /></a>We set up two name servers in
+<a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>. Two servers are as few as you'll
+ever want to run. Depending on the size of your network, you may need
+to run many more than just two servers. It is not uncommon to run
+from five to seven servers, with one of them off-site. How many name
+servers are enough? You'll have to decide that based on your
+network. Here are some guidelines to help out:</p><p>
+
+
+<ul><li>Run at least one name server on each network or subnet you have. This
+removes routers as a point of failure. Make the most of any
+multihomed hosts you have, since they are (by definition) attached to
+more than one network.<p></p></li><li>If you have a file server and some diskless nodes, run a name server
+on the file server to serve this group of machines.<p></p></li><li>Run name servers near, but not necessarily on, large multiuser
+computers. The users and their processes probably generate a lot of
+queries, and as an administrator, you will work harder to keep a
+multiuser host up. But balance their needs against the risk of
+running a name server -- a security-critical server -- on a
+system that lots of people have access to.<p></p></li><li>Run at least one name server <a name="INDEX-1280" /></a>off-site. This makes your data available
+when your network isn't. You might argue that it's
+useless to look up an address when you can't reach the host.
+Then again, the off-site name server may be available if your network
+is reachable, but your other name servers are down. If you have a
+close relationship with an organization on the Internet -- say
+another university or a business partner -- they may be willing to
+run a slave for you.<p></p></li></ul>
+<a href="ch08_01.html#dns4-CHP-8-FIG-1">Figure 8-1</a> shows a sample topology and a brief
+analysis to show you how this might work.</p><p>
+
+
+<a name="dns4-CHP-8-FIG-1" /></a><div class="figure"><img height="310" alt="Figure 8-1" src="figs/dns4_0801.gif" width="427" /></div><h4 class="objtitle">Figure 8-1. Sample network topology</h4>
+
+Notice that if you follow our guidelines, there are still a number of
+places you could choose to run a name server. Host <em class="emphasis">d</em>, the file server for hosts <em class="emphasis">a</em>, <em class="emphasis">b</em>, <em class="emphasis">c</em>, and <em class="emphasis">e</em>, could run a name server. Host
+<em class="emphasis">g</em>, a big, multiuser host, is
+another good candidate. But probably the best choice is host
+<em class="emphasis">f</em>, the smaller host with
+interfaces on both networks. You'll need to run only one name
+server instead of two, and it'll run on a closely watched host.
+If you want more than one name server on either network, you can also
+run one on <em class="emphasis">d</em> or <em class="emphasis">g</em>.</p><p>
+
+
+<a name="dns4-CHP-8-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">8.1.1. Where Do I Put My Name Servers?</h3>
+
+
+<a name="INDEX-1281" /></a>In addition to giving you a rough idea of
+how many name servers you'll need, these criteria should also
+help you decide <em class="emphasis">where</em> to run name servers (e.g.,
+on file servers and multihomed hosts). But there are other important
+considerations when choosing the right
+<a name="INDEX-1282" /></a>host.</p><p>
+
+
+Other factors to keep in mind are the host's connectivity, the
+software it runs (BIND and otherwise), maintaining the homogeneity of
+your name servers, and security:</p><p>
+
+
+<dl>
+<dt><i>Connectivity</i></dt>
+<dd><a name="INDEX-1283" /></a>It's important that name servers be
+well-connected. Having a name server running on the fastest, most
+reliable host on your network won't do you any good if the host
+is mired in some backwater subnet of your network behind a slow,
+flaky serial line. Try to find a host close to your link to the
+Internet (if you have one), or find a well-connected Internet host to
+act as a slave for your zone. And on your own network, try to run
+name servers near the hubs of your network.</p><p>
+
+It's doubly important that your primary master name server be
+well connected. The primary needs good connectivity to all the slaves
+that update from it, for reliable zone transfers. And, like any name
+server, it'll benefit from fast, reliable networking.</p><p>
+
+</dd>
+
+<dt><i>Software</i></dt>
+<dd><a name="INDEX-1284" /></a>Another factor to consider in choosing a
+host for a name server is the software the host runs. Software-wise,
+the best candidate for a name server is a host running a
+vendor-supported version of BIND 8.2.3 or 9.1.0 and a robust
+implementation of TCP/IP (preferably based on 4.3 or 4.4 BSD
+Unix's networking -- we're Berkeley snobs). You can
+compile your own 8.2.3 or 9.1.0 BIND from the
+sources -- it's not hard, and the latest versions are very
+reliable -- but you'll probably have a tough time getting
+your vendor to support it. If you don't absolutely need a
+feature of BIND 8, you may be able to get away with running your
+vendor's port of older BIND code, like 4.9.7, which will give
+you the benefit of your vendor's support, for what that's
+worth.<p></p></dd>
+
+
+<dt><i>Homogeneity</i></dt>
+<dd>One last thing to take into account is
+the<a name="INDEX-1285" /></a> homogeneity of your name servers. As much
+as you might believe in "open systems," hopping between
+different versions of Unix can be frustrating and confusing. Avoid
+running name servers on lots of different platforms, if you can. You
+can waste a lot of time porting your scripts (or ours!) from one
+operating system to another or looking for the location of
+<em class="filename">nslookup</em> or <em class="filename">named.conf</em> on
+three different Unixes. Moreover, different vendors' versions
+of Unix tend to support different versions of BIND, which can cause
+all sorts of frustration. If you need the security features of BIND 8
+or 9 on all your name servers, for example, choose a platform that
+supports BIND 8 or 9 for all your name servers.<p></p></dd>
+
+
+<dt><i>Security</i></dt>
+<dd><a name="INDEX-1286" /></a>Since you would undoubtedly prefer that
+hackers not commandeer your name server to assist them in attacking
+your own hosts or other networks across the Internet, it's
+important to run your name server on a secure host. Don't run a
+name server on a big, multiuser system if you can't trust its
+users. If you have certain computers that are dedicated to hosting
+network services but don't permit general logins, those are
+good candidates for running name servers. If you have only one or a
+few really secure hosts, consider running the primary master name
+server on one of those, since its compromise would be more
+significant than the compromise of the slaves.<p></p></dd>
+
+</dl>
+
+
+Though these are really secondary considerations -- it's
+more important to have a name server on a given subnet than to have
+it running on the perfect host -- do keep these criteria in mind
+when making a choice.<a name="INDEX-1287" /></a></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-8-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">8.1.2. Capacity Planning</h3>
+
+
+<a name="INDEX-1288" /></a> <a name="INDEX-1289" /></a> <a name="INDEX-1290" /></a>If you have heavily populated networks or
+users who do a lot of name server-intensive work, you may find that
+you need more name servers than we've recommended to handle the
+load. Or our recommendations may be fine for a little while, but as
+people add hosts to your nets or install new name server-intensive
+programs, you may find your name servers bogged down by queries.</p><p>
+
+
+Just which tasks are "name server-intensive"? Surfing the
+<a name="INDEX-1291" /></a>Web can be name server-intensive. Sending
+<a name="INDEX-1292" /></a>electronic mail, especially to large
+mailing lists, can be name server-intensive. Programs that make lots
+of <a name="INDEX-1293" /></a>remote procedure calls to different hosts
+can be name server-intensive. Even running certain graphical user
+environments can tax your name server. X Windows-based user
+environments, for example, query the name server to check access
+lists (among other things).</p><p>
+
+
+The astute (and precocious) among you may be asking, "But how
+do I know when my name servers are overloaded? What do I look
+for?" An excellent question!</p><p>
+
+
+<a name="INDEX-1294" /></a>Memory
+utilization is probably the most important aspect of a name
+server's operation to monitor. <em class="filename">named </em>can
+get very large on a name server that is authoritative for many zones.
+If <em class="filename">named </em>'s size, plus the size of the
+other processes you run, exceeds the size of your host's real
+memory, your host may swap furiously ("thrash") and not
+get anything done. Even if your host has more than enough memory to
+run all its processes, large name servers are slow to start and slow
+to spawn new <em class="filename">named</em> processes (e.g., to handle
+zone transfers). Another problem, peculiar to BIND 4: since a BIND 4
+name server<em class="filename"> </em>creates new
+<em class="filename">named</em> processes to handle zone transfers,
+it's quite possible to have more than one <em class="filename">named
+</em>process running at one time -- one answering queries
+and one or more servicing zone transfers. If your BIND 4 master name
+server already consumes 5 or 10 megabytes of memory, count on two or
+three times that amount being used occasionally.</p><p>
+
+
+<a name="INDEX-1295" /></a>
+<a name="INDEX-1296" /></a>Another criterion you can use to measure
+the load on your name server is the load the
+<em class="filename">named</em> process places on the host's CPU.
+Correctly configured name servers don't use much CPU time, so
+high CPU usage is often symptomatic of a configuration error.
+Programs such as <a name="INDEX-1297" /></a>
+<a name="INDEX-1298" /></a><em class="filename">top
+</em>can help you characterize your name server's average
+CPU utilization.<a href="#FOOTNOTE-54">[54]</a>
+Unfortunately, there are no absolute rules when it comes to
+acceptable CPU utilization. We offer a rough rule of thumb, though:
+5% average CPU utilization is probably acceptable; 10% is a bit high,
+unless the host is dedicated to providing name service.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-54" /></a>[54]<em class="filename">top</em> is a very
+handy program, written by Bill LeFebvre, that gives you a continuous
+report of which processes are sucking up the most CPU time on your
+host. The most recent version of <em class="filename">top</em> is
+available via anonymous FTP from <a href="ftp://eecs.nwu.edu/">ftp://eecs.nwu.edu</a> as file
+<em class="filename">/pub/top/top-3.4.tar.Z</em>.</p><p>
+
+</blockquote>
+
+
+To get an idea of what normal figures are, here's what
+<em class="filename">top</em> might show for a relatively quiet name
+server:</p><p>
+
+
+<blockquote><pre class="code">last pid: 14299; load averages: 0.11, 0.12, 0.12       18:19:08
+68 processes: 64 sleeping, 3 running, 1 stopped
+Cpu states: 11.3% usr, 0.0% nice, 15.3% sys, 73.4% idle, 0.0% intr, 0.0% ker
+Memory: Real: 8208K/13168K act/tot Virtual: 16432K/30736K act/tot Free: 4224K
+
+  PID USERNAME PRI NICE   SIZE   RES STATE  TIME   WCPU    CPU COMMAND
+   89 root       1    0  2968K 2652K sleep  5:01  0.00%  0.00% named</pre></blockquote>
+
+
+Okay, that's <em class="emphasis">really</em> quiet. Here's
+what <em class="filename">top</em> shows on a busy (though not overloaded)
+name server:</p><p>
+
+
+<blockquote><pre class="code">load averages: 0.30, 0.46, 0.44                  system: relay 16:12:20
+39 processes: 38 sleeping, 1 waiting
+Cpu states: 4.4% user, 0.0% nice, 5.4% system, 90.2% idle, 0.0% unk5, 0.0% unk6, 
+0.0% unk7, 0.0% unk8
+Memory: 31126K (28606K) real, 33090K (28812K) virtual, 54344K free Screen #1/ 3
+
+   PID USERNAME PRI NICE  SIZE   RES   STATE   TIME  WCPU   CPU  COMMAND
+ 21910 root       1    0  2624K  2616K sleep 146:21  0.00% 1.42% /etc/named</pre></blockquote>
+
+
+<a name="INDEX-1299" /></a>Another
+statistic to look at is the number of <a name="INDEX-1300" /></a>queries the name server receives per
+minute (or second, if you have a busy name server). Again, there are
+no absolutes here: a fast Pentium III running NetBSD can probably
+handle thousands of queries per second without breaking a sweat,
+while an older Unix host might have problems with more than a few
+queries a second.</p><p>
+
+
+To check the volume of queries your name server is receiving,
+it's easiest to look at the name server's internal
+<a name="INDEX-1301" /></a>statistics,
+which you can configure the server to write to
+<em class="emphasis">syslog</em><a name="INDEX-1302" /></a> at regular intervals.<a href="#FOOTNOTE-55">[55]</a>
+For example, you could configure your name server to dump statistics
+every hour (actually, that's the default for BIND 8 servers),
+and compare the number of queries received between hours:<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-55" /></a>[55]Some
+older BIND name servers need coercion to dump their statistics: the
+ABRT signal (IOT on older systems). BIND 4.9 name servers
+automatically dump stats every hour, but 4.9.4 through 4.9.7 name
+servers, once again, need to be coerced with ABRT.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">options {
+        statistics-interval 60;
+};</pre></blockquote>
+
+
+BIND 9 name servers don't support the
+<em class="emphasis">statistics-interval</em> substatement, but you can
+use <em class="filename">rndc </em>to tell a BIND 9 name server to dump
+statistics on the hour, for example in <em class="filename">crontab </em>:</p><p>
+
+
+<blockquote><pre class="code">0 * * * *  /usr/local/sbin/rndc stats</pre></blockquote>
+
+
+You should pay special attention to <a name="INDEX-1303" /></a>peak periods. Monday
+morning is often busy, because many people like to respond to mail
+they've received over the weekend first thing on Mondays.</p><p>
+
+
+You might also want to take a sample starting just after lunch, when
+people are returning to their desks and getting back to
+work -- all at about the same time. Of course, if your
+organization is spread across several time zones, you'll have
+to use your own good judgment to determine a busy time.</p><p>
+
+
+Here's a snippet from the <em class="emphasis">syslog</em> file on a
+BIND 8.2.3 name server:</p><p>
+
+
+<blockquote><pre class="code">Aug  1 11:00:49 terminator named[103]: NSTATS 965152849 959476930 A=8 NS=1 
+SOA=356966 PTR=2 TXT=32 IXFR=9 AXFR=204
+Aug  1 11:00:49 terminator named[103]: XSTATS 965152849 959476930 RR=3243 RNXD=0 
+RFwdR=0 RDupR=0 RFail=20 RFErr=0 RErr=11 RAXFR=204 RLame=0 ROpts=0 SSysQ=3356 
+
+SAns=391191 SFwdQ=0 SDupQ=1236 SErr=0 <tt class="userinput"><b>RQ=458031</b></tt> RIQ=25 RFwdQ=0 RDupQ=0 RTCP=101316 
+SFwdR=0 SFail=0 SFErr=0 SNaAns=34482 SNXD=0 RUQ=0 RURQ=0 RUXFR=10 RUUpd=34451
+Aug  1 12:00:49 terminator named[103]: NSTATS 965156449 959476930 A=8 NS=1 
+SOA=357195 PTR=2 TXT=32 IXFR=9 AXFR=204
+Aug  1 12:00:49 terminator named[103]: XSTATS 965156449 959476930 RR=3253 RNXD=0 
+RFwdR=0 RDupR=0 RFail=20 RFErr=0 RErr=11 RAXFR=204 RLame=0 ROpts=0 SSysQ=3360 
+
+SAns=391444 SFwdQ=0 SDupQ=1244 SErr=0 <tt class="userinput"><b>RQ=458332</b></tt>RIQ=25 RFwdQ=0 RDupQ=0 RTCP=101388 
+SFwdR=0 SFail=0 SFErr=0 SNaAns=34506 SNXD=0 RUQ=0 RURQ=0 RUXFR=10 RUUpd=34475</pre></blockquote>
+
+
+The number of queries received is dumped in the
+<a name="INDEX-1304" /></a><em class="emphasis">RQ</em> field (in
+bold). To calculate the number of queries received in the hour, just
+subtract the first <em class="emphasis">RQ</em> value from the second one:
+458332 - 458031 = 301.</p><p>
+
+
+Even if your host is fast enough to handle the number of queries it
+receives, you should make sure that the <a name="INDEX-1305" /></a>DNS traffic isn't placing an undue
+load on your network. On most <a name="INDEX-1306" /></a>
+<a name="INDEX-1307" /></a>LANs, DNS traffic is too
+small a proportion of the network's bandwidth to worry about.
+Over slow leased lines or dialup connections, though, DNS traffic
+could consume enough bandwidth to merit concern.</p><p>
+
+
+For a rough estimate of the volume of <a name="INDEX-1308" /></a>DNS
+traffic on your LAN, multiply the number of queries received (RQ)
+plus the number of answers sent (<a name="INDEX-1309" /></a>SAns) in an hour by 800 bits (100
+bytes, a rough average size for a DNS message), and divide by 3600
+(seconds per hour) to find the bandwidth utilized. This should give
+you a feeling for how much of your network's bandwidth is
+consumed by DNS traffic.<a href="#FOOTNOTE-56">[56]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-56" /></a>[56]For a nice package that
+automates the analysis of BIND's statistics, look for Nigel
+<a name="INDEX-1310" /></a>Campbell's
+<em class="emphasis">bindgraph</em><a name="INDEX-1311" /></a>
+<a name="INDEX-1312" /></a>
+in the DNS Resources Directory's tools page, <a href="http://www.dns.net/dnsrd/tools.html">http://www.dns.net/dnsrd/tools.html</a>.</p><p>
+
+</blockquote>
+
+
+To give you an idea of what's normal, the last
+<a name="INDEX-1313" /></a>NSFNET traffic report (in April 1995)
+showed that DNS traffic constituted just over 5% of the total traffic
+volume (in bytes) on their backbone. The NSFNET's figures were
+based upon actual traffic sampling, not calculations like ours using
+the name server's statistics.<a href="#FOOTNOTE-57">[57]</a> If you want to get a more accurate idea of
+the traffic your name server is receiving, you can always do your own
+traffic sampling with a LAN protocol analyzer.<a name="INDEX-1314" /></a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-57" /></a>[57]We're not
+sure how representative of the current state of the Internet these
+numbers are, but it's extremely difficult to wheedle equivalent
+numbers out of the commercial backbone providers that succeeded the
+NSFNET.</p><p>
+
+</blockquote>
+
+
+<a name="INDEX-1315" /></a>Once <a name="INDEX-1316" /></a>you've found
+that your name servers are overworked, what then? First, it's a
+good idea to make sure your name servers aren't being bombarded
+with queries by a misbehaving program. To do that, you'll need
+to find out where all the queries are coming from.</p><p>
+
+
+If you're running a BIND 4.9 or 8.1.2 name server, you can find
+out which resolvers and name servers are querying your name server
+just by dumping the statistics. These name servers keep statistics on
+a host-by-host basis, which is really useful in tracking down heavy
+users of your name server. BIND 8.2 or newer name servers don't
+keep these statistics by default; to induce them to keep host-by-host
+statistics, use the <em class="firstterm">host-statistics
+</em>substatement in your <em class="emphasis">options</em>
+statement, like this:<a href="#FOOTNOTE-58">[58]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-58" /></a>[58]BIND 9 doesn't support
+the <em class="emphasis">host-statistics</em> substatement -- or
+keeping per-host statistics, for that matter -- as of
+9.1.0.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">options {
+	host-statistics yes;
+};</pre></blockquote>
+
+
+For example, take these statistics:</p><p>
+
+
+<blockquote><pre class="code">+++ Statistics Dump +++ (829373099) Fri Apr 12 23:24:59 1996
+970779    time since boot (secs)
+471621    time since reset (secs)
+0    Unknown query types
+185108    A queries
+6    NS queries
+69213    PTR queries
+669    MX queries
+2361    ANY queries
+++ Name Server Statistics ++
+(Legend)
+    RQ      RR      RIQ      RNXD      RFwdQ
+    RFwdR   RDupQ   RDupR    RFail     RFErr
+    RErr    RTCP    RAXFR    RLame     ROpts
+    SSysQ   SAns    SFwdQ    SFwdR     SDupQ
+    SFail   SFErr   SErr     RNotNsQ   SNaAns
+    SNXD
+(Global)
+    257357 20718 0 8509 19677  19939 1494 21 0 0  0 7 0 1 0
+    824 236196 19677 19939 7643  33 0 0 256064 49269  155030
+ [15.17.232.4]
+    8736 0 0 0 717  24 0 0 0 0  0 0 0 0 0  0 8019 0 717 0
+    0 0 0 8736 2141  5722
+[15.17.232.5]
+    115 0 0 0 8  0 21 0 0 0  0 0 0 0 0  0 86 0 1 0  0 0 0 115 0  7
+[15.17.232.8]
+    66215 0 0 0 6910  148 633 0 0 0  0 5 0 0 0  0 58671 0 6695 0
+    15 0 0 66215 33697  6541
+[15.17.232.16]
+    31848 0 0 0 3593  209 74 0 0 0  0 0 0 0 0  0 28185 0 3563 0
+    0 0 0 31848 8695  15359
+[15.17.232.20]
+    272 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 272 0 0 0  0 0 0 272 7  0
+[15.17.232.21]
+    316 0 0 0 52  14 3 0 0 0  0 0 0 0 0  0 261 0 51 0  0 0 0 316 30  30
+[15.17.232.24]
+    853 0 0 0 65  1 3 0 0 0  0 2 0 0 0  0 783 0 64 0  0 0 0 853 125  337
+[15.17.232.33]
+    624 0 0 0 47  1 0 0 0 0  0 0 0 0 0  0 577 0 47 0  0 0 0 624 2  217
+[15.17.232.94]
+    127640 0 0 0 1751  14 449 0 0 0  0 0 0 0 0  0 125440 0 1602 0
+    0 0 0 127640 106  124661
+[15.17.232.95]
+    846 0 0 0 38  1 0 0 0 0  0 0 0 0 0  0 809 0 37 0  0 0 0 846 79  81
+-- Name Server Statistics --
+--- Statistics Dump --- (829373099) Fri Apr 12 23:24:59 1996</pre></blockquote>
+
+
+After the <em class="emphasis">Global</em> entry, each host is broken out
+by IP address in brackets. Looking at the legend, you can see that
+the first field in each record is RQ, or queries received. That gives
+us a good reason to look at hosts 15.17.232.8, 15.17.232.16, and
+15.17.232.94, which appear to be responsible for about 88% of our
+queries.</p><p>
+
+
+If you're running an older name server, the only way to find
+out which resolvers and name servers are sending all those darned
+queries is to turn on name server
+<a name="INDEX-1317" /></a>debugging.
+(We'll cover this in depth in <a href="ch13_01.html">Chapter 13, "Reading BIND Debugging Output"</a>.)
+All you're really interested in is the source IP addresses of
+the queries your name server is receiving. When poring over the
+debugging output, look for hosts sending repeated queries, especially
+for the same or similar information. That may indicate a
+misconfigured or buggy program running on the host, or a foreign name
+server pelting your name server with queries.<a name="INDEX-1318" /></a></p><p>
+
+
+<a name="INDEX-1319" /></a> <a name="INDEX-1320" /></a>If all the queries appear legitimate,
+add a new name server. Don't put the name server just anywhere,
+though; use the information from the debugging output to help you
+decide where best to run one. In cases where DNS traffic is gobbling
+up your Ethernet, it won't help to choose a host at random and
+create a name server there. You need to consider which hosts are
+sending all the queries, then figure out how to best provide them
+name service. <a name="INDEX-1321" /></a>Here are some hints to help you
+decide:</p><p>
+
+
+<ul><li>Look for queries from resolvers on hosts that share the same file
+server. You could run a name server on the file server.<p></p></li><li>Look for queries from resolvers on large, multiuser hosts. You could
+run a name server there.<p></p></li><li>Look for queries from resolvers on another subnet. Those resolvers
+should be configured to query a name server on their local subnet. If
+there isn't one on that subnet, create one.<p></p></li><li>Look for queries from resolvers on the same bridged segment (assuming
+you use bridging). If you run a name server on the bridged segment,
+the traffic won't need to be bridged to the rest of the
+network.<p></p></li><li>Look for queries from hosts connected to each other via another,
+lightly loaded network. You could run a name server on the
+other<a name="INDEX-1322" /></a>
+network.<a name="INDEX-1323" /></a>
+<a name="INDEX-1324" /></a>
+<a name="INDEX-1325" /></a><p></p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.6. Keeping Everything Running Smoothly</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.2. Adding More Name Servers</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:24 GMT -->
+</html>

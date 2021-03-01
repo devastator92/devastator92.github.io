@@ -1,0 +1,704 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch13_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Evaluating the Risks of a Service (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch13_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.2. Evaluating the Risks of a Service</h2>
+
+
+
+
+
+When somebody requests that you allow a service through your
+firewall, you will go through a process of evaluation to decide
+exactly what to do with the service. In the following chapters, we
+give you a combination of information and analysis, based on our
+evaluations. This section attempts to lay out the evaluation process
+for you, so that you can better understand the basis for our
+statements, and so that you can make your own evaluations of services
+and servers we don't discuss.</p><p>
+
+
+
+
+
+When you evaluate services, it's important not to make
+assumptions about things beyond your control. For instance, if
+you're planning to run a server, you shouldn't assume
+that the clients that connect to it are going to be the clients
+it's designed to work with; an attacker can perfectly well
+write a new client that does things differently. Similarly, if
+you're running a client, you shouldn't assume that all
+the servers you connect to are well behaved unless you have some
+means of controlling them.</p><p>
+
+
+
+
+
+<a name="ch13-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.2.1. What Operations Does the Protocol Allow?</h3>
+
+
+
+
+
+<a name="INDEX-1221" /> <a name="INDEX-1222" /> <a name="INDEX-1223" />Different
+protocols are designed with different levels of security. Some of
+them are quite safe by design (which doesn't mean that
+they're safe once they've been implemented!), and some of
+them are unsafe as designed. While a bad implementation can make a
+good protocol unsafe, there's very little that a good
+implementation can do for a bad protocol, so the first step in
+evaluating a service is evaluating the underlying protocol.</p><p>
+
+
+
+
+
+This may sound dauntingly technical, and indeed it can be. However, a
+perfectly useful first cut can often be done without any actual
+knowledge of the details of how the protocol works, just by thinking
+about what it's supposed to be doing.</p><p>
+
+
+
+
+
+<a name="ch13-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">13.2.1.1. What is it designed to do?</h3>
+
+
+
+
+
+No matter how little else you know about a protocol, you know what
+it's supposed to be able to do, and that gives you a powerful
+first estimate of how risky it must be. In general, the less a
+protocol does, the safer it is.</p><p>
+
+
+
+
+
+For instance, suppose you are going to invent a protocol that will be
+used to talk to a coffee maker, so that you can put your coffee maker
+on the Web. You could, of course, build a web server into the coffee
+maker (or wait for coffee makers to come with web servers, which
+undoubtedly will happen soon) or use an existing protocol,<a href="#FOOTNOTE-26">[26]</a> but as a rugged individualist you have decided to make up
+a completely new protocol. Should you allow this protocol through
+your firewall?</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-26" />[26]An appropriate choice would be the Hyper Text Coffee Pot
+Control Protocol (HTCPCP), defined in RFC 2324, April 1, 1998, but
+like most RFCs issued on April 1st, it is rarely implemented.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+Well, if the protocol just allows people to ask the coffee maker how
+much coffee is available and how hot it is, that sounds OK. You
+probably don't care who has that information. If you're
+doing something very secret, maybe it's not OK. What if the
+competition finds out you're suddenly making coffee in the
+middle of the night? (The U.S. government discovered at one point
+that journalists were tracking important news stories by watching the
+rates at which government agencies ordered pizza deliveries late at
+night.)</p><p>
+
+
+
+
+
+What if the protocol lets people make coffee? Well, that depends. If
+there's a single "make coffee" command, and the
+coffee maker will execute it only if everything's set up to
+make coffee, that's still probably OK. But what if
+there's a command for boiling the water and one for letting it
+run through the coffee? Now your competitors can reduce your
+efficiency rate by ensuring your coffee is weak and undrinkable.</p><p>
+
+
+
+
+
+What if you decided that you wanted real flexibility, so you designed
+a protocol that gave access to each switch, sensor, and light in the
+machine, allowing them to be checked and set, and then you provided a
+program with settings for making weak coffee, normal coffee, and
+strong coffee? That would be a very useful protocol, providing all
+sorts of interesting control options, and a malicious person using it
+could definitely explode the coffee machine.</p><p>
+
+
+
+
+
+Suppose you're not interested in running the coffee machine
+server; you just want to let people control the coffee machine from
+your site with the coffee machine controller. So far, there
+doesn't seem to be much reason for concern (particularly if
+you're far enough away to avoid injury when the coffee machine
+explodes). The server doesn't send much to the client, just
+information about the state of the coffee machine. The client
+doesn't send the server any information about itself, just
+instructions about the coffee machine.</p><p>
+
+
+
+
+
+You could still easily design a coffee machine client that would be
+risky. For instance, you could add a feature to shut down the client
+machine if the coffee machine was about to explode. It would make the
+client a dangerous thing to run without changing the protocol at all.</p><p>
+
+
+
+
+
+While you will probably never find yourself debating coffee-making
+protocols, this discussion covers the questions you'll want to
+ask about real-life protocols; what sort of information do they give
+out and what can they change? The following table provides a very
+rough outline of things that make a protocol more or less safe.</p><p>
+
+
+
+
+
+<a name="ch13-12-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Safer</p><p></th>
+<th>
+Less Safe</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+Receives data that will be displayed only to the user</p><p></td>
+<td>
+Changes the state of the machine</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Exchanges predefined data in a known format</p><p></td>
+<td>
+Exchanges data flexibly, with multiple types and the ability to add
+new types</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Gives out no information</p><p></td>
+<td>
+Gives out sensitive information</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Allows the other end to execute very specific commands</p><p></td>
+<td>
+Allows the other end to execute flexible commands</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch13-13-fm2xml" /><div class="sect3">
+<h3 class="sect3">13.2.1.2. Is the level of authentication and authorization it uses appropriate for doing that?</h3>
+
+
+
+
+
+<a name="INDEX-1224" />The more
+risky an operation is, the more control you want to have over who
+does it. This is actually a question of authorization (who is allowed
+to do something), but in order to be able to determine authorization
+information, you must first have good authentication. It's no
+point being able to say "Cadmus may do this, but Dorian may
+not", if you can't be sure which one of them is trying to
+do what.</p><p>
+
+
+
+
+
+A protocol for exchanging audio files may not need any authentication
+(after all, we've already decided it's not very
+dangerous), but a protocol for remotely controlling a computer
+definitely needs authentication. You want to know exactly who you are
+talking to before you decide that it's okay for them to issue
+the "delete all files" command.</p><p>
+
+
+
+
+
+Authentication can be based on the host or on the user and can range
+considerably in strength. A protocol could give you any of the
+following kinds of information about clients:</p><p>
+
+
+
+
+
+<ul><li>No information about where a connection comes from</p><p></li><li>Unverifiable information (for instance, the client may send a
+username or hostname to the server expecting the server to just trust
+this information, as in SMTP)</p><p></li><li>A password or other authenticator that an attacker can easily get
+hold of (for instance, the community string in SNMP or the cleartext
+password used by standard Telnet)</p><p></li><li>A nonforgeable way to authenticate (for instance, an SSH negotiation)</p></li></ul>
+Once the protocol provides an appropriate level of authentication, it
+also needs to provide appropriate controls over authorization. For
+instance, a protocol that allows both harmless and dangerous commands
+should allow you to give some users permission to do everything, and
+others permission to do only harmless things. A protocol that
+provides good authentication but no authorization control is a
+protocol that permits revenge but not protection (you can't
+keep people from doing the wrong thing; you can only track them down
+once they've done it).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch13-14-fm2xml" /><div class="sect3">
+<h3 class="sect3">13.2.1.3. Does it have any other commands in it?</h3>
+
+
+
+
+
+If you have a chance to actually analyze a protocol in depth, you
+will want to make sure that there aren't any hidden surprises.
+Some protocols include little-used commands that may be more risky
+than the commands that are the main purpose of the protocol. One
+example that occurred in an early protocol document for SMTP was the
+TURN command. It caused the SMTP protocol to reverse the direction of
+flow of electronic mail; a host that had originally been sending mail
+could start to receive it instead. The intention was to support
+polling and systems that were not always connected to the network.
+The protocol designers didn't take authentication into account,
+however; since SMTP has no authentication, SMTP senders rely on their
+ability to control where a connection goes to as a way to identify
+the recipient. With TURN, a random host could contact a server, claim
+to be any other machine, and then issue a TURN to receive the other
+machine's mail. Thus, the relatively obscure TURN command made
+a major and surprising change in the security of the protocol. The
+TURN command is no longer specified in the SMTP protocol.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-15-fm2xml" /><div class="sect2">
+<a name="INDEX-1225" /><a name="INDEX-1226" /><h3 class="sect2">13.2.2. What Data Does the Protocol Transfer?</h3>
+
+
+
+
+
+<a name="INDEX-1227" />Even if the protocol is
+reasonably secure itself, you may be worried about the information
+that's transferred. For instance, you can imagine a credit card
+authorization service where there was no way that a hostile client
+could damage or trick the server and no way that a hostile server
+could damage or trick the client, but where the credit card numbers
+were sent unencrypted. In this case, there's nothing inherently
+dangerous about running the programs, but there is a significant
+danger to the information, and you would not want to allow people at
+your site to use the service.</p><p>
+
+
+
+
+
+When you evaluate a service, you want to consider what information
+you may be sharing with it, and whether that information will be
+appropriately protected. In the preceding TURN command example, you
+would certainly have been alert to the problem. However, there are
+many instances that are more subtle. For instance, suppose people
+want to play an online game through your firewall -- no important
+private information could be involved there, right? Wrong. They might
+need to give usernames and passwords, and that information provides
+important clues for attackers. Most people use the same usernames and
+passwords over and over again.</p><p>
+
+
+
+
+
+In addition to the obvious things (data that you know are important
+secrets, like your credit card number, the location the plutonium is
+hidden in, and the secret formula for your product), you will want to
+be careful to watch out for protocols that transfer any of the
+following:</p><p>
+
+
+
+
+
+<ul><li>Information that identifies individual people (Social Security
+numbers or tax identifiers, bank account numbers, private telephone
+numbers, and other information that might be useful to an
+impersonator or hostile person)</p><p></li><li>Information about your internal network or host configuration,
+including software or hardware serial numbers, machine names that are
+not otherwise made public, and information about the particular
+software running on machines</p><p></li><li>Information that can be used to access systems (passwords and
+usernames, for instance)<a name="INDEX-1228" /></p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-16-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.2.3. How Well Is the Protocol Implemented?</h3>
+
+
+
+
+
+<a name="INDEX-1229" />Even the best protocol can be
+unsafe if it's badly implemented. You may be running a protocol
+that doesn't contain a "shutdown system" command
+but have a server that shuts down the system anyway whenever it gets
+an illegal command.</p><p>
+
+
+
+
+
+This is bad programming, which is appallingly common. While some
+subtle and hard-to-avoid attacks involve manipulating servers to do
+things that are not part of the protocol the servers are
+implementing, almost all of the attacks of this kind involve the most
+obvious and easy ways to avoid errors. The number of commercial
+programs that would receive failing grades in an introductory
+programming class is beyond belief.</p><p>
+
+
+
+
+
+In order to be secure, a program needs to be very careful with the
+data that it uses. In particular, it's important that the
+program verify assumptions about data that comes from possibly
+hostile sources. What sources are possibly hostile depends on the
+environment that the program is running in. If the program is running
+on a secured bastion host with no hostile users, and you are willing
+to accept the risk that any attacker who gets access to the machine
+has complete control over the program, the only hostile data source
+you need to worry about is the network.</p><p>
+
+
+
+
+
+On the other hand, if there are possibly hostile users on the
+machine, or you want to maintain some degree of security if an
+attacker gets limited access to the machine, then all incoming data
+must be untrusted. This includes command-line arguments,
+configuration data (from configuration files or a resource manager),
+data that is part of the execution environment, and all data read
+from the network. Command-line arguments should be checked to make
+sure they contain only valid characters; some languages interpret
+special characters in filenames to mean "run the following
+program and give me the output instead of reading from the
+file". If an option exists to use an alternate configuration
+file, an attacker might be able to construct an alternative that
+would allow him or her greater access. The execution environment
+might allow override variables, perhaps to control where temporary
+files are created; such values need to be carefully validated before
+using them. All of these flaws have been discovered repeatedly in
+real programs on all kinds of operating
+systems.<a name="INDEX-1230" /></p><p>
+
+
+
+
+
+An example of poor argument checking, which attackers still scan for,
+occurred in one of the sample CGI programs that were originally
+distributed with the NCSA HTTP server. The program was installed by
+default when the software was built and was intended to be an example
+of CGI programming. The program used an external utility to perform
+some functions, and it gave the utility information that was
+specified by the remote user. The author of the program was even
+aware of problems that can occur when running external utilities
+using data you have received. Code had been included to check for a
+list of bad values. Unfortunately, the list of bad values was
+incomplete, and that allowed arbitrary commands to be run by the HTTP
+server. A better approach, based upon "That Which Is Not
+Expressly Permitted Is Prohibited", would have been to check
+the argument for allowable characters.</p><p>
+
+
+
+
+
+<a name="INDEX-1231" />
+<a name="INDEX-1232" />The worst result of failure to check
+arguments is a "buffer overflow", which is the basis for
+a startlingly large number of attacks. In these attacks, a program is
+handed more input data than its programmer expected; for instance, a
+program that's expecting a four-character command is handed
+more than 1024 characters. This sort of attack can be used against
+any program that accepts user-defined input data and is easy to use
+against almost all network services. For instance, you can give a
+very long username or password to any server that authenticates users
+(FTP, POP, IMAP, etc.), use a very long URL to an HTTP server, or
+give an extremely long recipient name to an SMTP server. A
+well-written program will read in only as much data as it was
+expecting. However, a sloppily written program may be written to read
+in all the available input data, even though it has space for only
+some of it.</p><p>
+
+
+
+
+
+When this happens, the extra data will overwrite parts of memory that
+were supposed to contain something else. At this point, there are
+three possibilities. First, the memory that the extra data lands on
+could be memory that the program isn't allowed to write on, in
+which case the program will promptly be killed off by the operating
+system. This is the most frequent result of this sort of error.</p><p>
+
+
+
+
+
+Second, the memory could contain data that's going to be used
+somewhere else in the program. This can have all sorts of nasty
+effects; again, most of them result in the program's crashing
+as it looks up something and gets a completely wrong answer. However,
+careful manipulation may get results that are useful to an attacker.
+For instance, suppose you have a server that lets users specify what
+name they'd like to use, so it can say "Hi, Fred!"
+It asks the user for a nickname and then writes that to a file. The
+user doesn't get to specify what the name of the file is;
+that's specified by a configuration file read when the server
+starts up. The name of the nickname file will be in a variable
+somewhere. If that variable is overwritten, the program will write
+its nicknames to the file with the new value as its name. If the
+program runs as a privileged user, that file could be an important
+part of the operating system. Very few operating systems work well if
+you replace critical system files with text files.</p><p>
+
+
+
+
+
+Finally, the memory that gets overwritten could be memory
+that's not supposed to contain data at all, but instead
+contains instructions that are going to be executed. Once again, this
+will usually cause a crash because the result will not be a valid
+sequence of instructions. However, if the input data is specifically
+tailored for the computer architecture the program is running on, it
+can put in valid instructions. This attack is technically difficult,
+and it is usually specific to a given machine and operating system
+type; an attack that works on a Sun running Solaris will not work on
+an Intel machine running Solaris, nor will an attack that works on
+the same Intel machine running Windows 95. If you can't move a
+binary program between two machines, they won't both be
+vulnerable to exactly the same form of this attack.</p><p>
+
+
+
+
+
+Preventing a "buffer overflow" kind of attack is a matter
+of sensible programming, checking that input falls within expected
+limits. Some programming languages automatically include the basic
+size checks that prevent buffer overflows. Notably, C does not do
+this, but Java does.</p><p>
+
+
+
+
+
+<a name="ch13-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">13.2.3.1. Does it have any other commands in it?</h3>
+
+
+
+
+
+Some protocol implementations include extra debugging or
+administrative features that are not specified in the protocol. These
+may be poorly implemented or less well thought out and can be more
+risky than those specified in the protocol.
+<a name="INDEX-1233" /><a name="INDEX-1234" />The most famous example of this was
+exploited by the 1988 Morris worm, which issued a special SMTP
+debugging command that allowed it to tell Sendmail to execute
+anything the intruder liked. The debugging command is not specified
+in the SMTP protocol.<a name="INDEX-1235" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-18-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.2.4. What Else Can Come in If I Allow This Service?</h3>
+
+
+
+
+
+<a name="INDEX-1236" />Suppose
+somebody comes up with a perfect protocol -- it protects the
+server from the client and vice versa, it securely encrypts data, and
+all the known implementations of it are bullet proof. Should you just
+open a hole for that protocol to any machine on your network? No,
+because you can't guarantee that every internal and external
+host is running that protocol at that port number.</p><p>
+
+
+
+
+
+There's no guarantee that traffic on a port is using the
+protocol that you're interested in. This is particularly true
+for protocols that use large numbers of ports or ports above 1024
+(where port numbers are not assigned to individual protocols), but it
+can be true for any protocol and any port number. For instance, a
+number of programs send protocols other than HTTP to port 80 because
+firewalls frequently allow all traffic to port 80.</p><p>
+
+
+
+
+
+In general, there are two ways to ensure that the packets
+you're letting in belong to the protocol that you want. One is
+to run them through a proxy system or an intelligent packet filter
+that can check them; the other is to control the destination hosts
+they're going to. Protocol design can have a significant effect
+on your ability to implement either of these solutions.</p><p>
+
+
+
+
+
+If you're using a proxy system or an intelligent packet filter
+to make sure that you're allowing in only the protocol that you
+want, it needs to be able to tell valid packets for that protocol
+from invalid ones. This won't work if the protocol is
+encrypted, if it's extremely complex, or if it's
+extremely generic. If the protocol involves compression or otherwise
+changes the position of important data, validating it may be too slow
+to be practical. In these situations, you will either have to control
+the hosts that use the ports, or accept the risk that people will use
+other protocols.<a name="INDEX-1237" /> <a name="INDEX-1238" /> <a name="INDEX-1239" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13. Internet Services and Firewalls</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.3. Analyzing Other Protocols</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch13_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>

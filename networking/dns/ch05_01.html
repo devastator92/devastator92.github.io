@@ -1,0 +1,288 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:19 GMT -->
+<head><title>DNS and Electronic Mail (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_10.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 5. DNS and Electronic Mail</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-5-SECT-1">MX Records</a><br />
+<a href="ch05_02.html">What's a Mail Exchanger, Again?</a><br />
+<a href="ch05_03.html">The MX Algorithm</a><br /><p></p></div>
+
+
+<em>And here Alice began to get rather sleepy, and went on saying to
+herself, in a dreamy sort of way, "Do cats eat bats? Do cats
+eat bats?" and sometimes "Do bats eat cats?" for,
+you see, as she couldn't answer either question, it
+didn't much matter which way she put it.</em></p><p>
+
+
+<a name="INDEX-652" /></a> <a name="INDEX-653" /></a>I'll bet you're drowsy, too,
+after that looong chapter. Thankfully, this chapter discusses a topic
+that should be very interesting to you system administrators and
+postmasters: how DNS impacts electronic mail. And even if it
+isn't interesting to you, at least it's shorter than the
+last chapter.</p><p>
+
+
+<a name="INDEX-654" /></a>One
+of the advantages of the Domain Name System over
+<a name="INDEX-655" /></a>host tables is its support of
+advanced <a name="INDEX-656" /></a>mail
+routing. When mailers had only the <em class="filename">HOSTS.TXT</em>
+file (and its derivative, <em class="filename">/etc/hosts</em>) to work
+with, the best they could do was to attempt delivery to a
+host's IP address. If that failed, they could either defer
+delivery of the message and try again later, or bounce the message
+back to the sender.</p><p>
+
+
+DNS offers a mechanism for specifying backup hosts for mail delivery,
+and also for allowing hosts to assume mail handling responsibilities
+for other hosts. This lets diskless hosts that don't run
+mailers, for example, have mail addressed to them processed by their
+server.</p><p>
+
+
+DNS, unlike host tables, allows arbitrary names to represent
+electronic mail destinations. You can -- and most organizations
+on the Internet do -- use the domain name of your main
+<a name="INDEX-657" /></a>forward-mapping zone as an
+<a name="INDEX-658" /></a>email
+destination. Or you can add domain names to your zone that are purely
+email destinations and don't represent any particular host. A
+single logical email destination may also represent several mail
+servers. With host tables, mail destinations were hosts, period.</p><p>
+
+
+Taken all together, these features give administrators much more
+flexibility in configuring electronic mail on their networks.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-5-SECT-1" /></a>
+<h2 class="sect1">5.1. MX Records</h2>
+
+
+<a name="INDEX-659" /></a>DNS uses a single type of resource
+record to implement enhanced mail routing: the MX record. Originally,
+the MX record's function was split between two records, the
+<a name="INDEX-660" /></a>
+<a name="INDEX-661" /></a>MD (mail destination) and
+<a name="INDEX-662" /></a>
+<a name="INDEX-663" /></a>MF (mail forwarder) records. MD
+specified the final destination to which a message addressed to a
+given domain name should be delivered; MF specified a host that would
+forward mail on to the eventual destination, should that destination
+be unreachable.</p><p>
+
+
+Early experience with DNS on the ARPAnet showed that separating the
+functions didn't work very well. A mailer needed both the MD
+and MF records attached to a domain name (if both existed) to decide
+where to send mail -- one or the other alone wouldn't do.
+But an explicit lookup of one type or another (either MD or MF) would
+cause a name server to cache just that record type. So mailers either
+had to do two queries, one for MD and one for MF records, or they
+could no longer accept cached answers. This meant that the overhead
+of running mail was higher than that of running other services, which
+was eventually deemed unacceptable.</p><p>
+
+
+The two records were integrated into a single record type, MX, to
+solve this problem. Now a mailer just needed all the MX records for a
+particular domain name destination to make a mail routing decision.
+Using cached MX records was fine, as long as the TTLs matched.</p><p>
+
+
+MX records specify a <a name="INDEX-664" /></a> <a name="INDEX-665" /></a><em class="firstterm">mail exchanger</em> for
+a domain name; this is a host that will process
+<em class="emphasis">or</em> forward mail for the domain name (through a
+firewall, for example). "<a name="INDEX-666" /></a>
+<a name="INDEX-667" /></a>Processing"
+the mail means either delivering it to the individual it's
+addressed to or gatewaying it to another mail transport, like X.400
+or Microsoft Exchange.
+"<a name="INDEX-668" /></a>Forwarding"
+means sending it to its final destination or to another mail
+exchanger "closer" to the destination via SMTP, the
+Internet's Simple Mail Transfer Protocol. Sometimes, forwarding
+the mail involves queuing it for some amount of time, too.</p><p>
+
+
+In order to prevent <a name="INDEX-669" /></a>
+<a name="INDEX-670" /></a>mail
+routing loops, the MX record has an extra parameter besides the
+domain name of the mail exchanger: a <a name="INDEX-671" /></a><em class="firstterm">preference value</em>.
+The preference value is an unsigned 16-bit number (between
+and 65535) that indicates the mail exchanger's priority. For
+example, the MX record:</p><p>
+
+
+<blockquote><pre class="code">peets.mpk.ca.us.    IN    MX    10 relay.hp.com.</pre></blockquote>
+
+
+specifies that <em class="emphasis">relay.hp.com</em>
+is a mail exchanger for <em class="emphasis">peets.mpk.ca.us</em> at preference value 10.</p><p>
+
+
+Taken together, the preference values of a destination's mail
+exchangers determine the order in which a mailer should use them. The
+preference value itself isn't important, only its relationship
+to the values of other mail exchangers: is it higher or lower than
+the values of this destination's other mail exchangers? Unless
+there are other records involved:</p><p>
+
+
+<blockquote><pre class="code">plange.puntacana.dr.  IN  MX  1 listo.puntacana.dr.
+plange.puntacana.dr.  IN  MX  2 hep.puntacana.dr.</pre></blockquote>
+
+
+does exactly the same thing as:</p><p>
+
+
+<blockquote><pre class="code">plange.puntacana.dr.  IN  MX  50  listo.puntacana.dr.
+plange.puntacana.dr.  IN  MX  100 hep.puntacana.dr.</pre></blockquote>
+
+
+Mailers should attempt delivery to the mail exchangers with the
+<em class="emphasis">lowest</em> preference values first. It may seems a
+little counterintuitive at first that the most preferred mail
+exchanger has the lowest preference value. But since the preference
+value is an unsigned quantity, this lets you specify a
+"best" mail exchanger at preference value 0.</p><p>
+
+
+If delivery to the most preferred mail exchanger(s) fails, mailers
+should attempt delivery to less preferred mail exchangers (those with
+higher preference values) in order of increasing preference value.
+That is, mailers should try more preferred mail exchangers before
+they try less preferred mail exchangers. More than one mail exchanger
+may share the same preference value, too, giving the mailer its
+choice of which to send to first.<a href="#FOOTNOTE-28">[28]</a> The mailer must try all the mail exchangers at a given
+preference value before proceeding to the next higher value.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-28" /></a>[28]The newest version
+of <em class="filename">sendmail</em>, Version 8, will actually choose
+randomly among mail exchangers with the same preference.</p><p>
+
+</blockquote>
+
+
+For example, the MX records for <em class="emphasis">oreilly.com</em>
+might be:</p><p>
+
+
+<blockquote><pre class="code">oreilly.com.    IN    MX    0  ora.oreilly.com.
+oreilly.com.    IN    MX    10 ruby.oreilly.com.
+oreilly.com.    IN    MX    10 opal.oreilly.com.</pre></blockquote>
+
+
+Interpreted together, these MX records instruct mailers to attempt
+delivery to <em class="emphasis">oreilly.com</em> by
+sending to:</p><p>
+
+
+<ol><li><em class="emphasis">ora.oreilly.com</em> first<p></p></li><li>Either <em class="emphasis">ruby.oreilly.com</em> or
+<em class="emphasis">opal.oreilly.com</em> next, and
+finally<p></p></li><li>The remaining preference 10 mail exchanger (the one not used in step
+2)<p></p></li></ol>
+Of course, once the mailer successfully delivers the mail to one of
+<em class="emphasis">oreilly.com</em>'s mail
+exchangers, it can stop. A mailer successfully delivering <em class="emphasis">oreilly.com</em> mail to <em class="emphasis">ora.oreilly.com</em> doesn't need to
+try <em class="emphasis">ruby.oreilly.com</em> or
+<em class="emphasis">opal.oreilly.com</em>.</p><p>
+
+
+Note that <em class="emphasis">oreilly.com</em>
+isn't a particular host; it's the domain name of
+O'Reilly &amp; Associates' main <a name="INDEX-672" /></a>forward-mapping zone. O'Reilly &amp;
+Associates uses the domain name as the email destination for everyone
+who works there. It's much easier for correspondents to
+remember the single email destination <em class="emphasis">oreilly.com</em> than to remember which
+host -- <em class="emphasis">ruby.oreilly.com</em>?
+<em class="emphasis">amber.oreilly.com</em>? -- each employee
+has an email account on.</p><p>
+
+
+This requires, of course, that the mailer on <em class="emphasis">ora.oreilly.com</em> keep track of which host
+each user at O'Reilly &amp; Associates has an email account on.
+That's usually done by maintaining a master
+<em class="filename">aliases</em> file on <em class="emphasis">ora.oreilly.com</em> that forwards email from
+<em class="emphasis">ora.oreilly.com</em> to its
+eventual destination.</p><p>
+
+
+What if a destination doesn't have any MX records, but it has
+one or more <a name="INDEX-673" /></a>A records? Will a mailer
+simply not deliver mail to that destination? Actually, you can
+compile recent versions of
+<a name="INDEX-674" /></a><em class="filename">sendmail</em>
+to do just that. Most vendors, however, have compiled their
+<em class="filename">sendmail</em>s to be more forgiving: if no MX records
+exist but one or more A records do, they'll at least attempt
+delivery to the address. Version 8 of <em class="filename">sendmail</em>
+compiled "out of the box" will try the address of a mail
+destination without MX records. Check your vendor's
+documentation if you're not sure whether your mail server will
+send mail to destinations with only address records. Even though
+nearly all mailers deliver mail to a destination with just an address
+record and no MX records, it's still a good idea to have at
+least one MX record for each legitimate mail destination. When it has
+mail to deliver, <em class="filename">sendmail</em> always looks up the MX
+records for a destination <em class="emphasis">first</em>. If the
+destination doesn't have any MX records, a name
+server -- usually one of your authoritative name
+servers -- still must answer that query, and then
+<em class="filename">sendmail</em> goes on to look up A records. That
+takes extra time, slows mail delivery, and adds a little load to your
+zone's authoritative name servers. If you simply add an MX
+record for each destination pointing to a domain name that maps to
+the same address that an address lookup would return,
+<em class="filename">sendmail</em> has to send only one query, and the
+mailer's local name server caches the MX record for future
+use.<a name="INDEX-675" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_10.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.10. What Next?</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.2. What's a Mail Exchanger, Again?</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:19 GMT -->
+</html>

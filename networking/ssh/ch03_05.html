@@ -1,0 +1,1062 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:01 GMT -->
+<head><title>Inside SSH-2 (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.5. Inside SSH-2</h2>
+
+
+
+<a name="INDEX-356" />In this <a name="INDEX-357" />section, we discuss the design and
+internals of SSH-2, focusing particularly on its differences and
+improvements as compared to SSH-1. We won't repeat the
+information common to the two protocols. We also compare the products
+SSH1 and SSH2, their software implementation differences, and their
+protocol support. <a href="ch03_05.html#ch03-94965">Figure 3-4</a> summarizes the
+architecture of SSH-2.</p>
+
+
+
+<a name="ch03-94965" /><div class="figure"><img height="621" alt="Figure 3-4" src="figs/ssh_0304.gif" width="482" /></div><h4 class="objtitle">Figure 3-4. SSH-2 architecture</h4>
+
+The most important distinction between SSH1 and SSH2 is that they
+support different, incompatible versions of the SSH protocol: SSH-1.5
+and SSH-2.0. [<a href="ch01_05.html#ch01-87482">Section 1.5, "History of SSH"</a>] These products also have
+important implementation differences, some due to the differing
+protocols, but many are simply omissions due to SSH2's being a
+complete rewrite.</p>
+
+
+
+<a name="ch03-21676" /><div class="sect2">
+<h3 class="sect2">3.5.1. Protocol Differences (SSH-1 Versus SSH-2)</h3>
+
+
+
+<a name="INDEX-358" />SSH-1 is monolithic, encompassing
+multiple functions in a single protocol.
+<a name="INDEX-359" />SSH-2, on the other hand, has been
+separated into modules and consists of three protocols working
+together:</p>
+
+
+
+<ul><li>SSH <a name="INDEX-360" />Transport Layer Protocol
+(<a name="INDEX-361" />SSH-TRANS)</p></li><li>SSH <a name="INDEX-362" />Authentication Protocol
+(<a name="INDEX-363" />SSH-AUTH)</p></li><li>SSH <a name="INDEX-364" />Connection Protocol
+(<a name="INDEX-365" />SSH-CONN)</p></li></ul>
+Each of these protocols has been specified separately, and a fourth
+document, SSH <a name="INDEX-366" />Protocol Architecture
+(<a name="INDEX-367" />SSH-ARCH),
+describes the overall architecture of the SSH-2 protocol as realized
+in these three separate specifications.</p>
+
+
+
+<a href="ch03_05.html#ch03-67626">Figure 3-5</a> outlines the division of labor between
+these modules and how they relate to each other, application
+programs, and the network. SSH-TRANS is the fundamental building
+block, providing the initial connection, packet protocol, server
+authentication, and basic encryption and integrity services. After
+establishing an SSH-TRANS connection, an application has a single,
+secure, full-duplex byte stream to an authenticated peer.</p>
+
+
+
+<a name="ch03-67626" /><div class="figure"><img height="310" alt="Figure 3-5" src="figs/ssh_0305.gif" width="368" /></div><h4 class="objtitle">Figure 3-5. SSH-2 protocol family</h4>
+
+Next, the
+<a name="INDEX-368" />client
+can use SSH-AUTH over the SSH-TRANS connection to authenticate itself
+to the server. SSH-AUTH defines three authentication methods:
+publickey, hostbased, and password. Publickey is similar to the SSH-1
+"RSA" method, but it is more general and can accommodate
+any public-key signature algorithm. The standard requires only one
+algorithm, DSA, since RSA until recently was encumbered by patent
+restrictions.<a href="#FOOTNOTE-31">[31]</a> Hostbased is similar to the SSH-1 RhostsRSA method,
+providing trusted-host authentication using cryptographic assurance
+of the client host's identity. The password method is
+equivalent to SSH-1's password authentication; it also provides
+for changing a user's password, though we haven't seen
+any implementations of this feature. The weak, insecure Rhosts
+authentication of SSH-1 is absent.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-31" />[31]RSA entered the public domain in
+September 2000, after many years as a patented algorithm.</p>
+
+
+</blockquote>
+
+
+
+Finally, the SSH-CONN protocol provides a variety of richer services
+to clients over the single pipe provided by SSH-TRANS. This includes
+everything needed to support multiple interactive and noninteractive
+sessions: multiplexing several streams (or
+<em class="emphasis">channels</em>) over the underlying pipe; managing X,
+port, and agent forwarding; forwarding application signals across the
+connection (such as SIGWINCH, indicating terminal window resizing);
+terminal handling; data compression; and remote program execution.
+Unlike SSH-1, SSH-CONN can handle multiple interactive sessions over
+the same connection, or none. This means SSH-2 supports X or port
+forwarding without the need for a separate terminal session, which
+SSH-1 can't do.</p>
+
+
+
+Note that SSH-CONN isn't layered on SSH-AUTH; they are both at
+the same level above SSH-TRANS. A specialized SSH server for a
+particular, limited purpose might not require authentication. Perhaps
+it just prints out "Nice to meet you!" to anyone who
+connects. More practically, an anonymous <tt class="command">sftp</tt>
+server might provide freely available downloads to all comers. Such a
+server could simply allow a client to engage in SSH-CONN immediately
+after establishing an SSH-TRANS connection, whereas a general login
+server would always require successful authentication via SSH-AUTH
+first.</p>
+
+
+
+We now survey the major differences between SSH-1 and SSH-2. These
+include:</p>
+
+
+
+<ul><li>Expanded algorithm negotiation between client and server</p></li><li>Multiple methods for key-exchange</p></li><li>Certificates for public keys</p></li><li><p>More flexibility with authentication, including partial authentication</p></li><li><p>Stronger integrity checking through cryptography</p></li><li><p>Periodic replacement of the session key ("rekeying")</p></li></ul>
+<a name="ch03-18546" /><div class="sect3">
+<h3 class="sect3">3.5.1.1. Algorithm choice and negotiation</h3>
+
+
+
+A nice feature of SSH-1 is <em class="emphasis">algorithm
+negotiation,</em><a name="INDEX-369" /> in which a client selects a bulk
+encryption cipher from among those supported by the server. Other
+algorithms within SSH-1, however, are hardcoded and inflexible. SSH-2
+improves upon this by making other algorithms negotiable between
+client and server: host key, message authentication, hash function,
+session key exchange, and data compression. SSH-2 requires support of
+one method per category to ensure interoperability and defines
+several other recommended and optional methods. [<a href="ch03_09.html#ch03-65213">Section 3.9, "Algorithms Used by SSH"</a>]</p>
+
+
+
+Another improvement of SSH-2 is an extensible namespace for
+<a name="INDEX-370" />algorithms. SSH-1
+identifies the negotiable bulk ciphers by a numerical code, with no
+values set aside for local additions. In contrast, SSH-2 algorithms
+(as well as protocols, services, and key/certificate formats) are
+named by strings, and local definitions are explicitly supported.
+From SSH-ARCH:</p>
+
+
+
+
+"Names that do not contain an at-sign (@) are reserved to be assigned
+by IANA (Internet Assigned Numbers Authority). Examples include
+3des-cbc, sha-1, hmac-sha1, and zlib. Additional names of this format
+may be registered with IANA [and] MUST NOT be used without first
+registering with IANA. Registered names MUST NOT contain an at-sign
+(@) or a comma (,). Anyone can define additional algorithms by using
+names in the format name@domainname, e.g., ourciphercbc@ssh.fi. The
+format of the part preceding the at sign is not specified; it
+<em class="emphasis">must</em> consist of US-ASCII characters except
+at-sign and comma. The part following the at-sign
+<em class="emphasis">must</em> be a valid fully qualified internet domain
+name [RFC-1034] controlled by the person or organization defining the
+name. Each domain decides how it manages its local namespace."</p>
+
+
+
+
+This format allows new, nonstandard algorithms to be added for
+internal use without affecting interoperability with other SSH-2
+implementations, even those with other local additions. OpenSSH makes
+use of this ability, defining an integrity-checking algorithm called
+<tt class="literal">hmac-ripemd160@openssh.com</tt>.</p>
+</div>
+
+
+
+
+
+<a name="ch03-70562" /><div class="sect3">
+<h3 class="sect3">3.5.1.2. Session key exchange and the server key</h3>
+
+
+
+<a name="INDEX-371" />Recall that the
+<em class="emphasis">session key</em><a name="INDEX-372" /> is the shared symmetric key for the bulk
+data cipher -- the one used directly to encrypt user data passing
+over the SSH connection. [<a href="ch03_03.html#ch03-59754">Section 3.3, "The Architecture of an SSH System"</a>] In SSH-1, this
+key is generated by the client and passed securely to the server by
+double-encrypting it with the server key and server's host key.
+The server key's purpose is to provide perfect forward secrecy.
+[<a href="ch03_04.html#ch03-62629">Section 3.4.1, "Establishing the Secure Connection"</a>]</p>
+
+
+
+In keeping with its design, SSH-2 introduces a more general mechanism
+to accommodate multiple key-exchange methods, from which one is
+negotiated for use. The chosen method produces a shared secret that
+isn't used directly as the session key, but rather is input to
+a further process that produces the session key. The extra processing
+ensures that neither side can fully determine the session key
+(regardless of the exchange method used) and provides protection
+against replay attacks. [<a href="ch03_01.html#ch03-80506">Section 3.1.2, "Integrity "</a>] The key-exchange
+phase of the SSH-2 protocol is also responsible for server
+authentication, as in SSH-1.</p>
+
+
+
+SSH-2 currently defines only one key-exchange method,
+<tt class="literal">diffie-hellman-group1-sha1</tt>, and all
+implementations must support it. As the name implies, it is the
+<a name="INDEX-373" />Diffie-Hellman key-agreement algorithm
+with a fixed group,<a href="#FOOTNOTE-32">[32]</a> together with the SHA-1 hash
+function. The Diffie-Hellman algorithm provides forward secrecy by
+itself, so no server key is needed. Also, independent of the
+processing just described, the Diffie-Hellman algorithm alone ensures
+that neither side can dictate the shared secret.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-32" />[32]A <em class="emphasis">group</em> is a
+mathematical abstraction relevant to the Diffie-Hellman procedure;
+see references on group theory, number theory, or abstract algebra if
+you're curious.</p>
+
+
+</blockquote>
+
+
+
+<tt class="literal">diffie-hellman-group1-sha1</tt><a name="INDEX-374" />
+already provides forward secrecy, so SSH-2 implementations using it
+don't need a server key. Since other key-exchange methods may
+be defined for SSH-2, someone could conceivably implement the SSH-1
+key-exchange algorithm, requiring a server key or similar method to
+provide perfect forward secrecy. But such a method hasn't been
+defined, so server keys are found only in SSH1 and OpenSSH/1.
+Therefore, an SSH-2-only server is more amenable to control by
+<em class="emphasis">inetd</em>, since it avoids the overhead of
+generating a server key on startup. [<a href="ch05_04.html#ch05-58373">Section 5.4.3.2, "Invocation by inetd"</a>]
+Examples are SSH2, or OpenSSH with SSH-1 support turned off.</p>
+</div>
+
+
+
+
+
+<a name="ch03-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">3.5.1.3. Key/identity binding</h3>
+
+
+
+In any <a name="INDEX-375" /><a name="INDEX-376" /><a name="INDEX-377" />public-key system, a crucial problem
+is verifying the owner of a key. Suppose you want to share encrypted
+messages with your friend Alice, but an intruder, Mallory, tricks you
+into accepting one of <em class="emphasis">his</em> public keys as
+Alice's. Now any messages you encrypt (supposedly) to Alice are
+readable by Mallory. Of course, you and Alice will quickly discover
+the problem when she finds that she can't decrypt your
+messages, but by then the damage is done.</p>
+
+
+
+The <a name="INDEX-378" />key-ownership problem is addressed using
+a technique called <em class="emphasis">public-key certificates</em>. A
+certificate is a data structure attesting that a <em class="emphasis">trusted
+third party</em> vouches for the key's owner. More
+precisely, the certificate attests to the binding between a public
+key and a particular identity (a personal or company name, email
+address, URL, etc.), or an ability (the right to access a database,
+modify a file, log into an account, etc.). The attestation is
+represented by a digital signature from the third party. So in our
+example, you and Alice could arrange for a trusted third party, Pete,
+to sign your respective public keys, and you would therefore not
+believe Mallory's bogus, unsigned key.</p>
+
+
+
+This is all well and good, but who vouches for the voucher? How do
+you know the signer of Alice's key is really Pete? This problem
+continues recursively, as you need the signer's public key, and
+a certificate for that, and so on. These chains of certificates can
+be arranged in a hierarchy rooted at well-known Certificate
+Authorities, or they may be arranged in a decentralized network, the
+so-called "web of trust" used by PGP. Such arrangements,
+or trust models, are the basis for a public-key infrastructure (PKI).</p>
+
+
+
+In SSH, the key-ownership problem shows up in the bindings between
+hostnames and host keys. In all current SSH implementations, this is
+done using simple databases of hostnames, addresses, and keys which
+must be maintained and distributed by the user or system
+administrator. This isn't a scalable system. SSH-2 permits
+certificates to be included with public keys, opening the door for
+PKI techniques. The current SSH-2 specification defines formats for
+X.509, SPKI, and OpenPGP certificates, although no current SSH
+implementation supports their use.</p>
+
+
+
+Certificates, in theory, can also apply to user authentication. For
+instance, a certificate can bind a username to a public key, and SSH
+servers can accept valid certificates as authorization for the
+private key holder to access an account. This system provides the
+benefits of hostbased authentication without the fragile dependence
+on peer host security. If PKIs become more common, perhaps such
+features will appear.</p>
+</div>
+
+
+
+
+
+<a name="ch03-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">3.5.1.4. Authentication</h3>
+
+
+
+In order to
+<a name="INDEX-379" />authenticate,
+an SSH-1 client tries a sequence of authentication methods chosen
+from the set allowed by the server -- public-key, password,
+trusted host, etc. -- until one succeeds or all fail. This method
+is an all-or-nothing proposition; there's no way for a server
+to require multiple forms of authentication, since as soon as one
+method succeeds, the authentication phase ends.</p>
+
+
+
+The SSH-2 protocol is more flexible: the server informs the client
+which authentication methods are usable at any point in the exchange,
+as opposed to just once at the beginning of the connection, as in
+SSH-1. Thus, an SSH-2 server can, for example, decide to disallow
+public-key authentication after two unsuccessful attempts but still
+continue allowing the password method only. One use of this feature
+is interesting to note. SSH-2 clients usually first make an
+authentication request using a special method, "none." It
+always fails and returns the real authentication methods permitted by
+the server. If you see puzzling references in the SSH logs indicating
+that the method "none" has "failed," now you
+know what's going on (and it's normal).</p>
+
+
+
+An SSH-2 server also may indicate partial success: that a particular
+method succeeded, but further authentication is necessary. The server
+therefore can require the client to pass multiple authentication
+tests for login, say, both password and hostbased. The SSH2 server
+configuration keyword <tt class="literal">RequiredAuthentications</tt>
+controls this feature, which OpenSSH/2 currently lacks. [<a href="ch05_05.html#ch05-46136">Section 5.5.1, "Authentication"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch03-18-fm2xml" /><div class="sect3">
+<h3 class="sect3">3.5.1.5. Integrity checking</h3>
+
+
+
+Improving on SSH-1's weak CRC-32 <a name="INDEX-380" />integrity
+check, SSH-2 uses cryptographically strong <a name="INDEX-381" />Message
+Authentication Code (MAC) algorithms to provide integrity and data
+origin assurance. The MAC methods and keys for each direction
+(separate from the session encryption keys) are determined during the
+key-exchange phase of the protocol. SSH-2 defines several MAC
+algorithms, and requires support for <tt class="literal">hmac-sha1</tt>, a 160-bit hash
+using the standard keyed HMAC construction with SHA-1. (See RFC-2104,
+"HMAC: Keyed-Hashing for Message Authentication.")</p>
+</div>
+
+
+<a name="INDEX-382" />
+
+
+<a name="ch03-80181" /><div class="sect3">
+<h3 class="sect3">3.5.1.6. Hostbased authentication</h3>
+
+
+
+An SSH server needs some sort of client host identifier to perform
+hostbased <a name="INDEX-383" /><a name="INDEX-384" />authentication. Specifically, it
+needs this for two operations:</p>
+
+
+
+<ul><li>Looking up the client host key</p></li><li>Matching the client host while performing authorization via the
+hostbased control files (<em class="filename">shosts.equiv</em>, etc.)</p></li></ul>
+Call these operations the
+<em class="emphasis">HAUTH</em><a name="INDEX-385" /> process. Now, there is an important
+difference between trusted-host authentication in protocols 1 and 2:
+in SSH-2, the authentication request contains the client hostname,
+whereas in SSH-1 it doesn't. This means that SSH-1 is
+constrained to use the client IP address, or a name derived from the
+address via the naming service, as the identifier. Since the SSH-1
+server's idea of the client host identity is tied to the
+client's network address, <a name="INDEX-386" />RhostsRSA authentication can't
+work completely (or sometimes at all) in the following common
+scenarios:</p>
+
+
+
+<ul><li>Mobile client with a changing IP address (e.g., a laptop being
+carried around and connected to different networks)</p></li><li>Client behind a network-visible proxy, such as SOCKS</p></li><li>Client with multiple network addresses ("multihomed"),
+unless the corresponding DNS entries are arranged in a particular way</p></li></ul>
+The SSH-2 protocol, on the other hand, doesn't impose this
+restriction: the hostbased authentication process is in principle
+independent of the client's network address. An SSH-2 server
+has two candidates at hand for the client identifier: the name in the
+authentication request,
+<em class="emphasis">N</em><sub class="subscript">auth</sub> and the name looked
+up via the client's network address,
+<em class="emphasis">N</em><sub class="subscript">net</sub>. It can simply
+ignore <em class="emphasis">N</em><sub class="subscript">net</sub> altogether,
+using <em class="emphasis">N</em><sub class="subscript">auth</sub> for
+<em class="emphasis">HAUTH</em> instead. Of course, the known-hosts list
+and hostbased authorization files must be maintained using that
+namespace. Indeed, <em class="emphasis">N</em><sub class="subscript">auth</sub>
+can be chosen from any space of identifiers, not necessarily tied or
+related to the network naming service at all. For clarity's
+sake, it should probably continue to be the client's canonical
+hostname.</p>
+
+
+
+As currently implemented,
+<a name="INDEX-387" />SSH2 doesn't do
+this. <tt class="command">sshd2</tt> behaves just as
+<tt class="command">sshd1</tt> does, using
+<em class="emphasis">N</em><sub class="subscript">net</sub> for
+<em class="emphasis">HAUTH</em> and uses
+<em class="emphasis">N</em><sub class="subscript">auth</sub> only as a sanity
+check. If <em class="emphasis">N</em><sub class="subscript">net </sub><img align="absmiddle" src="figs/U2260.gif" />
+<em class="emphasis">N</em><sub class="subscript">auth</sub>,
+<em class="emphasis">sshd2</em> fails the authentication. This is really
+backwards and causes hostbased authentication to be much less useful
+than it could be, since it continues to not work in the scenarios
+noted earlier. The authors have suggested to SCS to instead use
+<em class="emphasis">N</em><sub class="subscript">auth</sub> for
+<em class="emphasis">HAUTH</em> and implement the
+<em class="emphasis">N</em><sub class="subscript">net </sub>=
+<em class="emphasis">N</em><sub class="subscript">auth</sub> check as a per-host
+option. It makes sense as an extra bit of security, in cases where
+it's known that the client host address should never change.
+This is analogous to public-key authentication, which is independent
+of the client host address, but which admits additional restrictions
+based on the source address when appropriate (via the
+<tt class="literal">"hosts="</tt> <em class="filename">authorized_keys</em>
+option).</p>
+</div>
+
+
+
+
+
+<a name="ch03-11767" /><div class="sect3">
+<h3 class="sect3">3.5.1.7. Session rekeying</h3>
+
+
+
+<a name="INDEX-388" /><a name="INDEX-389" />The
+more data that's encrypted with a particular key and available
+for analysis, the better an attacker's chances of breaking the
+encryption. It is therefore wise to periodically change keys if large
+amounts of data are being encrypted. This isn't much of an
+issue with asymmetric keys, since they are typically used only to
+encrypt small amounts of data, producing digital signatures over hash
+values or encrypting symmetric keys. A key for the bulk data cipher
+of an SSH connection, however, might encrypt hundreds of megabytes of
+data, if it's being used to transfer large files or perform
+protected backups, for example. The SSH-2 protocol provides a way for
+either side of an SSH connection to initiate a re-keying of the
+<a name="INDEX-390" />session. This causes the
+client and server to negotiate new session keys and take them into
+use. SSH-1 doesn't provide a way to change the bulk cipher key
+for a session.</p>
+</div>
+
+
+
+
+
+<a name="ch03-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">3.5.1.8. SSH-1/SSH-2: summary</h3>
+
+
+
+<a href="ch03_05.html#ch03-57773">Table 3-3</a> summarizes the important differences
+between Versions 1.5 and 2.0 of the SSH protocol. <a name="INDEX-391" /> <a name="INDEX-392" /></p>
+
+
+
+<a name="ch03-57773" /><h4 class="objtitle">Table 3-3.  SSH-1 and SSH-2 Differences </h4><table border="1">
+
+
+
+<tr>
+<th>
+SSH-2</p></th>
+<th>
+SSH-1</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+Separate transport, authentication, and connection protocols.</p></td>
+<td>
+One monolithic protocol.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Strong cryptographic integrity check.</p></td>
+<td>
+Weak CRC-32 integrity check.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Supports password changing.</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+<tr>
+<td>
+Any number of session channels per connection (including none).</p></td>
+<td>
+Exactly one session channel per connection (requires issuing a remote
+command even when you don't want one).</p></td>
+</tr>
+
+
+<tr>
+<td>
+Full negotiation of modular cryptographic and compression algorithms,
+including bulk encryption, MAC, and public-key.</p></td>
+<td>
+Negotiates only the bulk cipher; all others are fixed.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Encryption, MAC, and compression are negotiated separately for each
+direction, with independent keys.</p></td>
+<td>
+The same algorithms and keys are used in both directions (although RC4 uses separate keys, since the
+algorithm's design demands that keys not be reused).</p></td>
+</tr>
+
+
+<tr>
+<td>
+Extensible algorithm/protocol naming scheme allows local extensions
+while preserving interoperability.</p></td>
+<td>
+Fixed encoding precludes interoperable additions.</p></td>
+</tr>
+
+
+<tr>
+<td>
+User authentication methods:</p>
+
+
+
+<ul><li>public-key (DSA, RSA, OpenPGP)</p></li>
+<li>hostbased</p></li><li>password</p></li><li>(Rhosts dropped due to insecurity)</p></li></ul></td>
+<td>
+Supports a wider variety:</p>
+
+
+
+<ul><li>public-key (RSA
+only)</p></li><li>RhostsRSA</p></li>
+<li>password</p></li>
+
+<li>Rhosts
+(<em class="emphasis">rsh</em>-style)</p></li>
+
+<li>TIS</p></li>
+
+<li>Kerberos</p></li></ul></td>
+</tr>
+
+
+<tr>
+<td>
+Use of Diffie-Hellman key agreement removes the need for a server key.</p></td>
+<td>
+Server key used for forward secrecy on the session key.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Supports public-key certificates.</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+<tr>
+<td>
+User authentication exchange is more flexible and allows requiring
+multiple forms of authentication for access.</p></td>
+<td>
+Allows exactly one form of authentication per session.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Hostbased authentication is in principle independent of client
+network address, and so can work with proxying, mobile clients, etc.
+(but see <a href="ch03_05.html#ch03-80181">Section 3.5.1.6, "Hostbased authentication"</a>).</p></td>
+<td>
+RhostsRSA authentication is effectively tied to the client host
+address, limiting its usefulness.</p></td>
+</tr>
+
+
+<tr>
+<td>
+Periodic replacement of session keys.</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-20-fm2xml" /><div class="sect2">
+<h3 class="sect2">3.5.2. Implementation Differences</h3>
+
+
+
+<a name="INDEX-393" /><a name="INDEX-394" />There are many differences among the
+current crop of SSH-1 and SSH-2 implementations. Some are direct
+results of the different protocols, such as the ability to require
+multiple forms of authentication or support of the DSA public-key
+algorithm. Others are feature differences that aren't dictated
+by the protocols, but are simply inclusions or omissions by the
+software authors. Here we discuss some nonprotocol-related design and
+feature differences among OpenSSH, SSH1, and SSH2:</p>
+
+
+
+<ul><li>Host keys</p></li><li>No fallback to <em class="emphasis">rsh</em></p></li><li>Setuid client</p></li><li><p>SSH-1 backward compatibility</p></li></ul>
+<a name="ch03-25788" /><div class="sect3">
+<h3 class="sect3">3.5.2.1. Host keys</h3>
+
+
+
+SSH <a name="INDEX-395" />host keys are
+long-term asymmetric keys that distinguish and identify hosts running
+SSH, or instances of the SSH server, depending on the SSH
+implementation. This happens in two places in the SSH protocol:</p>
+
+
+
+<ol><li>Server authentication verifying the server host's identity to
+connecting clients. This process occurs for every SSH
+connection.<a href="#FOOTNOTE-33">[33]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-33" />[33]In SSH-1, the host key also encrypts the
+session key for transmission to the server. However, this use is
+actually for server authentication, rather than for data protection
+per se; the server later proves its identity by showing that it
+correctly decrypted the session key. Protection of the session key is
+obtained by encrypting it a second time with the ephemeral server
+key.</p>
+
+
+</blockquote></li><li>Authentication of a client host to the server; used only during
+RhostsRSA or hostbased user authentication.</p></li></ol>
+Unfortunately, the term "host key" is confusing. It
+implies that only one such key may belong to a given host. This is
+true for client authentication but not for server authentication,
+because multiple SSH servers may run on a single machine, each with a
+different identifying key.<a href="#FOOTNOTE-34">[34]</a> This so-called "host key"
+actually identifies a running instance of the SSH server program, not
+a machine.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-34" />[34]Or sharing the same key,
+if you wish, assuming the servers are compatible with one
+another.</p>
+
+
+</blockquote>
+
+
+
+SSH1 maintains a single database serving both server authentication
+and client authentication. It is the union of the system
+<em class="filename">known_hosts</em> file (
+<em class="filename">/etc/ssh_known_hosts</em><a name="INDEX-396" />), together with the user's
+<em class="filename">~/.ssh/known_hosts</em><a name="INDEX-397" />
+file on either the source machine (for server authentication) or the
+target machine (for client authentication). The database maps a
+hostname or address to a set of keys acceptable for authenticating a
+host with that name or address. One name may be associated with
+multiple keys (more on this shortly).</p>
+
+
+
+SSH2, on the other hand, maintains two separate maps for these
+purposes:</p>
+
+
+
+<ul><li>The <em class="filename">hostkeys</em><a name="INDEX-398" /> map for server host authentication</p></li><li>The <em class="filename">knownhosts</em><a name="INDEX-399" /> map for client host authentication</p></li></ul>
+Hooray, more confusing terminology. Here, the term "known
+hosts" is reused with slightly different formatting (knownhosts
+versus known_hosts) for an overlapping but not identical purpose.</p>
+
+
+
+While SSH1 keeps host keys in a file with multiple entries, SSH2
+stores them in a filesystem directory, one key per file, indexed by
+filename. For instance, a <em class="filename">knownhosts</em> directory
+looks like:</p>
+
+
+
+<blockquote><pre class="code">$ ls -l /etc/ssh2/knownhosts/
+total 2
+-r -- r -- r -- 
+   1 root     root       697 Jun  5 22:22 wynken.sleepy.net.ssh-dss.pub
+-r -- r -- r -- 
+   1 root     root       697 Jul 21  1999 blynken.sleepy.net.ssh-dss.pub</pre></blockquote>
+
+
+
+Note that the filename is of the form <em class="filename">&lt;hostname&gt;.&lt; key
+type&gt;.pub</em>.</p>
+
+
+
+The other map, <em class="emphasis">hostkeys</em>, is keyed not just on
+name/address, but also on the server's TCP listening port; that
+is to say, it is keyed on TCP sockets. This allows for multiple keys
+per host in a more specific manner than before. Here, the filenames
+are of the form <em class="filename">key_</em> &lt;
+<em class="filename">port number</em> &gt;
+<em class="filename">_</em> &lt;hostname&gt;
+<em class="filename">.pub</em>. The following example shows the public
+keys for one SSH server running on <em class="emphasis">wynken</em>, port 22, and two running on
+<em class="emphasis">blynken</em>, ports 22 and 220.
+Furthermore, we've created a symbolic link to make
+"nod" another name for the server at <em class="emphasis">wynken</em>:22. End users may add to these
+maps by placing keys (either manually or automatically by client)
+into the directories <em class="filename">~/.ssh2/knownhosts</em> and
+<em class="filename">~/.ssh2/hostkeys</em>.</p>
+
+
+
+<blockquote><pre class="code">$ ls -l /etc/ssh2/hostkeys/
+total 5
+-rw-r--r--   1 root     root    757 May 31 14:52 key_22_blynken.sleepy.net.pub
+-rw-r--r--   1 root     root    743 May 31 14:52 key_22_wynken.sleepy.net.pub
+-rw-r--r--   1 root     root    755 May 31 14:52 key_220_wynken.sleepy.net.pub
+lrwxrwxrwx   1 root     root     28 May 31 14:57 key_22_nod.pub -&gt; 
+                                                 key_22_wynken.sleepy.net.pub</pre></blockquote>
+
+
+
+Even though it allows for multiple keys per host, SSH2 is missing one
+useful feature of SSH1: <a name="INDEX-400" />multiple keys <em class="emphasis">per
+name.</em> This sounds like the same thing, but there's a
+subtle difference: names can refer to more than one host. A common
+example is a set of load-sharing login servers hidden behind a single
+hostname. A university might have a set of three machines intended
+for general login access, each with its own name and address:</p>
+
+
+
+<blockquote class="simplelist">
+
+<em class="emphasis">login1.foo.edu</em> <img align="absmiddle" src="figs/U2192.gif" /> 10.0.0.1</p>
+
+<em class="emphasis">login2.foo.edu</em> <img align="absmiddle" src="figs/U2192.gif" /> 10.0.0.2</p>
+
+<em class="emphasis">login3.foo.edu</em> <img align="absmiddle" src="figs/U2192.gif" /> 10.0.0.3</p>
+
+</blockquote>
+
+
+
+In addition, there is a single generic name that carries all three
+addresses:</p>
+
+
+
+<blockquote class="simplelist">
+
+<em class="emphasis">login.foo.edu</em> <img align="absmiddle" src="figs/U2192.gif" /> {10.0.0.1, 10.0.0.2, 10.0.0.3}</p>
+
+</blockquote>
+
+
+
+The <a name="INDEX-401" />university
+computing center tells people to connect only to <em class="emphasis">login.foo.edu</em>, and the
+university's naming service hands out the three addresses in
+round-robin order (e.g., using round-robin DNS) to share the load
+among the three machines. SSH has problems with this setup by
+default. Each time you connect to <em class="emphasis">login.foo.edu</em>, you have a 2/3 chance of
+reaching a different machine than you reached last time, with a
+different host key. SSH repeatedly complains that the host key of
+<em class="emphasis">login.foo.com</em> has changed
+and issues a warning about a possible attack against your client.
+This soon gets annoying. With SSH1, you can edit the
+<em class="filename">known_hosts</em> file to associate the generic name
+with each of the individual host keys, changing this:</p>
+
+
+
+<blockquote><pre class="code">login1.foo.edu 1024 35 1519086808544755383...
+login2.foo.edu 1024 35 1508058310547044394...
+login3.foo.edu 1024 35 1087309429906462914...</pre></blockquote>
+
+
+
+to this:</p>
+
+
+
+<blockquote><pre class="code">login1.foo.edu,login.foo.edu 1024 35 1519086808544755383...
+login2.foo.edu,login.foo.edu 1024 35 1508058310547044394...
+login3.foo.edu,login.foo.edu 1024 35 1087309429906462914...</pre></blockquote>
+
+
+
+With SSH2, however, there's no general way to do this; since
+the database is indexed by entries in a directory, with one key per
+file, it can't have more than one key per name.</p>
+
+
+
+It might seem that you're losing some security by doing this,
+but we don't think so. All that's really happening is the
+recognition that a particular name may refer to different hosts at
+different times, and thus you tell SSH to trust a connection to that
+name if it's authenticated by any of a given set of keys. Most
+of the time, that set happens to have size 1, and you're
+telling SSH, "When I connect to this name, I want to make sure
+I'm connecting to this particular host." With multiple
+keys per name, you can also say, "When I connect to this name,
+I want to make sure that I get one of the following set of
+hosts." That's a perfectly valid and useful thing to do.</p>
+
+
+
+Another way to solve this problem is for the system administrators of
+<em class="emphasis">login. foo.com</em> to install
+the same host key on all three machines. But this defeats the ability
+for SSH to distinguish between these hosts, even if you want it to.
+We prefer the former approach.</p>
+</div>
+
+
+
+
+
+<a name="ch03-91717" /><div class="sect3">
+<h3 class="sect3">3.5.2.2. No fallback to rsh</h3>
+
+
+
+Not only does SSH1 support
+<tt class="command">rsh</tt><a name="INDEX-402" />-style authentication, but
+also <tt class="command">ssh</tt> can invoke <tt class="command">rsh</tt>
+automatically if a remote host has no SSH server running. Along with
+Rhosts authentication support, this feature is deliberately absent
+from SSH2, due to the poor security of <tt class="command">rsh</tt>. [<a href="ch07_04.html#ch07-42679">Section 7.4.5.8, "RSH issues"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch03-52465" /><div class="sect3">
+<h3 class="sect3">3.5.2.3. Setuid client</h3>
+
+
+
+The SSH1 client needs to be installed as <a name="INDEX-403" />setuid root in
+order to use RhostsRSA authentication. There are two reasons for
+this: host key access and privileged source ports. The privileged
+port requirement from the client is a holdover from
+<tt class="command">rsh</tt>-style authentication that adds no security to
+RhostsRSA, and that requirement has been dropped from SSH2 hostbased
+authentication. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>]</p>
+
+
+
+The remaining reason for a setuid client is access to the private
+host key file. The host key is stored unencrypted, so SSH can access
+it without a human to type a passphrase. Therefore the file
+containing the private host key must be protected from general read
+access. The SSH server usually runs as root for other reasons, and so
+can read any file. The client, though, is run by ordinary users, yet
+must have access to the private host key to engage in trusted-host
+authentication. The file is usually installed as readable only by the
+root user, and so the client needs to be setuid root.</p>
+
+
+
+Now, on general security grounds, one tries to avoid installing
+setuid programs if at all possible -- most especially those that
+setuid to root. Any such program must be carefully written to prevent
+abuse. Preferably, a setuid program should be small and simple with
+little user interaction. The big, complicated SSH client, which talks
+constantly with users as well as other machines, is definitely not a
+safe candidate.</p>
+
+
+
+SSH2 sidesteps this problem by introducing the
+<tt class="command">ssh-signer2</tt><a name="INDEX-404" />
+program. <tt class="command">ssh-signer2</tt> factors into a separate
+program that portion of the client that requires access to the
+private host key. It speaks the SSH packet protocol on its standard
+input and output and takes as input a hostbased authentication
+request to be signed. It carefully checks the request for validity;
+most particularly, it checks that the username in the request is that
+of the user running <tt class="command">ssh-signer2</tt>, and that the
+hostname is the canonical name of the current host. If the request is
+valid, <tt class="command">ssh-signer2</tt> signs the request with the host
+key and returns it.</p>
+
+
+
+Since <tt class="command">ssh-signer2</tt> is a relatively small and
+simple, it is easier to be confident that it is securely written and
+safe to make setuid. In turn, the SSH client itself is no longer
+setuid; when it needs to sign a hostbased authentication request, it
+runs <tt class="command">ssh-signer2</tt> as a subprocess to get the
+signature.</p>
+
+
+
+Although the SSH2 installation process makes the private host key
+readable only by root, and <tt class="command">ssh-signer2</tt> setuid
+root, there is no real need to use the root account for this purpose,
+and indeed every reason not to. It suffices to create a new,
+unprivileged user for this specific purpose, say, "ssh."
+It should be a locked account with no password and no way to log into
+it, and the account information should be stored in local files
+(e.g., <em class="filename">/etc/passwd</em>,
+<em class="filename">/etc/group</em>) rather than NIS. You should then
+make the host key file readable only by this account and make
+<tt class="command">ssh-signer2</tt> setuid and owned by it. For example:</p>
+
+
+
+<blockquote><pre class="code"># chown ssh /etc/ssh_host_key
+# chmod 400 /etc/ssh_host_key
+# chown ssh /usr/local/bin/ssh-signer2
+# chmod 04711 /usr/local/bin/ssh-signer2</pre></blockquote>
+
+
+
+This has the same effect as the default installation and is even less
+risky since it doesn't involve a setuid root program.</p>
+
+
+
+You can do the same thing with <tt class="command">ssh1</tt>, but it
+renders trusted-host authentication unusable, since the server
+demands a privileged source port for the RhostsRSA mechanism.</p>
+</div>
+
+
+
+
+
+<a name="ch03-76730" /><div class="sect3">
+<h3 class="sect3">3.5.2.4. SSH-1 backward compatibility</h3>
+
+
+
+SSH2 can provide backward
+<a name="INDEX-405" />compatibility for the SSH-1 protocol if
+the entire SSH1 package is also installed on the same machine. The
+SSH2 client and server simply run their SSH1 counterparts when they
+connect to a partner running the older protocol. This is rather
+cumbersome. It's also wasteful and slow, since each new
+<tt class="command">sshd1</tt> needs to generate its own server key, which
+otherwise the single master server only regenerates once an hour.
+This wastes entropy, sometimes a precious commodity, and can cause
+noticeable delays in the startup of SSH-1 connections to an SSH2
+server. Further, it is an administrative headache and a security
+problem, since one must maintain two separate SSH server
+configurations and try to make sure all desired restrictions are
+adequately covered in both.</p>
+
+
+
+Beginning with Version 2.1.0,
+<a name="INDEX-406" />OpenSSH supports
+both SSH-1 and SSH-2 in a single set of programs, though the support
+isn't yet as complete as that found in SSH2. (For example,
+hostbased authentication is missing; this doesn't affect
+compliance with SSH-2, though, since that support is optional.) This
+technique avoids the problems inherent in the SSH2 mechanism. The
+SSH-1 protocol is still considered the primary option; if
+you're contacting a server that supports both protocols, the
+OpenSSH client uses SSH-1. You can force it to use SSH-2 with the
+<em class="emphasis">-2</em> switch, or the "protocol 2"
+configuration statement.<a name="INDEX-407" /> <a name="INDEX-408" /> <a name="INDEX-409" /></p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.4. Inside SSH-1</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.6. As-User Access </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:02 GMT -->
+</html>

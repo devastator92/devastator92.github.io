@@ -1,0 +1,1916 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Stronger security for NFS (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">12.5. Stronger security for NFS</h2>
+
+The security mechanisms described so far in this <a name="INDEX-1814" />
+<a name="INDEX-1815" />chapter
+are essentially refinements of the standard Unix login/password and
+file permission constraints, extended to handle distributed
+environments. Some additional care is taken to restrict superuser
+access over the network, but nothing in RPC's AUTH_SYS
+authentication protocol ensures that the user specified by the UID in
+the credential structure is permitted to use the RPC service, and
+nothing verifies that the user (or user running the application
+sending RPC requests) is really who the UID professes to be.
+</p>
+
+Simply checking user credentials is like giving out employee badges:
+the badge holder is given certain access rights. Someone who is not
+an employee could steal a badge and gain those same rights.
+Validating the user credentials in an NFS request is similar to
+making employees wear badges with their photographs on them: the
+badge grants certain access rights to its holder, and the photograph
+on the badge ensures that the badge holder is the "right"
+person. Stronger RPC security mechanisms than AUTH_SYS exist, which
+add credential validation to the standard RPC system. These stronger
+mechanisms can be used with NFS. We will discuss two of the stronger
+RPC security mechanisms available with Solaris 8, AUTH_DH, and
+RPCSEC_GSS. Both mechanisms rely on cryptographic techniques to
+achieve stronger security.
+</p>
+
+<a name="nfs2-CHP-12-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">12.5.1. Security services</h3>
+
+Before we describe AUTH_DH and RPCSEC_GSS, we will explain
+<a name="INDEX-1816" />
+<a name="INDEX-1817" />the
+notion of security services, and which services RPC provides.
+Security isn't a monolithic concept, but among others, includes
+notions like authorization, auditing, and compartmentalization. RPC
+security is concerned with four services: identification,
+authentication, integrity, and privacy. Identification is merely the
+name RPC gives to the client and the server. The client's name
+usually corresponds to the UID. The server's name usually
+corresponds to the hostname. Authentication is the service that
+proves that the client and server are who they identify themselves to
+be. Integrity is the service that ensures the messages are not
+tampered with, or at least ensures that the receiver knows they have
+been tampered with. Privacy is the service that prevents
+eavesdropping.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">12.5.2. Brief introduction to cryptography </h3>
+
+Before we describe<a name="INDEX-1818" />
+<a name="INDEX-1819" />
+how the AUTH_DH and RPCSEC_GSS mechanisms work, we will explain some
+of the general principles of cryptography that apply to both
+mechanisms. A complete treatment of the topic can be found in the
+book <em class="emphasis">Applied Cryptography</em>, by Bruce Schneier
+(John Wiley and Sons, Inc., 1996).
+</p>
+
+There are four general cryptographic techniques that are pertinent:
+symmetric key encryption, asymmetric key encryption, public key
+exchange, and one way hash functions.
+</p>
+
+<a name="nfs2-CHP-12-SECT-5.2.1" /><div class="sect3">
+<h3 class="sect3">12.5.2.1. Symmetric key encryption</h3>
+
+In a symmetric encryption scheme, the
+user<a name="INDEX-1820" />
+<a name="INDEX-1821" />
+<a name="INDEX-1822" />
+knows<a name="INDEX-1823" /> some
+secret value (such as a password), which is used to encrypt a value
+such as a timestamp. The secret value is known as a <em class="emphasis">secret
+key</em>. The problem <a name="INDEX-1824" />with symmetric encryption is that
+to get another host to validate your encrypted timestamp, you need to
+get your secret key (password) onto that host. Think of this problem
+as a password checking exercise: normally your password is verified
+on the local machine. If you were required to get your password
+validated on an NFS server, you or the system administrator would
+somehow have to get your password on that machine for it to perform
+the validation. An example of a symmetric key encryption
+<a name="INDEX-1825" />scheme is the <em class="emphasis">Data
+Encryption Standard</em> (<em class="emphasis">DES</em>).
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.2.2" /><div class="sect3">
+<h3 class="sect3">12.5.2.2. Asymmetric key encryption</h3>
+
+Asymmetric key encryption involves the
+<a name="INDEX-1826" /> <a name="INDEX-1827" />
+<a name="INDEX-1828" />use of a public key to encrypt a
+secret value, such as a symmetric key, and, a private key to decrypt
+the same value. A public key and private key are associated as a
+pair. One half of the pair gets generated from the other via a series
+of arithmetic operations. The private key is never equal to the
+public key, hence the term <em class="emphasis">asymmetric</em>. As the
+names suggest, the public key is well-known to everyone, whereas the
+private key is known only to its owner. This helps solve the problem
+of getting a secret key on both hosts. You choose a symmetric secret
+key, encrypt it with the server's public key, send the result
+to the server and the server decrypts the secret key with its own
+private key. The secret key can then be used to encrypt a value like
+a timestamp, which the server validates by decrypting with the shared
+secret key. Alternatively, we could have encrypted the timestamp
+value with the server's public key, sent it to the server, and
+let the server decrypt it with the server's private key.
+However, asymmetric key encryption is usually much slower than
+symmetric key encryption. So, typically software that uses asymmetric
+key encryption uses symmetric key encryption once the shared secret
+key is established
+</p>
+
+The public key is published so that it is available for
+authentication services. The encryption mechanism used for asymmetric
+schemes typically uses a variety of exponentiation and other
+arithmetic operators that have nice commutative properties. The
+encryption algorithm is complex enough, and the keys themselves
+should be big enough (at least 1024 bits), to guarantee that a public
+key can't be decoded to discover its corresponding private key.
+Asymmetric key encryption is also called public key encryption. An
+example of an asymmetric key encryption is RSA.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.2.3" /><div class="sect3">
+<h3 class="sect3">12.5.2.3. Public key exchange</h3>
+
+Public key exchange is similar to<a name="INDEX-1829" /> <a name="INDEX-1830" /> <a name="INDEX-1831" /> asymmetric key encryption in all
+ways but one: it does not encrypt a shared secret key with either
+public or private key. Instead, two agents, say a user and a server,
+generate a shared symmetric secret key that uniquely identifies one
+to the other but cannot be reproduced by a third agent, even if the
+initial agents' public keys are grabbed and analyzed by some
+attacker.
+</p>
+
+Here is how the shared secret key, also called a <em class="emphasis">common
+key</em>, is computed. The user sends to the server the
+user's public key, and the server sends to the user the
+server's public key. The user creates a common key by applying
+a set of arithmetic operations onto the server's public key and
+the user's private key. The server generates the
+<em class="emphasis">same</em> key by applying the same arithmetic onto
+the user's public key and the server's private key.
+Because the algorithm uses commutative operations, the operation
+order does not matter  --  both schemes generate the same key, but
+<em class="emphasis">only</em> those two agents can recreate the key
+because it requires knowing at least one private key. An example of a
+public key exchange algorithm is<a name="INDEX-1832" /> <a name="INDEX-1833" /> <a name="INDEX-1834" /> Diffie-Hellman or DH for short.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.2.4" /><div class="sect3">
+<h3 class="sect3">12.5.2.4. One-way hash functions and MACs</h3>
+
+A <em class="emphasis">one-way hash function</em> takes a string of
+<a name="INDEX-1835" /> <a name="INDEX-1836" />
+<a name="INDEX-1837" /> <a name="INDEX-1838" />
+<a name="INDEX-1839" /> <a name="INDEX-1840" />octets
+of any length and produces a fixed width value called the
+<em class="emphasis">hash</em>. The function is designed such that given
+the hash, it is hard to find the string used as input to the one-way
+hash function, or for that matter, any string that produces the same
+hash result.
+</p>
+
+Let's say you and the server have established a common
+symmetric secret key using one of the three previously mentioned
+techniques. You now want to send a message to the server, but want to
+make sure an attacker in the middle cannot tamper with the message
+without the server knowing. What you can do is first combine your
+message with the secret key (you don't have to encrypt your
+message with the secret key), and then take this combination and
+apply the one way hash function to it.<a href="#FOOTNOTE-22">[22]</a> This computation is called a <em class="emphasis">message
+authentication code</em> or <em class="emphasis">MAC</em>. Then send
+both the MAC and the message (not the combination with the secret
+key) to the server. The server can then verify that you sent the
+message, and not someone who intercepted it by taking the message,
+combining it with the shared secret key in the same way you did, and
+computing the MAC. If the server's computed MAC is the same as
+the MAC you sent, the server has verified that you sent it.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-22" />[22]For brevity,
+we don't describe how a secret key and a message are combined,
+nor how the one-way hash function is applied. Unless you are a
+skilled cryptographer, you should not attempt to invent your own
+scheme. Instead, use the algorithm described in RFC2104.</p>
+</blockquote>
+
+Even though your message and MAC are sent in the clear to the server,
+an attacker in the middle cannot change the message without the
+server knowing it because this would change the result of the MAC
+computation on the server. The attacker can't change the MAC to
+match a tampered message because he doesn't know the secret key
+that only the server and you know. An example of a one-way hash
+function is MD5. An example of a MAC algorithm is HMAC-MD5.
+</p>
+
+Note that when you add a MAC to a message you are<a name="INDEX-1841" /> <a name="INDEX-1842" /> <a name="INDEX-1843" /> <a name="INDEX-1844" /> <a name="INDEX-1845" /> <a name="INDEX-1846" /> enabling
+the<a name="INDEX-1847" />
+<a name="INDEX-1848" /> security
+service of integrity.
+</p>
+
+</div>
+</div>
+<a name="nfs2-CHP-12-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">12.5.3. NFS and IPSec</h3>
+
+IPSec is the standard protocol for <a name="INDEX-1849" />
+<a name="INDEX-1850" />
+<a name="INDEX-1851" />security
+at the IP network level. With IPSec you can beef up your trusted host
+relationships with strong cryptography. IPSec was invented by the
+Internet Engineering Task Force (IETF) to <a name="INDEX-1852" />deal with
+three issues:
+</p>
+
+<ul><li>
+Attackers are becoming quite adept at <a name="INDEX-1853" />spoofing IP addresses. The attacker
+targets a host to victimize. The victim shares some resources (such
+as NFS exports) to only a specific set of clients and uses the source
+IP address of the client to check access rights. The attacker selects
+the IP address of one of these clients to masquerade as. Sometimes
+the attacker is lucky, and the client is down, so this is not too
+difficult. Or the attacker has to take some steps such as disabling a
+router or loading the targeted client. If the attacker fails, you
+might see messages like:
+</p>
+
+<blockquote><pre class="code">IP: Hardware address '%s' trying to be our address %s!</pre></blockquote>
+
+or:</p>
+
+<blockquote><pre class="code">IP: Proxy ARP problem?  Hardware address '%s' thinks it is %s</pre></blockquote>
+
+on the legitimate client's console.</p>
+
+Once the legitimate client is disabled, the attacker then changes the
+IP address on a machine that he controls to that of the legitimate
+client and can then access the victim.
+</p>
+</li><li>
+An attacker that controls a gateway can easily engineer attacks where
+he tampers with the IP packets.
+</p>
+</li><li>
+Finally, if the Internet is to be a tool enabling more collaboration
+between organizations, then there needs to be a way to add privacy
+protections to sensitive traffic.
+</p>
+</li></ul>
+Here is what IPSec can do:</p>
+
+<ul><li>
+Via per-host keys, allows hosts to authenticate each other. This
+frustrates IP spoofing attacks.
+</p>
+</li><li>
+Using a session key derived from per-host keys as input to a MAC,
+protects the integrity of IP traffic to frustrate packet tampering.
+</p>
+</li><li>
+Using a session key, encrypts all the data in the IP packet to
+frustrate eavesdropping.
+</p>
+</li></ul>
+The first two capabilities are provided by the
+<em class="emphasis">AH</em> (<em class="emphasis">Authentication Header</em>)
+feature of IPSec. The all three capabilities are provided by the
+<em class="emphasis">ESP</em> (<em class="emphasis">Encapsulating Security
+Payload</em>) feature of IPSec.
+</p>
+
+Many systems, including Solaris 8, have IPSec support. We won't
+go into the details of how to set up IPSec. However, we will point
+out that IPSec can be a useful tool to improve the security of your
+NFS environment:
+</p>
+
+<ul><li>
+If you use the AH feature, then all NIS lookups are safe from
+tampering on the NIS server, or the NIS traffic. So the attacker
+cannot fool your NFS server into believing that client
+<em class="emphasis">gonzo</em> has IP address 192.4.5.6, instead of
+10.1.2.3. 
+</p>
+</li><li>
+Enabling AH on NFS clients and servers prevents attackers from
+spoofing the clients you list on servers'
+<em class="emphasis">rw=,</em> <em class="emphasis">ro=</em>, and
+<em class="emphasis">root=</em> lists.
+</p>
+</li><li>
+ESP used on the NFS client and server makes operating through
+firewalls safer when accessing sensitive data.
+</p>
+</li></ul>
+While IPSec is useful for securing NFS, because its security is host
+based, it does not protect your network from attackers that log onto
+your IPSec-protected hosts and assume the identity of other users.
+The discussions of AUTH_DH and RPCSEC_GSS that follow address
+this<a name="INDEX-1854" />
+<a name="INDEX-1855" />
+<a name="INDEX-1856" /> issue.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">12.5.4. AUTH_DH: Diffie-Hellman authentication</h3>
+
+AUTH_DH is an RPC security flavor <a name="INDEX-1857" /> <a name="INDEX-1858" /> <a name="INDEX-1859" />that
+uses encryption techniques to improve on AUTH_SYS.
+</p>
+
+<a name="nfs2-CHP-12-SECT-5.4.1" /><div class="sect3">
+<h3 class="sect3">12.5.4.1. Old terms:  AUTH_DES, secure RPC, and, secure NFS</h3>
+
+AUTH_DH was originally called AUTH_DES, and
+<a name="INDEX-1860" />
+<a name="INDEX-1861" />
+<a name="INDEX-1862" />indeed, you'll find that most
+documentation of AUTH_DH still calls it AUTH_DES. However, the _DES
+part of the name is a misnomer. While the DES algorithm is used in
+AUTH_DH, as we will see later, it is the Diffie-Hellman algorithm
+that is central to the workings of the AUTH_DH. We will not refer to
+AUTH_DES again.
+</p>
+
+When AUTH_DH is combined with RPC, the combination is often referred
+to as "Secure RPC." When RPC, and AUTH_DH are combined
+with NFS, the result is often referred to as "Secure
+NFS." However, in the 13 years since AUTH_DH was invented, two
+things have occurred:
+</p>
+
+<ul><li>
+AUTH_DH is no longer considered secure by many security experts.
+After you read the material on AUTH_DH, you might concur.
+</p>
+</li><li>
+RPCSEC_GSS, a stronger, more secure security flavor for RPC is now
+available with Solaris 8 and other NFS implementations.
+</p>
+</li></ul>
+We will not use the terms "Secure RPC" or "Secure
+NFS" again, since they are confusing. Instead, we will use
+RPC/DH and NFS/dh to refer to RPC secured with AUTH_DH, and NFS
+secured with RPC/DH, respectively.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.2" /><div class="sect3">
+<h3 class="sect3">12.5.4.2. Diffie-Hellman key exchange</h3>
+
+AUTH_DH uses Diffie-Hellman public key exchange. Using this
+encryption scheme, RPC can be made more secure by requiring each
+client to establish a valid common key before making RPC requests to
+the server. Diffie-Hellman key exchange relies on each agent that
+wants to establish a common key to agree on two pieces of information
+beforehand. For AUTH_DH these pieces are:
+</p>
+
+<ul><li>
+A base for the exponentiation part of the calculation. AUTH_DH uses a
+base of 3.
+</p>
+</li><li>
+A modulus used for the remainder part of the calculation. AUTH_DH
+uses a modulus of
+<tt class="literal">0xd4a0ba0250b6fd2ec626e7efd637df76c716e22d0944b88b</tt>.
+Let's label this constant as AUTH_DH_MOD.
+</p>
+</li></ul>
+Let PRIV_C be the private key of the client. Then the public key of
+the client is:
+</p>
+
+<blockquote><pre class="code">(1) PUBLIC_C = ( 3 <sup class="superscript">PRIV_C</sup> ) mod<sup class="superscript"> </sup>AUTH_DH_MOD</pre></blockquote>
+
+Let PRIV_S be the private key of the server. Then the public key of
+the server is:
+</p>
+
+<blockquote><pre class="code">(2) PUBLIC_S = ( 3 <sup class="superscript">PRIV_S </sup>) mod<sup class="superscript"> </sup>AUTH_DH_MOD</pre></blockquote>
+
+The client computes a common key between the client and server as:</p>
+
+<blockquote><pre class="code">(3) COMMON_C_S = ( PUBLIC_S <sup class="superscript">PRIV_C</sup> ) mod<sup class="superscript"> </sup>AUTH_DH_MOD</pre></blockquote>
+
+The server computes the common key between the server and client as:</p>
+
+<blockquote><pre class="code">(4) COMMON_S_C = ( PUBLIC_C <sup class="superscript">PRIV_S </sup>) mod AUTH_DH_MOD</pre></blockquote>
+
+To prove that COMMON_C_S equals COMMON_S_C, we replace PUBLIC_S in
+statement (3) with the expression it was derived from in statement
+(2) and drop the MOD part of the expression. We do the same for
+PUBLIC_C in statement (4) with the expression from statement (2):
+</p>
+
+<blockquote><pre class="code">(3.1) COMMON_C_S_PRIME = ( 3 <sup class="superscript">PRIV_S </sup>)<sup class="superscript">PRIV_C = </sup>3 <sup class="superscript">PRIV_S * PRIV_C</sup>
+(4.1) COMMON_S_C_PRIME = ( 3 <sup class="superscript">PRIV_C </sup>)<sup class="superscript">PRIV_S = </sup>3 <sup class="superscript">PRIV_C * PRIV_S  </sup></pre></blockquote>
+
+Because multiplication is a commutative operation, it is obvious that
+COMMON_C_S_PRIME equals COMMON_S_C_PRIME. Therefore, COMMON_C_S
+equals COMMON_S_C.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.3" /><div class="sect3">
+<h3 class="sect3">12.5.4.3. How RPC/DH works</h3>
+
+RPC/DH uses a combination <a name="INDEX-1863" />
+<a name="INDEX-1864" />of
+Diffie-Hellman key exchange and DES encryption. User validation is
+performed by the server, based on information in the RPC request.
+</p>
+
+The client and server decide on the common key via the Diffie-Hellman
+algorithm discussed previously in <a href="ch12_05.html#nfs2-CHP-12-SECT-5.4.2">Section 12.5.4.2, "Diffie-Hellman key exchange"</a>. The common key will be used to
+construct a shared secret DES key. Note that because AUTH_DH_MOD is
+192 bits, the common key will be 192 bits. However, DES uses 64 bit
+keys, such that the low order bit of each octet is a parity bit,
+making DES effectively a 56-bit symmetric key algorithm. AUTH_DH
+deals with this by selecting the middle 64 bits of the common key.
+These 64 bits are split into eight octets. Parity is added to the low
+order bit of each octet. In addition the high order bit of each octet
+is unused, making this effectively a 48-bit shared secret key.
+</p>
+
+The first time the client contacts the server, it generates a random
+session key, and encrypts it with the shared secret DES key. The
+session key is also a DES key. The client also generates a
+time-to-live value (in seconds) called the
+<em class="emphasis">window</em>, and a window value that is one second
+less than the first window value. The two window values are encrypted
+with the session key. The encrypted session key and the encrypted
+window values are sent to the server. The server can decrypt the
+encrypted session key because it knows the common key, and therefore
+the shared secret DES key. With the session key, it can decrypt the
+window values. If the second window value is not one less than the
+first, the server knows something odd is going on, and it rejects the
+client's request.
+</p>
+
+The first time, and on every subsequent contact to the server, the
+client encrypts the current time using the session key. It sends its
+RPC request to the server.
+</p>
+
+The server decrypts the timestamp, using the same session key, and
+verifies that it is accurate. If the decrypted timestamp falls
+outside of the time to live window, the server rejects the request.
+</p>
+
+So far we've described how RPC/DH does authentication. We will
+now look at how identity works in RPC/DH. Recall that AUTH_SYS sends
+a UID, GID, and a list of supplementary GIDs. The first time RPC/DH
+contacts the server to establish the session key, it sends no UIDs or
+GIDs. Instead it sends a string, called a
+<em class="emphasis">netname</em>, which identifies two items:
+</p>
+
+<ul><li>
+The user (albeit, the username is a UID expressed in ASCII-decimal)</p>
+</li><li>
+The domain name of the user (usually this is an NIS domain name)</p>
+</li></ul>
+The server does three things with the netname:</p>
+
+<ul><li>
+Locates an NIS server serving the specified domain that knows about
+the user.
+</p>
+</li><li>
+Looks up the user's netname in the NIS
+<em class="emphasis">netid</em> map for the user's UID, GID, and
+list of supplementary groups.
+</p>
+</li><li>
+Looks up the user's netname in the NIS
+<em class="emphasis">publickey</em> map for the user's
+Diffie-Hellman public key. With that, and the server's private
+key, the server can determine the common key, then the shared secret
+key, then decrypt the session key, and use that to verify that the
+request came from a user corresponding to the netname.
+</p>
+</li></ul>
+By the way, notice that AUTH_DH doesn't have the "too
+many groups" problem of AUTH_SYS that was discussed in <a href="ch12_04.html#nfs2-CHP-12-SECT-4.1">Section 12.4.1, "RPC security"</a>, since no GID list<a name="INDEX-1865" /> <a name="INDEX-1866" /> is sent on the
+wire.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.4" /><div class="sect3">
+<h3 class="sect3">12.5.4.4. RPC/DH state and NFS statelessness</h3>
+
+The title of the section says it all. How
+can<a name="INDEX-1867" /> we reconcile the fact that
+NFS is stateless, and yet RPC/DH clearly establishes state in the
+form of a session key, with a time to live? This state has to be kept
+on the server. The answer is that this is not state that has to be
+recovered in the event of a server crash, which is in stark contrast
+to file locking state. If the server reboots, or if it even decides
+to throw away an RPC/DH session, it is not a disaster. The client
+simply gets an error indicating that the server has no knowledge of
+the session, and the client establishes a new session key as if it
+was the first contact between the client and server.
+</p>
+
+We'll now look at how NFS/dh works by first seeing how to add
+the security features to NFS, and then seeing how the public and
+private keys are managed within this system.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.5" /><div class="sect3">
+<h3 class="sect3">12.5.4.5. Enabling NFS/dh</h3>
+
+Enabling NFS/dh on a filesystem is quite simple: export <a name="INDEX-1868" />and
+mount the filesystem with the <em class="emphasis">sec=dh</em> option. On
+the NFS server, the <em class="emphasis">/etc/dfs/dfstab</em> entry looks
+like this:
+</p>
+
+<blockquote><pre class="code">share -o sec=dh,rw /export/home/thud</pre></blockquote>
+
+When a filesystem is exported with the <em class="emphasis">sec=dh</em>
+option, clients using NFS Version 2 must mount it with the
+<em class="emphasis">sec=dh</em> option if they are to enjoy normal user
+access privileges in the filesystem. On the NFS client, add the
+<em class="emphasis">sec=dh</em> option in the automounter map entry, or
+the <em class="emphasis">/etc/vfstab</em> entry for the filesystem:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">automounter auto_home entry:</i>
+thud                     -sec=dh          bonk:/export/home/thud
+
+<i class="lineannotation">vfstab entry:</i>
+bonk:/export/home/thud - /thud nfs  - no  sec=dh,rw </pre></blockquote>
+
+If the client is using NFS Version 3, it will use Version 3 of the
+MOUNT protocol. MOUNT Version 3 will return the RPC security flavor
+that the directory is exported with, along with the filehandle of the
+directory. Thus, with NFS Version 3, the <em class="emphasis">sec=dh</em>
+mountoption is not necessary.
+</p>
+
+If a user accessing the filesystem can generate a session key with
+the NFS server, it is used to encrypt the timestamps sent with that
+user's NFS requests. If the server decrypts the timestamps
+successfully, the netname presented by the user is trusted and is
+used to derive normal Unix-style credentials for the purpose of file
+access.
+</p>
+
+It's possible, though, that the user can't exchange a
+session key with the server. This will be the case if the user
+doesn't have a public key defined, or if the user cannot supply
+the proper private key to generate a common key using Diffie-Hellman
+key exchange. When there is no valid common key, some NFS servers
+remap the user to <em class="emphasis">nobody</em>. However, by default,
+Solaris 8 rejects such users. If you want to give such users
+anonymous access you can export the filesystem with the following
+line in <em class="emphasis">/etc/dfs/dfstab</em> :
+</p>
+
+<blockquote><pre class="code">share -o sec=dh:none,rw /export/home/thud</pre></blockquote>
+
+Within the NFS/dh system, a user without a valid public/private key
+pair becomes an anonymous user on the NFS server and is subject to
+the same access restrictions (discussed earlier in this chapter) that
+apply to the anonymous user <em class="emphasis">nobody</em>. To utilize
+NFS/dh without impairing a user's ability to do work, you must
+define <a name="INDEX-1869" />public and private key pairs for
+trusted users and trusted hosts.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.6" /><div class="sect3">
+<h3 class="sect3">12.5.4.6. Public and private keys</h3>
+
+Public and private keys are<a name="INDEX-1870" /> <a name="INDEX-1871" /> <a name="INDEX-1872" /> <a name="INDEX-1873" /> maintained in the
+<em class="emphasis">publickey.byname</em> NIS map, which is built from
+<em class="emphasis">/etc/publickey</em> on the master NIS
+server.<a href="#FOOTNOTE-23">[23]</a> The only key that is defined by
+default is one for <em class="emphasis">nobody</em>, which is required for
+the anonymous user mapping. Public and encrypted secrets keys are
+contained in the <em class="emphasis">/etc/publickey</em> file, along with
+a unique identifier for the machine or user owning these keys.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-23" />[23]If you are not running NIS or NIS+, you can
+still create keys, and use NFS/dh with the <em class="emphasis">publickey</em>
+entry in <em class="emphasis">nsswitch.conf</em> set to
+<em class="emphasis">files</em>. You will need to set up an NIS domain
+name on each NFS client and server (see <a href="ch03_02.html#nfs2-CHP-3-SECT-2.4">Section 3.2.4, "Enabling NIS on client hosts"</a>
+for how to set up a domain name on a host). You will also have to
+devise a means for keeping all the <em class="emphasis">/etc/publickey</em>
+files on each client and server synchronized, since the
+encrypted private key field must change every time the user's
+password changes. </p> </blockquote>
+
+<blockquote><pre class="code">unix.10461@nesales publickey:privatekey</pre></blockquote>
+
+The keys are long strings of hexadecimal digits, representing the
+encrypted key values. Obviously, the NIS map cannot contain the
+actual private keys, or the entire encryption mechanism would be
+baseless. Instead, the <em class="emphasis">/etc/publickey</em>
+file's <em class="emphasis">private key</em> field contains the
+user's private key, encrypted with the user's login
+password. For host entries, the private key is encrypted using the
+root password. The private keys themselves are large random numbers,
+just like the session key that is used by RPC/DH.
+</p>
+
+Identifiers in <em class="emphasis">/etc/publickey</em> are called
+<em class="emphasis">netname</em>s and take one of two forms:
+</p>
+
+<blockquote><pre class="code">unix.uid@NISdomain 
+unix.host@NISdomain</pre></blockquote>
+
+The first form is used for user keys; it defines a key valid in the
+current NIS domain. The host key is used to create a RPC/DH key for
+the superuser on the named host. No user key is required for
+<em class="emphasis">root</em>  --  only a host key.
+</p>
+
+The <em class="emphasis">/etc/publickey</em> file is changed by the RPC/DH
+utilities that create and manage key values. Because it contains
+encrypted key strings, it is not easily edited by the superuser, just
+as the password fields in <em class="emphasis">/etc/passwd</em> cannot be
+hand-edited. The <em class="emphasis">publickey</em> file should exist
+<em class="emphasis">only</em> on the NIS master server, or else
+users' private keys will become out of date when they change
+their passwords (and therefore change the <a name="INDEX-1874" /> <a name="INDEX-1875" /> <a name="INDEX-1876" /> <a name="INDEX-1877" />encryption key used
+to store their private keys).
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.7" /><div class="sect3">
+<h3 class="sect3">12.5.4.7. Creating keys</h3>
+
+The superuser can add <a name="INDEX-1878" /> <a name="INDEX-1879" />user
+<a name="INDEX-1880" />keys (on the NIS master server)
+using <em class="emphasis">newkey -u user</em>. As
+<em class="emphasis">root</em>, run <em class="emphasis">newkey</em> with the
+user's login name:
+</p>
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>newkey -u stern</b></tt> 
+Adding new key for unix.1461@nesales.East.Sun.COM. 
+Enter stern's login password:</pre></blockquote>
+
+The password is used to encrypt the private key so that it can be
+safely placed in the <em class="emphasis">publickey</em> maps.
+Unfortunately, the user's existing password in the NIS
+<em class="emphasis">passwd</em> maps must be supplied, requiring you to
+know the user's password. This is fine if you are adding the
+user to passwd map anyway; he is therefore a new user. However, it is
+very inconvenient if you are adding NFS/dh security and have a large
+pool of existing users because:
+</p>
+
+<ul><li>
+You could change every user's login password to the same value.
+The problem with that is that for a period of time every user has the
+same password, and you can expect that some of your users will take
+malicious advantage of that.
+</p>
+</li><li>
+You could change every user's login password to a unique value.
+The problem with that is you have to somehow securely get the new
+passwords to each user. Unless you have a secure email system like
+PGP or S/MIME installed that pretty much leaves you to walk to every
+user's office or telephone them. That you are considering
+NFS/dh suggests that you have a large user base. This is simply not
+practical.
+</p>
+</li></ul>
+Hopefully, a future version of Solaris will fix this so that you can
+supply any password to <em class="emphasis">newkey</em>. The way it would
+work is that you'd use the same RPC/DH password to encrypt
+every private key via newkey. You'd tell your users what the
+RPC/DH password is, and they would each use c<em class="emphasis">hkey
+-p</em> (more on <em class="emphasis">chkey</em> later) to change
+the RPC/DH password to match their login password. Once all the users
+had done the <em class="emphasis">chkey</em>, you'd then start
+exporting NFS filesystems with NFS/dh.
+</p>
+
+You cannot achieve the ideal, but you can come close. What you can do
+is create a <em class="emphasis">template</em> user login, with a unique
+UID (let's use <em class="emphasis">66666</em> for this example) and
+GID, and assign it a password that you intend to publish to all your
+users. Make sure that <em class="emphasis">template</em> has a shell of
+<em class="emphasis">/dev/null</em> in the <em class="emphasis">passwd</em>
+map, so that no one can log in as <em class="emphasis">template</em>. Now
+create keys for <em class="emphasis">template</em> :
+</p>
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>newkey -u template</b></tt> 
+Adding new key for unix.66666@nesales.East.Sun.COM. 
+Enter template's login password:</pre></blockquote>
+
+If you look at the <em class="emphasis">/etc/publickey</em> on host
+<em class="emphasis">nismaster</em> you should see something like:
+</p>
+
+<blockquote><pre class="code">unix.66666@nesales.East.Sun.COM 74365f4e03701cf96de938a59baa39f1039ada407b4ab3a3:9b7130a3f38c6e86f431f81ce1cf64b5e59991d3d5d1ce0596fd5167cb878b51</pre></blockquote>
+
+The netname of <em class="emphasis">template</em> is
+<em class="emphasis">unix.66666@nesales.East.Sun.COM</em>. Each of your
+users will have a similar netname, except for the number between the
+<em class="emphasis">unix</em> prefix, and the
+<em class="emphasis">@nesale.East.Sun.COM</em> suffix. The last long
+hexadecimal number after the colon (:) is user <em class="emphasis">template</em>
+'s private key, encrypted with <em class="emphasis">template</em>
+'s login password.
+</p>
+
+Now for each user, make a copy of <em class="emphasis">template</em>
+'s entry in the <em class="emphasis">/etc/publickey</em>
+file, but change the netname to match the user. Let's say that
+your set of users is <em class="emphasis">stern</em>,
+<em class="emphasis">labiaga</em>, and <em class="emphasis">mre,</em>  with
+UIDs of 1461, 15124, and 23154, respectively. You then edit the
+/<em class="emphasis">etc/publickey</em> file to look like:
+</p>
+
+<blockquote><pre class="code">unix.66666@nesales.East.Sun.COM 74365f4e03701cf96de938a59baa39f1039ada407b4ab3a3:9b7130a3f38c6e86f431f81ce1cf64b5e59991d3d5d1ce0596fd5167cb878b51
+unix.<tt class="userinput"><b>1461</b></tt>@nesales.East.Sun.COM 74365f4e03701cf96de938a59baa39f1039ada407b4ab3a3:9b7130a3f38c6e86f431f81ce1cf64b5e59991d3d5d1ce0596fd5167cb878b51
+unix.<tt class="userinput"><b>15124</b></tt>@nesales.East.Sun.COM 74365f4e03701cf96de938a59baa39f1039ada407b4ab3a3:9b7130a3f38c6e86f431f81ce1cf64b5e59991d3d5d1ce0596fd5167cb878b51
+unix.<tt class="userinput"><b>23514</b></tt>@nesales.East.Sun.COM 74365f4e03701cf96de938a59baa39f1039ada407b4ab3a3:9b7130a3f38c6e86f431f81ce1cf64b5e59991d3d5d1ce0596fd5167cb878b51</pre></blockquote>
+
+You now want to push the publickey file changes into the publickey
+NIS maps:
+</p>
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>cd /var/yp</b></tt>
+nismaster# <tt class="userinput"><b>make publickey</b></tt>
+updated publickey
+pushed publickey</pre></blockquote>
+
+You have now almost effortlessly fully populated the
+<em class="emphasis">publickey</em> maps, but each entry has the same
+public key, same private key, and the same password. This is not what
+you want for the long term. So now you tell your users to expend some
+effort. Each user should be told to:
+</p>
+
+<ul><li>
+Change his or her RPC/DH password that the private key is encrypted
+with (changing the password to the user's login password is
+recommended).
+</p>
+</li><li>
+Change his or her public and private key.</p>
+</li></ul>
+Here are the instructions we give to each user: </p>
+
+<blockquote><pre class="code">client% <tt class="userinput"><b>chkey -p   </b></tt>
+Updating nis publickey database.
+Reencrypting key for 'unix.1461@nesales.East.Sun.COM'.
+Please enter the Secure-RPC password for stern:
+Please enter the login password for stern:
+Sending key change request to nismaster ...
+
+client% <tt class="userinput"><b>chkey</b></tt>
+Updating nis publickey database.
+Generating new key for 'unix.1461@nesales.East.Sun.COM'.
+Please enter the Secure-RPC password for stern:
+Sending key change request to nismaster ...</pre></blockquote>
+
+The first <em class="emphasis">chkey</em> command invocation reencrypts
+his private key with his login password. The second chkey invocation
+generates a brand new and unique private key and public key pair.
+</p>
+
+If the user supplies an invalid password, no password or key will be
+created. If the user's password is valid, and the NIS master
+server is receiving key updates, the key will be added to, or
+modified in, the NIS <em class="emphasis">publickey</em> maps. Both the
+<em class="emphasis">chkey</em> and <em class="emphasis">newkey</em> utilities
+update the <em class="emphasis">/etc/publickey</em> file on the NIS master
+server.
+</p>
+
+To ensure that your users are following the
+<em class="emphasis">chkey</em> instructions, you can check the
+<em class="emphasis">publickey.byname</em> map to see if both the private
+key and the public key fields of each user have changed, by comparing
+them to that of the user <em class="emphasis">template</em>.
+</p>
+
+The only way to create host keys (for superuser verification) is to
+use <em class="emphasis">newkey -h</em> as root :
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>newkey -h bitatron</b></tt> 
+Adding new key for unix.bitatron@nesales.East.Sun.COM. 
+New password:</pre></blockquote>
+
+You must create a host key for every NFS client (so that the client
+can mount filesystems shared with <em class="emphasis">sec=dh</em>) and
+NFS server (so that the server can generate the common key).
+</p>
+
+To receive NIS map updates from <em class="emphasis">newkey</em> or
+<em class="emphasis">chkey</em>, the master NIS server must be able to run
+<em class="emphasis">rpc.ypupdated</em>. On Solaris 8, this daemon is
+started as part of the
+<em class="emphasis">/usr/lib/netsvc/yp/ypstart</em> script, which in turn
+is started by the <em class="emphasis">/etc/init.d/rpc</em> boot script.
+</p>
+
+On every machine that will be using NFS/dh, make sure you are running
+the <em class="emphasis">keyserv</em> daemon. This process is used to
+cache private and common keys, and is also started out of
+<em class="emphasis">/etc/init.d/rpc</em> with lines of the form:
+</p>
+
+<blockquote><pre class="code">if [ -x /usr/sbin/keyserv -a \
+      -n "'/usr/bin/domainname 2&gt;/dev/null'" ]; then
+       /usr/sbin/keyserv &gt;/dev/msglog 2&gt;&amp;1
+       echo " keyserv\c"
+fi</pre></blockquote>
+
+As you can see, <em class="emphasis">keyserv</em> will not start if there
+is no domain name established. Make sure <em class="emphasis">keyserv</em>
+can start, or you will not be able to create session<a name="INDEX-1881" /> <a name="INDEX-1882" /> keys, even if you
+have a valid public and private key pair in the
+<em class="emphasis">publickey</em> NIS maps.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.8" /><div class="sect3">
+<h3 class="sect3">12.5.4.8. Establishing a session key</h3>
+
+When you log into a machine that is <a name="INDEX-1883" />
+<a name="INDEX-1884" />running NFS/dh, the password you supply
+to <em class="emphasis">login</em> is used to attempt to decrypt your
+encrypted private key (in the <em class="emphasis">publickey</em> map). If
+the login and RPC/DH passwords do not match you get errors like:
+</p>
+
+<blockquote><pre class="code">Password does not decrypt secret key (type = 192-0) for 'unix.23514@nesales.East.Sun.COM'.
+Password does not decrypt any secret keys for unix.23514@nesales.East.Sun.COM.</pre></blockquote>
+
+The private key is given to the <em class="emphasis">keyserv</em> daemon,
+<a name="INDEX-1885" />
+<a name="INDEX-1886" />
+<a name="INDEX-1887" />which caches it for generating common
+keys. The common keys are used to exchange session keys with NFS
+servers, as described earlier in this section. Therefore, the entire
+session key generation procedure goes like this:
+</p>
+
+<ol><li>
+You define a public and private key pair, using
+<em class="emphasis">newkey</em> or <em class="emphasis">chkey</em>. The
+private key is a large, random number; it is stored in the
+<em class="emphasis">publickey</em> map by encrypting it with your
+password.
+</p>
+</li><li>
+When you log into a machine, your password is used to decrypt your
+private key. The private key is given to the
+<em class="emphasis">keyserv</em> daemon, where it is cached until you log
+out.
+</p>
+</li><li>
+To access an NFS filesystem mounted with the
+<em class="emphasis">sec=dh</em> option, you must establish a common key
+with the NFS server. You form a common key using your private key and
+the public key for the NFS server. This is done automatically by the
+RPC/DH system.
+</p>
+</li><li>
+From the common key, you derive a shared secret key by taking a
+subset of the bits of the common key. This secret key is used to
+encrypt a randomly generated session key, which is passed to the NFS
+server. All of your NFS requests to that server contain a timestamp
+encrypted with the session key. The server decrypts this timestamp to
+validate your NFS requests.
+</p>
+</li></ol>
+Note that you must supply your login password for the
+<em class="emphasis">keyserv</em> daemon to be given your private key. If
+you don't supply a password when you log into a machine  -- 
+for example, you <em class="emphasis">rlogin</em> to another machine
+ --  then there is no way for the <em class="emphasis">keyserv</em>
+daemon to automatically receive your decrypted private key. To
+establish a session key in this situation, use the
+<em class="emphasis">keylogin</em> utility, which accepts your login
+password and uses it to decrypt your private key:
+</p>
+
+<blockquote><pre class="code">remote% <tt class="userinput"><b>keylogin</b></tt> 
+Password:</pre></blockquote>
+
+Note that if your login and RPC/DH passwords are different, whether
+you use <em class="emphasis">rlogin</em> or not, you must use
+<em class="emphasis">keylogin</em> to allow <em class="emphasis">keyserv</em>
+to see your private key. Or else you can use <em class="emphasis">chkey
+-p</em> to change your RPC/DH password to your login password.
+</p>
+
+Keys that are decrypted via <em class="emphasis">keylogin</em> are also
+<a name="INDEX-1888" /> <a name="INDEX-1889" />passed to <em class="emphasis">keyserv</em>,
+where they remain until the user executes a
+<em class="emphasis">keylogout</em>. If you are going to be logging into
+nontrusted hosts, use <em class="emphasis">keylogin</em> to decrypt your
+key, and add <em class="emphasis">keylogout</em> to your
+<em class="emphasis">.logout</em> file (in your home directory) so that
+your key is destroyed when you log out.
+</p>
+
+You must reference the NIS <em class="emphasis">passwd</em> map in order
+for the automatic private key caching to occur. For proper operation
+of NFS/dh, do not put users in the local file
+<em class="emphasis">/etc/passwd</em>, or their encrypted private keys may
+become out-of-date when they change their local passwords but do not
+change the NIS-managed password used to encrypt the private key in
+the <em class="emphasis">publickey</em> map. On the NIS master server,
+make sure you use an alternate password source file, instead of the
+default <em class="emphasis">/etc/passwd</em>.
+</p>
+
+There's one thing missing: how does the root, or host, private
+key get decrypted? You establish a session key using the
+<em class="emphasis">host</em> key for the NFS server. In order for the
+server to exchange keys with you, it must be able to decrypt the
+host's private key, and this requires the root password or a
+"hidden" copy of the root key. One obvious approach is to
+force someone to supply the root password when the machine boots, so
+that the host private key in the <em class="emphasis">publickey</em> map
+can be decrypted and given to the <em class="emphasis">keyserv</em>
+daemon. However, this is often too restrictive: if an NFS server
+boots and no system administrator is present to supply the root
+password, no NFS/dh services will be available.
+</p>
+
+You can solve this dilemma by using the <em class="emphasis">-r</em>
+option to <em class="emphasis">keylogin</em> to store the host's
+private key in the protected <em class="emphasis">/etc/.rootkey</em> file
+of the NFS server. Note that this is <em class="emphasis">not</em> the
+root password; it's the large, random number used as the
+host's private key. When the <em class="emphasis">keyserv</em>
+daemon starts up, it reads the host's key out of this file so
+that clients of the host can establish session keys with it.
+</p>
+
+A similar issue applies to the NFS client when you are using the
+automounter to access NFS mounted filesystems. Unless the superuser
+has logged into the system, and thus manually established his private
+key into keyserv, users will not be able use the automounter to
+access filesystems exported with <em class="emphasis">sec=dh</em>. Once
+again, you use <em class="emphasis">keylogin -r</em>, this time running it
+on the NFS client. When the <em class="emphasis">keyserv</em> daemon
+starts up, it reads the host's key out of this file so that the
+automounter can establish session keys <a name="INDEX-1890" /> <a name="INDEX-1891" />on NFS servers.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.9" /><div class="sect3">
+<h3 class="sect3">12.5.4.9. NFS/dh checklist</h3>
+
+This list summarizes what you need to do to<a name="INDEX-1892" />
+create the various daemons and files that must be in place for proper
+operation of NFS/dh:
+</p>
+
+<ol><li>
+Create keys for users with <em class="emphasis">chkey</em> or
+<em class="emphasis">newkey -u</em>. Create a host key for each machine on
+which you need secure <em class="emphasis">root</em> access using
+<em class="emphasis">newkey -h</em>.
+</p>
+</li><li>
+Make sure the NIS master server is running
+<em class="emphasis">rpc.ypupdated</em>.
+</p>
+</li><li>
+Push the <em class="emphasis">publickey</em> map to all NIS slaves after
+making any changes to it, so that NFS/dh is operating before the next
+NIS map transfer.
+</p>
+</li><li>
+Establish a <em class="emphasis">/etc/.rootkey</em> file on every NFS
+server and client via <em class="emphasis">keylogin -r</em>.
+</p>
+</li><li>
+If you are using NFS/dh on trusted hosts, make sure that users
+perform a <em class="emphasis">keylogin</em> to produce a temporary
+private key. If users do not supply a password when they log into a
+host, the local <em class="emphasis">keyserv</em> process on that host
+must be given the user's private key explicitly. Also, have
+users add <em class="emphasis">keylogout</em> to their
+<em class="emphasis">.logout</em> files to remove the temporary keys given
+to <em class="emphasis">keyserv</em>.
+</p>
+</li><li>
+Ensure that each client that is using NFS/dh is running the
+<em class="emphasis">keyserv</em> daemon.
+</p>
+</li><li>
+To export a filesystem using NFS/dh, add the
+<em class="emphasis">sec=dh</em> option to its entry in
+<em class="emphasis">/etc/dfs/dfstab</em>. On NFS Version 2 clients, mount
+the filesystem with the <em class="emphasis">sec=dh</em> option in the
+mount options field of the automounter map or
+<em class="emphasis">/etc/vfstab</em>.
+</p>
+</li></ol>
+Finally, make sure that your client and server clocks remain
+well-synchronized (see <a href="ch14_07.html#nfs2-CHP-14-SECT-7">Section 14.7, "Time synchronization"</a> for a simple
+scheme). Since NFS/dh uses encrypted timestamps for validation,
+drifting client clocks may cause the server to reject otherwise valid
+NFS/dh requests because they appear to be replays of out-of-date
+requests. The NFS server code has a small window for checking client
+timestamps, and if the clock drift falls within this window, the RPC
+call is executed.
+</p>
+
+On Solaris 8, the default window size is five minutes (300 seconds).
+If you are serious about using NFS/dh, you will probably want to
+leave this window unchanged. However, you can change it to a
+different value, by modifying the <em class="emphasis">authdes_win</em>
+tunable parameter in the <em class="emphasis">/etc/system</em> file:
+</p>
+
+<blockquote><pre class="code">* 10 minutes
+set rpcsec:authdes_win = 600</pre></blockquote>
+
+You can also set it on a live system without rebooting by:</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>echo</b></tt> <tt class="userinput"><b>authdes_win/W 0t600</b></tt> <tt class="userinput"><b>| adb -k -w</b></tt>
+<tt class="userinput"><b>authdes_win:    0x12c  =  0x258</b></tt> </pre></blockquote>
+
+The shorter the window, the less time a would-be network spoofer has
+to attempt to replay any request, but on the other hand, the less
+clock drift you can<a name="INDEX-1893" /> tolerate.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.4.10" /><div class="sect3">
+<h3 class="sect3">12.5.4.10. How secure is RPC/DH?</h3>
+
+RPC/DH is flawed for several<a name="INDEX-1894" /> reasons:
+</p>
+
+<ul><li>
+It uses a 192-bit modulus for its public and private keys. In 1987,
+192 bits was appropriate because for larger sizes, it was found that
+common key generation took several minutes to complete on Motorola
+68010 processors, which were still used in a significant number of
+Sun's installed base of systems. However, by 1990, advances in
+RISC processors produced workstation machines that could, by brute
+force, derive the private key from any public key in under a day.
+</p>
+</li><li>
+It uses only a 48-bit shared secret key for encrypting the session
+key. This can be brute forced in less than a day as well.
+</p>
+</li><li>
+Recall the discussion about requiring users to do a
+<em class="emphasis">keylogin</em> if they are using
+<em class="emphasis">rlogin</em> between trusted hosts. The point of
+<em class="emphasis">rlogin</em> with trusted hosts is to avoid constant
+password challenges. Also, the more times the same password is
+entered, the more opportunity for someone to look over your shoulder
+(or to eavesdrop on the network) to see it.
+</p>
+</li><li>
+RPC/DH does a better job of authentication than AUTH_SYS, but there
+is no support for integrity or privacy. It is obvious why privacy is
+desirable, but why is integrity so important to NFS? Say we are using
+NFS/dh, and our attacker in the middle intercepts a request to read a
+particular file. He prevents the read from proceeding. However, he
+takes the RPC/DH header, and concatenates it with a new NFS request
+to write the same file (this is known as a <em class="emphasis">splicing
+attack</em>). As we discussed earlier in <a href="ch12_05.html#nfs2-CHP-12-SECT-5.2.4">Section 12.5.2.4, "One-way hash functions and MACs"</a>, this would not be possible if RPC/DH
+had integrity services.
+</p>
+</li><li>
+It's impossible to extend RPC/DH to fix the above issues.</p>
+</li></ul>
+For these reasons, many security experts will tell you that NFS/dh is
+waste of time to deploy, even though the successful attacks on NFS/dh
+require the attacker to have much more sophistication than that
+needed to attack NFS over AUTH_SYS. If you understand the risks and
+you are comfortable with the security offered by one more of:
+</p>
+
+<ul><li>
+NIS</p>
+</li><li>
+DNS (that is, DNS without DNSSEC)</p>
+</li><li>
+NFS over AUTH_SYS</p>
+</li><li>
+Transparent security discussed earlier in <a href="ch12_01.html#nfs2-CHP-12-SECT-1">Section 12.1, "User-oriented network security"</a>
+</p>
+</li><li>
+Password-based security such as what <em class="emphasis">imap</em>,
+<em class="emphasis">telnet</em>, and <em class="emphasis">ftp</em> offer
+</p>
+</li></ul>
+then you ought to be comfortable with RPC/DH. If you aren't
+comfortable with any of the above, including RPC/DH, then you should
+be running a very secure combination of directory service and file
+service. One combination would be NIS+ with enhanced DH security, as
+mentioned in <a href="ch12_02.html#nfs2-CHP-12-SECT-2">Section 12.2, "How secure are NIS and NFS?"</a> <a name="INDEX-1895" />earlier in this
+chapter, and Kerberized NFS as described in the next <a name="INDEX-1896" /> <a name="INDEX-1897" /> <a name="INDEX-1898" />section.
+</p>
+
+</div>
+</div>
+<a name="nfs2-CHP-12-SECT-5.5" /><div class="sect2">
+<h3 class="sect2">12.5.5. RPCSEC_GSS:  Generic security services for RPC</h3>
+
+The previous section described a complete<a name="INDEX-1899" /> <a name="INDEX-1900" />
+security system for NFS and RPC, and the subsection <a href="ch12_05.html#nfs2-CHP-12-SECT-5.4.10">Section 12.5.4.10, "How secure is RPC/DH?"</a> discusses its flaws. Sun decided to
+develop a new RPC security flavor that would address the problems,
+with one added feature: it would be infinitely extendable, so that
+key size limitations, and problems with cryptographic algorithms
+(cryptographers are constantly finding problems with various
+algorithms) would not slow development of new security mechanisms.
+</p>
+
+The new security flavor is called RPCSEC_GSS. Note that it does not
+have the AUTH_ prefix like AUTH_SYS and AUTH_DH. This is because it
+provides integrity and privacy services in addition to
+authentication.
+</p>
+
+RPCSEC_GSS is based on<a name="INDEX-1901" /> the Generic Security Services API
+(GSS-API). GSS-API provides the ability to write applications that
+can authenticate clients and servers, integrity protect the messages
+they exchange, and also privacy protect the messages they exchange.
+GSS-API also permits one to "plug in" different security
+mechanisms or providers without changing the application that uses
+GSS-API. <a href="ch12_05.html#nfs2-CHP-12-FIG-2">Figure 12-2</a> depicts the GSS-API multiplex
+applications that are consumers of GSS-API, and mechanisms that are
+providers for GSS-API.
+</p>
+
+<a name="nfs2-CHP-12-FIG-2" /><div class="figure"><img height="200" alt="Figure 12-2" src="figs/nfs2.1202.gif" width="316" /></div><h4 class="objtitle">Figure 12-2.  GSS-API architecture</h4>
+
+RPCSEC_GSS leverages GSS-API capabilities to provide authentication,
+integrity, and privacy if the security mechanism provider supports
+those services. Currently<a name="INDEX-1902" /> <a name="INDEX-1903" /> Kerberos V5 is the mostly widely deployed
+GSS-API security provider, and it does support all three services.
+NFS over RPCSEC_GSS can use Kerberos V5's capabilities. At the
+time this book was written:
+</p>
+
+<ul><li>
+Solaris (2.6, 7, and 8) was the only known Unix operating system
+offering an NFS implementation that supported Kerberos V5 security.
+</p>
+</li><li>
+At least two PC/NFS implementations -- Hummingbird's
+Maestro, and Netmanage's Interdrive -- supported Kerberos V5
+security.
+</p>
+</li></ul>
+<a name="nfs2-CHP-12-SECT-5.5.1" /><div class="sect3">
+<h3 class="sect3">12.5.5.1. Kerberos V5</h3>
+
+The Kerberos V5 system was developed at the Massachusetts Institute
+of Technology. It is another mechanism for enforcing security within
+a service, but it differs from RPC/DH in several ways:
+</p>
+
+<ul><li>
+Kerberos uses multiple levels of DES encryption to exchange keys and
+passwords. No public key encryption is used.
+</p>
+</li><li>
+A <em class="emphasis">Key Distribution Center</em> (<em class="emphasis">KDC</em>
+) is required to maintain Kerberos V5 service passwords;
+this server must be kept safe from attack to preserve the integrity
+of the Kerberos system. RPC/DH uses the
+<em class="emphasis">publickey</em> map, which is available to all NIS
+clients. The data in the <em class="emphasis">publickey</em> map is
+encrypted using user's login passwords, not an additional
+RPC/DH password.
+</p>
+</li><li>
+Kerberos V5 authentication is built into the entire service, or
+application, not just into the session layer. For example, you can
+use Kerberos to make the line printer spooling daemon secure. Doing
+so, however, requires the source <a name="INDEX-1904" />code to the line printer
+software.
+</p>
+</li><li>
+Kerberos V5 has the notion <a name="INDEX-1905" />of
+<em class="emphasis">forwardable</em> credentials. Think back to earlier
+in this chapter (see <a href="ch12_05.html#nfs2-CHP-12-SECT-5.4.8">Section 12.5.4.8, "Establishing a session key"</a>) when we
+talked about <em class="emphasis">rlogin</em>, transparent access, and the
+fact that when using NFS/dh, you still had to provide a password to
+<em class="emphasis">keylogin</em> even though (or rather, because)
+<em class="emphasis">rlogin</em> didn't prompt for one. Kerberos V5
+has replacements for programs like <em class="emphasis">rlogin</em> and
+<em class="emphasis">telnet</em> that work like that which they replace,
+but also support some extra features:</p>
+
+<ul>
+<li>
+Kerberos V5 is used to authenticate
+the<a name="INDEX-1906" /> user, not passwords.
+</p>
+</li><li>
+Traffic between the client and server is optionally encrypted as a
+way to provide privacy protection.
+</p>
+</li>
+<li>
+Credentials can be forwarded from the client to the server. This
+feature, known as a <em class="emphasis">forwardable ticket granting
+ticket</em>, allows the following sequence of events:</p>
+
+
+<ol><li>
+The user logs into his desktop machine. He is prompted for his Unix
+login password, which also happens to be his Kerberos V5 password.
+This results in a <em class="emphasis">ticket granting ticket</em> (TGT)
+being sent from the KDC to his desktop. His home directory is
+NFS-mounted but exported with Kerberos V5 security
+(<em class="emphasis">sec=krb5</em>).
+</p>
+</li>
+
+<li>
+The NFS filesystem uses the TGT to get an NFS
+<em class="emphasis">service</em> <em class="emphasis">ticket</em> from the
+KDC, which allows the user to be authenticated to the NFS server. The
+service ticket is encrypted with the NFS server's key, which
+both the KDC and the NFS server know about. The NFS server can
+decrypt the service ticket from the client because the server stores
+the server's key in its
+<em class="emphasis">/etc/krb5/krb5.keytab</em> file, which is analogous to
+RPC/DH's <em class="emphasis">/etc/.rootkey</em> file.
+</p>
+</li>
+
+
+<li>
+The user now wishes to log onto a remote system. He uses a Kerberized
+version of <em class="emphasis">rlogin</em> to do so, passing a
+command-line option that indicates that he wants his TGT to be
+forwarded.
+</p>
+</li>
+
+<li>
+The NFS filesystem on the remote system must do an NFS mount of the
+user's home directory, which is still exported with
+<em class="emphasis">sec=krb5</em>. It needs an NFS service ticket to
+authenticate the user to the NFS server. Because the TGT has been
+forwarded, no password prompt to the user is necessary.
+</p>
+
+Thus the user, having authenticated himself once when he logged into
+his desktop, can roam freely and securely among the network, as he
+did in the days when the network was using simple host-based trust
+for rlogin and NFS.
+</p>
+</li></ol>
+</li></ul>
+</li></ul>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.5.2" /><div class="sect3">
+<h3 class="sect3">12.5.5.2. SEAM: Kerberos V5 for Solaris</h3>
+
+Sun's Kerberos V5 implementation is <a name="INDEX-1907" /> <a name="INDEX-1908" />called
+<em class="emphasis">Sun Enterprise Authentication Mechanism</em> (SEAM).
+</p>
+
+For this chapter to completely explain how to set up SEAM for running
+Kerberos V5 and NFS secured with Kerberos V5, it would have to
+include as much material as was written in this chapter about NIS and
+NFS/dh, and all the chapters leading up to it. In other words, the
+title of this book would be <em class="emphasis">Managing NIS, Kerberos V5, and
+NFS</em>. Fortunately, the SEAM documentation is well-written,
+and the installation fairly turnkey.<a href="#FOOTNOTE-24">[24]</a> Thus it is not clear that much value could
+be added in this book to explain minutiae of SEAM.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-24" />[24]This appraisal
+is the opinion of one of the co-authors of this book, Mike Eisler,
+who was the project lead for SEAM while employed by Sun Microsystems,
+Inc. </p> </blockquote>
+
+However, the rest of this section collects some practical overview
+information on SEAM that you might find useful as you approach the
+issue of deploying Kerberos V5.
+</p>
+
+SEAM 1.0 is available for Solaris 2.6 and Solaris 7, and is packaged
+with the <em class="emphasis">Solaris Easy Access Server</em> (SEAS) 3.0
+product, which is unbundled from Solaris 2.6 and Solaris 7. If you
+bought a server from Sun, you might find SEAS 3.0 preinstalled. At
+the time this book was written, SEAM 1.0.1 was available for Solaris
+8 as a free download from Sun's website. Look for the product
+called <em class="emphasis">Solaris 8 Admin Pack</em>. Do not attempt to
+run SEAM 1.0 on Solaris 8. If you upgrade to Solaris 8 from a Solaris
+2.6 or Solaris 7 system that has SEAM 1.0 installed, then you should
+immediately install SEAM 1.0.1.
+</p>
+
+SEAM 1.0 and SEAM 1.0.1 rely on a GUI-based installation technology
+that is similar to Installshield for Windows systems. What you do not
+want to do is go ahead and install SEAM without reading the
+documentation. A couple of notes:
+</p>
+
+<ul><li>
+SEAM 1.0 comes on the SEAS 3.0 CD-ROM. Install the SEAS 3.0
+documentation first, and read through the SEAM 1.0 documentation.
+</p>
+</li><li>
+SEAM 1.0.1 is part of the Solaris 8 Admin Pack, and at the time this
+book was written, the only way to get SEAM 1.0.1 was to download it.
+You can download SEAM 1.0.1 separately from the rest of the Admin
+Pack. However, be warned that it comes in a self-extracting shell
+script, otherwise known as a <em class="emphasis">shar</em> file; the term
+<em class="emphasis">shar</em> stands for <em class="emphasis">sh</em>ell
+<em class="emphasis">ar</em>chive. The <em class="emphasis">shar</em> file
+proceeds to run the GUI installer, and the installer does not let you
+install the documentation first, because it doesn't have the
+documentation. Instead, you first need to download the documentation
+separately (which includes all the documentation of the Admin Pack,
+so it is a large download). Once you've downloaded the
+documentation, start reading it.
+</p>
+
+There is also documentation on SEAM in the Solaris 8 administration
+documents. It is worth reading this as well.
+</p>
+</li></ul>
+Note that the SEAS 3.0 and Admin Pack documentation are packaged in
+the form of web pages.
+</p>
+
+As you read the SEAM documentation, it should be clear that SEAM and
+NIS plus RPC/DH share some parallels, including:
+</p>
+
+<ul><li>
+Both have master servers (SEAM has a master KDC, and NIS has a master
+NIS server).
+</p>
+</li><li>
+Both recommend one or more slave servers.</p>
+</li><li>
+Both have a distinct client component.</p>
+</li><li>
+Both have a client-side daemon for managing session keys (SEAM has
+<em class="emphasis">gssd</em>, RPC/DH has <em class="emphasis">keyserv</em>).
+</p>
+</li></ul>
+If you read the SEAM 1.0 documentation from the SEAS 3.0 product, the
+SEAM 1.0.1 documentation from the Admin Pack, and the SEAM
+documentation in Solaris 8, you see that progressive releases of
+Solaris, from 2.6 onward, integrate more and more components of SEAM.
+<a href="ch12_05.html#nfs2-CHP-12-TABLE-1">Table 12-1</a> describes the progression so far.
+</p>
+
+<a name="nfs2-CHP-12-TABLE-1" /><h4 class="objtitle">Table 12-1.  SEAM progression </h4><table border="1">
+
+
+
+
+
+
+<tr>
+<th>
+Solaris Release</p>
+</th>
+<th>
+Unbundled Product</p>
+</th>
+<th>
+SEAM Version</p>
+</th>
+<th>
+Features Integrated with Solaris</p>
+</th>
+<th>
+Features Integrated in Unbundled Product</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+Solaris 2.6</p>
+</td>
+<td>
+SEAS 3.0</p>
+</td>
+<td>
+SEAM 1.0</p>
+</td>
+<td>
+RPCSEC_GSS hooks</p>
+</td>
+<td>
+KDC, Remote KDC administration, Kerberized networking utilities,
+Kerberos client utilities, RPCSEC_GSS, GSS-API, Kerberos V5 GSS
+provider, Kerberos V5 PAM module
+</p>
+</td>
+</tr>
+<tr>
+<td>
+Solaris 7</p>
+</td>
+<td>
+SEAS 3.0</p>
+</td>
+<td>
+SEAM 1.0</p>
+</td>
+<td>
+RPCSEC_GSS, GSS-API</p>
+</td>
+<td>
+KDC, Remote KDC administration, Kerberized networking utilities,
+Kerberos client utilities, Kerberos V5 GSS provider, Kerberos V5 PAM
+module
+</p>
+</td>
+</tr>
+<tr>
+<td>
+Solaris 8</p>
+</td>
+<td>
+Solaris 8 Admin Pack</p>
+</td>
+<td>
+SEAM 1.0.1</p>
+</td>
+<td>
+RPCSEC_GSS, GSS-API, Kerberos client utilities, Kerberos V5 GSS
+provider, Kerberos V5 PAM module
+</p>
+</td>
+<td>
+KDC, Remote KDC administration, Kerberized networking utilities</p>
+</td>
+</tr>
+
+</table><p>
+
+Presumably the progression in <a href="ch12_05.html#nfs2-CHP-12-TABLE-1">Table 12-1</a> will
+continue with future versions of Solaris and other operating systems.
+</p>
+
+The fifth column of <a href="ch12_05.html#nfs2-CHP-12-TABLE-1">Table 12-1</a> consistently lists
+"Kerberized networking utilities." These are utilities
+like <em class="emphasis">rlogin</em>, <em class="emphasis">rsh</em>,
+<em class="emphasis">rcp</em>, <em class="emphasis">ftp</em>, and
+<em class="emphasis">telnet</em> (and their server daemons) that have been
+modified to understand Kerberos V5 security. The reason they are
+there is that they facilitate the deployment of an Intranet that
+sends no passwords in the clear over the wire, and indeed, via
+forwardable TGTs, enables you to send no passwords at all. Without
+these utilities, there would be less point in having strong NFS
+security, since passwords would often appear on your network. This is
+another drawback of RPC/DH: it does not add strong security to the
+basic networking utilities.
+</p>
+
+By now, we've mentioned PAM several times without explaining
+it. Recall that your RPC/DH password is used to decrypt your private
+key. If your RPC/DH password is the same as your Unix login password,
+then you don't need to provide your RPC/DH password separately.
+How does this happen? The Solaris <em class="emphasis">login</em> command
+has code in it to try to decrypt the user's private key with
+the Unix login password. Now suppose you've installed Kerberos
+V5 and would like the system to attempt to use the Unix login
+password as the key that decrypts your TGT from the KDC. One way
+would be for your operating system vendor to change the
+<em class="emphasis">login</em> command to do so. But then, you decide
+you'd like the <em class="emphasis">su</em> command and the desktop
+lock screen feature to do the same. After a while, it gets to be a
+lot of utilities to maintain. A better way is to have pluggable
+framework that calls security mechanism specific code in shared
+objects and has them take care of acquiring credentials. This is what
+PAM does. SEAM provides a Kerberos V5 PAM module. Check out your
+system's documentation for information on PAM; PAM is common to
+many Unix systems.
+</p>
+
+Here are some final recommendations for and observations about SEAM
+installation:
+</p>
+
+<ul><li>
+SEAM allows you to use it without DNS running. Don't do that.
+If you ever change your mind, you'll have to repopulate the
+entire principal (analogous to an RPC/DH
+<em class="emphasis">netname</em>) database in the KDC.
+</p>
+</li><li>
+It is better to install SEAM clients (which can be NFS clients or NFS
+servers) by utilizing the preconfiguration steps that the
+documentation talks about, and the GUI installer tries to walk you
+through. Keep in mind that the preconfiguration information need
+only, and should only, be established once, on an NFS server. You
+then run the SEAM installer on each host, pointing it at the
+preconfigured information on an NFS mounted or automounted filesystem
+(usually same filesystem where the installer lives). This reduces
+per-host installation tedium.
+</p>
+</li><li>
+The SEAM documentation is very task-oriented, and hence very
+practical. Even if you ultimately want to do things differently,
+practice first, and follow the documentation examples as close to
+verbatim as possible before you try something complex or a little bit
+different.
+</p>
+</li><li>
+Do not skip any steps. SEAM is rather unforgiving if a small, but
+critical step is missed. You'll find that you can cut and paste
+from the web-based documentation into your command shell, and if you
+make that a habit, you'll <a name="INDEX-1909" /> <a name="INDEX-1910" />stay out of trouble.
+</p>
+</li></ul>
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.5.3" /><div class="sect3">
+<h3 class="sect3">12.5.5.3. Enabling Kerberized NFS</h3>
+
+This section assumes that you've gone <a name="INDEX-1911" />through the installation and
+configuration that the SEAM documentation describes.
+</p>
+
+Enabling Kerberized NFS on a filesystem is quite simple: export and
+mount the filesystem with the <em class="emphasis">sec=krb5</em> option.
+On the NFS server, the <em class="emphasis">/etc/dfs/dfstab</em> entry
+looks like this:
+</p>
+
+<blockquote><pre class="code">share -o sec=krb5,rw /export/home/thud</pre></blockquote>
+
+When a filesystem is exported with the <em class="emphasis">sec=krb5</em>
+option, clients using NFS Version 2 must mount it with the
+<em class="emphasis">sec=krb5</em> option if they are to enjoy normal user
+access privileges in the filesystem. On the NFS client, add the
+<em class="emphasis">sec=krb5</em> option in the automounter map entry or
+the <em class="emphasis">/etc/vfstab</em> entry for the filesystem:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">automounter auto_home entry:</i>
+thud                   -sec=krb5      bonk:/export/home/thud 
+
+<i class="lineannotation">vfstab entry:</i>
+bonk:/export/home/thud - /thud nfs  - no  sec=krb5 </pre></blockquote>
+
+As was the case for enabling NFS/dh (see <a href="ch12_05.html#nfs2-CHP-12-SECT-5.4.5">Section 12.5.4.5, "Enabling NFS/dh"</a>) with NFS Version 3, the
+<em class="emphasis">sec=krb5</em> option is not necessary in the
+automounter map or <em class="emphasis">vfstab</em> entries.
+</p>
+
+The <em class="emphasis">krb5</em> option uses a combination of DES
+symmetric key encryption and the MD5 one-way hash function to produce
+the RPC credentials that are sent to, and authenticated by, the NFS
+server.
+</p>
+
+Not only is there a <em class="emphasis">krb5</em> option to
+<em class="emphasis">sec=</em>, but there are <em class="emphasis">krbi</em>
+and <em class="emphasis">krbp</em> as well.
+</p>
+
+Like the <em class="emphasis">krb5</em> option, <em class="emphasis">krb5i</em>
+uses Kerberos V5 to authenticate users to NFS servers when the
+filesystem is exported with <em class="emphasis">sec=krb5i</em>. Unlike
+<em class="emphasis">krb5</em>, it also computes an MD5-based MAC on every
+remote procedure call request to the server, and every response to
+the client. The MAC is computed on an entire message: RPC header,
+plus NFS arguments or results. Thus <em class="emphasis">krb5i</em>
+provides <em class="emphasis">i</em>ntegrity protection, hence the
+trailing <em class="emphasis">i</em> in <em class="emphasis">krb5i</em>.
+</p>
+
+Like <em class="emphasis">krb5</em> and <em class="emphasis">krb5i</em>,
+<em class="emphasis">krb5p</em> uses Kerberos V5 to authenticate. Like
+<em class="emphasis">krb5i</em> it uses Kerberos V5 to provide integrity.
+Unlike <em class="emphasis">krb5</em> and <em class="emphasis">krb5i</em>,
+<em class="emphasis">krb5p</em> uses Kerberos V5's DES encryption to
+provide privacy. Note that only the NFS arguments and results are
+encrypted; the RPC headers go in the clear. So an attacker could
+deduce which NFS operation is being performed, but not on what file,
+nor what the file or directory <a name="INDEX-1912" />content is.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.5.4" /><div class="sect3">
+<h3 class="sect3">12.5.5.4. Security and performance</h3>
+
+So, why wouldn't a client want<a name="INDEX-1913" /> <a name="INDEX-1914" /> to always mount with <em class="emphasis">krb5p</em>
+? It is, after all, the most secure of
+<em class="emphasis">sec=</em> options we've seen in this book. The
+reason is that as soon as you involve cryptography in data
+processing, you slow down the processing. This is because
+cryptography tends to be a highly CPU-bound function. Consider the
+performance results in <a href="ch12_05.html#nfs2-CHP-12-TABLE-2">Table 12-2</a>. The NFS client
+and server were each running Solaris 8 with SEAM. Both the systems
+were Sun Ultra 5 systems, each with 128 megabytes of RAM, and one 270
+Mhz CPU. A 200 megabyte file was written from the client to the
+server to the server's <em class="emphasis">/tmp</em> file system,
+via the <em class="emphasis">mkfile</em> utility. NFS Version 3 over TCP
+was used. As we can see from <a href="ch12_05.html#nfs2-CHP-12-TABLE-2">Table 12-2</a>, the
+<em class="emphasis">krb5</em> option does not cost much to use relative
+to <em class="emphasis">sys</em>. But <em class="emphasis">krb5i</em> and
+<em class="emphasis">krb5p</em> added increasingly significant overhead.
+Some people have the reasonable perspective that drop off in
+throughput is not as important as the increased CPU utilization.
+</p>
+
+<a name="nfs2-CHP-12-TABLE-2" /><h4 class="objtitle">Table 12-2. Kerberized NFS performance </h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+ <em class="emphasis">sec=</em> value</p>
+</th>
+<th>
+Throughput in MB/sec</p>
+</th>
+<th>
+Throughput Degradation Relative to <em class="emphasis">sec=sys</em></p>
+</th>
+<th>
+Percent CPU Utilization on Server</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+sys</p>
+</td>
+<td>
+5.40</p>
+</td>
+<td>
+N/A</p>
+</td>
+<td>
+69%</p>
+</td>
+</tr>
+<tr>
+<td>
+krb5</p>
+</td>
+<td>
+5.26</p>
+</td>
+<td>
+2.6%</p>
+</td>
+<td>
+70%</p>
+</td>
+</tr>
+<tr>
+<td>
+krb5i</p>
+</td>
+<td>
+4.44</p>
+</td>
+<td>
+17.7%</p>
+</td>
+<td>
+77%</p>
+</td>
+</tr>
+<tr>
+<td>
+krb5p</p>
+</td>
+<td>
+1.45</p>
+</td>
+<td>
+73.1%</p>
+</td>
+<td>
+99%<a name="INDEX-1915" />
+<a name="INDEX-1916" />
+</p>
+</td>
+</tr>
+
+</table><p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.5.5" /><div class="sect3">
+<h3 class="sect3">12.5.5.5. Combining krb5, krb5i, krb5p</h3>
+
+You can combine the <em class="emphasis">krb5</em> * options with
+<a name="INDEX-1917" />each other.
+</p>
+
+Let's suppose <em class="emphasis">/export/home</em> on server
+<em class="emphasis">labrador</em> contains the home directories of
+security conscious folks, though some are less paranoid than others.
+You can accommodate everyone by adding the following to
+<em class="emphasis">/etc/dfs/dfstab</em>:
+</p>
+
+<blockquote><pre class="code">share -o sec=krb5p:krb5i:krb5,rw /export/home</pre></blockquote>
+
+This means the clients pick any of the three flavors of
+<em class="emphasis">krb5</em> when they mount the NFS filesystem. Note
+that this is one instance where even if the client is using NFS
+Version 3, that the administrator on the client may want to specify a
+<em class="emphasis">sec=</em> option in their automounter maps or
+<em class="emphasis">vfstab</em> or on their <em class="emphasis">mount</em>
+command line. The reason is that the client (at least the Solaris 8
+client) will pick from the array of security flavors that
+<em class="emphasis">mountd</em> returns the first security flavor that
+the client supports. So if a client prefers <em class="emphasis">krb5</em>
+but <em class="emphasis">krb5p</em> is first, <em class="emphasis">sec=</em> is
+needed for the <em class="emphasis">mount</em> command to override the
+automatic choice.
+</p>
+
+Given the results in <a href="ch12_05.html#nfs2-CHP-12-TABLE-2">Table 12-2</a>, you might want to
+be careful about exporting filesystems with
+<em class="emphasis">krb5i</em> or <em class="emphasis">krb5p</em> security
+enabled. If you have data that can go in the clear on the network,
+then never export it with <em class="emphasis">krb5p</em>. If your users
+are writing data over the network, and very bad things could happen
+if an attacker spliced the RPC header from a
+<em class="emphasis">sec=krb5</em> NFS request onto a forged set of
+destructive arguments, then enable <em class="emphasis">krb5i</em>.
+Otherwise <em class="emphasis">krb5</em> should be sufficient. Indeed, for
+certain kinds of<a name="INDEX-1918" /> read-only data,
+<em class="emphasis">sec=sys</em> or <em class="emphasis">sec=none</em> are
+fine.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-12-SECT-5.5.6" /><div class="sect3">
+<h3 class="sect3">12.5.5.6. IPSec versus krb5i and krb5p</h3>
+
+As discussed earlier in <a href="ch12_05.html#nfs2-CHP-12-SECT-5.3">Section 12.5.3, "NFS and IPSec"</a>,
+IPSec<a name="INDEX-1919" /> can provide integrity (AH) and privacy
+(ESP) services. If you are enabling AH and ESP then do you need to
+use <em class="emphasis">krb5i</em> or <em class="emphasis">krb5p</em> ? Note
+that the session keys for AH and ESP are derived from per-host keys,
+whereas the session keys for <em class="emphasis">krb5i</em> and
+<em class="emphasis">krb5p</em> are derived from per user keys. If you are
+paranoid about attacks on hosts to find the IPSec keys, then
+you'll want to run <em class="emphasis">krb5i</em> and
+<em class="emphasis">krb5p</em> in addition to AH and ESP. However, it
+will cost you double in CPU utilization to do so. In general, it is
+not necessary to use <em class="emphasis">krb5i</em> if AH is used, and
+not necessary to use <em class="emphasis">krb5p</em> is ESP is used.
+However, even if AH or ESP is used to protect NFS traffic, it still
+makes sense to use <em class="emphasis">krb5</em> protection on your NFS
+traffic if <a name="INDEX-1920" /> <a name="INDEX-1921" />you want <a name="INDEX-1922" /> <a name="INDEX-1923" />strong authentication.
+</p>
+
+</div>
+</div>
+<a name="nfs2-CHP-12-SECT-5.6" /><div class="sect2">
+<h3 class="sect2">12.5.6. Planning a transition from NFS/sys to stronger NFS security</h3>
+
+Perhaps you've been exporting filesystems<a name="INDEX-1924" /> <a name="INDEX-1925" /> with <em class="emphasis">sec=sys</em>
+(the default if <em class="emphasis">sec=</em> is not specified) for some
+time, and now decide to start using better NFS security, such as
+NFS/dh or Kerberized NFS. One issue is that it takes less time to
+reconfigure servers to use stronger NFS security than to reconfigure
+clients, because there are more client machines, and more user ids
+than host ids to add to the various tables that RPC/DH and Kerberos
+V5 require. Also, some NFS client implementations may not be running
+Solaris 8, and may support the stronger NFS security that you decide
+to switch to. So even after you get your servers reconfigured to use
+Kerberos V5 security, it won't be practical to simply change:
+</p>
+
+<blockquote><pre class="code">share -o rw /export/home</pre></blockquote>
+
+to:</p>
+
+<blockquote><pre class="code">share -o sec=krb5,rw /export/home</pre></blockquote>
+
+and not expect some chaos. That you can combine any two or more
+<em class="emphasis">sec=</em> options on the same
+<em class="emphasis">dfstab</em> entry allows you to stage some graceful
+transitions.
+</p>
+
+For example, suppose you've decided to use NFS/dh. You may have
+some legacy software running on some NFS clients that is stuck on
+older systems. Thus you can't upgrade the client systems to an
+operating system that can support stronger NFS security. You can do
+the following:
+</p>
+
+<blockquote><pre class="code">share -o sec=sys,rw=legacy-group,sec=dh,rw=upgrade-group /export/home</pre></blockquote>
+
+such that the legacy machines and upgrade machines are each
+<a name="INDEX-1926" />
+<a name="INDEX-1927" />placed in
+their own netgroup.
+</p>
+
+</div>
+<a name="nfs2-CHP-12-SECT-5.7" /><div class="sect2">
+<h3 class="sect2">12.5.7. NFS security futures</h3>
+
+In <a href="ch12_05.html#nfs2-CHP-12-SECT-5.2.2">Section 12.5.2.2, "Asymmetric key encryption"</a>, we
+<a name="INDEX-1928" /> <a name="INDEX-1929" />mentioned the RSA public key algorithm, but
+did not talk about any NFS security that uses RSA. RSA is arguably
+the best asymmetric key encryption algorithm known to us. It is the
+foundation of most Public Key Infrastructure (PKI) products, as well
+as networking protocols like SSL/TLS and S/MIME. So why doesn't
+NFS use it? The main issue with RSA is that it was patented and so
+royalties were due to its rights holders. Now that the patent has
+expired, expect to see the following features in the future:
+</p>
+
+<ul><li>
+Asymmetric key technology integrated with Kerberos V5. Without
+asymmetric key technology, a physical compromise of the KDC
+effectively compromises all of the principals listed in KDC, as it
+stores each user's symmetric key. With asymmetric key
+technology, only the public key needs to be stored in the KDC.
+</p>
+</li><li>
+The NFS Version 4 protocol specifies an SSL-like GSS-API mechanism
+provider called LIPKEY as one of the two required security providers
+to RPCSEC_GSS (Kerberos V5 being the other). LIPKEY uses asymmetric
+key algorithms. So when NFS Version 4 is deployed widely, expect to
+see RSA used to secure it. Like SSL, LIPKEY can be easily used
+through a firewall.
+</p>
+</li></ul>
+The poor performance of <em class="emphasis">krb5p</em> (<a href="ch12_05.html#nfs2-CHP-12-TABLE-2">Table 12-2</a>) is due largely to the fact that DES is a very
+slow algorithm. There are faster, not to mention more secure,
+algorithms, but many of them are proprietary, subject to royalties.
+The royalty<a name="INDEX-1930" />
+<a name="INDEX-1931" />
+free <em class="emphasis">Advanced Encryption Standard</em>
+(<em class="emphasis">AES</em>) has been selected to replace DES. AES is
+faster and more secure than DES. Expect to see future versions of NFS
+run over<a name="INDEX-1932" />
+<a name="INDEX-1933" /> Kerberos
+V5 and LIPKEY <a name="INDEX-1934" /> <a name="INDEX-1935" />using AES as the encryption algorithm.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.4. NFS security</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.6. Viruses</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

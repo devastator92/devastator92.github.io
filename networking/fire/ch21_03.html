@@ -1,0 +1,369 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+<head><title>Authentication Mechanisms (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch21_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">21.3. Authentication Mechanisms</h2>
+
+
+
+
+
+In order to use any of the methods of authentication we've
+outlined earlier, you need hardware or software to implement them.
+This section discusses some of the commonly available hardware and
+software authentication mechanisms that are at the heart of
+authentication systems (in particular, it discusses those supported
+by TIS FWTK, which is the most widely available system). The most
+popular of the full-blown systems are discussed later in this
+chapter.</p><p>
+
+
+
+
+
+<a name="ch21-20408" /><div class="sect2">
+<h3 class="sect2">21.3.1. One-Time Password Software</h3>
+
+
+
+
+
+<a name="INDEX-1966" /><a name="INDEX-1967" />There are two ways a one-time password
+system may work:</p><p>
+
+
+
+
+
+<ul><li>The list can be generated randomly, and a copy kept by the user and
+the system.</p><p></li><li>The list (or, more likely, a specific entry from the list) can be
+generated on demand by the user and validated by the system.</p><p></li></ul>
+The problem with keeping a list on the system is that if the system
+is compromised, so is the list, and the list could then be used for
+future access. This is as bad as having someone snoop on a reusable
+password while you use it.</p><p>
+
+
+
+
+
+<a name="INDEX-1968" /> <a name="INDEX-1969" />An
+IETF standard addresses this problem; it's a system called OTP
+(for one-time password), which is based on S/Key, originally designed
+by Leslie Lamport and developed by Bellcore. While it allows a system
+to reliably authenticate a user, nothing on the system compromises
+the user's password if the system itself is compromised. The
+system has the ability to validate a user's current response
+but does not have the ability to predict what that user's
+<em class="emphasis">next</em> response will be.</p><p>
+
+
+
+
+
+OTP works by iteratively applying a cryptographically secure hash
+algorithm, starting with some initial seed value. A cryptographically
+secure hash algorithm is one that takes arbitrary-sized input and
+produces a much smaller output (something like a checksum) that has
+two special properties:</p><p>
+
+
+
+
+
+<ul><li>The input cannot be regenerated from the output; thus, it's not
+simply a compression or encryption algorithm.</p><p></li><li>The probability of two different inputs (particularly two different
+inputs of the same size) producing the same output is vanishingly
+small.</p><p></li></ul>
+<a name="INDEX-1970" />OTP can use a
+variety of different algorithms for this purpose. All OTP systems
+must support MD5, and they are encouraged to also support SHA and
+D4. (The original S/Key used only MD4.) Cryptographic checksum
+algorithms are discussed further in <a href="appc_01.html">Appendix C, "Cryptography"</a>.</p><p>
+
+
+
+
+
+OTP works by starting with a seed (which is either provided by the
+user or generated randomly) and applying the chosen hash algorithm
+iteratively to get a sequence of keys. It applies the hash algorithm
+to the seed to get the first key, applies the hash algorithm to the
+first key to get the second key, applies the hash algorithm to the
+second key to get the third key, and so on. In order to validate a
+user, the system has to know some key (call it key number
+<em class="emphasis">n</em>) in the sequence. The system prompts the user
+for the previous key (key <em class="emphasis">n-</em>1), applies the hash
+algorithm to the user's answer (supposedly key
+<em class="emphasis">n</em>-1), and checks to see if the result is the key
+<em class="emphasis">n</em> that it knows. If the result is the key
+<em class="emphasis">n</em>, the user must have supplied the correct key
+<em class="emphasis">n</em>-1.</p><p>
+
+
+
+
+
+OTP can encode each key into a series of short words, so they are
+easier for a user to read and type, rather than simply generating a
+random-looking jumble of characters. <a href="ch21_03.html#ch21-37783">Figure 21-1</a>
+shows how OTP works.</p><p>
+
+
+
+
+
+<a name="ch21-37783" /><div class="figure"><img height="360" alt="Figure 21-1" src="figs/fire2.2101.gif" width="456" /></div><h4 class="objtitle">Figure 21-1. How OTP works</h4>
+
+Because cryptographic hashing is nonreversible (you can't
+determine the input given the output), the system can't easily
+figure out what key <em class="emphasis">n</em>-1 is, even though it knows
+key <em class="emphasis">n</em>. All the server can do is to verify that
+key <em class="emphasis">n</em>-1 (when presented by the user) is the key
+that generates key <em class="emphasis">n</em>. This means that even if an
+attacker can somehow obtain key <em class="emphasis">n</em> (for example,
+by snooping on a user's login session), he won't be able
+to easily figure out the next key (key <em class="emphasis">n-</em>1).</p><p>
+
+
+
+
+
+OTP isn't absolutely invulnerable to attack. Several attacks
+are possible:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Brute force attacks</i></dt>
+<dd><a name="INDEX-1971" />Attackers could try a whole series of
+possibilities for key <em class="emphasis">n</em>-1 until they found one
+that translated to key <em class="emphasis">n</em>. However, this type of
+attack is very unlikely to succeed. Because of the size of the key
+space (the number of possible keys) and the computation requirements
+of cryptographic hashing, a brute force approach of this kind is
+considered to be computationally infeasible for all but the most
+serious and well-financed attackers. (It would probably take a
+significant amount of supercomputer time before they found the right
+key.)</p><p></dd>
+
+
+
+
+
+<dt><i>Dictionary attacks</i></dt>
+<dd><a name="INDEX-1972" />If the
+user provides the initial seed (rather than having the initial seed
+be generated randomly), dictionary attacks are possible. Attackers
+could guess at the seed in the same way that they might guess at
+reusable passwords; they'd typically try things like words from
+the dictionary, names, places, etc. To these words, they would apply
+the cryptographic hashing algorithm an appropriate number of times to
+see if it generates a key they've seen used.</p><p></dd>
+
+
+
+
+
+<dt><i>Modified sniffing attacks </i></dt>
+<dd><a name="INDEX-1973" />An
+attacker can run a packet sniffer and collect the beginning of an OTP
+password (all but the last few characters) and then try all the
+possible combinations for the last characters, before the user
+finishes. This relies on extremely delicate timing, but in Telnet
+connections, user input is frequently sent keystroke by keystroke as
+it is generated. This creates a lag that is significant for a
+computer. An attacker probably won't be able to try all
+possible combinations but may be able to try all possible
+combinations that make English words. OTP implementations are
+required to try to prevent this attack, which is usually done by
+preventing multiple simultaneous connections from the same user.</p><p></dd>
+
+</dl>
+
+
+
+
+
+There are two ways for users to use OTP: either keys can be generated
+on demand, or the user can be supplied with a printed list of keys.</p><p>
+
+
+
+
+
+To generate OTP keys on demand, the user needs a computer and a
+program to generate them. That user will have to provide the seed,
+the key number, and the cryptographic algorithm to be used, and the
+program will iterate the algorithm that many times to generate the
+key desired. The seed will have to be either entered by the user or
+read from a file on the computer. If the seed is entered by the user,
+the user would probably pick a seed the same way he or she would pick
+a password. Because users are notoriously poor at picking passwords,
+this makes the system subject to dictionary attacks, as we've
+described earlier. If the seed is read from a file, it can be more
+random (and therefore less guessable) than something the user would
+provide, but you have to worry about the risks  --  probably low
+ --  of the computer or file being stolen.</p><p>
+
+
+
+
+
+The alternative way to use OTP is to have the system generate and
+print a list of keys, enough keys to last the user for a reasonable
+period of time. In this case, the system randomly generates the
+initial seed, thus protecting itself against dictionary attacks. The
+printout should simply be a numbered list of keys, with no further
+identification or explanation. It is possible that the list could be
+stolen from a user, but you have to decide which you think is more
+likely: that the list will be stolen (and that the thief will know
+what it is and what to do with it), or that the user's session
+will be snooped on. If your users are generating keys on demand,
+they're probably using a seed that's subject to
+dictionary attack (otherwise, they would find it too hard to remember
+the seed); if one of their sessions is snooped on, their keys can be
+attacked.</p><p>
+
+
+
+
+
+We think that using a seed that's subject to dictionary attack
+is a greater risk than having a list of keys stolen, so we prefer
+using printed lists of keys to using keys generated on
+demand.<a name="INDEX-1974" />
+<a name="INDEX-1975" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-20505" /><div class="sect2">
+<h3 class="sect2">21.3.2. One-Time Password Hardware</h3>
+
+
+
+
+
+There are also systems for generating nonreusable passwords in
+hardware. The systems in common use are small cards, about the size
+of miniature calculators. You install software and/or hardware on the
+computer, and a user who wants to log in uses information generated
+by the card as part of the process. In order to prevent attackers
+from simply stealing the card, there is usually a "something
+you know" component, which is either a fixed password used to
+unlock the card itself, or a fixed password added to the generated
+information as part of the login process.</p><p>
+
+
+
+
+
+These systems use a variety of different ways to generate passwords.
+Some of them vary the password based on the time; some of them work
+their way through a one-time password list; and some of them use a
+challenge-response system, where the computer provides a challenge
+that the user types into the card, and the card provides a response
+for the user to give the computer.</p><p>
+
+
+
+
+
+Although the card-based systems have different strengths and
+weaknesses, they share the same general advantages and disadvantages.
+On the good side, they provide a guaranteed level of protection
+without requiring special reader hardware; on the bad side, there are
+considerable hardware costs for the cards, and you have to alter
+login software on the machines that you want to protect. Most
+authentication systems now contain support for the popular cards, but
+you will still need to install vendor libraries.</p><p>
+
+
+
+
+
+Card-based tokens are something of a hassle for their users, who have
+to carry the device, type things into it, read things from it, and
+protect a small and expensive object from being damaged or lost.
+Printed one-time password lists also present a certain number of user
+annoyances; there's nothing like turning over your list to
+discover that the print has worn off the next password you need.</p><p>
+
+
+
+
+
+Other hardware "something you have" options avoid many of
+these problems. For instance, smart cards, which put a small amount
+of information into a chip suitable for embedding in a credit
+card-sized object, are cheaper, easier to carry, and don't have
+keypads or readouts to fiddle with. The "secret encoder
+ring", which puts a small transmitter into a device that will
+pass for a chunky ring or a smallish ornament for your keys, is still
+a small, valuable object that you have to protect, but it
+doesn't have a keypad or a readout, and it's emotionally
+very satisfying. However, all of these options require reader
+hardware at the location where the user needs to authenticate. Smart
+card readers are becoming more prevalent, and smart cards are the
+most likely of these options to be practical for widespread use.
+While it's unlikely that Internet cafes and terminals in
+airports will provide smart card readers soon, it's relatively
+easy to get them for laptop computers.</p><p>
+
+
+
+
+
+You can also use hand-held computers like Palm Pilots and Windows CE
+machines to generate one-time passwords. It is very convenient for
+people who already have these devices, but it is not as secure as
+using devices that are designed to be security tokens.
+General-purpose hand-held devices do not provide hardware protection
+(they can be taken apart, so that people have access to the data).
+ost of them don't provide significant software protection,
+either; you can set a password, but it's generally easy to
+guess, and if you back the device up to a larger computer, the data
+is usually completely unprotected on the larger computer. If you use
+these devices for one-time passwords, you should consider adding
+additional access protection beyond that provided with the device.</p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch21_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">21.2. Passwords</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">21.4. Modular Authentication for Unix </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:39 GMT -->
+</html>

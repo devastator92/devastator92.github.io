@@ -1,0 +1,363 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Incorrect directory content caching (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch15_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">15.4. Incorrect directory content caching</h2>
+
+
+A user of a Solaris NFS client reported having <a name="INDEX-2351" />
+<a name="INDEX-2352" /> <a name="INDEX-2353" />intermittent problems
+accessing files mounted from a non-Unix NFS server. The Solaris NFS
+client <em class="emphasis">tarsus</em> was apparently able to list files
+that had previously been removed by another NFS client, but was
+unable to access the contents of the files. The files would
+eventually disappear. The NFS client that initially removed the files
+did not experience any problems and the user reported that the files
+had indeed been removed from the server's directory. He
+verified this by logging into the NFS server and listing the contents
+of the exported directory.</p>
+
+
+We suspected the client <em class="emphasis">tarsus</em> was not
+invalidating its cached information, and proceeded to try to
+reproduce the problem while capturing the NFS packets to analyze the
+network traffic:</p>
+
+
+<blockquote><pre class="code">[1] tarsus$ <tt class="userinput"><b>ls -l /net/inchun/export/folder</b></tt>
+total 8
+-rw-rw-rw-   1 labiaga  staff       2883 Apr 10 20:03 data1
+-rw-rw-rw-   1 root     other         12 Apr 10 20:01 data2
+
+[1] protium$ <tt class="userinput"><b>rm /net/inchun/export/folder/data2</b></tt>
+
+[2] tarsus$ <tt class="userinput"><b>ls /net/inchun/export/folder</b></tt>
+data1   data2
+[3] tarsus$ <tt class="userinput"><b>ls -l /net/inchun/export/folder</b></tt>
+/net/inchun/export/folder/data2: Stale NFS file handle
+total 6
+-rw-rw-rw-   1 labiaga  staff       2883 Apr 10 20:03 data1</pre></blockquote>
+
+
+The first directory listing on <em class="emphasis">tarsus</em> correctly
+displayed the contents of the NFS directory
+<em class="emphasis">/net/inchun/export/folder</em> before anything was
+removed. The problems began after the NFS client
+<em class="emphasis">protium</em> removed the file
+<em class="emphasis">data2</em>. The second directory listing on
+<em class="emphasis">tarsus</em> continued showing the recently removed
+<em class="emphasis">data2</em> file as part of the directory, although
+the extended directory listing reported a "Stale NFS
+filehandle" for <em class="emphasis">data2</em>.</p>
+
+
+This was a typical case of inconsistent caching of information by an
+NFS client. Solaris NFS clients cache the directory content and
+attribute information in memory at the time the directory contents
+are first read from the NFS server. Subsequent client accesses to the
+directory first validate the cached information, comparing the
+directory's cached modification time to the modification time
+reported by the server. A match in modification times indicates that
+the directory has not been modified since the last time the client
+read it, therefore it can safely use the cached data. On the other
+hand, if the modification times are different, the NFS client purges
+its cache, and issues a new NFS
+<a name="INDEX-2354" /><em class="emphasis">Readdir</em>
+request to the server to obtain the updated directory contents and
+attributes. Some non-Unix NFS servers are known for not updating the
+modification time of directories when files are removed, leading to
+directory caching problems. We used <em class="emphasis">snoop</em> to
+capture the NFS packets between our client and server while the
+problem was being reproduced. The analysis of the snoop output should
+help us determine if we're running into this caching problem.</p>
+
+
+To facilitate the discussion, we list the <em class="emphasis">snoop</em>
+packets preceded by the commands that generated them. This shows the
+correlation between the NFS traffic and the Unix commands that
+generate the traffic:</p>
+
+
+<blockquote><pre class="code">[1] tarsus $ <tt class="userinput"><b>ls -l /net/inchun/export/folder</b></tt>
+total 8
+-rw-rw-rw-   1 labiaga  staff       2883 Apr 10 20:03 data1
+-rw-rw-rw-   1 root     other         12 Apr 10 20:01 data2
+
+ 7   0.00039    tarsus -&gt; inchun    NFS C GETATTR2 FH=FA14
+ 8   0.00198    inchun -&gt; tarsus    NFS R GETATTR2 OK
+ 9   0.00031    tarsus -&gt; inchun    NFS C READDIR2 FH=FA14 Cookie=0
+10   0.00220    inchun -&gt; tarsus    NFS R READDIR2 OK 4 entries (No more)
+11   0.00033    tarsus -&gt; inchun    NFS C LOOKUP2 FH=FA14 data2
+12   0.00000    inchun -&gt; tarsus    NFS R LOOKUP2 OK FH=F8CD
+13   0.00000    tarsus -&gt; inchun    NFS C GETATTR2 FH=F8CD
+14   0.00000    inchun -&gt; tarsus    NFS R GETATTR2 OK
+15   0.00035    tarsus -&gt; inchun    NFS C LOOKUP2 FH=FA14 data1
+16   0.00211    inchun -&gt; tarsus    NFS R LOOKUP2 OK FH=F66F
+17   0.00032    tarsus -&gt; inchun    NFS C GETATTR2 FH=F66F
+18   0.00191    inchun -&gt; tarsus    NFS R GETATTR2 OK</pre></blockquote>
+
+
+Packets 7 and 8 contain the request and reply for attributes for the
+<em class="emphasis">/net/inchun/export/folder</em> directory. The
+attributes can be displayed by using the <em class="emphasis">-v</em>
+directive:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from:</i> snoop -i /tmp/capture -p 7,8 -v
+ETHER:  ----- Ether Header -----
+ETHER:  
+ETHER:  Packet 8 arrived at 20:45:9.75
+...
+NFS:  ----- Sun NFS -----
+NFS:  
+NFS:  Proc = 1 (Get file attributes)
+NFS:  Status = 0 (OK)
+NFS:  File type = 2 (Directory)
+NFS:  Mode = 040777
+NFS:   Type = Directory
+NFS:   Setuid = 0, Setgid = 0, Sticky = 0
+NFS:   Owner's permissions = rwx
+NFS:   Group's permissions = rwx
+NFS:   Other's permissions = rwx
+NFS:  Link count = 2, UID = 0, GID = -2, Rdev = 0x0
+NFS:  File size = 512, Block size = 512, No. of blocks = 1
+NFS:  File system id = 7111, File id = 161
+NFS:  Access time       = 11-Apr-00 12:50:18.000000 GMT
+NFS:  Modification time = 11-Apr-00 12:50:18.000000 GMT
+NFS:  Inode change time = 31-Jul-96 09:40:56.000000 GMT</pre></blockquote>
+
+
+Packet 8 shows the <em class="emphasis">/net/inchun/export/folder</em>
+directory was last modified on April 11, 2000 at 12:50:18.000000 GMT.
+<em class="emphasis">tarsus</em> caches this timestamp to later determine
+when the cached directory contents need to be updated. Packet 9
+contains the request made by <em class="emphasis">tarsus</em> for the
+directory listing from <em class="emphasis">inchun</em>. Packet 10
+contains <em class="emphasis">inchun</em>'s reply with four entries
+in the directory. A detailed view of the packets shows the four
+directory entries: ".", "..",
+"<em class="emphasis">data1"</em>, and
+"<em class="emphasis">data2".</em> The EOF indicator notifies
+the client that all existing directory entries have been listed, and
+there is no need to make another NFS <em class="emphasis">Readdir</em>
+call:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from:</i> snoop -i /tmp/capture -p 9,10 -v
+ETHER:  ----- Ether Header -----
+ETHER:  
+ETHER:  Packet 10 arrived at 20:45:9.74
+...
+NFS:  ----- Sun NFS -----
+NFS:  
+NFS:  Proc = 16 (Read from directory)
+NFS:  Status = 0 (OK)
+NFS:   File id  Cookie Name
+NFS:       137   50171 .
+NFS:       95    50496 ..
+NFS:       199   51032 data1
+NFS:       201   51706 data2
+NFS:    4 entries
+NFS:  EOF = 1
+NFS:</pre></blockquote>
+
+
+The directory contents are cached by <em class="emphasis">tarsus</em>, so
+that they may be reused in a future directory listing. The NFS
+<em class="emphasis">Lookup</em> and NFS <em class="emphasis">Getattr</em>
+requests, along with their corresponding replies in packets 11 thru
+18, result from the long listing of the directory requested by
+<em class="emphasis">ls -l</em>. An NFS <em class="emphasis">Lookup</em>
+obtains the filehandle of a directory component. The NFS
+<em class="emphasis">Getattr</em> requests the file attributes of the file
+identified by the previously obtained filehandle.</p>
+
+
+NFS Version 2 filehandles are 32 bytes long. Instead of displaying a
+long and cryptic 32-byte number, <em class="emphasis">snoop</em> generates
+a shorthand version of the filehandle and displays it when invoked in
+summary mode. This helps you associate filehandles with file objects
+more easily. You can obtain the exact filehandle by displaying the
+network packet in verbose mode by using the -v option. The packet 7
+filehandle FH=FA14 is really:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from:</i> snoop -i /tmp/capture -p 7 -v
+NFS: ----- Sun NFS -----
+NFS:
+NFS:  Proc = 1 (Get file attributes)
+NFS:  File handle = [FA14]
+NFS:   0204564F4C32000000000000000000000000A10000001C4DFF20A00000000000</pre></blockquote>
+
+
+Next, <em class="emphasis">protium</em>, a different NFS client comes into
+the picture, and removes one file from the directory previously
+cached by <em class="emphasis">tarsus</em>:</p>
+
+
+<blockquote><pre class="code">[1] protium $ <tt class="userinput"><b>rm /net/inchun/export/folder/data2</b></tt>
+
+22   0.00000   protium -&gt; inchun    NFS C GETATTR2 FH=FA14
+23   0.00000    inchun -&gt; protium   NFS R GETATTR2 OK
+24   0.00000   protium -&gt; inchun    NFS C REMOVE2 FH=FA14 data2
+25   0.00182    inchun -&gt; protium   NFS R REMOVE2 OK</pre></blockquote>
+
+
+Packets 22 and 23 update the cached attributes of the
+<em class="emphasis">/net/inchun/export/folder</em> directory on
+<em class="emphasis">protium</em>. Packet 24 contains the actual NFS
+<em class="emphasis">Remove</em> request sent to
+<em class="emphasis">inchun</em>, which in turn acknowledges the
+successful removal of the file in packet 25.</p>
+
+
+<em class="emphasis">tarsus</em> then lists the directory in question, but
+fails to detect that the contents of the directory have changed:</p>
+
+
+<blockquote><pre class="code">[2] tarsus $ <tt class="userinput"><b>ls /net/inchun/export/folder</b></tt>
+data1   data2
+
+39   0.00000    tarsus -&gt; inchun    NFS C GETATTR2 FH=FA14
+40   0.00101    inchun -&gt; tarsus    NFS R GETATTR2 OK</pre></blockquote>
+
+
+This is where the problem begins. Notice that two NFS
+<em class="emphasis">Getattr</em> network packets are generated as a
+result of the directory listing but no <em class="emphasis">Readdir</em>
+request. In this case, the client issues the NFS
+<em class="emphasis">Getattr</em> operation to request the
+directory's modification time:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from:</i> snoop -i /tmp/capture -p 39,40 -v
+ETHER:  ----- Ether Header -----
+ETHER:  
+ETHER:  Packet 40 arrived at 20:45:10.88
+...
+NFS:  ----- Sun NFS -----
+NFS:  
+NFS:  Proc = 1 (Get file attributes)
+NFS:  Status = 0 (OK)
+NFS:  File type = 2 (Directory)
+NFS:  Mode = 040777
+NFS:   Type = Directory
+NFS:   Setuid = 0, Setgid = 0, Sticky = 0
+NFS:   Owner's permissions = rwx
+NFS:   Group's permissions = rwx
+NFS:   Other's permissions = rwx
+NFS:  Link count = 2, UID = 0, GID = -2, Rdev = 0x0
+NFS:  File size = 512, Block size = 512, No. of blocks = 1
+NFS:  File system id = 7111, File id = 161
+NFS:  Access time       = 11-Apr-00 12:50:18.000000 GMT
+NFS:  Modification time = 11-Apr-00 12:50:18.000000 GMT
+NFS:  Inode change time = 31-Jul-96 09:40:56.000000 GMT</pre></blockquote>
+
+
+The modification time of the directory is the same as the
+modification time before the removal of the file!
+<em class="emphasis">tarsus</em> compares the cached modification time of
+the directory with the modification time just obtained from the
+server, and determines that the cached directory contents are still
+valid since the modification times are the same. The directory
+listing is therefore satisfied from the cache instead of forcing the
+NFS client to read the updated directory contents from the server.
+This explains why the removed file continues to show up in the
+directory listing:</p>
+
+
+<blockquote><pre class="code">[3] tarsus $ <tt class="userinput"><b>ls -l /net/inchun/export/folder</b></tt>
+/net/inchun/export/folder/data2: Stale NFS file handle
+total 6
+-rw-rw-rw-   1 labiaga  staff       2883 Apr 10 20:03 data1
+
+44   0.00000    tarsus -&gt; inchun    NFS C GETATTR2 FH=FA14
+45   0.00101    inchun -&gt; tarsus    NFS R GETATTR2 OK
+46   0.00032    tarsus -&gt; inchun    NFS C GETATTR2 FH=F66F
+47   0.00191    inchun -&gt; tarsus    NFS R GETATTR2 OK
+48   0.00032    tarsus -&gt; inchun    NFS C GETATTR2 FH=F8CD
+49   0.00214    inchun -&gt; tarsus    NFS R GETATTR2 Stale NFS file handle</pre></blockquote>
+
+
+The directory attributes reported in packet 45 are the same as those
+seen in packet 40, therefore <em class="emphasis">tarsus</em> assumes that
+it can safely use the cached filehandles associated with the cached
+entries of this directory. In packet 46, <em class="emphasis">tarsus</em>
+requests the attributes of filehandle F66F, corresponding to the
+<em class="emphasis">data1</em> file. The server replies with the
+attributes in packet 47. <em class="emphasis">tarsus</em> then proceeds to
+request the attributes of filehandle F8CD, which corresponds to the
+<em class="emphasis">data2</em> file. The server replies with a
+"Stale NFS filehandle" error because there is no file on
+the server associated with the given filehandle. This problem would
+never have occurred had the server updated the modification time
+after removing the file causing <em class="emphasis">tarsus</em> to detect
+that the directory had been changed.</p>
+
+
+Directory caching works nicely when the NFS server obeys Unix
+directory semantics. Many non-Unix NFS servers provide such semantics
+even if they have to submit themselves to interesting contortions.
+Having said this, there is nothing in the NFS protocol specification
+that requires the modification time of a directory to be updated when
+a file is removed. You may therefore need to disable Solaris NFS
+directory caching if you're running into problems interacting
+with non-Unix servers. To permanently disable NFS directory caching,
+add this line to <em class="emphasis">/etc/system</em>:</p>
+
+
+<blockquote><pre class="code">set nfs:nfs_disable_rddir_cache = 0x1</pre></blockquote>
+
+
+The Solaris kernel reads <em class="emphasis">/etc/system</em> at startup
+and sets the value of <em class="emphasis">nfs_disable_rddir_cache</em> to
+0x1 in the <em class="emphasis">nfs</em> kernel module. The change takes
+effect only after reboot. Use <em class="emphasis">adb</em> to disable
+caching during the current session, postponing the need to reboot.
+You still need to set the tunable in <em class="emphasis">/etc/system</em>
+to make the change permanent through reboots:</p>
+
+
+<blockquote><pre class="code">aqua# <tt class="userinput"><b>adb -w -k /dev/ksyms /dev/mem</b></tt>
+physmem    3ac8
+nfs_disable_rddir_cache/W1
+nfs_disable_rddir_cache:    0x0        =    0x1</pre></blockquote>
+
+
+<em class="emphasis">adb</em> is an interactive assembly level debugger
+that enables you to consult and modify the kernel's memory
+contents. The <em class="emphasis">-k</em> directive instructs
+<em class="emphasis">adb</em> to perform kernel memory mapping accessing
+the kernel's memory via <em class="emphasis">/dev/mem</em>, and
+obtaining the kernel's symbol table from
+<em class="emphasis">/dev/ksyms</em>. The <em class="emphasis">-w</em> directive allows
+you to modify the kernel memory contents. A word of caution:
+<em class="emphasis">adb</em> is a power tool that will cause serious data
+<a name="INDEX-2355" />
+<a name="INDEX-2356" />
+<a name="INDEX-2357" />corruption and potential system panics
+when misused.</p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">15.3. Boot parameter confusion</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15.5. Incorrect mount point permissions</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

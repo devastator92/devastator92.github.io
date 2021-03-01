@@ -1,0 +1,1936 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch18_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:36 GMT -->
+<head><title>Remote Command Execution (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch18_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">18.2. Remote Command Execution</h2>
+
+
+
+
+
+<a name="INDEX-1724" />A variety of protocols exist
+primarily to allow users to execute commands on remote systems. This
+section describes the BSD "r" commands,
+<em class="emphasis">rexec</em> and <em class="emphasis">rex</em>.</p><p>
+
+
+
+
+
+<a name="ch18-9991" /><div class="sect2">
+<h3 class="sect2">18.2.1. BSD "r" Commands</h3>
+
+
+
+
+
+<a name="INDEX-1725" />The BSD
+"r" commands (<em class="emphasis">rsh</em>,
+<em class="emphasis">rlogin</em>, <em class="emphasis">rcp</em>,
+<em class="emphasis">rdump</em>, <em class="emphasis">rrestore</em>, and
+<em class="emphasis">rdist</em>) are designed to provide convenient remote
+access, without requiring the user to type a password, to services
+such as remote command execution (<em class="emphasis">rsh</em>), remote
+login (<em class="emphasis">rlogin</em>), and remote file copying
+(<em class="emphasis">rcp</em> and <em class="emphasis">rdist</em>).</p><p>
+
+
+
+
+
+These programs are extremely useful, but as we discuss later in this
+section, they are safe to use only in an environment in which all of
+the machines are more or less trusted to play by the rules. While it
+may be appropriate to use these services within a local area network,
+it's almost never appropriate to use them across the Internet.
+It's just too easy for someone to convince these services that
+they're OK and that the service should perform what's
+requested.</p><p>
+
+
+
+
+
+<a name="INDEX-1726" />The difficulty
+with these commands is that they use address-based authentication.
+The server looks at the source address of the request and decides
+whether or not it trusts the remote host to tell it who the user is
+(this is controlled by the <em class="emphasis">/etc/hosts.equiv</em> and
+.<em class="emphasis">rhosts</em> files on Unix
+systems).<a name="INDEX-1727" /></p><p>
+
+
+
+
+
+An attacker who convinces one of these servers that a connection is
+coming from a "trusted" machine can essentially get
+complete and unrestricted access to your system. This can be done by
+impersonating a trusted machine and using its IP address, by
+confusing DNS so that DNS thinks that the attacker's IP address
+maps to a trusted machine's name, or by any of a number of
+other methods.</p><p>
+
+
+
+
+
+If the trusted host check described previously fails (that is, if the
+user is not coming from a trusted host), most of these services
+simply deny the client's request and disconnect. The
+<em class="emphasis">rlogind</em> server, however, will prompt the client
+for a password if the trusted host check fails. The password entered
+is sent in the clear over the net, just as with Telnet, so you have
+to worry about attackers capturing passwords from
+<em class="emphasis">rlogin</em> sessions, as they can from Telnet
+sessions. See <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a>, for a discussion of ways
+to address password sniffing attacks.</p><p>
+
+
+
+
+
+On some systems, it is possible to disable the trusted host checks
+with a command-line argument to the servers; even if your server
+doesn't provide a convenient switch to disable the checks, if
+you have (or can get) source code for the servers, it's usually
+a relatively simple fix. However, without the trusted host mechanism,
+the <em class="emphasis">rshd</em> server is completely pointless because
+it provides no way to prompt for a password or other authenticator if
+the trusted host check fails. The <em class="emphasis">rlogind</em> server
+is still somewhat useful without the trusted host check because it
+can ask for a password, but it's not much more useful than
+Telnet.</p><p>
+
+
+
+
+
+<a name="ch18-5-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.1.1. BSD "r" commands under Windows NT</h3>
+
+
+
+
+
+<a name="INDEX-1728" />
+<a name="INDEX-1729" />Windows NT 4 provides clients for
+<em class="emphasis">rcp</em> and <em class="emphasis">rsh,</em> and the
+Windows NT 4 Server Resource Kit provides servers for all of the
+commands except <em class="emphasis">rlogin</em>, which requires a
+separate server from the rest. Although the Windows NT clients use a
+slightly different syntax from modern Unix clients, they have the
+same security implications.</p><p>
+
+
+
+
+
+<a name="INDEX-1730" />The security implications
+for the server are somewhat worse in Windows NT than they are in
+Unix. The basic problem is the same; the server is relying on the
+client's information about the user. Most clients are not in
+the least trustworthy (there are a number of ways for somebody with
+control over a client to take on any identity they please). In
+addition, since the client is identified only by checking the source
+IP address, the server is vulnerable to IP address spoofing even if
+it only trusts carefully chosen clients.</p><p>
+
+
+
+
+
+Worse yet, there is a mismatch between <em class="emphasis">rsh</em> and
+Windows NT's security model. Under NT, a program cannot just
+assume a user's identity without a password.
+<em class="emphasis">rsh</em>, however, is incapable of providing a
+password. The <em class="emphasis">rsh</em> server has to find some way to
+bridge this gap. Some servers take the straightforward and completely
+insecure approach of not even trying to assume the user's
+identity, and running everything with the server's permissions.
+Others store a mapping between <em class="emphasis">rsh</em> users and
+Windows NT users, including the Windows NT password. This provides
+better security when the server is in use, but an attacker who gets
+access to the mapping data has user and password information.</p><p>
+
+
+
+
+
+Because of these problems, running these servers is not advisable.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-10052" /><div class="sect3">
+<h3 class="sect3">18.2.1.2. Packet filtering characteristics of the BSD "r" commands</h3>
+
+
+
+
+
+<a name="INDEX-1731" />The "r"
+commands are TCP-based services. For the server, they use well-known
+port 513 (<em class="emphasis">rlogin</em>) or 514
+(<em class="emphasis">rsh</em>, <em class="emphasis">rcp</em>,
+<em class="emphasis">rdump</em>, <em class="emphasis">rrestore</em>, and
+<em class="emphasis">rdist</em> ; these are just different clients for the
+same server). They are somewhat unusual in that they use random ports
+<em class="emphasis">below</em> 1024 for the client end.</p><p>
+
+
+
+
+
+Using ports below 1024 for the client end is an attempt at a security
+scheme that allows password-less access to these services as long as
+the requests come from a trusted host and user, as discussed earlier.
+The idea is that, if the request comes from a port below 1024 on the
+client end, then the request must be OK with root on the client
+machine; if it were not, the client never could have gotten the port
+below 1024 to use for the request. This notion is completely
+incorrect on Windows operating systems, where any user can use any
+port that is not already in use.</p><p>
+
+
+
+
+
+Further, some of the clients of the server on port 514
+(<em class="emphasis">rsh</em>, for example) use a second TCP connection
+for error reporting. This second TCP connection is opened from a
+random port below 1024 on the server to a random port below 1024 on
+the client; that is, an outgoing <em class="emphasis">rsh</em> command
+involves an incoming TCP connection for the error channel.</p><p>
+
+
+
+
+
+<a name="ch18-6-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+513</p><p></td>
+<td>
+<a href="#FOOTNOTE-82">[82]</a></p><p>
+</td>
+<td>
+<em class="emphasis">rlogin</em>, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+513</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rlogin</em>, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+514</p><p></td>
+<td><a href="#FOOTNOTE-82">[82]</a></td>
+<td>
+<em class="emphasis">rsh/rcp/rdump/rrestore/rdist</em>, external client to
+internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+514</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rsh/rcp/rdump/rrestore/rdist</em>, internal server to
+external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td><a href="#FOOTNOTE-82">[82]</a></td>
+<td>
+<em class="emphasis">rsh</em> error channel, internal server to external
+client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rsh</em> error channel, external client to internal
+server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+513</p><p></td>
+<td><a href="#FOOTNOTE-82">[82]</a></td>
+<td>
+<em class="emphasis">rlogin</em>, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+513</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rlogin</em>, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+514</p><p></td>
+<td><a href="#FOOTNOTE-82">[82]</a></td>
+<td>
+<em class="emphasis">rsh/rcp/rdump/rrestore/rdist</em>, internal client to
+external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+514</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rsh/rcp/rdump/rrestore/rdist</em>, external server to
+internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td><a href="#FOOTNOTE-82">[82]</a></td>
+<td>
+<em class="emphasis">rsh</em> error channel, external server to internal
+client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+&lt;1024</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+<em class="emphasis">rsh</em> error channel, internal client to external
+server</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-82" />[82]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.<a name="INDEX-1732" /></p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-10342" /><div class="sect3">
+<h3 class="sect3">18.2.1.3. Proxying characteristics of the BSD "r" commands</h3>
+
+
+
+
+
+<a name="INDEX-1733" />The only one of the "r"
+commands that's widely used across the Internet is
+<em class="emphasis">rlogin</em>. TIS FWTK provides a proxy
+<em class="emphasis">rlogin</em> server that uses modified user procedures
+to provide outbound <em class="emphasis">rlogin.</em></p><p>
+
+
+
+
+
+The other commands rely completely on address-based authentication,
+and don't allow the user to specify a password at all.
+They're used so seldom across the Internet that proxies for
+them are not widely available. All of them allow the user to specify
+enough data that's passed to the server that it would be
+possible to write modified-procedures proxies for them. Modifying the
+<em class="emphasis">rcmd( )</em> and related functions in the standard
+Unix library allow you to create clients that use a generic proxy
+server.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-10357" /><div class="sect3">
+<h3 class="sect3">18.2.1.4. Network address translation characteristics of the BSD "r"commands</h3>
+
+
+
+
+
+<a name="INDEX-1734" />For the most part, the BSD
+"r" commands will function with network address
+translation without problems. The <em class="emphasis">rsh</em> error
+channel, however, is set up from the server to the client, and the
+server gets the client's IP address from the
+<em class="emphasis">rsh</em> protocol. Most network address translation
+systems will not translate this embedded address, and error channel
+creation will fail, causing <em class="emphasis">rsh</em> to fail. Network
+address translation systems that change port numbers may also cause
+connections to fail if they move the client port above 1023.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-7-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.1.5. Summary of recommendations for the BSD "r" command</h3>
+
+
+
+
+
+<ul><li>Don't allow any of the "r" commands across your
+firewall except outbound by proxy; they're unsafe. Use SSH or
+alternative protocols such as Telnet, FTP, and so on that can be made
+more secure.</p><p></li><li>There is no way to safely provide outgoing <em class="emphasis">rsh</em>
+service using packet filters, because to do so you would have to
+allow incoming TCP connections to random ports below 1024 for the
+error channels.</p><p></li><li>Because of the mismatch in security models, the
+<em class="emphasis">rsh</em> server is particularly dangerous on Windows
+NT; although Windows NT-based <em class="emphasis">rsh</em> clients are
+reasonably safe, Windows NT-based <em class="emphasis">rsh</em> servers
+are much more dangerous than Unix-based <em class="emphasis">rsh</em>
+servers.</p><p></li><li>If you absolutely have to allow "r" commands, make sure
+that the trusted host mechanisms are strictly controlled (preferably
+by disabling that code in the server, which may require command-line
+options or modifying the source code).</p><p></li><li>Beware disclosure of reusable passwords when using
+<em class="emphasis">rlogin</em>, just as when using Telnet.<a name="INDEX-1735" /></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-10376" /><div class="sect2">
+<h3 class="sect2">18.2.2. rexec</h3>
+
+
+
+
+
+<a name="INDEX-1736" /><em class="emphasis">rexec</em> is a widely
+run but rarely used server. It's rarely used because almost no
+operating system provides both the client and the server. It is
+unclear to us why it is widely run, but almost every Unix system
+ships with <em class="emphasis">rexecd</em> enabled in
+<em class="emphasis">/etc/inetd.conf</em>, apparently just in case
+somebody should be moved to write a local client for it. By contrast,
+Windows NT 4 machines ship with an <em class="emphasis">rexec</em> client
+but no daemon (in case you are running Unix machines, perhaps?). The
+only systems we know of which commonly ship with both a client and a
+server are Silicon Graphics machines running IRIX, which use
+<em class="emphasis">rexec</em> as the underlying protocol for the
+<em class="emphasis">inst</em> software installation program.</p><p>
+
+
+
+
+
+<em class="emphasis">rexec</em> is usually lumped in with the BSD
+"r" commands, but actually it has a slightly more secure
+design than the others. Rather than providing source-address
+authentication, it always requires the user to provide a username and
+password. This advantage is outweighed by the fact that it passes
+these across the network in the clear, so it has no security
+advantage over Telnet, for example. Worse yet, most
+<em class="emphasis">rexec</em> daemons provide no logging whatsoever.
+This makes <tt class="command">rexec</tt> a favorite point of attack, since
+you are unlikely to notice the attackers at any point -- while
+they're trying to break in, or even after they've gotten
+in.</p><p>
+
+
+
+
+
+<a name="ch18-10392" /><div class="sect3">
+<h3 class="sect3">18.2.2.1. Packet filtering characteristics of rexec</h3>
+
+
+
+
+
+<em class="emphasis">rexec</em> is a TCP-based service. The server uses
+port 512. The client uses a random port above 1023.</p><p>
+
+
+
+
+
+<a name="ch18-8-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+512</p><p></td>
+<td>
+<a href="#FOOTNOTE-83">[83]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Incoming <em class="emphasis">rexec</em>, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+512</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming <em class="emphasis">rexec</em>, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+512</p><p></td>
+<td><a href="#FOOTNOTE-83">[83]</a></td>
+<td>
+Outgoing <em class="emphasis">rexec</em>, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+512</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing <em class="emphasis">rexec</em>, server to client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<a name="FOOTNOTE-83" />[83]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-10512" /><div class="sect3">
+<h3 class="sect3">18.2.2.2. Proxying characteristics of rexec</h3>
+
+
+
+
+
+Because very few platforms are widely available with both clients and
+servers for <em class="emphasis">rexec</em>, no proxies are widely
+available for it. If you had a client that did use
+<em class="emphasis">rexec</em>, it would not be terribly difficult to
+modify it to use a generic proxy like SOCKS. If the
+<em class="emphasis">rexec</em> clients on a given machine were always
+accessing the same server, you could also use a generic proxy server
+like the <em class="emphasis">plug-gw</em> program in TIS FWTK. It would
+be somewhat trickier, but by no means impossible, to write a
+dedicated proxy server that would use modified user procedures.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-10525" /><div class="sect3">
+<h3 class="sect3">18.2.2.3. Network address translation characteristics of rexec</h3>
+
+
+
+
+
+<em class="emphasis">rexec</em> does not use embedded IP addresses, and it
+will function with network address translation without problems.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-9-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.2.4. Summary of recommendations for rexec</h3>
+
+
+
+
+
+<ul>
+<li>Do not allow <em class="emphasis">rexec</em> across your firewall.</p><p></li>
+<li>Disable <em class="emphasis">rexecd</em> on all machines that do not need it to provide software packages via <em class="emphasis">inst</em>.</p><p></li></ul>
+<a name="INDEX-1737" />
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-10531" /><div class="sect2">
+<h3 class="sect2">18.2.3. rex</h3>
+
+
+
+
+
+<a name="INDEX-1738" /><em class="emphasis">rex</em> is an RPC-based
+service for remote command execution. For an understanding of the
+problems RPC-based services pose for firewalls, see the discussion of
+RPC-based services in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>. There are worse
+problems with <em class="emphasis">rex</em>, however; in particular, it
+places all of its security checks in the client (which is a program
+named <em class="emphasis">on</em>), and anyone can use a modified client
+that bypasses these checks.</p><p>
+
+
+
+
+
+<tt class="command">rex</tt> is a TCP Sun RPC service; for more information
+on the packet filtering, proxying, and network address translation
+characteristics of RPC services, see <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+<a name="ch18-10543" /><div class="sect3">
+<h3 class="sect3">18.2.3.1. Summary of recommendations for rex</h3>
+
+
+
+
+
+<ul><li>Don't allow <em class="emphasis">rex</em> across your firewall;
+better yet, don't allow it at all because it's completely
+insecure even within a LAN environment.</p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.2.4. Windows NT Remote Commands</h3>
+
+
+
+
+
+<a name="INDEX-1739" /> <a name="INDEX-1740" />For Windows NT 4, the Windows NT
+Resource Kit also provides three Windows NT-specific services that
+allow you to remotely execute commands. They are:</p><p>
+
+
+
+
+
+<ul><li>Remote Command Line or REMOTE</p><p></li><li>Remote Command or RCMD</p></li><li><p>Remote Console or RCONSOLE</p></li></ul>
+(For Windows 2000, this sort of functionality is handled by the
+Terminal Server, which is discussed later in this chapter.)</p><p>
+
+
+
+
+
+<a name="INDEX-1741" />
+<a name="INDEX-1742" /> <a name="INDEX-1743" />Despite their very similar names, these
+services do quite different things. RCMD is a fairly standard remote
+execution service; you start up the server, and clients that connect
+to it can then execute any command. REMOTE is more limited; you start
+the command to be run at the same time you start the server, and the
+client can control only the command you started. Commands that use
+graphics or complicated input and output methods will not work with
+either service (this includes a number of standard programs you might
+want to use from a command line, including most notably
+<tt class="command">edit</tt>). Neither service encrypts information.</p><p>
+
+
+
+
+
+Remote Console provides more capabilities than either RCMD or REMOTE.
+It gives you a console on the remote machine exactly as if you were
+physically logged into the machine and had asked for a command
+prompt. It takes over video and all input and output, so that any
+program that normally works in a console window will work correctly.
+Remote Console does support encryption. By default, it encrypts
+authentication information. In addition, clients can request that an
+entire connection be encrypted (the server cannot require
+encryption). Authentication information is encrypted with DES. The
+details of the other encryption systems are not documented.</p><p>
+
+
+
+
+
+The services also use different security models. RCMD uses normal
+Windows NT authentication. The user who is running the client must
+have permission to log in to the server machine interactively, and
+the commands will run with that user's permissions. (Some early
+versions of RCMD do not actually correctly run the commands with the
+user's permissions; you should be sure to run the most recent
+version.) REMOTE does not by default do any authentication
+whatsoever, and the command is run with the permissions of the user
+who started the server. When you start a REMOTE server, it is
+possible to limit access to a particular group or user.</p><p>
+
+
+
+
+
+Remote Console uses its own authentication. By default, only members
+of the Administrators group can use Remote Console. It is possible to
+give this ability to other users by making them members of the group
+"RConsoleUsers"; if you do this, the users will
+automatically have the privilege "Log on as a batch
+file". When these users use Remote Console, they will get a
+console running with their normal permissions, as if they were
+physically logged in at the console (except that Remote Console does
+not check to see if they have the "Log on locally"
+permission that would let them do that).</p><p>
+
+
+
+
+
+REMOTE is of limited usefulness and is highly insecure. RCMD is more
+useful but still not very secure. If you need occasional command-line
+access to remote machines on a relatively secure network, Remote
+Console is a reasonable way to provide it. If you need full
+administration remotely, you will need a more powerful remote access
+solution; if you need to cross an insecure network, you will need a
+better protected one. In any case, if you are working remotely
+between NT machines, Remote Console is preferable to
+<em class="emphasis">rsh</em>, since Remote Console uses Windows NT user
+authentication, which is more secure than <em class="emphasis">rsh</em>'s
+source address authentication.</p><p>
+
+
+
+
+
+All of these services are based on SMB transactions; the packet
+filtering, proxying, and network address characteristics of SMB
+transactions are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+<a name="ch18-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.4.1. Summary of recommendations for remote commands</h3>
+
+
+
+
+
+<ul><li>Don't allow Remote Console, RCMD, or other SMB-based services,
+across your firewall.</p><p></li><li>Don't run REMOTE at all.<a name="INDEX-1744" /> <a name="INDEX-1745" /> <a name="INDEX-1746" /><a name="INDEX-1747" /></p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-14602" /><div class="sect2">
+<h3 class="sect2">18.2.5. Secure Shell (SSH)</h3>
+
+
+
+
+
+<a name="INDEX-1748" />
+<a name="INDEX-1749" />The secure shell, or SSH, derives
+its name from one of the commands in the original implementation,
+which was written by Tatu Ylonen in 1995. SSH can be used as a secure
+replacement for the BSD "r" commands because it provides
+all of their functionality but uses strong authentication and
+encryption. On a Unix system it provides login
+(<em class="emphasis">slogin</em>), remote shell
+(<em class="emphasis">ssh</em>), and remote copy
+(<em class="emphasis">scp</em>) commands. In addition, SSH provides a
+built-in proxy mechanism that overcomes the problems of using remote
+X Windows clients (X Windows is discussed in more detail later in
+this chapter). SSH can also perform arbitrary "port
+forwarding", routing traffic received on one port on one
+machine to another port on another machine. Because SSH uses
+encryption, the port forwarding mechanism can be used as a very
+limited VPN capability.</p><p>
+
+
+
+
+
+SSH servers are widely available for Unix and Windows NT and may be
+available for other platforms that provide command-line interfaces.
+SSH clients are available for almost all platforms.</p><p>
+
+
+
+
+
+There is a good bit of confusion about the name "SSH".
+Originally there was a single program called
+<em class="emphasis">ssh</em>, but over time, several other entities have
+grown up. There is a package, including the <em class="emphasis">ssh</em>
+program and others, which is usually called SSH; there is a network
+communications protocol that the <em class="emphasis">ssh</em> program
+(and others) are based on, which is also usually called SSH; and
+there is a company called SSH Communications Security that has other
+products that use the SSH name.</p><p>
+
+
+
+
+
+Currently, two versions of the SSH protocol exist, SSH version 1 and
+SSH version 2. SSH version 1 is the original. Version 2 has a number
+of new features, including support for the TLS protocol, which is
+discussed further in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>. This protocol (at
+the time of writing) is not yet an IETF standard, and hence, SSH
+version 2 is still a work in progress. SSH version 2 is also in the
+process of becoming an IETF standard.</p><p>
+
+
+
+
+
+The original implementation, which is distributed primarily in source
+code form, has a generous license that makes it available free of
+charge for most noncommercial purposes. The reference implementation
+of SSH version 2 by SSH Communications Security is being supported
+and sold commercially (although it is available free of charge for
+very limited uses). Multiple programs based on the SSH protocols,
+some of them commercial and some of them freely available, are also
+developed by other people.</p><p>
+
+
+
+
+
+Because of the multiple implementations and the different licensing
+and legal restrictions, both versions are in widespread use, and this
+is expected to continue to be the case for some time. Unless
+otherwise noted, this discussion applies to both versions of the SSH
+Communications Security package.</p><p>
+
+
+
+
+
+Used correctly, SSH provides protection against a number of risks.
+Because it uses an encrypted connection for the entire conversation,
+including user authentication, it protects against eavesdroppers,
+whether they are looking for passwords or for data. The integrity
+mechanism that's used prevents session hijacking; an attacker
+cannot take over an existing connection because the attacker will not
+be able to correctly generate the integrity checksums.</p><p>
+
+
+
+
+
+<a name="INDEX-1750" />SSH is a very popular tool for people who
+break into sites, as well as for administrators, and for many of the
+same reasons. Because SSH provides encrypted connections,
+administrators can't tell what information is moving across an
+SSH connection. Furthermore, SSH provides port-forwarding features
+(discussed later), which allow you to run all sorts of other
+protocols across an SSH connection, without any administrative
+control.</p><p>
+
+
+
+
+
+Since SSH is often used for remote administration, it's also a
+very useful command for attackers to booby-trap. Attackers will often
+install versions of SSH that function normally but send the attacker
+all authentication information, as well as the information needed to
+decrypt a connection (allowing them to snoop on it or hijack it). You
+should keep careful control over what machines can run SSH, and they
+should be protected bastion hosts where you will detect changes.</p><p>
+
+
+
+
+
+<a name="ch18-12-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.1. What makes SSH secure?</h3>
+
+
+
+
+
+<a name="INDEX-1751" /> <a name="INDEX-1752" />The
+security of SSH does not come purely from the fact that it uses a
+specific encryption algorithm, cryptographic hash, or public key
+cryptography, but from the way the algorithms are used. The important
+characteristics of a secure private communication session are
+discussed in <a href="appc_01.html">Appendix C, "Cryptography"</a>.</p><p>
+
+
+
+
+
+Both version 1 and 2 of SSH meet the characteristics of a secure
+private communication session because:</p><p>
+
+
+
+
+
+<ul><li>The client and server negotiate encryption algorithms (in the case of
+SSH version 2, negotiation also determines which key exchange
+mechanism and integrity checksums are used).</p><p></li><li>The identity of the server to which a client is connecting is always
+verified, and this identity check is performed before any client user
+authentication information is sent. This mechanism is discussed in
+the next section on server authentication.</p><p></li><li>The key exchange algorithms that are used prevent man-in-the-middle
+attacks.</p><p></li><li>At the end of the key exchange, a checksum exchange will detect any
+tampering with algorithm negotiation.</p><p></li><li>The server checks the client identity in a number of ways; these
+mechanisms are discussed later in the section on client
+authentication.</p><p></li><li>All data packets exchanged include message integrity checks. An
+integrity check failure causes a connection to be closed.</p><p></li><li>An SSH server uses temporary authentication parameters that are
+discarded after a configurable time period (normally one hour) to
+prevent recorded sessions from being decrypted at a later
+time.<a name="INDEX-1753" />
+<a name="INDEX-1754" /></p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-13-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.2. SSH server authentication</h3>
+
+
+
+
+
+<a name="INDEX-1755" /> <a name="INDEX-1756" />As mentioned earlier,
+SSH clients always verify the identity of an SSH server before
+sending any user authentication information -- the ordering here
+is critical because it prevents a rogue server from impersonating a
+real server and capturing user authentication information. The server
+authentication mechanism does not rely on name service or IP address
+authentication. If you connect to a machine via Telnet, you are
+relying on your name service to give you the correct IP address
+information; if an attacker can feed you bad name service data, you
+will be connected to the attacker's machine and will happily
+give it your username and password information.</p><p>
+
+
+
+
+
+<a name="INDEX-1757" />In both versions of SSH,
+public key cryptography is used to prove the identity of a server.
+The first part of checking the identity is to verify that you have a
+valid public key for the server that you wish to connect to. At the
+time SSH version 1 was developed, this was a very difficult problem
+because there was no standard interoperable global infrastructure for
+the purpose of distributing and verifying public keys. This situation
+is slowly improving, and SSH version 2 can use a certificate
+authority to verify a public key (this is one of the features
+provided by using TLS, which is discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>). SSH version 2 also supports the mechanism
+developed for SSH version 1.</p><p>
+
+
+
+
+
+The solution SSH version 1 uses is novel; the client retrieves the
+public key from the server itself, checks to see if it already knows
+a key for a server having this name, and compares the keys. A
+mismatch in keys causes a warning to be printed. When the client
+doesn't already have a key, it also prints a warning and
+optionally stores the public key for the next time you connect to the
+server. This system makes the client vulnerable to a hostile server
+on the first connection, but it does provide significantly more
+security than having the client vulnerable to a hostile server on
+every connection.</p><p>
+
+
+
+
+
+It is also possible to provide a local system database of keys for
+servers that users might want to connect to. This protects clients
+against a hostile server but at the expense of maintaining the local
+database. Having a local database is effective only if it is possible
+to know in advance which servers clients are going to connect to.</p><p>
+
+
+
+
+
+After checking the validity of a key, SSH then checks the identity of
+the server by sending a message encrypted using the public
+key.<a href="#FOOTNOTE-84">[84]</a> When the server proves that it successfully decrypted the
+message, and therefore knows the private part of the public key, the
+client believes it is talking to the correct server.<a name="INDEX-1758" /></p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-84" />[84]SSH version 2 does not always use public key
+algorithms for this. See the description of TLS in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>, for how server identity is determined.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-14-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.3. SSH client authentication</h3>
+
+
+
+
+
+<a name="INDEX-1759" /> <a name="INDEX-1760" />The SSH
+protocol supports a number of client authentication mechanisms:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>rhosts</i></dt>
+<dd>The <em class="emphasis">rhosts</em> <a name="INDEX-1761" />authentication
+mechanism is exactly the same as for the BSD
+"r" commands. If the client is using a privileged port
+and the <em class="filename">.rhosts</em> file permits the login, then it
+is allowed. This mechanism is not enabled by default, and it is not
+recommended because it is not secure. This mechanism requires that
+SSH be installed so that it can use a privileged port.</p><p></dd>
+
+
+
+
+
+<dt><i>rhosts with RSA authentication of the client host </i></dt>
+<dd><a name="INDEX-1762" />This approach combines
+.<em class="filename">rhosts</em> with public key cryptography. The server
+first checks the identity of the client host. If
+the RSA public key for the client host is known to the server and the
+client can prove it knows the host private key, then
+<em class="filename">.rhosts</em> authentication is performed. Allowing
+this mechanism is the simplest way to replace the BSD "r"
+commands without forcing users to set up any new files. This
+mechanism also requires that SSH be installed so that it can use a
+privileged port and be able to read the client host private key.</p><p></dd>
+
+
+
+
+
+<dt><i>RSA authentication of the user </i></dt>
+<dd>This approach uses only public key cryptography. The client first
+sends the user's public key to the server. If the server is
+willing to accept the key, it responds with a challenge so that the
+client can prove that it knows the user's private key. This
+mechanism reads only user files and does not require SSH to use a
+privileged port. SSH can also use an "agent" to hold user
+private keys. SSH clients, when they need to use a private key,
+contact the SSH agent to perform cryptographic operations on their
+behalf. By default SSH clients will automatically set up forwarding
+to your SSH agent if you have one running. This means that you can
+chain together multiple SSH connections through several systems
+without having to copy your private key to multiple
+systems.<a name="INDEX-1763" /></p><p></dd>
+
+
+
+
+
+<dt><i>Kerberos v5 authentication and TIS authentication server </i></dt>
+<dd><a name="INDEX-1764" />These modes work the same way as other
+applications that use these systems, which are described in <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a>.</p><p></dd>
+
+
+
+
+
+<dt><i>Passwords </i></dt>
+<dd><a name="INDEX-1765" />The final, and fallback authentication
+mode for SSH is to prompt for the user's normal login password.
+This is the same authentication used by programs like Telnet; the
+advantage is that at the point where SSH asks for the password, it
+has already established an encrypted connection, so the password is
+not passed in cleartext the way it is with Telnet or
+<em class="emphasis">rlogin</em>.</p><p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-15-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.4. Additional SSH options for client control</h3>
+
+
+
+
+
+An SSH server may accept or reject a connection based upon a number
+of conditions in addition to its client and user authentication,
+including:</p><p>
+
+
+
+
+
+<ul><li>The source IP address of the connection</p><p></li><li>The name of the host from which the connection is coming</p></li><li><p>The groups of which the user is a member<a name="INDEX-1766" /> <a name="INDEX-1767" /></p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.5. SSH session hijacking protection</h3>
+
+
+
+
+
+<a name="INDEX-1768" />
+<a name="INDEX-1769" />One of the important
+features of SSH is that it prevents session hijacking. Both versions
+of SSH use a message integrity mechanism to prevent hijacking. This
+makes it difficult for a third party to take over an open connection
+and use it because the third party must generate packets that both
+ends will accept. Versions 1 and 2 use different mechanisms, and each
+is believed to make it virtually impossible to hijack a
+session -- no successful hijackings have ever been reported.
+However, the cryptographic techniques used in SSH version 2 (because
+it uses TLS) are considered to be superior.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.6. Port forwarding</h3>
+
+
+
+
+
+<a name="INDEX-1770" />SSH has a facility called
+<em class="emphasis">port</em> <em class="emphasis">forwarding</em> that allows
+you to run other protocols across an SSH connection. There are two
+ways of doing port forwarding, "local" and
+"remote" (see <a href="ch18_02.html#ch18-68833">Figure 18-2</a>). Both kinds
+of forwarding are configured when the SSH client connects to the
+server, and both of them allow a connection made on one end of the
+SSH connection to go to the other end and then continue from there,
+possibly to a completely different host. Port forwarding stops when
+you close the SSH session to the server.</p><p>
+
+
+
+
+
+<a name="ch18-68833" /><div class="figure"><img height="389" alt="Figure 18-2" src="figs/fire2.1802.gif" width="446" /></div><h4 class="objtitle">Figure 18-2. SSH port forwarding</h4>
+
+In local forwarding, the SSH client accepts connections and sends the
+data to the SSH server, which sends it on to the destination. In
+remote port forwarding, the server accepts the connections and sends
+the data to the client. In either case, whenever a connection is made
+to the listening port, a new TCP connection is made to the target
+system. Multiple, simultaneous connections are supported. Neither the
+connection to the listening port nor the connection from the SSH
+tunnel to the final destination is encrypted or authenticated. The
+tunnel can be used by other people, not just by the person who set it
+up; depending on exactly how the tunnel is created, it may be
+available to any user on the same machine that the listening port is
+on, or it may be available to any host that can reach the listening
+port.</p><p>
+
+
+
+
+
+Port forwarding is both a useful feature and a very dangerous one. It
+is useful, for example, if you want to create a simple virtual
+private network between two servers that you control. Allowing SSH
+with port forwarding can be an effective way to protect protocols
+like POP and IMAP that normally exchange unencrypted data.</p><p>
+
+
+
+
+
+Port forwarding is dangerous because it can be set up to forward
+external connections to an internal service, effectively bypassing
+your firewall. If this occurs, it will be difficult to detect by
+examining network traffic because the connections will be encrypted.
+For this reason, you should only allow incoming SSH connections to
+servers that you control, and you should consider turning off the
+general port forwarding features for incoming connections. Similarly,
+you should limit outgoing SSH connections to using SSH clients that
+you control, preferably with port forwarding turned off. Remote port
+forwarding will allow apparently outbound connections to carry
+inbound traffic.</p><p>
+
+
+
+
+
+Port forwarding does require some knowledge of how the protocols work
+and the port numbers that are used. It is therefore not useful to
+most users. If you receive requests to use port forwarding features,
+you may wish to consider implementing a real virtual private network.
+See <a href="ch05_01.html">Chapter 5, "Firewall Technologies"</a>, for information on virtual private
+networking.</p><p>
+
+
+
+
+
+Both the client and the server provide ways to permanently turn off
+port forwarding; you can compile them without the port forwarding
+feature, or use a system configuration file to disable it. However,
+this will not prevent users from using their own clients (which may
+ignore the system configuration file).</p><p>
+
+
+
+
+
+Inbound port forwarding is configured at the start of an SSH session.
+SSH can set up forwarding for several different ports at the same
+time. However, an attacker can only exploit the ports that were set
+up at the start of a session; additional ports can only be attacked
+when new SSH sessions are started. For instance, if you set up port
+forwarding to an IMAP server, that may expose the IMAP server to
+attackers, but it doesn't allow access to any other services. It is
+possible to place default forwarding information into the per-user
+configuration file. This will cause ports to be forwarded
+automatically whenever an SSH session is started. You may want to
+disable inbound port forwarding on your SSH server to keep users from
+opening internal ports to attackers with this feature.</p><p>
+
+
+
+
+
+However, if an attacker can do port forwarding to a proxy server, and
+the proxy server can talk to the internal network, a single port
+forward can turn into extremely general access. For instance, if a
+port is forwarded from the outside to a web proxy, the attacker then
+has access to anything that the web proxy can reach. For various
+reasons, ranging from laziness to a desire to accommodate bad browser
+configurations, administrators often set up their external proxy
+systems so that they can reach internal servers. In this
+configuration, one single port forward can provide an attacker
+straightforward access to the entire internal web, and all the
+information and vulnerable servers that are on it. A SOCKS proxy
+server can give even more direct and widespread access.</p><p>
+
+
+
+
+
+If you allow incoming SSH connections and port forwarding, you should
+make sure that any firewall proxy services refuse and log connection
+attempts from those systems. In general, if you are using firewall
+proxy services, you should configure them to not allow connections to
+internal systems. This protects you from users using port forwarding
+on an incoming SSH server and using your proxy servers to access
+internal or external resources.<a name="INDEX-1771" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-18-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.7. Remote X11 Window System support</h3>
+
+
+
+
+
+<a name="INDEX-1772" /> <a name="INDEX-1773" />SSH has a very useful feature that allows
+remote X11 Window System applications to be run. This is a special
+case of port forwarding, which also transparently handles X11
+authentication cookies. For more information on the X11 Window
+System, see the X11 section later in this chapter. We recommend that
+you enable the X11 features only for systems on which you will be
+using it. The default setting can normally be made either globally or
+using individual user configuration files. The documentation for the
+version of SSH you are using should contain instructions on how to do
+this.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.8. Packet filtering characteristics of SSH</h3>
+
+
+
+
+
+SSH servers are at TCP port 22; SSH clients need to use a port 1024
+below when using <em class="filename">.rhost</em>-based authentication
+methods, but use a port above 1023 when they are not.</p><p>
+
+
+
+
+
+<a name="ch18-20-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any<a href="#FOOTNOTE-85">[85]</a></p><p>
+</td>
+<td>
+22</p><p></td>
+<td>
+<a href="#FOOTNOTE-86">[86]</a></p><p>
+</td>
+<td>
+Incoming SSH connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any<a href="#FOOTNOTE-85">[85]</a></p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming SSH connection, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+Any<a href="#FOOTNOTE-85">[85]</a></p><p></td>
+<td>
+22</p><p></td>
+<td><a href="#FOOTNOTE-86">[86]</a></td>
+<td>
+Outgoing SSH connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+22</p><p></td>
+<td>
+Any<a href="#FOOTNOTE-85">[85]</a></p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing SSH connection, server to client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-85" />[85]SSH clients use a port below 1024 when using
+<em class="filename">.rhost</em>-based authentication methods, and a port
+above 1023 otherwise.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-86" />[86]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-21-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.9. Proxying characteristics of SSH</h3>
+
+
+
+
+
+It is easy to proxy SSH as it uses a single TCP connection from the
+client to the server. When not using <em class="filename">.rhosts</em>
+authentication, it does not rely on using a port below 1024 and IP
+addresses for authentication. A proxy cannot perform any content
+checks due to the use of encryption in SSH. Under Unix, SSH has
+compile-time support for either SOCKS v4 or SOCKS v5. Some clients
+for other platforms also support SOCKS.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-22-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.10. Network address translation characteristics of SSH</h3>
+
+
+
+
+
+SSH does not use embedded IP addresses and will work transparently
+with network address translation.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-23-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.2.5.11. Summary of recommendations for SSH</h3>
+
+
+
+
+
+<ul><li>If you have to allow inbound connections, SSH is one of the safest
+ways.</p><p></li><li>Avoid using the <em class="filename">.rhosts</em>-based authentication
+methods.</p><p></li><li>Only allow inbound SSH connections to servers that you control.</p></li><li>Consider turning off port forwarding.</p></li><li><p>Only enable remote X11 support when you need it.</p></li><li><p>Consider disallowing outbound SSH connections, because they can be
+used to tunnel inbound connections, and it is difficult to enforce
+port forwarding restrictions on them.<a name="INDEX-1774" /><a name="INDEX-1775" /></p><p></li></ul>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch18_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">18. Remote Access to Hosts</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">18.3. Remote Graphical Interfaces</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch18_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:36 GMT -->
+</html>

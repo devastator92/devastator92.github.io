@@ -1,0 +1,1297 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:32 GMT -->
+<head><title>Web Server Security (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">11.4. Web Server Security</h2>
+
+<p>Web servers are <a name="INDEX-2509" />
+<a name="INDEX-2510" />
+<a name="INDEX-2511" />vulnerable
+to all of the normal security problems discussed in <a href="ch12_01.html">Chapter 12, "Network Security "</a>, but they also have their own special security
+considerations. In addition to guarding against the usual threats,
+web servers should be set up to protect the integrity of the
+information they disseminate as well as the information they receive
+from the client.
+</p>
+
+<p>Access to the information on the server is protected by access
+controls. You can control access to the server at the host level and
+at the user level in the <em class="emphasis">httpd.conf</em>
+configuration file. Access control is important for protecting
+internal and private web pages, but most web information is intended
+for dissemination to the world at large. For these global web pages,
+you don't want to limit access in any way, but you still want
+to protect the integrity of the information on the pages.
+</p>
+
+<p>One of the unique security risks for a web server is the possibility
+of an intruder changing the information on your web pages. We have
+all heard of high-profile incidents in which intruders alter the home
+page of some government agency to include comical or pornographic
+material. Although these attacks are not intended to do long-term
+harm to the server, they can certainly embarrass the organization
+that runs the web site.
+</p>
+
+<p>Unix file permissions protect the files and directories where web
+documents are stored. The server does not need write permissions, but
+it does need to read and execute these files. Executable files, if
+they are poorly designed, are always a potential security threat.
+</p>
+
+<a name="tcp3-CHP-11-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">11.4.1. The CGI and SSI Threat</h3>
+
+<p>Apache itself <a name="INDEX-2512" />
+<a name="INDEX-2513" />
+<a name="INDEX-2514" /> <a name="INDEX-2515" />is
+reliable <a name="INDEX-2516" />and reasonably secure.
+The biggest threat to the security of your server is the code that
+you write for your server to execute, most commonly Common Gateway
+Interface programs and Server Side Includes.
+</p>
+
+<p>CGI programs can be written in C, Perl, Python, or other programming
+languages. Badly written CGI programs represent one of the biggest
+threats to server security: intruders can exploit poor code by
+forcing buffer overflows or passing shell commands through the
+program to the system. To avoid this, you must be very careful about
+the code that you make available on your system. You should
+personally review all programs included in the
+<em class="emphasis">cgi-bin</em> directory. Try to write programs that do
+not allow free-form user input; use pull-down menus instead of
+keyboard input where possible. Limit and validate what comes in from
+the user to your system.
+</p>
+
+<p>To make it easier to review your CGI scripts, keep them all in the
+ScriptAlias directory. Don't allow scripts to be executed from
+any other directory unless you're positive no one can place a
+script there that you have not personally reviewed. In the next
+section, we'll see how to control which directories allow CGI
+execution when we discuss the Options directive.
+</p>
+
+<p>Server Side Includes (SSI) are <a name="INDEX-2517" />
+<a name="INDEX-2518" />
+<a name="INDEX-2519" />
+<a name="INDEX-2520" />also a <a name="INDEX-2521" />potential problem
+for the same reason as CGI programs. Server Side Includes are also
+called Server Parsed HTML, and the files often have the
+<em class="emphasis">.shtml</em> file extension. These files are processed
+by the server before they are sent to the client, and they can
+include other files or execute code from script files. If user input
+is used to dynamically modify an SSI file, the file is vulnerable to
+the same type of attacks as CGI scripts.
+</p>
+
+<p>SSI commands are embedded inside HTML comments, and therefore begin
+with <tt class="literal">&lt;!--</tt> and conclude with
+<tt class="literal">--&gt;</tt>. The SSI commands are listed in <a href="ch11_04.html#tcp3-CHP-11-TABLE-3">Table 11-3</a>.
+</p>
+
+<a name="tcp3-CHP-11-TABLE-3" /><h4 class="objtitle">Table 11-3. Server Side Include commands </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Command</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>#config</p>
+</td>
+<td>
+<p>Formats the display of file size and time.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>#echo</p>
+</td>
+<td>
+<p>Displays variables.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>#exec</p>
+</td>
+<td>
+<p>Executes a CGI script or a shell command.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>#flastmod</p>
+</td>
+<td>
+<p>Displays the date a document was last modified.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>#fsize</p>
+</td>
+<td>
+<p>Displays the size of a document.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>#include</p>
+</td>
+<td>
+<p>Inserts another file into the current document.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>The most secure way to operate is to disallow all SSI processing.
+This is the default unless All or Includes is specified by an Options
+directive in the <em class="emphasis">httpd.conf</em> file. A compromise
+setting is to allow SSI processing but disallow the #include and
+#exec commands. These are the greatest security threats because
+#include writes data to the document from an external file, and #exec
+enables script and command execution. Use IncludesNOEXEC on the
+Options directive for this setting. Let's now look at how
+Options are set for individual directories.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">11.4.2. Controlling Server Options</h3>
+
+<p>The <em class="emphasis">httpd.conf</em><a name="INDEX-2522" /> <a name="INDEX-2523" /> <a name="INDEX-2524" /> <a name="INDEX-2525" /> file can define server controls
+for all web documents or for documents in individual directories. The
+Options directive specifies what server options are permitted for
+documents. Placing the Options directive inside a Directory container
+limits the scope of the directive to that specific directory. The
+Solaris configuration provides an example:
+</p>
+
+<blockquote><pre class="code">&lt;Directory /&gt;
+    Options FollowSymLinks
+    AllowOverride None
+&lt;/Directory&gt;
+&lt;Directory "/var/apache/htdocs"&gt;
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;
+&lt;Directory "/var/apache/icons"&gt;
+    Options Indexes MultiViews
+    AllowOverride None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;
+&lt;Directory "/var/apache/cgi-bin"&gt;
+    AllowOverride None
+    Options None
+    Order allow,deny
+    Allow from all
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>This configuration defines server option controls for four
+directories: the root (<em class="emphasis">/</em>),
+<em class="emphasis">/var/apache/htdocs</em>,
+<em class="emphasis">/var/apache/icons</em>, and
+<em class="emphasis">/var/apache/cgi-bin</em>. The example shows four
+possible values for the Options directive: FollowSymLinks, Indexes,
+None, and MultiViews. The Options directive has several possible
+settings:
+</p>
+
+<dl>
+<a name="INDEX-2526" /><dt><i>All</i></dt>
+<dd>
+<p>Permits the use of all server options.</p>
+</dd>
+
+
+<a name="INDEX-2527" /><dt><i>ExecCGI</i></dt>
+<dd>
+<p>Permits the execution of CGI scripts from this directory. The ExecCGI
+option allows CGI scripts to be executed from directories other than
+the directory pointed to by the ScriptAlias directive. Many
+administrators set this option for the ScriptAlias directory, but
+doing so is somewhat redundant: the ScriptAlias directive already
+defines <em class="emphasis">/var/apache/cgi-bin</em> as the script
+directory. In the example, Options is set to None for the
+<em class="emphasis">/var/apache/cgi-bin</em> directory without undoing
+the effect of the ScriptAlias directive.
+</p>
+</dd>
+
+
+<a name="INDEX-2528" /><dt><i>FollowSymLinks</i></dt>
+<dd>
+<p>Permits the use of symbolic links. If this is allowed, the server
+treats a symbolic link as if it were a document in the directory.
+</p>
+</dd>
+
+
+<a name="INDEX-2529" /><dt><i>Includes</i></dt>
+<dd>
+<p>Permits the use of Server Side Includes (SSI).</p>
+</dd>
+
+
+<a name="INDEX-2530" /><dt><i>IncludesNOEXEC</i></dt>
+<dd>
+<p>Permits Server Side Includes (SSI) files that do not contain #exec
+and #include commands.
+</p>
+</dd>
+
+
+<a name="INDEX-2531" /><dt><i>Indexes</i></dt>
+<dd>
+<p>Permits a server-generated listing of the directory if an
+<em class="emphasis">index.html</em> file is not found.
+</p>
+</dd>
+
+
+<a name="INDEX-2532" /><dt><i>MultiViews</i></dt>
+<dd>
+<p>Permits the document language to be negotiated. See the AddLanguage
+and LanguagePriority directives discussed earlier in <a href="ch11_03.html#tcp3-CHP-11-SECT-3.6">Section 11.3.6, "Defining File Types"</a>.
+</p>
+</dd>
+
+
+<a name="INDEX-2533" /><dt><i>None</i></dt>
+<dd>
+<p>Disallows all server options. My personal favorite!</p>
+</dd>
+
+
+<a name="INDEX-2534" /><dt><i>SymLinksIfOwnerMatch</i></dt>
+<dd>
+<p>Permits the use of symbolic links if the target file of the link is
+owned by the same userid as the link itself.
+</p>
+</dd>
+
+</dl>
+
+<p>Use server options with care. The None and MultiViews options used in
+the Solaris configuration should not cause security problems,
+although MultiViews consumes server resources. The Indexes option
+poses a slight security risk, as it exposes a listing of the
+directory contents if no <em class="filename">index.html</em> file is
+found, which may be more information than you want to share with the
+world. FollowSymLinks has the potential for security problems because
+symbolic links can increase the number of directories in which
+documents are stored. The more directories you have, the more
+difficult it is to secure them, because each must have the proper
+permissions set and be monitored for possible file corruption. (See
+<a href="ch12_01.html">Chapter 12, "Network Security "</a> for information on Tripwire, a tool that
+helps monitor files.)
+</p>
+
+<p>The Directory containers in the previous example also contain
+<a name="INDEX-2535" />AllowOverride directives. These
+directives limit the amount of configuration control given to the
+<a name="INDEX-2536" /> <a name="INDEX-2537" /> <a name="INDEX-2538" /> <a name="INDEX-2539" />individual directories.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">11.4.3. Directory-Level Configuration Controls</h3>
+
+<p>The statement
+<a name="INDEX-2540" />
+<a name="INDEX-2541" />
+<a name="INDEX-2542" />
+<a name="INDEX-2543" /><tt class="literal">AccessFileName</tt>
+<tt class="literal">.htaccess</tt> enables directory-level configuration
+control and states that the name of the directory configuration file
+is <em class="emphasis">.htaccess</em>. If the server finds a file with
+this name in a directory from which it is retrieving information, it
+applies the configuration lines defined in the file before it
+releases the data. The AccessFileName directive delegates
+configuration control to the people who create and manage the
+individual web pages, giving them a file in which they can write
+configuration directives. The configuration directives in the
+<em class="emphasis">.htaccess</em> file are the same as those in the
+<em class="emphasis">httpd.conf</em> file that defines systemwide
+configuration. The Solaris configuration contains the
+<tt class="literal">AccessFileName</tt> <tt class="literal">.htaccess</tt> line,
+so directory-level configuration is allowed on Solaris systems by
+default.
+</p>
+
+<p>The <a name="INDEX-2544" />
+<a name="INDEX-2545" />
+<a name="INDEX-2546" />AllowOverride directive
+can be used to limit the amount of configuration control given to
+individual directories. It defines when the
+<em class="emphasis">.htaccess</em> file is allowed to override the
+configuration values set in <em class="emphasis">httpd.conf</em>. Placing
+the AllowOverride directives inside a Directory container limits the
+scope of AllowOverride to that specific directory, as we saw in the
+previous example.
+</p>
+
+<p>The AllowOverride directive has many possible settings. In addition
+to the keywords <tt class="literal">All</tt>, which permits the
+<em class="emphasis">.htaccess</em> file to override everything defined in
+the configuration files, and <tt class="literal">None</tt>, which allows no
+overrides, individual directives can be permitted through this
+directive. For example, to allow an <em class="emphasis">.htaccess</em>
+file to define file extension mappings, specify
+<tt class="literal">AllowOverride</tt> <tt class="literal">AddType</tt>. When
+this value is used on an AllowOverride directive, AddType directives
+can be used in the directory's <em class="emphasis">.htaccess</em>
+file to define file extension mappings. AllowOverride can be used to
+permit just about anything in the configuration to be overridden by
+the <em class="emphasis">.htaccess</em> file.
+</p>
+
+<p>The Options and AllowOverride directives limit access to server
+features and configuration controls, and can help keep information
+safe from corruption. Sometimes, however, you have information you
+want to keep safe from widespread distribution. Access controls limit
+the distribution of information.
+</p>
+
+</div>
+<a name="tcp3-CHP-11-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">11.4.4. Defining Access Controls</h3>
+
+<p>Use the <em class="emphasis">httpd.conf</em> file
+<a name="INDEX-2547" />
+<a name="INDEX-2548" />
+<a name="INDEX-2549" />to
+define host and user access controls. A few examples will make this
+capability clear. Let's start with an example of host access
+controls:
+</p>
+
+<blockquote><pre class="code">&lt;Directory "/var/apache/htdocs/internal"&gt;
+Order deny,allow
+Deny from all
+Allow from wrotethebook.com
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>This shows access controls for the directory
+<em class="emphasis">/var/apache/htdocs/internal</em>. The access controls
+are designed to grant access only to those hosts within the
+<em class="emphasis">wrotethebook.com</em> domain. The Directory container
+encloses three access control directives:
+</p>
+
+<dl>
+<a name="INDEX-2550" /><dt><b><tt class="literal">Order</tt></b></dt>
+<dd>
+<p>Defines the order in which the access control rules are evaluated.
+<tt class="literal">deny,allow</tt> tells <tt class="literal">httpd</tt> to apply
+the deny rule first, and then permit exceptions to that rule based on
+the allow rule. In the example, we block access from everyone with
+the deny rule and then permit exceptions for systems that are part of
+the <em class="emphasis">wrotethebook.com</em> domain with the allow rule.
+This is an example of access rules that might be used to protect an
+internal web site.
+</p>
+</dd>
+
+
+<a name="INDEX-2551" /><dt><b><tt class="literal">Deny from</tt></b></dt>
+<dd>
+<p>Identifies the hosts not allowed to access web documents found in the
+<em class="emphasis">/var/apache/htdocs/internal</em> directory. The hosts
+can be identified by full or partial hostnames or IP addresses. Each
+Deny from directive can identify only one source; to specify multiple
+sources, use multiple Deny from directives. However, if a domain name
+or a network address is used, the source can encompass every host in
+an entire domain or network. The keyword <tt class="literal">all</tt>
+blocks all hosts.
+</p>
+</dd>
+
+
+<a name="INDEX-2552" /><dt><b><tt class="literal">Allow from</tt></b></dt>
+<dd>
+<p>Identifies hosts that are granted access to documents in the
+directory. The hosts can be identified by full or partial hostnames
+or IP addresses. Each Allow from directive can identify only one
+source; to specify multiple sources, use multiple Allow from
+directives. However, if a domain name or a network address is used,
+the source can encompass every host in an entire domain or network.
+The keyword <tt class="literal">all</tt> allows all hosts.
+</p>
+</dd>
+
+</dl>
+
+<p>The example here controls access on a host-by-host basis. This type
+of control is commonly used to segregate information for internal
+users from information for external customers. It is also possible to
+control file access at the user and group level.
+</p>
+
+<a name="tcp3-CHP-11-SECT-4.4.1" /><div class="sect3">
+<h3 class="sect3">11.4.4.1. Requiring user authentication</h3>
+
+<p>User authentication <a name="INDEX-2553" /> <a name="INDEX-2554" /> <a name="INDEX-2555" /> <a name="INDEX-2556" />can
+be required before granting access to a document or directory. It is
+generally used to limit information to a small group. An example of
+user access control is:
+</p>
+
+<blockquote><pre class="code">&lt;Directory "/var/apache/htdocs/internal/accounting"&gt;
+AuthName "Accounting"
+AuthType Basic
+AuthUserFile /etc/apache/http.passwords
+AuthGroupFile /etc/apache/http.groups
+Require hdqtrs rec bill pay
+Order deny,allow
+Deny from all
+Allow from Limit&gt;
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>The first two directives in this Directory container are AuthName and
+AuthType. <a name="INDEX-2557" />
+<a name="INDEX-2558" />
+<a name="INDEX-2559" />AuthName provides the value for
+the <em class="emphasis">authentication realm</em> -- a value that is
+placed on the <tt class="literal">WWW-Authenticate</tt> header sent to the
+client. A realm is a group of server resources that share the same
+authentication. In the example, the directory
+<em class="emphasis">/var/apache/htdocs/internal/accounting</em> is the
+only item in the Accounting realm. But it would be possible to have
+other password-protected directories or documents in the Accounting
+realm. If we did, a user that was authenticated for any resource in
+the Accounting realm would be authenticated for all resources in that
+realm.
+</p>
+
+<p>The <a name="INDEX-2560" />
+<a name="INDEX-2561" />AuthType
+directive specifies the type of password authentication that will be
+used. This can be either Basic or Digest. When Basic is specified, a
+plain clear-text password is used for authentication. When Digest is
+specified, Message Digest 5 (MD5) is used for authentication. Digest
+is rarely used, partly because it is not completely implemented in
+all browsers, but more importantly because data that requires strong
+authentication is better protected using Secure Sockets Layer (SSL)
+security. SSL is covered later in <a href="ch11_04.html#tcp3-CHP-11-SECT-4.5">Section 11.4.5, "Using Encryption"</a>.
+</p>
+
+<p>In this example, access is granted if the user belongs to a valid
+group and has a valid password. These groups and passwords have
+nothing to do with the groups and passwords used by
+<tt class="literal">login</tt>. The groups and passwords used here are
+specifically defined by you for use with the web server. The files
+you create for this purpose are the ones pointed to by the
+AuthUserFile and AuthGroupFile entries. Add passwords to the web
+server password file with the <tt class="literal">htpasswd</tt> command
+that comes with the Apache system; add groups to the group file by
+editing the file with any text editor. The entries in the group file
+start with the group name followed by a colon and a list of users
+that belong to the group. For example:
+</p>
+
+<blockquote><pre class="code">hdqtrs: amanda pat craig kathy</pre></blockquote>
+
+<p>The <a name="INDEX-2562" />
+<a name="INDEX-2563" />Require
+directive requires the user to enter the web username and password.
+The example limits access to users who belong to one of the groups
+<tt class="literal">hdqtrs</tt>, <tt class="literal">rec</tt>,
+<tt class="literal">bill</tt>, or <tt class="literal">pay</tt>, and who also
+enter a valid password. Alternatively, placing the keyword
+<tt class="literal">valid-user</tt> on the Require line instead of a list
+of groups grants access to any user with a valid password and ignores
+the group file.
+</p>
+
+<p>Even if you do not use web server groups, specify the AuthGroupFile
+entry when using password authentication. If you don't want to
+create a dummy group file, simply point the entry to
+<em class="emphasis">/dev/null</em>.
+</p>
+
+<p>The Order, Deny, and Allow directives perform the same function in
+this example as they did in the previous one. Here we are adding
+password authentication to host authentication. That's not
+required. If the Order, Deny, and Allow directives were not in the
+example, any system on the Internet would be allowed to access the
+documents if the user on that system had the correct username and
+password.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-11-SECT-4.4.2" /><div class="sect3">
+<h3 class="sect3">11.4.4.2. Improved user authentication</h3>
+
+<p>The standard authentication module, <a name="INDEX-2564" />
+<a name="INDEX-2565" />mod_auth, stores user
+authentication data in flat files that are searched sequentially. A
+sequential search of even a few hundred entries can be time
+consuming. Use an indexed database to improve performance if you have
+more than a few password entries.
+</p>
+
+<p>Two modules, mod_auth_db, which uses Berkeley DB databases, and
+mod_auth_dbm, which uses Unix DBM databases, provide support for
+password databases. The basic Solaris configuration dynamically loads
+mod_auth_dbm, so we can use a password database on a Solaris system
+with very little effort.
+</p>
+
+<p>The password database is used in much the same way as the sequential
+database. Using the authentication example shown previously, we can
+change to a
+<a name="INDEX-2566" />
+<a name="INDEX-2567" />password database simply by
+changing the AuthUserFile directive to an AuthDBMUserFile directive
+and the AuthGroupFile directive to an AuthDBMGroupFile directive.
+Here is an example:
+</p>
+
+<blockquote><pre class="code">&lt;Directory "/var/apache/htdocs/internal/accounting"&gt;
+AuthName "Accounting"
+AuthType Basic
+AuthDBMUserFile /etc/apache/passwords
+AuthDBMGroupFile /etc/apache/groups
+Require hdqtrs rec bill pay
+Order deny,allow
+Deny from all
+Allow from Limit&gt;
+&lt;/Directory&gt;</pre></blockquote>
+
+<p>These two small changes are all that is needed in the
+<em class="emphasis">httpd.conf</em> file. The biggest change when using a
+password database is that passwords are no longer defined with the
+<tt class="literal">htpassword</tt> command. Instead, the
+<tt class="literal">dbmmanage</tt> command is used to create password and
+group database entries. The syntax of the
+<tt class="literal">dbmmanage</tt><a name="INDEX-2568" /> command is:
+</p>
+
+<blockquote><pre class="code">dbmmanage <em class="replaceable">filename command username password</em> </pre></blockquote>
+
+<p>The items on a <tt class="literal">dbmmanage</tt> command line are largely
+self-explanatory. <em class="replaceable">filename</em> is the name of
+the database file. <em class="replaceable">username</em> and
+<em class="replaceable">password</em> are just what you would expect
+for a password database. <em class="replaceable">command</em> is a
+keyword that defines the function of the <tt class="literal">dbmmanage</tt>
+command. The possible
+<a name="INDEX-2569" /><em class="replaceable">command</em>
+keywords are:
+</p>
+
+<dl>
+<a name="INDEX-2570" /><dt><b><tt class="literal">add</tt></b></dt>
+<dd>
+<p>Adds a username and password to the database. The password must
+already be encrypted because <tt class="literal">dbmmanage</tt> does not
+encrypt the password for you when you use the <tt class="literal">add</tt>
+keyword. See the <tt class="literal">adduser</tt> keyword.
+</p>
+</dd>
+
+
+<a name="INDEX-2571" /><dt><b><tt class="literal">adduser</tt></b></dt>
+<dd>
+<p>Adds a username and password to the database. The password is
+provided in clear text and then encrypted by
+<tt class="literal">dbmmanage</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-2572" /><dt><b><tt class="literal">check</tt></b></dt>
+<dd>
+<p>Checks if the username and password match those in the database.</p>
+</dd>
+
+
+<a name="INDEX-2573" /><dt><b><tt class="literal">delete</tt></b></dt>
+<dd>
+<p>Removes a username and password from the database.</p>
+</dd>
+
+
+<a name="INDEX-2574" /><dt><b><tt class="literal">import</tt></b></dt>
+<dd>
+<p>Copies
+<em class="replaceable">username</em><tt class="literal">:</tt><em class="replaceable">password</em>
+entries from stdin. The passwords must already be encrypted.
+</p>
+</dd>
+
+
+<a name="INDEX-2575" /><dt><b><tt class="literal">update</tt></b></dt>
+<dd>
+<p>Changes the password for a username that is already in the database.</p>
+</dd>
+
+
+<a name="INDEX-2576" /><dt><b><tt class="literal">view</tt></b></dt>
+<dd>
+<p>Displays the contents of the database.</p>
+</dd>
+
+</dl>
+
+<p>In the following example, the
+<em class="emphasis">/etc/apache/passwords</em> file is created and two
+new users are added to the database:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">dbmmanage /etc/apache/passwords adduser sara</b>
+New password:
+Re-type new password:
+User sara added with password encrypted to XsH4aRiQbEzp2
+# <b class="emphasis-bold">dbmmanage /etc/apache/passwords adduser alana</b>
+New password:
+Re-type new password:
+User alana added with password encrypted to AslrgF/FPQvF6
+# <b class="emphasis-bold">dbmmanage /etc/apache/passwords view</b>
+alana:AslrgF/FPQvF6
+sara:XsH4aRiQbEzp2</pre></blockquote>
+
+<p>Notice that <tt class="literal">dbmmanage</tt> prompts for the password if
+it is not provided on the command line.
+</p>
+
+<p>All of the access control examples shown so far define access
+controls for a directory. It is also possible to define access
+control for all directories on a server or for individual documents.
+To apply access controls to every document provided by the server,
+simply place the access control directives outside a Directory
+container; the access controls here apply only to a single directory
+because they are located within a Directory container. To apply
+access controls to a single file or document, place the directives
+inside a Files or Document <a name="INDEX-2577" /> <a name="INDEX-2578" /> <a name="INDEX-2579" /> <a name="INDEX-2580" />container. 
+</p>
+
+</div>
+
+<a name="tcp3-CHP-11-SECT-4.4.3" /><div class="sect3">
+<h3 class="sect3">11.4.4.3. Setting file-level access controls</h3>
+
+<p>The Solaris <a name="INDEX-2581" />
+<a name="INDEX-2582" />
+<a name="INDEX-2583" />
+<a name="INDEX-2584" />configuration provides an
+example of applying access controls to individual files. In order to
+prevent the <em class="emphasis">.htaccess</em> file from being downloaded
+by a curious client, the Solaris configuration contains the following
+Files container:
+</p>
+
+<blockquote><pre class="code">&lt;Files ~ "^\.ht"&gt;
+    Order allow,deny
+    Deny from all
+&lt;/Files&gt;</pre></blockquote>
+
+<p>The Order and Deny directives are somewhat different from previous
+examples. Here the Order directive tells Apache to process the Allow
+directive first and then the Deny directive. This enables the Deny
+directive to override anything done by the Allow directive. In this
+case there is no Allow directive, and the Deny directive denies all
+remote access to the <em class="emphasis">.htaccess</em> file.
+</p>
+
+<p>In fact, this Deny directive applies to more than just the
+<em class="emphasis">.htaccess</em> file. The tilde (<tt class="literal">~</tt>)
+on the Files line tells Apache to interpret the filename as a regular
+expression. The regular expression <tt class="literal">^\.ht</tt> matches
+any filename that begins with <tt class="literal">.ht</tt>. This was done
+because users and administrators often start <tt class="literal">httpd</tt>
+configuration files with the string <tt class="literal">.ht</tt>, e.g., a
+user password file might be named <em class="emphasis">.htpassword</em>.
+Using a regular expression as a filename on the Files line applies
+the access controls to a wide range of possible files.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-11-SECT-4.4.4" /><div class="sect3">
+<h3 class="sect3">11.4.4.4. Setting document-level access controls</h3>
+
+<p>Use the Location <a name="INDEX-2585" />
+<a name="INDEX-2586" />
+<a name="INDEX-2587" />
+<a name="INDEX-2588" />directive to apply access
+controls at the document level. Where the Directory line has a
+directory name, the Location directive has a document name from a
+URL. The directives defined inside a Location container apply only to
+that document. In the following example, access controls are applied
+to the <em class="emphasis">server-status</em> document:
+</p>
+
+<blockquote><pre class="code">&lt;Location /server-status&gt;
+SetHandler server-status
+Order deny,allow
+Deny from all
+Allow from wrotethebook.com
+&lt;/Location&gt;</pre></blockquote>
+
+<p>If the Apache server gets a request for
+<em class="emphasis">www.wrotethebook.com/server-status</em>, it applies
+these access controls. <em class="emphasis">/server-status</em> is the
+name of a document, not the name of a directory. In fact, this is a
+special document that shows the server status and is constructed by a
+special handler. The access controls make the server status available
+to everyone in our domain but deny it to all outsiders. The last
+section in this chapter shows how the server-status page is used to
+monitor a web server. But before we move on to that topic, we need to
+look at one final aspect of security -- protecting the information
+the client sends to the server.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-11-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">11.4.5. Using Encryption</h3>
+
+<p>The <a name="INDEX-2589" />
+<a name="INDEX-2590" />
+<a name="INDEX-2591" /> <a name="INDEX-2592" />security
+features described in the previous sections are all designed to
+protect information provided by the server. However, you are also
+responsible for protecting the security of your client's data.
+If you want to run an electronic commerce business, you must use a
+secure server that protects your customers' personal
+information, such as credit card numbers. Secure Apache servers use
+Secure Sockets Layer (SSL) to encrypt protected sessions.
+</p>
+
+<p>SSL is both more powerful and more complex than the security features
+discussed so far. It is more powerful because it uses public key
+cryptography for strong authentication and to negotiate session
+encryption. When SSL is used, the exchange of data between the client
+and server is encrypted and protected.
+</p>
+
+<p>SSL is also more complex because it uses <a name="INDEX-2593" />public key cryptography. All
+encryption is complex, and public key encryption is particularly so.
+<a href="ch12_01.html">Chapter 12, "Network Security "</a> describes how public key encryption
+works and, in particular, how the SSL protocol works. If you want
+this background information, read <a href="ch12_01.html">Chapter 12, "Network Security "</a> before
+adding SSL to your Apache server.
+</p>
+
+<p>The mod_ssl package adds SSL support to Apache. In turn, mod_ssl
+depends on OpenSSL for encryption libraries, tools, and the
+underlying SSL protocols. Many Linux systems and some Unix systems
+include <a name="INDEX-2594" />
+<a name="INDEX-2595" />OpenSSL.
+Before installing mod_ssl, make sure OpenSSL is installed on your
+system; if it isn't, download the source
+<a name="INDEX-2596" />code from
+<a href="http://www.openssl.org/">http://www.openssl.org</a>. Run the
+<tt class="literal">config</tt> utility that comes with the source code and
+then run <tt class="literal">make</tt> to compile OpenSSL. Run
+<tt class="literal">make test</tt> and <tt class="literal">make install</tt> to
+install it.
+</p>
+
+<p>Once OpenSSL is installed, <a name="INDEX-2597" />mod_ssl can be installed. Many Linux
+systems and some Unix systems include mod_ssl as part of the basic
+Apache system. If your system doesn't, download the mod_ssl
+package from <a href="http://www.modssl.org/">http://www.modssl.org</a>. Recompile Apache using
+the <tt class="literal">--with-ssl</tt> option to incorporate the SSL
+extensions into Apache.<a href="#FOOTNOTE-128">[128]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-128" /><p>[128]<em class="emphasis">Linux Apache Web
+Server Administration</em> is an excellent reference on
+compiling Apache.</p> </blockquote>
+
+<p>The mod_ssl installation inserts various SSL configuration lines into
+the sample Apache configuration, usually called
+<em class="emphasis">httpd.conf.default</em>. These new lines are placed
+inside IfDefine containers so that SSL support is an option that can
+be invoked from the <tt class="literal">httpd</tt> command line. Red Hat,
+which bundles mod_ssl into the basic system, provides a good example
+of how this is done. Here are the IfDefine containers for the mod_ssl
+LoadModule and AddModule directives from a Red Hat system:
+</p>
+
+<blockquote><pre class="code">&lt;IfDefine HAVE_SSL&gt;
+LoadModule ssl_module         modules/libssl.so
+&lt;/IfDefine&gt;
+&lt;IfDefine HAVE_SSL&gt;
+AddModule mod_ssl.c
+&lt;/IfDefine&gt;</pre></blockquote>
+
+<p>The LoadModule and AddModule directives are used only if HAVE_SSL is
+defined on the <tt class="literal">httpd</tt> command line. The string
+"HAVE_SSL" is arbitrary; on another system, the string
+might be "SSL". All that matters is that the string
+matches a value defined on the <tt class="literal">httpd</tt> command line.
+For example:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">httpd -DHAVE_SSL</b></pre></blockquote>
+
+<p>This command attempts to start an SSL Apache server on a Red Hat 7.2
+system.
+</p>
+
+<p>In addition to the containers for the LoadModule and AddModule
+directives, there is an IfDefine container that defines a special SSL
+server configuration. The container from the Red Hat configuration is
+shown here:
+</p>
+
+<blockquote><pre class="code">&lt;IfDefine HAVE_SSL&gt;
+Listen 80
+Listen 443
+&lt;/IfDefine&gt;
+&lt;IfDefine HAVE_SSL&gt;
+AddType application/x-x509-ca-cert .crt
+AddType application/x-pkcs7-crl    .crl
+&lt;/IfDefine&gt;
+&lt;IfDefine HAVE_SSL&gt;
+&lt;VirtualHost _default_:443&gt;
+ErrorLog logs/error_log
+TransferLog logs/access_log
+SSLEngine on
+SSLCertificateFile /etc/httpd/conf/ssl.crt/server.crt
+SSLCertificateKeyFile /etc/httpd/conf/ssl.key/server.key
+&lt;Files ~ "\.(cgi|shtml|phtml|php3?)$"&gt;
+    SSLOptions +StdEnvVars
+&lt;/Files&gt;
+&lt;Directory "/var/www/cgi-bin"&gt;
+    SSLOptions +StdEnvVars
+&lt;/Directory&gt;
+SetEnvIf User-Agent ".*MSIE.*" \
+         nokeepalive ssl-unclean-shutdown \
+         downgrade-1.0 force-response-1.0
+CustomLog logs/ssl_request_log \
+          "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x '%r' %b"
+&lt;/VirtualHost&gt;
+&lt;/IfDefine&gt;</pre></blockquote>
+
+<p>The two lines in the first IfDefine container tell the server to
+listen to port 443, as well as to the standard port 80. Port 443 is
+the port used by SSL. The two lines in the second IfDefine container
+map the file extensions .<em class="emphasis">crt</em> and
+.<em class="emphasis">crl</em> to specific MIME file types. The extensions
+.<em class="emphasis">crt</em> and .<em class="emphasis">crl</em> are both
+related to SSL certificates. More on certificates in a moment.
+</p>
+
+<p>The bulk of the SSL server configuration is defined in a VirtualHost
+container. This virtual host configuration is invoked when a
+connection comes into the default server on port 443 -- the SSL
+port. A special log file is created to track SSL requests. ErrorLog,
+TransferLog, and CustomLog are directives we have seen before. Most
+of the other configuration directives are valid only when SSL is
+running:
+</p>
+
+<dl>
+<a name="INDEX-2598" /><dt><i>SSLEngine</i></dt>
+<dd>
+<p>Turns on SSL processing for this virtual host.</p>
+</dd>
+
+
+<a name="INDEX-2599" /><dt><i>SetEnvIf</i></dt>
+<dd>
+<p>Performs essentially the same function as the BrowserMatch directives
+described earlier. In this case, the SetEnvIf directive checks to see
+if the <tt class="literal">User-Agent</tt> (the browser) is Microsoft
+Internet Explorer. If it is, the
+<tt class="literal">ssl-unclean-shutdown</tt> option lets Apache know that
+this browser will not properly shut down the connection and that
+keepalives should not be used with Internet Explorer.
+</p>
+</dd>
+
+
+<a name="INDEX-2600" /><dt><i>SSLOptions</i></dt>
+<dd>
+<p>Sets special SSL protocol options. In the example, StdEnvVars are
+enabled for the <em class="emphasis">/var/www/cgi-bin</em> directory and
+for all CGI and SSI files. StdEnvVars are environment variables sent
+over the connection to the client. Retrieving these variables is time
+consuming for the server, so they are sent only when it is possible
+that the client could use them, as is the case when CGI scripts or
+SSI files are involved.
+</p>
+</dd>
+
+
+<a name="INDEX-2601" /><dt><i>SSLCertificateFile</i></dt>
+<dd>
+<p>Points to the file that contains the server's public key.</p>
+</dd>
+
+
+<a name="INDEX-2602" /><dt><i>SSLCertificateKeyFile</i></dt>
+<dd>
+<p>Points to the file that contains the server's private key.</p>
+</dd>
+
+</dl>
+
+<p>Public key cryptography requires two encryption keys: a public key
+that is made available to all clients, and a private key that is kept
+secret. The public key is in a special format called a
+<em class="emphasis">certificate</em><a name="INDEX-2603" />.
+Before you can start SSL on your server, you must create these two
+keys.
+</p>
+
+<p>OpenSSL provides the tools to create the public and private keys
+required for SSL. The simplest of these is the Makefile found in the
+<em class="emphasis">ssl/certs</em> directory,<a href="#FOOTNOTE-129">[129]</a>
+which allows you to create certificates and keys with a
+<tt class="literal">make</tt> command. Two different types
+<a name="INDEX-2604" />of arguments can be used with the
+<tt class="literal">make</tt> command to create an SSL certificate or key.
+One type of argument uses the file extension to determine the type of
+certificate or key created:
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-129" /><p>[129]<em class="emphasis">ssl/certs</em> is relative to the path where
+OpenSSL is installed on your system. On our Red Hat system, the full
+path is <em class="emphasis">/usr/share/ssl/certs</em>.</p> </blockquote>
+
+<dl>
+<dt><b><tt class="literal">make</tt> <em class="replaceable">name</em><tt class="literal">.key</tt></b></dt>
+<dd>
+<p>Creates a private key and stores it in the file
+<em class="replaceable">name</em><tt class="literal">.key</tt>.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make</tt> <em class="replaceable">name</em><tt class="literal">.crt</tt></b></dt>
+<dd>
+<p>Creates a certificate containing a public key and stores it in the
+file <em class="replaceable">name</em><tt class="literal">.crt</tt>.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make</tt> <em class="replaceable">name</em><tt class="literal">.pem</tt></b></dt>
+<dd>
+<p>Creates a certificate and a key in the Privacy Enhanced Mail (PEM)
+format and stores it in the file
+<em class="replaceable">name</em><tt class="literal">.pem</tt>. In <a href="ch12_01.html">Chapter 12, "Network Security "</a>, this <tt class="literal">make</tt> command is used
+to create the keys required for the <tt class="literal">stunnel</tt>
+program.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make</tt> <em class="replaceable">name</em><tt class="literal">.csr</tt></b></dt>
+<dd>
+<p>Creates a certificate signature request. A certificate can be
+digitally signed by a trusted agent, called a <em class="emphasis">certificate
+authority</em> (CA), who vouches for the authenticity of the
+public key contained in the certificate. More about this later in
+this section.
+</p>
+</dd>
+
+</dl>
+
+<p>Keywords are the other type of argument that can be used with this
+akefile. The keywords create certificates and keys that are intended
+solely for use with Apache:
+</p>
+
+<dl>
+<dt><b><tt class="literal">make</tt> <tt class="literal">genkey</tt></b></dt>
+<dd>
+<p>Creates a private key for the Apache server. The key is stored in the
+file pointed to by the KEY variable in the Makefile.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make</tt> <tt class="literal">certreq</tt></b></dt>
+<dd>
+<p>Creates a certificate signature request for the Apache server. The
+certificate signature request is stored in the file pointed to by the
+CSR variable in the Makefile.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">make</tt> <tt class="literal">testcert</tt></b></dt>
+<dd>
+<p>Creates a certificate for the Apache server. This certificate can be
+used to boot and test the SSL server. However, the certificate is not
+signed by a recognized CA and therefore is not acceptable for use on
+the Internet. The certificate is stored in the file pointed to by the
+CRT variable in the Makefile.
+</p>
+</dd>
+
+</dl>
+
+<p>The <em class="emphasis">/etc/httpd/conf</em> directory on the Red Hat
+system has a link to the Makefile to make it easy to build the keys
+in the place where the <em class="emphasis">httpd.conf</em> file expects
+to find them. A look at the <em class="emphasis">/etc/httpd/conf</em>
+directory on a Red Hat system shows that the keys pointed to by
+SSLCertificateFile and SSLCertificateKeyFile already exist, even
+though you did not create them.
+</p>
+
+<p>The Makefile uses the <tt class="literal">openssl</tt> command to create
+the certificates and keys. The <tt class="literal">openssl</tt> command has
+a large and complex syntax, so using the Makefile provides real
+benefit. However, you can use the <tt class="literal">openssl</tt> command
+directly to do things that are not available through the Makefile.
+For example, to look at the contents of the certificate that Red Hat
+has placed in the <em class="emphasis">/etc/httpd/conf</em> directory,
+enter the following command:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">openssl x509 -noout -text -in ssl.crt/server.crt</b>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 0 (0x0)
+        Signature Algorithm: md5WithRSAEncryption
+        Issuer: C=--, ST=SomeState, L=SomeCity, O=SomeOrganization,
+                OU=SomeOrganizationalUnit,
+                CN=localhost.localdomain/Email=root@localhost.localdomain
+        Validity
+            Not Before: Jul 27 12:58:42 2001 GMT
+            Not After : Jul 27 12:58:42 2002 GMT
+        Subject: C=--, ST=SomeState, L=SomeCity, O=SomeOrganization,
+                 OU=SomeOrganizationalUnit,
+                 CN=localhost.localdomain/Email=root@localhost.localdomain
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+            RSA Public Key: (1024 bit)
+                Modulus (1024 bit):
+                    00:a3:e7:ef:ba:71:2a:52:ff:d9:df:da:94:75:59:
+                    07:f9:49:4b:1c:d0:67:b2:da:bd:7b:0b:64:63:93:
+                    50:3d:a1:02:e3:05:3b:8e:e6:25:06:a3:d2:0f:75:
+                    0a:85:71:66:d0:ce:f9:8b:b0:73:2f:fe:90:75:ad:
+                    d6:28:77:b0:27:54:81:ce:3b:88:38:88:e7:eb:d6:
+                    e9:a0:dd:26:79:aa:43:31:29:08:fe:f8:fa:90:d9:
+                    90:ed:80:96:91:53:9d:88:a4:24:0a:d0:21:7d:5d:
+                    53:9f:77:a1:2b:4f:62:26:13:57:7f:de:9b:40:33:
+                    c3:9c:33:d4:25:1d:a3:e2:47
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier:
+                55:E9:ED:C1:BF:1A:D4:F8:C2:78:6E:7A:2C:D4:9C:AC:7B:CD:D2
+            X509v3 Authority Key Identifier:
+                keyid:55:E9:ED:C1:BF:1A:D4:6E:7A:2C:D4:DD:9C:AC:7B:CD:D2
+                DirName:/C=-/ST=SomeState/L=SomeCity/O=SomeOrganization/
+                       OU=SomeOrganizationalUnit/CN=localhost.localdomain/
+                       Email=root@localhost.localdomain
+                serial:00
+            X509v3 Basic Constraints:
+                CA:TRUE
+    Signature Algorithm: md5WithRSAEncryption
+        76:78:77:f0:a2:19:3b:39:5f:2a:bd:d0:42:da:85:6e:c2:0c:
+        5e:80:40:9c:a8:65:da:bf:38:2b:f0:d6:aa:30:72:fb:d3:1d:
+        ce:cd:19:22:fb:b3:cc:07:ce:cc:9b:b6:38:02:7a:21:72:7c:
+        26:07:cc:c9:e0:36:4f:2f:23:c9:08:f7:d4:c1:57:2f:3e:5c:
+        d5:74:70:c6:02:df:1a:62:72:97:74:0a:a6:db:e0:9d:c9:3d:
+        8e:6b:18:b1:88:93:68:48:c3:a3:27:99:67:6f:f7:89:09:52:
+        3a:a3:fb:20:52:b0:03:06:22:dd:2f:d2:46:4e:42:f2:1c:f0:
+        f1:1a</pre></blockquote>
+
+<p>As you can see, there is a lot of
+<a name="INDEX-2605" />information in a certificate. But only a
+few pieces of it are needed to determine whether this is a valid
+certificate for our server:
+</p>
+
+<dl>
+<dt><b><tt class="literal">Issuer</tt></b></dt>
+<dd>
+<p>The Issuer is the <em class="emphasis">distinguished name</em> of the CA
+that issued and signed this certificate. A distinguished name is a
+name format designed to uniquely identify an organization. It's
+clear in this certificate that the name of the Issuer is just an
+example, not a real organization.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">Subject</tt></b></dt>
+<dd>
+<p>The Subject is the distinguished name of the organization to which
+this certificate was issued. In our case, it should be the name of
+our organization. Again, the Subject in this certificate is just an
+example.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">Validity</tt></b></dt>
+<dd>
+<p>The Validity is the time frame in which this certificate is valid.
+Here, the certificate is valid for a year. Because the dates are
+valid, this certificate can be used to test SSL.
+</p>
+</dd>
+
+</dl>
+
+<p>To test that the SSL server is indeed running, use a browser to
+attach to the local server. However, instead of starting the URL with
+<tt class="literal">http://</tt>, start it with
+<tt class="literal">https://</tt>. <tt class="literal">https</tt> connects to
+port 443, which is the SSL port. The browser responds by warning you
+that the server has an invalid certificate, as shown in <a href="ch11_04.html#tcp3-CHP-11-FIG-4">Figure 11-4</a>.
+</p>
+
+<a name="tcp3-CHP-11-FIG-4" /><div class="figure"><img height="346" alt="Figure 11-4" src="figs/tcp3_1104.gif" width="332" /></div><h4 class="objtitle">Figure 11-4. A warning about an invalid certificate</h4>
+
+<p>Clicking on View Certificate shows some of the same certificate
+information we just saw. You can accept the certificate for this
+session and connect to the "secure document." In this
+case, the secure document is just a test page because we have not yet
+stored any real secure documents on the system.
+</p>
+
+<p>The server is up and running, but it can't be used by external
+customers until we get a valid signed certificate. Use
+<tt class="literal">make</tt> <tt class="literal">certreq</tt> to create a
+certificate signature request specific to your server. Here is an
+example:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">cd /etc/httpd/conf</b>
+# <b class="emphasis-bold">make certreq</b>
+umask 77 ; \
+/usr/bin/openssl req -new -key /etc/httpd/conf/ssl.key/server.key -out /etc/http
+d/conf/ssl.csr/server.csr
+Using configuration from /usr/share/ssl/openssl.cnf
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank.
+For some fields there will be a default value.
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:<b class="emphasis-bold">US</b>
+State or Province Name (full name) [Some-State]:<b class="emphasis-bold">Maryland</b>
+Locality Name (eg, city) []:<b class="emphasis-bold">Gaithersburg</b>
+Organization Name (eg, company) [Internet Widgits Ltd]:<b class="emphasis-bold">WroteThebook.com</b>
+Organizational Unit Name (eg, section) []:<b class="emphasis-bold">Headquarters</b>
+Common Name (eg, your name or hostname)[]:<b class="emphasis-bold">crab.wrotethebook.com</b>
+Email Address []:<b class="emphasis-bold">alana@wrotethebook.com</b>
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:</pre></blockquote>
+
+<p>The freshly created request can be examined using the
+<tt class="literal">openssl</tt> command. Notice that this request has a
+valid Subject containing a distinguished name that identifies our
+server. However, there is no Issuer. This request needs to be signed
+by a recognized CA to become a useful certificate.
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">openssl req -noout -text -in server.csr</b>
+Using configuration from /usr/share/ssl/openssl.cnf
+Certificate Request:
+    Data:
+        Version: 0 (0x0)
+        Subject: C=US, ST=Maryland, L=Gaithersburg, O=WroteThebook.com,
+                 OU=Headquarters, 
+                 CN=crab.wrotethebook.com/Email=alana@wrotethebook.com
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+            RSA Public Key: (1024 bit)
+                Modulus (1024 bit):
+                    00:a3:e7:ef:ba:71:2a:52:ff:d9:df:da:94:75:59:
+                    07:f9:49:4b:1c:d0:67:b2:da:bd:7b:0b:64:63:93:
+                    50:3d:a1:02:e3:05:3b:8e:e6:25:06:a3:d2:0f:75:
+                    0a:85:71:66:d0:ce:f9:8b:b0:73:2f:fe:90:75:ad:
+                    d6:28:77:b0:27:54:81:ce:3b:88:38:88:e7:eb:d6:
+                    e9:a0:dd:26:79:aa:43:31:29:08:fe:f8:fa:90:d9:
+                    90:ed:80:96:91:53:9d:88:a4:24:0a:d0:21:7d:5d:
+                    53:9f:77:a1:2b:4f:62:26:13:57:7f:de:9b:40:33:
+                    c3:9c:33:d4:25:1d:a3:e2:47
+                Exponent: 65537 (0x10001)
+        Attributes:
+            a0:00
+    Signature Algorithm: md5WithRSAEncryption
+        3f:c2:34:c1:1f:21:d7:93:5b:c0:90:c5:c9:5d:10:cd:68:1c:
+        7d:90:7c:6a:6a:99:2f:f8:51:51:69:9b:a4:6c:80:b9:02:91:
+        f7:bd:29:5e:a6:4d:a7:fc:c2:e2:39:45:1d:6a:36:1f:91:93:
+        77:5b:51:ad:59:e1:75:63:4e:84:7b:be:1d:ae:cb:52:1a:7c:
+        90:e3:76:76:1e:52:fa:b9:86:ab:59:b7:17:08:68:26:e6:d4:
+        ef:e6:17:30:b6:1c:95:c9:fc:bf:21:ec:63:81:be:47:09:c7:
+        67:fc:73:66:98:26:5e:53:ed:41:c5:97:a5:55:1d:95:8f:0b:
+        22:0b</pre></blockquote>
+
+<p>CAs are <a name="INDEX-2606" />
+<a name="INDEX-2607" />commercial,
+for-profit businesses. Fees and forms, as well as the CSR, are
+required before you can get your certificate signed. Your web browser
+contains a list of recognized CAs. On a Netscape 6.1 browser, you can
+view this list in the Certificate Manager in the Preferences, as
+shown in <a href="ch11_04.html#tcp3-CHP-11-FIG-5">Figure 11-5</a>. All CAs have web sites that
+provide the details of the cost and the application process.
+</p>
+
+<a name="tcp3-CHP-11-FIG-5" /><div class="figure"><img height="346" alt="Figure 11-5" src="figs/tcp3_1105.gif" width="413" /></div><h4 class="objtitle">Figure 11-5. The Netscape 6.1 list of recognized CAs</h4>
+
+<p>Although certificates signed by a recognized CA are the most widely
+used, it is possible to create a self-signed certificate. However,
+this has limited utility. As we saw in <a href="ch11_04.html#tcp3-CHP-11-FIG-4">Figure 11-4</a>,
+a certificate that is not signed by a recognized CA must be manually
+accepted by the client. Therefore, self-signed certificates can be
+used only if you have a small client base. Use the
+<tt class="literal">openssl</tt> command to sign the certificate yourself:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">openssl req -x509 -key ssl.key/server.key \</b>
+<b class="emphasis-bold">&gt; -in ssl.csr/server.csr -out ssl.crt/server.crt</b></pre></blockquote>
+
+<p>Examining the newly created <em class="emphasis">server.crt</em> file with
+<tt class="literal">openssl</tt> shows that the Issuer and the Subject
+contain the same distinguished name. But this time, the name is the
+valid name of our <a name="INDEX-2608" /> <a name="INDEX-2609" /> <a name="INDEX-2610" /> <a name="INDEX-2611" />server. 
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.3. Understanding an httpd.conf File</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.5. Managing Your Web Server</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:33 GMT -->
+</html>

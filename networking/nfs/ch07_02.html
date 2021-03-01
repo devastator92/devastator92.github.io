@@ -1,0 +1,743 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>NFS protocol and implementation (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.2. NFS protocol and implementation</h2>
+
+
+NFS is an RPC-based protocol, with<a name="INDEX-1003" /> a client-server relationship between the
+machine having the filesystem to be distributed and the machine
+wanting access to that filesystem. NFS kernel server threads run on
+the server and accept RPC calls from clients. These server threads
+are initiated<a name="INDEX-1004" />
+<a name="INDEX-1005" />
+by an <em class="emphasis">nfsd</em> daemon. NFS servers
+<a name="INDEX-1006" />
+<a name="INDEX-1007" />also
+run the <em class="emphasis">mountd</em> daemon to handle filesystem mount
+requests and some pathname translation. On an NFS client,
+asynchronous I/O threads (async threads) are
+<a name="INDEX-1008" />
+<a name="INDEX-1009" />usually run to improve NFS
+performance, but they are not required.</p>
+
+
+On the client, each process using NFS files is a client of the
+server. The client's system calls that access NFS-mounted files
+make RPC calls to the NFS servers from which these files were
+mounted. The virtual filesystem really
+just<a name="INDEX-1010" /> <a name="INDEX-1011" /> <a name="INDEX-1012" /> <a name="INDEX-1013" /> extends the operation of basic system
+calls like <em class="emphasis">read</em>( ) and
+<em class="emphasis">write</em>( ), similar to the way that NIS extends
+the operation of library calls like <em class="emphasis">getpwuid</em>( ).
+In NIS, the <em class="emphasis">getpwuid</em>( ) routine knows how to use
+the NIS RPC protocol to locate user information that isn't in
+the local <em class="emphasis">/etc/passwd</em> file. Within the virtual
+filesystem, the basic file- and filesystem-oriented system calls were
+modified to "know" how to operate on non-local
+filesystems.</p>
+
+
+Let's look at this with an example. On an NFS client, a user
+process <a name="INDEX-1014" /> <a name="INDEX-1015" />executes a <em class="emphasis">chmod</em>( )
+system call on an NFS-mounted file. The virtual filesystem passes
+this system call to NFS, which then executes a remote procedure call
+to set the permissions on the file, as specified in the
+process's system call. When the RPC completes, the system call
+returns to the user process. This example is fairly simple, because
+it doesn't involve any block I/O to get file data to or from
+the NFS server. When blocks of files are moved around, the async
+threads get involved to improve NFS performance. This section covers
+the protocols used by NFS and features of its implementation that
+were driven by performance or transparency goals.</p>
+
+
+<a name="nfs2-CHP-7-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">7.2.1. NFS RPC procedures</h3>
+
+
+Each version of the NFS RPC protocol <a name="INDEX-1016" /> <a name="INDEX-1017" />
+<a name="INDEX-1018" />contains <a name="INDEX-1019" />several procedures, each of which operates
+on either a file or a filesystem object. The basic procedures
+performed on an NFS server can be grouped into directory operations,
+file operations, link operations, and filesystem operations.
+Directory operations include <em class="emphasis">mkdir</em> and
+<em class="emphasis">rmdir</em>, which <a name="INDEX-1020" />
+<a name="INDEX-1021" />
+<a name="INDEX-1022" />
+<a name="INDEX-1023" />
+<a name="INDEX-1024" />
+<a name="INDEX-1025" />create
+and destroy directories like their Unix system call equivalents.
+<em class="emphasis">readdir</em> reads a directory, using an opaque
+directory pointer to perform sequential reads of the same directory.
+Other directory-oriented procedures are <em class="emphasis">rename</em>
+and <em class="emphasis">remove</em>, which operate on entries in a
+directory the same way the <em class="emphasis">mv</em> and
+<em class="emphasis">rm</em> commands do. <em class="emphasis">create</em>
+makes a new directory entry for a file.</p>
+
+
+The <em class="emphasis">lookup</em> operation is
+<a name="INDEX-1026" />the heart of the
+pathname-to-filehandle translation mechanism.
+<em class="emphasis">lookup</em> finds a named directory entry and returns
+a filehandle pointing to it. The <em class="emphasis">open</em>( ) system
+call uses <em class="emphasis">lookup</em>( ) extensively: it breaks a
+pathname down into its components and locates each component in its
+parent directory. For example, <em class="emphasis">open</em>( ) would
+handle the pathname <em class="emphasis">/home/thud/stern</em> by
+performing three operations:</p>
+
+
+<ul><li>Look up <em class="emphasis">home</em> in the root directory (/).</p></li><li>Look up <em class="emphasis">thud</em> in <em class="emphasis">/home</em>.</p></li><li>Look up <em class="emphasis">stern</em> in <em class="emphasis">/home/thud</em>.</p></li></ul>
+File operations are very closely associated with Unix system calls:
+<em class="emphasis">read</em> and <em class="emphasis">write</em> move data to
+and from the NFS client, and <em class="emphasis">getattr</em> and
+<em class="emphasis">setattr</em> get or modify the file's
+attributes. In a local filesystem, such as UFS, these attributes are
+stored in the file's inode, but file attributes are mapped to
+whatever system is used by the NFS server. Link operations include
+<em class="emphasis">link</em>, which creates a hard link on the server,
+and <em class="emphasis">symlink</em> and <em class="emphasis">readlink</em>
+which <a name="INDEX-1027" />create and read the values of symbolic
+links, respectively. Finally, <em class="emphasis">statfs</em> is a
+filesystem operation that returns information about the mounted
+filesystem that might be needed by <em class="emphasis">df</em>, for
+example.</p>
+
+
+Other filesystem operations include mounting and unmounting a
+filesystem,
+but<a name="INDEX-1028" /> these are handled through the
+NFS <em class="emphasis">mountd</em> server rather
+than<a name="INDEX-1029" /> the
+server threads. Mount operations are separated from the NFS protocol
+because mount points revolve around pathnames, and pathname syntax is
+peculiar to each operating system. Unix and VMS, for example, do not
+use the same syntax to specify the path to a file. The mount protocol
+is responsible for turning the server's file pathname into
+information that NFS can use to locate the file in future operations.</p>
+
+
+From the preceding descriptions, it is fairly clear how the basic
+Unix system<a name="INDEX-1030" />
+<a name="INDEX-1031" />
+<a name="INDEX-1032" /> calls map into
+NFS RPC calls. It is important to note that the NFS RPC protocol and
+the vnode interface are two different things. The vnode interface
+defines a set of operating system services that are used to access
+all filesystems, NFS or local. Vnodes simply generalize the interface
+to file objects. There are many routines in the vnode interface that
+correspond directly to procedures in the NFS protocol, but the vnode
+interface also contains implementations of operating system services
+such as mapping file blocks and buffer cache management.</p>
+
+
+The NFS RPC protocol is a specific realization of one of these vnode
+interfaces. It is used to perform specific vnode operations on remote
+files. Using the vnode interface, new filesystem types may be plugged
+into the operating system by adding kernel routines that perform the
+necessary vnode operations on objects in that filesystem.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">7.2.2. Statelessness and crash recovery</h3>
+
+
+The NFS protocol is stateless, meaning that<a name="INDEX-1033" /> <a name="INDEX-1034" /> <a name="INDEX-1035" /> <a name="INDEX-1036" />
+there is no need to maintain information about the protocol on the
+server. The client keeps track of all information required to send
+requests to the server, but the server has no information about
+previous NFS requests, or how various NFS requests relate to each
+other. Remember the differences between the TCP and UDP protocols:
+UDP is a stateless protocol that can lose packets or deliver them out
+of order; TCP is a stateful protocol that guarantees that packets
+arrive and are delivered in order. The hosts using TCP must remember
+connection state information to recognize when part of a transmission
+was lost.</p>
+
+
+The choice of a stateless protocol has two implications for the
+design and implementation of NFS:</p>
+
+
+<ul><li>NFS RPC requests must completely describe the operation to be
+performed. When writing a file block, for example, the
+<a name="INDEX-1037" />write operation must contain a
+filehandle, the offset into the file, and the length of the write
+operation. This is distinctly different from the Unix
+<em class="emphasis">write</em>( ) system call, which writes a buffer to
+wherever the current file descriptor's write pointer directs
+it. The state contained in the file descriptor does not exist on the
+NFS server.</p></li><li>Most NFS requests are <em class="emphasis">idempotent</em>, which
+<a name="INDEX-1038" />
+<a name="INDEX-1039" />means that an NFS client may send the
+same request one or more times without any harmful side effects. The
+net result of these duplicate requests is the same. For example,
+reading a specific block from a file is idempotent: the same data is
+returned from each operation.</p>
+
+
+Obviously, some operations are not idempotent: removing a file
+can't be repeated without side effects, because a second
+attempt to remove the file will fail if the first one succeeded. Most
+NFS servers make all requests idempotent by recording recently
+performed operations. A duplicate request that matches one of the
+recently performed requests is thrown away by the NFS
+server.<a href="#FOOTNOTE-11">[11]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-11" />[11]Not all implementations of NFS have this
+duplicate request cache. Current releases of Solaris, Compaq's
+Tru64 Unix, and other current operating systems implement the cache
+to improve the performance and "correctness" of NFS. A
+few, older implementations of NFS do not reject nonidempotent,
+duplicate requests. This produces some strange and often incorrect
+results when requests are retransmitted. An NFS client that sends the
+same <em class="emphasis">remove</em> operation to such a server may find
+that the designated file was removed, but the RPC call returns the
+"No such file or directory" error.</p>
+
+</blockquote></li></ul>
+The primary motivation for choosing a stateless protocol was to
+minimize the burden of crash recovery. Unlike a database system,
+which must verify transaction logs and look for incomplete
+operations, NFS has no explicit crash recovery mechanism. Because no
+state is maintained, the server may reboot and begin accepting client
+NFS requests again as if nothing had happened. Similarly, when
+clients reboot, the server does not need to know anything about them.
+Each NFS request contains enough information to be completed without
+any reference to state on the client or <a name="INDEX-1040" /> <a name="INDEX-1041" /> <a name="INDEX-1042" /> <a name="INDEX-1043" />server.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">7.2.3. Request retransmission</h3>
+
+
+NFS RPC requests are sent from a <a name="INDEX-1044" />
+<a name="INDEX-1045" />client
+to the server one at a time. A single client process will not issue
+another RPC call until the call in progress completes and has been
+acknowledged by the NFS server. In this respect NFS RPC calls are
+like system calls  --  a process cannot continue with the next
+system call until the current one completes. A single client host may
+have several RPC calls in progress at any time, coming from several
+processes, but each process ensures that its file operations are well
+ordered by waiting for their acknowledgements. Using the NFS async
+threads makes this a little more complicated, but for now it's
+helpful to think of each process sending a stream of NFS requests,
+one at a time.</p>
+
+
+When a client makes an RPC request, it sets a
+<a name="INDEX-1046" />
+<a name="INDEX-1047" />timeout period during which the
+server must service and acknowledge it. If the server doesn't
+get the request because it was lost along the way, or because the
+server is too overloaded to complete the request within the timeout
+period, the client <em class="emphasis">retransmits</em> the request.
+Requests are idempotent (if the server has a duplicate request
+cache), so no harm is done if the server executes the same request
+twice  --  when the NFS client gets a second confirmation from the
+RPC request, the client discards it.</p>
+
+
+NFS clients continue to retransmit requests until the request
+completes, either with an acknowledgement from the server or an error
+from the RPC layer. If an NFS server crashes, clients continue to
+repeat the call to the RPC layer (if the NFS filesystem is
+hard-mounted, otherwise the RPC timeout error is returned to the
+application) until the server reboots and can service them again.
+When the server is up again, NFS clients continue as if nothing
+happened. NFS clients cannot tell the difference between a server
+that has crashed and one that is very slow. This raises some
+important issues for tuning NFS servers and networks, which will be
+visited in <a href="ch18_01.html#nfs2-CHP-18-SECT-1">Section 18.1, "Slow server compensation"</a>.</p>
+
+
+The duplicate request cache on NFS servers
+<a name="INDEX-1048" />
+<a name="INDEX-1049" />usually contains a few hundred entries
+ --  the last few seconds (at most) of NFS requests on a busy
+server. This cache is limited in size to establish a
+"window" in which non-idempotent NFS requests are
+considered duplicates caused by retransmission rather than distinct
+requests. For example, if you execute:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rm foo</b></tt></pre></blockquote>
+
+
+on an NFS client, the client may need to send two or
+<a name="INDEX-1050" />
+<a name="INDEX-1051" />more <em class="emphasis">remove</em>
+requests to the NFS server before it receives an acknowledgment.
+It's up to the NFS server to weed out the duplicate
+<em class="emphasis">remove</em> requests, even if they are a second or so
+apart. However, if you execute <em class="emphasis">rm foo</em> on Monday,
+and then on Tuesday you execute the same command in the same
+directory (where the file has already been removed), you would be
+very surprised if <em class="emphasis">rm</em> did not return an error.
+Executing this "duplicate request" a day later should
+produce this familiar error:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rm foo</b></tt> 
+rm: foo: No such file or directory</pre></blockquote>
+
+
+To distinguish between duplicates generated due to an RPC timeout and
+retry and duplicates due to you repeating a command (whether it be a
+day later or a second later), NFS servers record a 32-bit RPC
+transaction identifier (<em class="emphasis">xid</em> ) with each entry in
+the duplicate request cache. The xid is part of every RPC <a name="INDEX-1052" /> <a name="INDEX-1053" /> <a name="INDEX-1054" />request's
+<a name="INDEX-1055" />
+<a name="INDEX-1056" />header,
+and it is expected that the NFS client will generate unique xids.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">7.2.4. Preserving Unix filesystem semantics</h3>
+
+
+The VFS makes all filesystems appear <a name="INDEX-1057" /> <a name="INDEX-1058" />homogeneous to user
+processes. There is a single Unix system call interface that operates
+on files, and the VFS and underlying vnode interface translate
+semantics of these system calls into actions appropriate for each
+type of underlying filesystem. It's important to stress the
+difference between <em class="emphasis">syntax</em> and
+<em class="emphasis">semantics</em> of system calls. Consistent syntax
+means that the system calls take the same arguments independent of
+the underlying filesystem. Semantics refers to what the system calls
+actually do: preserving semantics across different filesystem types
+means that a system call will have the same net effect on the files
+in each filesystem type. <em class="emphasis">Unix filesystem
+semantics</em> collectively refers to the way in which Unix
+files behave when various sequences of system calls are made. For
+example, opening a file and then unlinking it doesn't cause the
+file's data blocks to be released until the
+<em class="emphasis">close</em>( ) system call is
+<a name="INDEX-1059" />made. A new filesystem that wants to
+maintain Unix filesystem semantics must support this behavior.</p>
+
+
+The VFS definition makes it possible to ensure that semantics are
+preserved for all filesystems, so they all behave in the same manner
+when Unix system calls are made on their files. It is easy to use VFS
+to implement a filesystem with non-Unix semantics. It's also
+possible to integrate a filesystem into the VFS interface
+<a name="INDEX-1060" />
+<a name="INDEX-1061" />without supporting all of the Unix
+semantics; for example, you can put FAT (a filesystem used in MS-DOS,
+Windows, and NT operating systems) filesystems under VFS, but you
+can't create Unix-like symbolic links on them because the
+native FAT filesystem doesn't support symbolic links.</p>
+
+
+In this section, we'll look at how NFS deals with Unix
+filesystem semantics, including some of the operations that
+aren't exactly the same under NFS. NFS has slightly different
+semantics than the local Unix filesystem, but it tries to preserve
+the Unix semantics. An application that works with a local filesystem
+works equally well with an NFS-mounted filesystem and will not be
+able to distinguish between the two.</p>
+
+
+Consistency at the vnode interface level
+<a name="INDEX-1062" />makes
+NFS a powerful tool for creating filesystem hierarchies using many
+different NFS servers. The <em class="emphasis">mount</em> command
+requires that a filesystem be mounted on a directory; but directories
+are vnodes themselves. An NFS filesystem can be mounted on any vnode,
+which means that NFS filesystems can be mounted on top of other NFS
+filesystems or local filesystems. This is completely consistent with
+the way in which local disks are mounted on local filesystems.
+<em class="emphasis">/net</em> may be on the root filesystem, and
+<em class="emphasis">/net/host</em> is mounted on top of it. A workstation
+configured using NFS can create a view of the filesystems on the
+network that best meets its requirements by mounting these
+filesystems with a directory naming scheme of its choice.</p>
+
+
+Maintaining other Unix filesystem semantics is not quite as easy.
+Locking operations, for example, introduce state into a system that
+was meant to be stateless. This problem is addressed by a separate
+lock manager daemon. Another bit of Unix lore that had be preserved
+was the retention of an open file's data blocks, even when the
+file's directory entry was removed. Many Unix utilities
+including shells and mailers, use this "delayed unlink"
+feature to create temporary files that have no name in the
+filesystem, and are therefore invisible to probing users.</p>
+
+
+A complete solution to the problem would require that the server keep
+open file reference counts for each file and not free the
+file's data blocks until the reference count decreased to zero.
+However, this is precisely the kind of state information that makes
+crash recovery difficult, so NFS was implemented with a client-side
+solution that handles the common applications of this feature. When a
+<em class="emphasis">remove</em> operation is performed on an open file,
+the client issues a <em class="emphasis">rename</em> NFS RPC instead. The
+file is renamed to <em class="emphasis">.nfsXXXX</em>, where
+<em class="emphasis">XXXX</em> is a suffix to make the filename unique.
+When the file is eventually closed, the client issues the
+<em class="emphasis">remove</em> operation on the previously unlinked
+file. Note that there is no need for an "open" or
+"close" NFS RPC procedure, since "opened" and
+"closed" are states that are maintained on the client. It
+is still possible to confuse two clients that attempt to unlink a
+shared, open NFS-mounted file, since one client will not know that
+the other has the file open, but it emulates the behavior of a local
+filesystem sufficiently to <a name="INDEX-1063" /> <a name="INDEX-1064" />eliminate the need to change utilities
+that rely on it.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">7.2.5. Pathnames and filehandles</h3>
+
+
+All NFS operations use filehandles to designate<a name="INDEX-1065" />
+<a name="INDEX-1066" />
+<a name="INDEX-1067" />
+<a name="INDEX-1068" />
+the files or directories on which they will be performed. Filehandles
+are created on the server and contain information that uniquely
+identifies the file or directory on the server. The client's
+<a name="INDEX-1069" /> <a name="INDEX-1070" />NFS <em class="emphasis">mount</em> and
+<em class="emphasis">lookup</em> requests retrieve these filehandles for
+existing files. A side effect of making all vnodes homogeneous is
+that file pathname lookup must be done one component at a time. Each
+directory in the pathname might be a mount point for another
+filesystem, so each name look-up request cannot include multiple
+components. For example, let's look at <em class="emphasis">Client
+A</em> that NFS-mounts the <em class="emphasis">/usr/local</em>
+filesystem and also NFS-mounts a filesystem on
+<em class="emphasis">/usr/local/bin</em>:</p>
+
+
+<blockquote><pre class="code">clientA# <tt class="userinput"><b>mount server1:/usr/local /usr/local</b></tt> 
+clientA# <tt class="userinput"><b>mount server2:/usr/local/bin.mips /usr/local/bin</b></tt></pre></blockquote>
+
+
+When the NFS client reaches the <em class="emphasis">bin</em> component in
+the pathname, it realizes that there is an NFS filesystem mounted on
+this directory, and it sends its lookup requests to
+<em class="emphasis">server2</em> instead of <em class="emphasis">server1</em>.
+If the NFS client passed the whole pathname to
+<em class="emphasis">server1</em>, it might get the wrong answer on its
+lookup: <em class="emphasis">server1</em> has its own
+<em class="emphasis">/usr/local/bin</em> directory that may or may not be
+the same directory that <em class="emphasis">Client A</em> has mounted.
+While this may seem to be a very expensive series of operations, the
+kernel keeps a directory name lookup cache (DNLC) that prevents every
+look-up request from going to an NFS server.</p>
+
+
+The <em class="emphasis">lookup</em> operation takes a filename and a
+filehandle for a directory, and returns a filehandle pointing to the
+named file on the server. How then does the pathname traversal get
+started, if every <em class="emphasis">lookup</em> requires a filehandle
+from a previous pathname resolution? The <em class="emphasis">mount</em>
+operation seeds the lookup process by providing a filehandle for the
+root of the mounted filesystem. Within NFS, the only procedure that
+accepts full pathnames is the <em class="emphasis">mount</em> RPC, which
+turns the pathname into a filehandle for the mounted filesystem.</p>
+
+
+Let's look at how NFS turns the pathname
+<em class="emphasis">/usr/local/bin/emacs</em> into an NFS filehandle,
+assuming that it's on a filesystem mounted on
+<em class="emphasis">/usr/local</em> from server
+<em class="emphasis">wahoo</em>:</p>
+
+
+<ul><li>The NFS client asks the <em class="emphasis">mountd</em> daemon on
+<em class="emphasis">wahoo</em> for a filehandle for the filesystem the
+client has mounted on <em class="emphasis">/usr/local</em>, using the
+<em class="emphasis">server's</em> pathname that was supplied in the
+<em class="emphasis">/etc/vfstab</em> file or <em class="emphasis">mount</em>
+command. That is, if the client has mounted
+<em class="emphasis">/usr/local</em> with the
+<em class="emphasis">/etc/vfstab</em> entry:</p>
+
+<blockquote><pre class="code">wahoo:/tools/local   - /usr/local    nfs  - yes ro,hard</pre></blockquote>
+
+
+then the client will ask <em class="emphasis">wahoo</em> for a filehandle
+for the <em class="emphasis">/tools/local</em> directory.<a href="#FOOTNOTE-12">[12]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-12" />[12]Asking the mountd daemon isn't the only way to get the
+filehandle for a filesystem. Recall that <a href="ch06_01.html">Chapter 6, "System Administration Using the Network File System"</a>
+briefly mentioned the <em class="emphasis">public</em> option to the mount
+command. We will discuss this in more detail in <a href="ch12_01.html">Chapter 12, "Network Security"</a>.</p>
+
+</blockquote></li><li>Using the mount point filehandle, the client performs a lookup
+operation on the next component in the pathname:
+<em class="emphasis">bin</em>. It sends a <em class="emphasis">lookup</em> to
+<em class="emphasis">wahoo</em>, supplying the filehandle for the
+<em class="emphasis">/usr/local</em> directory and the name
+"bin." Server <em class="emphasis">wahoo</em> returns another
+filehandle for this directory.</p></li><li>The client goes to work on the next component in the path,
+<em class="emphasis">emacs</em>. Again, it sends a
+<em class="emphasis">lookup</em> using the filehandle for the directory
+containing <em class="emphasis">emacs</em> and the name it is looking for.
+The filehandle returned by the server is used by the client as a
+"pointer" (on the server) to
+<em class="emphasis">/usr/local/bin/emacs</em> (in the filesystem seen by
+client) for all future operations on that file.</p></li></ul>
+
+
+Filehandles are opaque to the
+<a name="INDEX-1071" />
+<a name="INDEX-1072" />client. In most NFS implementations on
+Unix machines, they are an encoding of the file's inode number,
+disk device number, and inode generation number. Other
+implementations, particularly non-Unix NFS servers that do not have
+inodes, encode their own native filesystem information in the
+filehandle. In any system, the filehandle is in a form that can be
+disassembled only on the NFS server. The structures contained in the
+filehandle are kept hidden from the client, the same way the
+structures in an object-oriented system are hidden in the
+object's implementation routines. In the case of NFS
+filehandles, the data described by the structure doesn't even
+exist on the client  --  it's all on the server, where the
+filehandle can be converted into a pointer to local file.</p>
+
+
+Filehandles become invalid, or stale,
+when<a name="INDEX-1073" />
+<a name="INDEX-1074" /> the
+inodes to which they point (on the server) are freed or re-used. NFS
+clients have no way of knowing what other operations may be affecting
+objects pointed to by their filehandles, so there is no way to warn a
+client in advance that a filehandle is invalid. If an RPC call is
+made with a filehandle that is stale, the NFS server returns a
+<em class="emphasis">stale filehandle</em> error to the
+<a name="INDEX-1075" />caller. Say that a user on one client
+removes an NFS-mounted directory and its contents using <em class="emphasis">rm
+-rf test</em>, while another client has a process using
+<em class="emphasis">test</em> as its current working directory. The next
+time the other process tries to read its working directory, it gets a
+stale filehandle error back from the NFS server:</p>
+
+
+<a name="ch07-3-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Client A</p></th>
+<th>
+Client B</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+<tt class="userinput"><b>cd /mnt/test</b></tt></p></td>
+<td>
+<tt class="userinput"><b>cd /mnt</b></tt></p></td>
+</tr>
+
+<tr>
+<td>&nbsp;</td>
+<td>
+<tt class="userinput"><b>rm -rf test</b></tt></p></td>
+</tr>
+
+<tr>
+<td>
+<tt class="userinput"><b>stat(.)--&gt;Stale file handle</b></tt></p></td>
+<td>&nbsp;</td>
+</tr>
+
+
+</table><p>
+
+If one client removes a file and then creates a new file that re-uses
+the freed inode, other filehandles (on other clients) that point to
+the re-used inode must be marked stale. Inode generation numbers were
+added to the basic Unix filesystem to add a time history to an inode.
+In addition to the inode number, the filehandle must match the
+current generation number of the inode, or it is marked stale. When
+the inode is re-used for a new file, its generation number is
+incremented. Stale filehandles become a problem when one user's
+work tramples on an area in use by another, or when a filesystem on a
+server is rebuilt from a backup tape. When restoring from a dump tape
+onto a fresh filesystem, all of the inode generation numbers in the
+filesystem are set to random numbers. This causes every filehandle in
+use for that filesystem to become stale  --  every inode pointed
+to by a pre-restore filehandle now probably points to a completely
+different file on the disk.</p>
+
+
+Therefore, a quick way to cripple an NFS network
+is<a name="INDEX-1076" />
+<a name="INDEX-1077" /> to restore a fileserver from a dump
+tape without rebooting the NFS clients. When you rebuild the
+server's filesystems, all of the inode generation numbers are
+reset; when you load the tape, files end up with different inode
+numbers and different inode generation numbers than they had on the
+original filesystem. All NFS client filehandles are now invalid
+because of the new generation numbers and the (random) renumbering of
+each file's inode. Any attempt to use an open filehandle
+results in stale filehandle errors. If you are going to restore an
+NFS-exported filesystem <a name="INDEX-1078" /> <a name="INDEX-1079" />from tape, unmount it from its clients
+or reboot<a name="INDEX-1080" />
+<a name="INDEX-1081" />
+<a name="INDEX-1082" />
+<a name="INDEX-1083" /> the
+clients.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">7.2.6. NFS Version 3</h3>
+
+
+There are four versions of the NFS <a name="INDEX-1084" />protocol: Versions 2, 3, and 4. Version 1
+did exist, but it was only a prototype, and neither an implementation
+nor specification was ever released. Version 4 has been specified,
+but at the time this book was written, there were no commercial
+implementatons. Version 3 has three major differences from Version 2:</p>
+
+
+<dl>
+<dt><i>Large file support</i></dt>
+<dd>Version 2 supported files up to
+<a name="INDEX-1085" />four gigabytes in length, though most
+implementations are limited to up to two-gigabyte files. Version 3
+supports files up to and including 2<sup class="superscript">64</sup> - 1
+bytes in length. Large file support was the primary driver for a
+protocol revision.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Writes to unstable storage</i></dt>
+<dd>Version 2 of the NFS protocol <a name="INDEX-1086" />specified that NFS servers could not reply
+successfully to a <em class="emphasis">write</em> request until the data
+had been committed to stable storage, usually magnetic disk, but
+non-volatile RAM was permissible as well. This limited the write
+throughput of NFS clients, and so Version 3 of the protocol permits
+the client to indicate that the <em class="emphasis">write</em> need not
+be committed to stable storage. This allows NFS servers to respond
+quickly to <em class="emphasis">write</em> requests. Of course, clients
+are still interested in committing their data to stable storage, and
+so Version 3 has a new procedure called <em class="emphasis">commit</em>,
+which tells the NFS server to write the uncommitted data to stable
+storage before returning success.</p>
+
+The theory behind this, supported by experimental measurement, is
+that faster throughput is gained by the NFS server committing data to
+stable storage in parallel with the client doing something else (such
+as generating more NFS requests), before the client issues the
+<em class="emphasis">commit</em>. Typically, the NFS Version 3 client will
+issue a <em class="emphasis">commit</em> when it is about to close a file,
+or when buffer space is tight.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>Large transfer sizes</i></dt>
+<dd>NFS Version 2 had a limit<a name="INDEX-1087" /> of 8192 bytes per NFS read and write
+request. NFS Version 3 lets the client and server negotiate a
+mutually acceptable limit.</p>
+
+Recall from <a href="ch01_03.html#nfs2-CHP-1-SECT-3.1">Section 1.3.1, "Datagrams and packets"</a> that packets larger than the
+medium's MTU must be fragmented. Fragmentation of output
+packets is easy, but the other direction, reassembly of input
+fragments, is harder if the fragments arrive out of order, or if a
+fragment is dropped or delayed. With larger NFS transfer sizes, the
+risk of a reassembly problem is higher, and if there is a problem,
+the entire datagram must be retransmitted, including all the
+fragments. NFS Version 2 was designed to be gentler to the network
+during the days when operating systems, routers, and network hardware
+were less capable. Nowadays, these components are much more
+effective, and so NFS Version 3 removes the artificial limits to
+<a name="INDEX-1088" />transfer
+size.</p>
+</dd>
+
+</dl>
+</div>
+
+
+
+
+<a name="nfs2-CHP-7-SECT-2.7" /><div class="sect2">
+<h3 class="sect2">7.2.7. NFS over TCP</h3>
+
+
+Both NFS Version 2 and Version 3 operate<a name="INDEX-1089" /> <a name="INDEX-1090" /> over UDP and TCP. Since TCP is
+stateful, and NFS is stateless, it would seem to be a contradiction,
+if not an impossibility for NFS to operate over TCP. However, the
+layer between NFS and TCP is RPC, and RPC is implemented to hide
+state issues of TCP from NFS.</p>
+
+
+The first time an NFS client contacts a server over TCP, the RPC
+layer takes care of establishing a connection. If a server crashes,
+the client won't know that immediately, but the next time it
+sends a request over the connection, the connection will break due to
+a connection reset from the server, or a connection timeout. In
+either case, the RPC layer simply re-establishes a connection.</p>
+
+
+Some NFS/TCP implementations, such as that in Solaris, maintain a
+single connection between the NFS client and server, such that all
+traffic -- for all users and mount points -- is multiplexed
+between the client and server. Other implementations, such as those
+in the BSD releases, have one connection per mountpoint. Aside from a
+user-level NFS client like a web browser, or a Java application
+linked to NFS classes, you are not likely to encounter an NFS client
+that creates a connection per user.</p>
+
+
+If the client crashes, the server will periodically close <a name="INDEX-1091" /> <a name="INDEX-1092" />connections that
+haven't been used in a while. On a Solaris NFS server, this
+connection idle <a name="INDEX-1093" />timer defaults to six minutes.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7. Network File System Design and Operation</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.3. NFS components</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

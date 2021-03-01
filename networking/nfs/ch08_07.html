@@ -1,0 +1,277 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Configuration options (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.7. Configuration options</h2>
+
+Adding disks to local clients opens two <a name="INDEX-1347" />
+<a name="INDEX-1348" />configuration options. You can use the
+local disk for swap space, or you can build an entire bootable system
+on it and put the root and swap filesystems on the local disk. This
+latter configuration is<a name="INDEX-1349" /> <a name="INDEX-1350" />
+called a <em class="emphasis">dataless</em> client, and makes sense if the
+client does not need most of the local disk for a very large swap
+space. If the client has a large swap partition and uses it
+frequently, adding a local disk may improve performance by reducing
+the client's traffic to its boot server. In other instances,
+the local disk provides private storage for sensitive files.
+</p>
+
+Dataless clients contain no user or data files on their local disks.
+Everything on the local disk can be reconstructed from operating
+system release tapes or from system installation scripts. The local
+disks are used for the root and swap filesystems, while
+<em class="emphasis">/usr</em> and all other filesystems are NFS-mounted.
+The dataless architecture provides some performance advantages from
+both the client and server perspective, particularly when the client
+has a large swap space.
+</p>
+
+A significant portion  --  usually more than 50% and sometimes 90%
+ --  of a diskless client's network traffic is caused by
+reading and writing the root and swap filesystems. Clients with local
+disks place less of a load on the network and on the boot server by
+sending their swap traffic to this disk.
+</p>
+
+<a name="nfs2-CHP-8-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">8.7.1. Dataless clients</h3>
+
+You may choose to use the dataless client configuration if you have
+to support a few machines of a new client architecture and would have
+to carve the disk space out of the server's
+<em class="emphasis">/export</em> partition. Adding a local disk keeps the
+server configuration simple and puts all files specific to the new
+client architecture on the local disks.
+</p>
+
+The best network architecture
+<a name="INDEX-1351" />
+<a name="INDEX-1352" /> <a name="INDEX-1353" />for dataless clients is one in
+which desktop machines run application sets with large, randomly
+accessed virtual address spaces. If the machine has a reasonably high
+level of paging activity, depending on the speed of the network and
+capacity of the NFS servers, using a local disk improves performance.
+Dataless clients may appear to be more expensive per seat than
+diskless clients, since the diskless machines get root and swap space
+at "bulk" prices from the server. On the other hand, in a
+pure diskless client environment, you must purchase additional disk
+space to hold the clients' root and swap filesystems. If you
+allocate some portion of the server's cost as the cost of
+replacing local disks, the dataless and diskless architectures have
+much less of a price differential. Be careful when analyzing
+client/server cost projections. You'll get the fairest numbers
+when you compare the total cost of the desktop workstation, any local
+disk, and the desktop's share of the cost of servers providing
+root, swap, and user filesystems.
+</p>
+
+When you do add local disks, it's important to choose your disk
+size carefully. If larger local disks are attached to dataless
+clients, they become inviting homes for user files that may not be
+backed up regularly. If you plan to configure dataless clients, use
+the smallest disk possible to contain the root and swap filesystems,
+with enough room on the local disk's root partition to contain
+a very large <em class="emphasis">/var</em> directory. Applications that
+use enough virtual memory to justify a local disk probably create
+huge temporary files on <em class="emphasis">/var/tmp</em> as well.
+</p>
+
+Management of dataless nodes is slightly<a name="INDEX-1354" /> <a name="INDEX-1355" /> more complex than that of
+diskless nodes. Even though the local disks contain no user files or
+tools, they may still have host-specific configuration information in
+the <em class="emphasis">/etc</em> directory, such as software password
+files. Use care when modifying the private parts of a dataless node
+so that the entire node can be recreated from a boot tape or archive
+tape if the local disk must be replaced. You will probably want to
+create a script that creates spool directories, copies printer
+configuration files, and creates NFS mount points on the client; you
+can use this script on dataless or new diskless clients as well. If
+possible, mount the dataless client spool directories from an NFS
+server so that the dataless client's disk contains no
+host-specific information. Ideally, you should not have to do backups
+of a dataless client.
+</p>
+
+After Solaris 2.5.1, the AdminSuite product
+<a name="INDEX-1356" />stopped supporting the dataless
+configuration option. This is a bit of an inconvenience to you, but
+it is surmountable. Consider that a dataless client is like a
+disk-full client except that <em class="emphasis">/usr</em> is mounted
+<a name="INDEX-1357" />
+<a name="INDEX-1358" />from an NFS server instead of from a
+local disk. The steps for doing this are:
+</p>
+
+<ol><li>
+Install the operating system on a disk-full client. If possible
+(depending on how many disks you have and how big they are), install
+all the software without specify a <em class="emphasis">/usr</em>
+partition. If you have to, specify a separate
+<em class="emphasis">/var</em> partition if that is what it takes to
+prevent a <em class="emphasis">/usr</em> partition from being created.
+It's OK to have the <em class="emphasis">/usr</em> partition
+created, but once you mount <em class="emphasis">/usr</em> from the NFS
+server, the question then is what do you do with the redundant local
+disk space? You can always mount it as another partition, say
+<em class="emphasis">/spare</em>, and have it around for future additional
+needs such as more <em class="emphasis">swap</em>, or more
+<em class="emphasis">/var</em> space.
+</p>
+</li><li>
+Edit <em class="emphasis">/etc/vfstab</em> on the client to mount
+<em class="emphasis">/usr</em> from an NFS server that has been set up for
+diskless client support. If there was an entry for
+<em class="emphasis">/usr</em> in <em class="emphasis">/etc/vfstab</em>,
+comment it out. For example you might comment out <em class="emphasis">/usr</em>
+'s <em class="emphasis">vfstab:</em>
+</p>
+
+<blockquote><pre class="code"><tt class="userinput"><b>#</b></tt> /dev/dsk/c0t0d0s6 /dev/rdsk/c0t0d0s6         /usr      ufs  1  no   -</pre></blockquote>
+
+and add:</p>
+
+<blockquote><pre class="code">wahoo:/export/exec/Solaris_2.7_sparc.all/usr - /usr      nfs  -  -    ro</pre></blockquote>
+</li>
+
+<li>
+Edit <em class="emphasis">/etc/hosts</em> and add the IP address of the
+NFS server. Both dataless and diskless clients require this, because
+while the system is booting, without <em class="emphasis">/usr</em>
+available, the software needed to access NIS or DNS won't be
+around, so <em class="emphasis">/etc/hosts</em> is needed to resolve the
+name of the NFS server to an IP address:
+</p>
+
+<blockquote><pre class="code">130.141.14.2          wahoo</pre></blockquote>
+</li>
+
+
+<li>
+Test this by rebooting the client. If you run into any problems, you
+can always shut the system down, and boot the system as <a name="INDEX-1359" /> <a name="INDEX-1360" />single user.
+</p>
+</li></ol>
+
+There is a drawback to this scheme. Applying some patches and
+packages will be less straightforward, because patches and packages
+can contain both <em class="emphasis">/usr</em> and
+<em class="emphasis">root</em> files, but the dataless client's
+<em class="emphasis">/usr</em> partition won't be writable by the
+utilities used to add patches and packages. The workaround for this
+is very dependent on the patch and packaging scheme used by the
+operating system. In case of Solaris, <a name="INDEX-1361" />
+<a name="INDEX-1362" />the
+<em class="emphasis">patchadd</em> utility has a <em class="emphasis">-R</em>
+<em class="emphasis">pathname</em> option, which is normally used to apply
+patches to a diskless client's root partitions. In that case,
+<em class="emphasis">patchadd</em> is run on the NFS server. In the case
+of a dataless client, you would invoke <em class="emphasis">patchadd</em>
+as:
+</p>
+
+<blockquote><pre class="code">client # <tt class="userinput"><b>patchadd -R / -M . 107460-03</b></tt></pre></blockquote>
+
+For a package that contains both root and <em class="emphasis">/usr</em>
+files, you could invoke the Solaris <em class="emphasis">pkgadd</em>
+command to install the package in a<a name="INDEX-1363" /> <a name="INDEX-1364" /> temporary place, and then copy the
+non-<em class="emphasis">usr</em> files to the dataless client's
+root:
+</p>
+
+<blockquote><pre class="code">client # <tt class="userinput"><b>mkdir /tmp/scratch</b></tt>
+client # <tt class="userinput"><b>pkgadd -d . -R /tmp/scratch SUNWxxxx</b></tt>
+client # <tt class="userinput"><b>cd /tmp/scratc</b></tt>h
+client # <tt class="userinput"><b>rm -rf usr</b></tt>
+client # <tt class="userinput"><b>find . -print | cpio -dump /</b></tt></pre></blockquote>
+
+</div>
+<a name="nfs2-CHP-8-SECT-7.2" /><div class="sect2">
+<h3 class="sect2">8.7.2. Swapping on a local disk</h3>
+
+In this configuration option, the client's root and
+<em class="emphasis">/usr</em> filesystems are NFS-mounted, but swap is
+from a local disk. The AdminSuite software doesn't provide an
+option for diskless client accessing local swap, but again it is
+surmountable. The steps are:
+</p>
+
+<ol><li>
+If not already done, add the diskless client to the boot server via
+the AdminSuite software. Go ahead and define a swap partition on the
+server so that you don't run the risk of confusing the
+AdminSuite software.
+</p>
+</li><li>
+Boot the client from the boot server. </p>
+</li><li>
+Identify and create the swap partition from the local disk. In
+Solaris, the easiest way to this is via the
+<em class="emphasis">format</em> command. When you invoke the
+<em class="emphasis">format</em> command, it will display the list of
+disks attached to the client. You then select one of the local disks
+and then use the "partition" command from inside
+<em class="emphasis">format</em> to find an existing partition and resize
+it, or create a partition with the desired size.
+</p>
+</li><li>
+Edit <em class="emphasis">/etc/vfstab</em> on the client to mount
+<em class="emphasis">swap</em> from the partition you identified in the
+previous step. For example you might change the two NFS-related
+<em class="emphasis">swap</em> <em class="emphasis">vfstab</em> entries from:
+</p>
+
+<blockquote><pre class="code">wahoo:/export/swap/honeymoon  -       /dev/swap nfs     -     -    -
+/dev/swap                     -       -         swap    -     -    -</pre></blockquote>
+
+
+
+to:</p>
+
+<blockquote><pre class="code">/dev/dsk/c0t0d0s7             -       -         swap    -     no   -</pre></blockquote>
+</li>
+
+<li>
+Reboot the client via diskless boot.</p>
+</li></ol>
+In general, the swap partition should cover most, if not all, of the
+local disk.
+</p>
+
+Of course, if you followed the example in <a href="ch08_04.html#nfs2-CHP-8-SECT-4">Section 8.4, "Managing client swap space"</a>, then you know you ought to be able to
+switch from NFS swap to local swap without a client reboot. This is
+only possible if the local swap partition is at least as big as the
+NFS-mounted swap file. Instead of rebooting the client in step 5,
+you<a name="INDEX-1365" />
+<a name="INDEX-1366" /> would
+do:
+</p>
+
+<blockquote><pre class="code">honeymoon# <tt class="userinput"><b>swap -a /dev/dsk/c0t0d0s7 </b></tt>
+honeymoon# <tt class="userinput"><b>swap -d /dev/swap</b></tt></pre></blockquote>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.6. Troubleshooting</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.8. Brief introduction to JumpStart administration</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

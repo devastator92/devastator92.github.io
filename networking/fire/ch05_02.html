@@ -1,0 +1,433 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:22 GMT -->
+<head><title>Packet Filtering (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.2. Packet Filtering</h2>
+
+
+
+
+
+<a name="INDEX-360" /><em class="emphasis">Packet filtering</em>
+systems route packets between internal and external hosts, but they
+do it selectively. They allow or block certain types of packets in a
+way that reflects a site's own security policy, as shown in
+<a href="ch05_02.html#ch05-1704">Figure 5-1</a>. The type of router used in a packet
+filtering firewall is known as a <em class="emphasis">screening
+router</em>.<a name="INDEX-361" /></p><p>
+
+
+
+
+
+<a name="ch05-1704" /><div class="figure"><img height="230" alt="Figure 5-1" src="figs/fire2.0501.gif" width="475" /></div><h4 class="objtitle">Figure 5-1. Using a screening router to do packet filtering</h4>
+
+As we discuss in <a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>, every packet has a set
+of headers containing certain information. The main information is:</p><p>
+
+
+
+
+
+<ul><li>IP source address</p><p></li><li>IP destination address</p></li><li><p>Protocol (whether the packet is a TCP, UDP, or ICMP packet)</p></li><li><p>TCP or UDP source port</p></li><li><p>TCP or UDP destination port</p></li><li><p>ICMP message type</p></li><li><p>Packet size</p></li></ul>
+The router can also look past the packet headers at data further on
+in the packet; this allows it, for instance, to filter packets based
+on more detailed information (like the name of the web page that
+somebody is requesting) and to verify that packets appear to be
+formatted as expected for their destination port. The router can also
+make sure that the packet is valid (it actually is the size that it
+claims to be and is a legal size, for instance), which helps catch a
+number of denial of service attacks based on malformed packets.</p><p>
+
+
+
+
+
+In addition, the router knows things about the packet that
+aren't reflected in the packet itself, such as:</p><p>
+
+
+
+
+
+<ul><li>The interface the packet arrives on</p><p></li><li>The interface the packet will go out on</p></li></ul>
+Finally, a router that keeps track of packets it has seen knows some
+useful historical facts, such as:</p><p>
+
+
+
+
+
+<ul><li>Whether this packet appears to be a response to another packet (that
+is, its source was the destination of a recent packet and its
+destination is the source of that other packet)</p><p></li><li>How many other packets have recently been seen to or from the same
+host</p><p></li><li>Whether this packet is identical to a recently seen packet</p></li><li>If this packet is part of a larger packet that has been broken into
+parts (fragmented)</p><p></li></ul>
+To understand how packet filtering works, let's look at the
+difference between an ordinary router and a screening router.</p><p>
+
+
+
+
+
+An ordinary router simply looks at the destination address of each
+packet and picks the best way it knows to send that packet towards
+that destination. The decision about how to handle the packet is
+based solely on its destination. There are two possibilities: the
+router knows how to send the packet towards its destination, and it
+does so; or the router does not know how to send the packet towards
+its destination, and it forgets about the packet and returns an ICMP
+"destination unreachable" message, to the packet's
+source.</p><p>
+
+
+
+
+
+A screening router, on the other hand, looks at packets more closely.
+In addition to determining whether or not it <em class="emphasis">can</em>
+route a packet towards its destination, a screening router also
+determines whether or not it <em class="emphasis">should</em>.
+"Should" or "should not" are determined by
+the site's security policy, which the screening router has been
+configured to enforce.</p><p>
+
+
+
+
+
+Packet filtering may also be performed by devices that pay attention
+only to "should" and "should not" and have no
+ability to route. Devices that do this are <em class="emphasis">packet filtering
+bridges</em>. They are rarer than packet filtering routers,
+mostly because they are dedicated security devices that don't
+provide all the other functions that routers do. Most sites would
+rather add features to routers that they need anyway, instead of
+adding a dedicated device. However, being a dedicated device provides
+advantages for packet filtering bridges; in particular, they are
+harder to detect and attack than packet filtering routers. They
+provide the same general features that we discuss for packet
+filtering routers.</p><p>
+
+
+
+
+
+Once it has looked at all the information, a straightforward packet
+filtering router can do any of the following things:</p><p>
+
+
+
+
+
+<ul><li>Send the packet on to the destination it was bound for.</p><p></li><li>Drop the packet -- just forget it, without notifying the sender.</p></li><li><p>Reject the packet -- refuse to forward it, and return an error to
+the sender.</p><p></li><li>Log information about the packet.</p></li><li>Set off an alarm to notify somebody about the packet immediately.</p></li></ul>
+ore sophisticated routers might also be able to do one or more of
+these things:</p><p>
+
+
+
+
+
+<ul><li>Modify the packet (for instance, to do network address translation).</p><p></li><li>Send the packet on to a destination other than the one that it was
+bound for (for instance, to force transactions through a proxy server
+or perform load balancing).</p><p></li><li>Modify the filtering rules (for instance, to accept replies to a UDP
+packet or to deny all traffic from a site that has sent hostile
+packets).</p><p></li></ul>
+The fact that servers for particular Internet services reside at
+certain port numbers lets the router block or allow certain types of
+connections simply by specifying the appropriate port number (e.g.,
+TCP port 23 for Telnet connections) in the set of rules specified for
+packet filtering. (<a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>, describes in detail
+how you construct these rules.)</p><p>
+
+
+
+
+
+Here are some examples of ways in which you might program a screening
+router to selectively route packets to or from your site:</p><p>
+
+
+
+
+
+<ul><li>Block all incoming connections from systems outside the internal
+network, except for incoming SMTP connections (so that you can
+receive electronic mail).</p><p></li><li>Block all connections to or from certain systems you distrust.</p></li><li>Allow electronic mail and FTP services, but block dangerous services
+like TFTP, the X Window System, RPC, and the "r" services
+(<em class="emphasis">rlogin</em>, <em class="emphasis">rsh</em>,
+<em class="emphasis">rcp</em>, etc.). (See <a href="ch13_01.html">Chapter 13, "Internet Services and Firewalls"</a>,
+for more information.)</p><p></li></ul>
+Packet filtering devices that keep track of packets that they see are
+frequently called <em class="emphasis">stateful packet filters</em>
+(because they keep information about the state of transactions). They
+may also be called <em class="emphasis">dynamic packet filters</em>
+because they change their handling of packets dynamically depending
+on the traffic they see. Devices that look at the content of packets,
+rather than at just their headers, are frequently called
+<em class="emphasis">intelligent packet filters</em>. In practice, almost
+all stateful packet filters also are capable of looking at the
+contents of packets, and many are also capable of modifying the
+contents of packets, so you may see all these capabilities lumped
+together under the heading "stateful packet filtering".
+However, something can legitimately be called a "stateful
+packet filter" without having the ability to do advanced
+content filtering or modification.</p><p>
+
+
+
+
+
+A packet filtering system is also a logical place to provide virtual
+private network or network address translation services. Since the
+packet filter is already looking at all of the packets, it can easily
+identify packets that are intended for a destination that is part of
+the virtual private network, encrypt those packets, and encapsulate
+them in another packet bound for the appropriate destination.</p><p>
+
+
+
+
+
+<a name="ch05-2-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.2.1. Advantages of Packet Filtering</h3>
+
+
+
+
+
+Packet filtering has a number of advantages.</p><p>
+
+
+
+
+
+<a name="ch05-4122" /><div class="sect3">
+<h3 class="sect3">5.2.1.1. One screening router can help protect an entire network</h3>
+
+
+
+
+
+One of the key advantages of packet filtering is that a single,
+strategically placed packet filtering router can help protect an
+entire network. If only one router connects your site to the
+Internet, you gain tremendous leverage on network security,
+regardless of the size of your site, by doing packet filtering on
+that router.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch05-3-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.2.1.2. Simple packet filtering is extremely efficient</h3>
+
+
+
+
+
+Because simple packet filtering requires paying attention only to a
+few packet headers, it can be done with very low overhead. Proxying
+is a fairly time-consuming operation, and adding proxying means
+directing connections through another program, usually on a machine
+that otherwise wouldn't be necessary to the routing process.
+Packet filtering takes place on a machine that was already in the
+critical path, and introduces a much smaller delay.</p><p>
+
+
+
+
+
+However, there is no free lunch; the more work your packet filters
+do, the slower they will be. If your packet filters behave like
+proxies, doing complicated data-driven operations that require
+keeping track of multiple packets, they will tend to perform like
+proxies as well.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch05-4139" /><div class="sect3">
+<h3 class="sect3">5.2.1.3. Packet filtering is widely available</h3>
+
+
+
+
+
+Packet filtering capabilities are available in many hardware and
+software routing products, both commercial and freely available over
+the Internet. Most sites already have packet filtering capabilities
+available in the routers they use.</p><p>
+
+
+
+
+
+ost commercial router products include packet filtering
+capabilities. Packet filtering capabilities are also available for a
+number of general-purpose computers. These are discussed further in
+<a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch05-4147" /><div class="sect2">
+<h3 class="sect2">5.2.2. Disadvantages of Packet Filtering</h3>
+
+
+
+
+
+Although packet filtering provides many advantages, there are some
+disadvantages to using packet filtering as well.</p><p>
+
+
+
+
+
+<a name="ch05-4150" /><div class="sect3">
+<h3 class="sect3">5.2.2.1. Current filtering tools are not perfect</h3>
+
+
+
+
+
+Despite the widespread availability of packet filtering in various
+hardware and software packages, packet filtering is still not a
+perfect tool. The packet filtering capabilities of many of these
+products share, to a greater or lesser degree, common limitations:</p><p>
+
+
+
+
+
+<ul><li>The packet filtering rules tend to be hard to configure. Although
+there is a range of difficulty, it mostly runs from slightly
+mind-twisting to brain-numbingly impossible.</p><p></li><li>Once configured, the packet filtering rules tend to be hard to test.</p></li><li>The packet filtering capabilities of many of the products are
+incomplete, making implementation of certain types of highly
+desirable filters difficult or impossible.</p><p></li><li><a name="INDEX-362" /><a name="INDEX-363" />Like anything else,
+packet filtering packages may have bugs in them; these bugs are more
+likely than proxying bugs to result in security problems. Usually, a
+proxy that fails simply stops passing data, while a failed packet
+filtering implementation may allow packets it should have denied.</p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch05-4-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.2.2.2. Packet filtering reduces router performance</h3>
+
+
+
+
+
+Doing packet filtering places a significant extra load on a router.
+As we discussed previously, more complex filters place more load on
+the router, but in some cases, simply turning on packet filtering on
+a given interface can also cost you a lot of performance on some
+routers, because the filtering is incompatible with certain caching
+strategies commonly used for performance enhancement. Cisco's
+"fastpath" functionality is an example of this; normally,
+fastpath can perform basic routing functions completely on the
+interface card, without involving the main CPU, but using some forms
+of filtering requires involving the main CPU for each packet, which
+is much slower. What enables/disables fastpath depends on the
+hardware and software version.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch05-4194" /><div class="sect3">
+<h3 class="sect3">5.2.2.3. Some policies can't readily be enforced by normal packet filtering routers</h3>
+
+
+
+
+
+The information that a packet filtering router has available to it
+doesn't allow you to specify some rules you might like to have.
+For example, packets say what host they come from but generally not
+what user. Therefore, you can't enforce restrictions on
+particular users. Similarly, packets say what port they're
+going to but not what application; when you enforce restrictions on
+higher-level protocols, you do it by port number, hoping that nothing
+else is running on the port assigned to that protocol. Malicious
+insiders can easily subvert this kind of control.</p><p>
+
+
+
+
+
+This problem is eased by using more intelligent packet filters;
+however, in each case, you have to give up some of the advantages of
+normal packet filtering. For instance, a packet filter can insist
+that users authenticate themselves before sending packets, and then
+it can filter packets by username. However, this removes the
+transparency advantage of normal packet filtering. A packet filter
+can also do protocol validity checking, but this is less than perfect
+and also increases filtering overhead.</p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5. Firewall Technologies</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.3. Proxy Services</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:22 GMT -->
+</html>

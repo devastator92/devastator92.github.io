@@ -1,0 +1,637 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+<head><title>Updating Zone Data Files (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.2. Updating Zone Data Files</h2>
+
+
+<a name="INDEX-1018" />
+<a name="INDEX-1019" />Something is always changing on
+your network -- new workstations arrive, you finally retire or
+sell the relic, or you move a host to a different network. Each
+change means that zone data files must be modified. Should you make
+the changes manually? Or should you wimp out and use a tool to help
+you?</p><p>
+
+
+First we'll discuss how to make the changes manually. Then
+we'll talk about a tool to help out: <em class="filename">h2n</em>.
+Actually, we recommend that you use a tool to create the zone data
+files -- we were kidding about that wimp stuff, okay? Or at least
+use a tool to increment the serial number for you. The syntax of zone
+data files lends itself to making mistakes. It doesn't help
+that the address and pointer records are in different files, which
+must agree with each other. However, even when you use a tool, it is
+critical to know what goes on when the files are updated, so
+we'll start with the manual method.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">7.2.1. Adding and Deleting Hosts</h3>
+
+
+<a name="INDEX-1020" />
+<a name="INDEX-1021" />After
+creating your zone data files initially, it should be fairly apparent
+what you need to change when you add a new host. We'll go
+through the steps here in case you weren't the one to set up
+those files or if you'd just like a checklist to follow. Make
+these changes to your <em class="emphasis">primary</em> master name
+server's zone data files. If you make the changes to your
+<em class="emphasis">slave</em> name server's backup zone data
+files, the slave's data will change, but the next zone transfer
+will overwrite it.</p><p>
+
+
+<ol><li>Update the serial number in <em class="filename">db.DOMAIN</em>. The
+serial number is likely to be at the top of the file, so it's
+easy to do first and reduces the chance that you'll forget.</p></li><li>Add any A (address), CNAME (alias), and MX (mail exchanger) records
+for the host to the <em class="filename">db.DOMAIN</em> file. We added the
+following resource records to the <em class="filename">db.movie.edu
+</em>file when a new host (<em class="emphasis">cujo</em>) was
+added to our network:</p><p>
+
+<blockquote><pre class="code">cujo  IN  A  192.253.253.5  ; cujo's internet address
+IN MX  10 cujo        ; if possible, mail directly to
+cujo
+IN MX  20 terminator  ; otherwise, deliver to our mail hub</pre></blockquote>
+</li>
+
+<li>Update the serial number and add PTR records to each
+<em class="filename">db.ADDR</em> file for which the host has an address.
+<em class="emphasis">cujo</em> only has one address,
+on network 192.253.253/24; therefore, we added the following PTR
+record to the <em class="filename">db.192.253.253</em> file:</p><p>
+<blockquote><pre class="code">5  IN PTR cujo.movie.edu.</pre></blockquote>
+</li>
+
+<li>Reload the primary master name server; this forces it to load the new
+information:</p><p>
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc reload</b></tt></pre></blockquote>
+
+
+If you've got a snazzy BIND 8.2 or newer name server, you can
+reload just the zones you changed:</p><p>
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc reload movie.edu 253.253.192.in-addr.arpa</b></tt></pre></blockquote>
+</li></ol>
+
+The primary master name server will load the new zone data. Slave
+name servers will load this new data sometime within the time
+interval defined in the SOA record for refreshing their data.</p><p>
+
+
+Sometimes your users won't want to wait for the slaves to pick
+up the new zone data -- they'll want it available right
+away. (Are you wincing or nodding knowingly as you read this?) Can
+you force a slave to load the new information right away? With
+Version 8 or 9 masters and slaves, the slaves pick up the new data
+quickly because the primary master notifies the slaves of changes
+within 15 minutes of the change. If your name server is 4.9 or later,
+you can reload it just as you did for your primary master name
+server. The reload induces the name server to refresh all of its
+slave zones. If your name server is 4.8.3 or earlier, remove all the
+slave's backup zone data files (or just the ones you want to
+force), kill the slave server, and start up a new one. Since the
+backup files are gone, the slave must immediately pull new copies of
+the zones.</p><p>
+
+
+To delete a
+<a name="INDEX-1022" />host,
+remove the resource records from the <em class="filename">db.DOMAIN</em>
+and from each <em class="filename">db.ADDR </em>file pertaining to that
+host. Increment the serial number in each zone data file you changed
+and reload your primary master name server.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">7.2.2. SOA Serial Numbers</h3>
+
+
+<a name="INDEX-1023" />Each
+of the zone data files has a serial number. Every time you change the
+data in a zone data file, you must increment the serial number. If
+you don't increment the serial number, slave name servers for
+the zone won't pick up the updated data.</p><p>
+
+
+Incrementing the serial number is simple. If the original zone data
+file had this <a name="INDEX-1024" />SOA record:</p><p>
+
+
+<blockquote><pre class="code">movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                                100     ; Serial
+                                3h      ; Refresh
+                                1h      ; Retry
+                                1w      ; Expire
+                                1h )    ; Negative caching TTL</pre></blockquote>
+
+
+the updated zone data file would have this SOA record:</p><p>
+
+
+<blockquote><pre class="code">movie.edu. IN SOA terminator.movie.edu. al.robocop.movie.edu. (
+                                101     ; Serial
+                                3h      ; Refresh
+                                1h      ; Retry
+                                1w      ; Expire
+                                1h )    ; Negative caching TTL</pre></blockquote>
+
+
+This simple change is the key to distributing the zone data to all of
+your slaves. Failing to increment the serial number is the most
+common mistake made when updating a zone. The first few times you
+make a change to a zone data file, you'll remember to update
+the serial number because the process is new and you're paying
+close attention. After modifying the zone data file becomes second
+nature, you'll make some "quickie" little change,
+forget to update the serial number . . . and none of the slaves will
+pick up the new zone data. That's why you should use a tool
+that updates the serial number for you! It could be
+<em class="filename">h2n</em> or something you write yourself, but
+it's a good idea to use a tool.</p><p>
+
+
+BIND does allow you to use a decimal serial number like 1.1, but we
+recommend that you use only <a name="INDEX-1025" />
+<a name="INDEX-1026" />integer values. Here's how BIND
+Version 4 handles <a name="INDEX-1027" />
+<a name="INDEX-1028" />decimal serial numbers: if there is a
+decimal point in the serial number, BIND multiplies the digits to the
+left of the decimal by 1000. The digits to the right of the decimal
+point are then <em class="emphasis">concatenated</em> to the digits on the
+left. Therefore, a number like 1.1 is converted to 10001 internally,
+and 1.10 is converted to 100010. This creates certain anomalies; for
+example, 1.1 is "greater" than 2, and 1.10 is
+"greater" than 2.1. Because this is so counterintuitive,
+we think it's best to stick with integer serial numbers.</p><p>
+
+
+There are several good ways to manage integer serial numbers. The
+most obvious is just to use a <a name="INDEX-1029" />counter:
+increment the serial number by one each time you modify the file.
+Another method is to derive the serial number from the date. For
+example, you could use the eight-digit number formed by YYYYMMDD.
+Suppose today is January 15, 1997. In this form, your serial number
+would be 19970115. This scheme allows only one update per day,
+though, and that may not be enough. Add another two digits to this
+number to indicate how many times the file has been updated that day.
+The first number for January 15, 1997 would then be 1997011500. The
+next modification that day would change the serial number to
+1997011501. This scheme allows 100 updates per day. It also has the
+advantage of leaving you an indication in the zone data file of when
+you last incremented the serial number. <em class="filename">h2n</em> will
+generate the serial number from the date if you use the
+<span class="option">-y</span> option. Whatever scheme you choose, the serial
+number must fit in a 32-bit integer.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">7.2.3. Starting Over with a New Serial Number</h3>
+
+
+<a name="INDEX-1030" />
+<a name="INDEX-1031" />What do you do if the serial
+number on one of your zones accidentally becomes very large and you
+want to change it back to a more reasonable value? There is a way
+that works with all versions of BIND, a way that works with Version
+4.8.1 and later, and one that works with 4.9 and later.</p><p>
+
+
+The way that always works with all versions is to purge your slaves
+of any knowledge of the old serial number. Then you can start
+numbering from one (or any convenient point). Here's how.
+First, change the serial number on your primary master server and
+restart it; now the primary master server has the new integer serial
+number. Log onto one of your slave name server hosts and kill the
+<em class="filename">named</em> process with the command <em class="filename">ndc
+stop</em>. Remove its backup zone data files (e.g.,
+<em class="filename">rm bak.movie.edu bak.192.249.249
+bak.192.253.253</em>) and start up your slave name server.
+Since the backup copies were removed, the slave must load a new
+version of the zone data files -- picking up the new serial
+numbers. Repeat this process for each slave server. If any of your
+slave name servers aren't under your control, you'll have
+to contact their administrators to get them to do the same.</p><p>
+
+
+If all your slaves run a version of BIND newer than 4.8.1 (and we
+pray you're not using 4.8.1) but older than BIND 9, you can
+take advantage of the special serial number zero. If you set a
+zone's serial number to <a name="INDEX-1032" />zero, each slave will transfer the zone
+the next time it checks. In fact, the zone will be transferred
+<em class="emphasis">every</em> time the slave checks, so don't
+forget to increment the serial number once all the slaves have
+synchronized on serial number zero. But there is a limit to how far
+you can increment the serial number. Read on.</p><p>
+
+
+The other method of fixing the serial number (with 4.9 and later
+slaves) is easier to understand if we first cover some background
+material. The DNS serial number is a 32-bit unsigned integer whose
+value ranges from
+to 4,294,967,295. The serial number uses <a name="INDEX-1033" /><em class="firstterm">sequence space
+arithmetic</em>, which means that for any serial number, half
+the numbers in the number space (2,147,483,647 numbers) are less than
+the serial number and half the numbers are larger.</p><p>
+
+
+Let's go over an example of sequence space numbers. Suppose the
+serial number is 5. Serial numbers 6 through (5 + 2,147,483,647) are
+larger than serial number 5 and serial numbers (5 + 2,147,483,649)
+through 4 are smaller. Notice that the serial number wrapped around
+to 4 after reaching 4,294,967,295. Also notice that we didn't
+include the number (5 + 2,147,483,648), because this is exactly
+halfway around the number space and could be larger or smaller than
+5, depending on the implementation. To be safe, don't use it.</p><p>
+
+
+Now back to the original problem. If your zone serial number is
+25,000 and you want to start numbering at 1 again, you can speed
+through the serial number space in two steps. First, add the largest
+increment possible to your serial number (25,000 + 2,147,483,647 =
+2,147,508,647). If the number you come up with is larger than
+4,294,967,295 (the largest 32-bit value), you'll have wrap
+around to the beginning of the number space by subtracting
+4,294,967,296 from it. After changing the serial number, you must
+wait for all of your slaves to pick up a new copy of the zone.
+Second, change the zone serial number to its target value (1), which
+is now <em class="emphasis">larger</em> than the current serial number
+(2,147,508,647). After the slaves pick up a new copy of the zone,
+you're done!</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">7.2.4. Additional Zone Data File Entries</h3>
+
+
+<a name="INDEX-1034" /> <a name="INDEX-1035" />After you've been running a name
+server for a while, you may want to add data to your name server to
+help you manage your zone. Have you ever been stumped when someone
+asked you <em class="emphasis">where</em> one of your hosts is? Maybe you
+don't even remember what kind of host it is. Administrators
+have to manage larger and larger populations of hosts these days,
+making it easy to lose track of this information. The name server can
+help you out. And if one of your hosts is acting up and someone
+notices remotely, the name server can help them get in touch with
+you.</p><p>
+
+
+So far in the book, we've covered SOA, NS, A, CNAME, PTR, and
+MX records. These records are critical to everyday
+operation -- name servers need them to operate, and applications
+look up data of these types. DNS defines many more datatypes, though.
+The next most useful resource record types are TXT and RP; these can
+be used to tell you a host's location and responsible person.
+For a list of common (and not-so-common) resource records, see <a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a>.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-2.4.1" /><div class="sect3">
+<h3 class="sect3">7.2.4.1. General text information</h3>
+
+
+<a name="INDEX-1036" />TXT stands for
+TeXT. These records are simply a list of strings, each less than 256
+characters in length. Versions of BIND prior to 4.8.3 do not support
+TXT records. In Version 4, BIND limits the zone data file TXT record
+to a single string of almost 2K of data.</p><p>
+
+
+TXT records can be used for anything you want; one use is to list a
+<a name="INDEX-1037" />host's location:</p><p>
+
+
+<blockquote><pre class="code">cujo  IN  TXT  "Location: machine room dog house"</pre></blockquote>
+
+
+BIND 8 and 9 have the same 2K limit, but you can specify the TXT
+record as multiple strings:</p><p>
+
+
+<blockquote><pre class="code">cujo  IN  TXT  "Location:" "machine room dog house"</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-2.4.2" /><div class="sect3">
+<h3 class="sect3">7.2.4.2. Responsible Person</h3>
+
+
+Domain administrators will undoubtedly develop a love/hate
+relationship with the Responsible Person, or RP, record. The
+<a name="INDEX-1038" />
+<a name="INDEX-1039" />RP record can be attached to any domain
+name, internal or leaf, and indicates who is responsible for that
+<a name="INDEX-1040" />
+<a name="INDEX-1041" />host or zone. This enables you to locate
+the miscreant responsible for the host peppering you with DNS
+queries, for example. But it also leads people to you when one of
+your hosts acts up.</p><p>
+
+
+The record takes two arguments as its record-specific data: an
+<a name="INDEX-1042" />electronic mail address in domain name
+format, and a <a name="INDEX-1043" />domain name pointing to additional data
+about the contact. The electronic mail address is in the same format
+the SOA record uses: it substitutes a "." for the
+"@". The next argument is a domain name, which must have
+a TXT record associated with it. The TXT record then contains
+free-format information about the contact, like full name and phone
+number. If you omit either field, you must specify the root domain
+(".") as a placeholder instead.</p><p>
+
+
+Here are some example RP (and associated) records:</p><p>
+
+
+<blockquote><pre class="code">robocop      IN  RP   root.movie.edu.  hotline.movie.edu.
+             IN  RP   richard.movie.edu.  rb.movie.edu.
+hotline      IN  TXT  "Movie U. Network Hotline, (415) 555-4111"
+rb           IN  TXT  "Richard Boisclair, (415) 555-9612"</pre></blockquote>
+
+
+Note that TXT records for <em class="emphasis">root.movie.edu</em> and <em class="emphasis">richard.movie.edu</em> aren't
+necessary, since they're only the domain name encoding of
+electronic mail addresses, not real domain names.</p><p>
+
+
+This resource record didn't exist when BIND 4.8.3 was
+implemented, but BIND 4.9 supports it. Check the documentation for
+your version of the name server to see if it supports RP before
+trying to use it.<a name="INDEX-1044" /> <a name="INDEX-1045" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">7.2.5. Generating Zone Data Files from the Host Table</h3>
+
+
+<a name="INDEX-1046" />As <a name="INDEX-1047" />
+<a name="INDEX-1048" />you
+saw in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, we defined a process for
+converting host table information into zone data. We've written
+a tool in <a name="INDEX-1049" />Perl to automate this process,
+called <em class="filename">h2n</em>.<a href="#FOOTNOTE-51">[51]</a> Using a tool to generate your data has
+one big advantage: there will be no syntax errors or inconsistencies
+in your zone data files -- assuming we wrote
+<em class="filename">h2n</em> correctly! One common inconsistency is to
+have an A (address) record for a host but no corresponding PTR
+(pointer) record, or the other way around. Because this data is in
+separate zone data files, it is easy to err.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-51" />[51]In case you've
+forgotten how to get <em class="filename">h2n</em>, see <a href="ch00_01.html">the Preface</a><em class="citetitle">" </em>in the
+Preface.</p><p>
+
+</blockquote>
+
+
+What does <em class="filename">h2n</em> do? Given the<em class="filename">
+/etc/hosts</em> file and some <a name="INDEX-1050" />command-line
+options, <em class="filename">h2n</em> creates the data files for your
+zones. As a system administrator, you keep the host table current.
+Each time you modify the host table, you run <em class="filename">h2n</em>
+again. <em class="filename">h2n</em> rebuilds each zone data file from
+scratch, assigning each new file the next higher serial number. It
+can be run manually or from <em class="filename">cron</em> each night. If
+you use <em class="filename">h2n</em>, you'll never again have to
+worry about forgetting to increment the serial number.</p><p>
+
+
+First, <em class="filename">h2n</em> needs to know the domain name of your
+forward-mapping zone and your network numbers.
+(<em class="filename">h2n</em> can figure out the names of your
+reverse-mapping zones from your network numbers.) These map
+conveniently into the zone data filenames: <em class="emphasis">movie.edu</em> zone data goes in
+<em class="filename">db.movie</em>, and network 192.249.249/24 data goes
+into <em class="filename">db.192.249.249</em>. The domain name of your
+forward-mapping zone and your network number are specified with the
+<span class="option">-d</span> and <span class="option">-n</span> options, as follows:</p><p>
+
+
+<dl>
+<dt><i>-d domain name</i></dt>
+<dd>The domain name of your forward-mapping zone.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-n network number</i></dt>
+<dd>The network number of your network. If you are generating files for
+several networks, use several <span class="option">-n</span> options on the
+command line. Omit trailing zeros and netmask specifications from the
+network numbers.</p></dd>
+
+</dl>
+
+
+The <em class="filename">h2n</em> command requires the <span class="option">-d
+</span>flag and at least one <span class="option">-n</span> option; they have
+no default values. For example, to create the data file for the zone
+<em class="emphasis">movie.edu</em>, which consists of
+two networks, give the command:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>h2n -d movie.edu -n 192.249.249 -n 192.253.253</b></tt></pre></blockquote>
+
+
+For greater control over the data, you can use other options:</p><p>
+
+
+<dl>
+<dt><i>-s server</i></dt>
+<dd>The name servers for the NS records. As with <span class="option">-n</span>, use
+several <span class="option">-s</span> options if you have multiple primary
+master or slave name servers. A Version 8 or 9 server will NOTIFY
+this list of servers when a zone changes. The default is the host on
+which you run <em class="filename">h2n</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-h host</i></dt>
+<dd>The host for the MNAME field of the SOA record.
+<em class="emphasis">host</em> must be the primary master name server to
+ensure proper operation of the NOTIFY feature. The default is the
+host on which you run <em class="filename">h2n</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-u user</i></dt>
+<dd>The mail address of the person in charge of the zone data. This
+defaults to <em class="emphasis">root</em> on the host on which you run
+<em class="filename">h2n</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-o other</i></dt>
+<dd>Other SOA values, not including the serial number, as a
+colon-separated list. These default to 10800:3600:604800:86400.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-f file</i></dt>
+<dd>Read the <em class="filename">h2n</em> options from the named
+<em class="emphasis">file</em> rather than from the command line. If you
+have lots of options, keep them in a file.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-v 4|8</i></dt>
+<dd>Generate configuration files for BIND 4 or 8; Version 4 is the
+default. Since BIND 9's configuration file format is basically
+the same as BIND 8's, you can use -<em class="emphasis">v 8</em> for
+a BIND 9 name server.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-y</i></dt>
+<dd>Generate the serial number from the date.</p></dd>
+
+</dl>
+
+
+Here is an example that uses all the options mentioned so far:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>h2n -f opts</b></tt></pre></blockquote>
+
+
+Contents of file <em class="filename">opts</em>:</p><p>
+
+
+<blockquote><pre class="code">-d movie.edu
+-n 192.249.249
+-n 192.253.253
+-s terminator.movie.edu
+-s wormhole
+-u al
+-h terminator
+-o 10800:3600:604800:86400
+-v 8
+-y</pre></blockquote>
+
+
+If an option requires a host name, you can provide either a full
+domain name (e.g., <em class="emphasis">terminator.movie.edu</em>) or just the
+host's name (e.g., <em class="emphasis">terminator</em>). If you give the host name
+only, <em class="filename">h2n</em> forms a complete domain name by adding
+the domain name given with the <span class="option">-d</span> option. (If a
+trailing dot is necessary, <em class="filename">h2n</em> adds it too.)</p><p>
+
+
+There are more options to <em class="filename">h2n</em> than we've
+shown here. For the complete list of options, you'll have to
+look at the manpage.</p><p>
+
+
+Of course, some kinds of resource records aren't easy to
+generate from <em class="filename">/etc/hosts  -- </em>the necessary
+data simply isn't there. You may need to add these records
+manually. But since <em class="filename">h2n</em> always rewrites zone
+data files, won't your changes be overwritten?</p><p>
+
+
+Well, <em class="filename">h2n</em> provides a "back door" for
+inserting this kind of data. Put these special records in a file
+named <a name="INDEX-1051" /><em class="filename">spcl.DOMAIN</em>, where
+<em class="emphasis">DOMAIN</em> is the first label of the domain name of
+your zone. When <em class="filename">h2n</em> finds this file, it will
+"include" it by adding the line:</p><p>
+
+
+<blockquote><pre class="code">$INCLUDE spcl.DOMAIN</pre></blockquote>
+
+
+to the end of the <em class="filename">db.DOMAIN</em> file. (The $INCLUDE
+statement is described later in this chapter.) For example, the
+administrator of <em class="emphasis">movie.edu</em>
+may add extra MX records into the file
+<em class="filename">spcl.movie</em> so that users can mail to <em class="emphasis">movie.edu</em> directly instead of sending
+mail to hosts within <em class="emphasis">movie.edu</em>. Upon finding this file,
+<em class="filename">h2n</em> would put the line:</p><p>
+
+
+<blockquote><pre class="code">$INCLUDE spcl.movie</pre></blockquote>
+
+
+at the end of the zone data file<a name="INDEX-1052" /> <a name="INDEX-1053" />
+<em class="filename">db.movie</em>.<a name="INDEX-1054" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">7.2.6. Keeping the Root Hints Current</h3>
+
+
+As we explained in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, the
+<a name="INDEX-1055" />
+<a name="INDEX-1056" /> <a name="INDEX-1057" />
+<a name="INDEX-1058" />root hints file tells your name server
+where the servers for the root zone are. It must be updated
+periodically. The root name servers don't change very often,
+but they do change. A good practice is to check your root hints file
+every month or two. In <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, we told you to
+get the file by FTPing to ftp.rs.internic.net. And that's
+probably the best way to keep current.</p><p>
+
+
+If you have a copy of <a name="INDEX-1059" />
+<a name="INDEX-1060" /><em class="filename">dig</em>,
+a utility that works a lot like <em class="filename">nslookup</em> and is
+included in the BIND distribution, you can retrieve the current list
+of root name servers just by running:<a name="INDEX-1061" /> <a name="INDEX-1062" /></p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig @a.root-servers.net  .  ns &gt; db.cache</b></tt></pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7. Maintaining BIND</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.3. Organizing Your Files</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+</html>

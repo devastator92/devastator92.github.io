@@ -1,0 +1,943 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+<head><title>Logging in BIND 8 and 9 (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch07_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.5. Logging in BIND 8 and 9</h2>
+
+
+<a name="INDEX-1083" /> <a name="INDEX-1084" />BIND 4 had an extensive logging
+system, writing information to a debug file and sending information
+to <em class="emphasis">syslog</em>. But BIND 4 gave you limited control
+over this logging process -- you could turn debugging up to a
+certain level, but that was it. BIND 8 and 9 have the same logging
+system as BIND 4, but both of the new BINDs give you control you
+didn't have with BIND 4.</p><p>
+
+
+This control has its costs though -- there's a lot to learn
+before you can effectively configure this subsystem. If you
+don't have some time you can spend to experiment with logging,
+use the defaults and come back to this topic later. Most of you
+won't need to change the default logging behavior.</p><p>
+
+
+There are two main concepts in logging: <em class="firstterm">channels
+</em><a name="INDEX-1085" />and
+<em class="firstterm">categories</em><a name="INDEX-1086" />.
+A channel specifies where logged data goes: to
+<em class="emphasis">syslog</em>, to a file, to <em class="filename">named
+</em>'s standard error output, or to the bit bucket. A
+category specifies what data is logged. In the BIND source code, most
+messages that the name server logs are categorized according to the
+function of the code they relate to. For example, a message produced
+by the part of BIND that handles dynamic updates is probably in the
+<em class="emphasis">update</em> category. We'll give you a list of
+the categories shortly.</p><p>
+
+
+Each category of data can be sent to a single channel or to multiple
+channels. In <a href="ch07_05.html#dns4-CHP-7-FIG-1">Figure 7-1</a>, queries are logged to a
+file while statistics data is both logged to a file and to
+<em class="emphasis">syslog</em>.</p><p>
+
+
+<a name="dns4-CHP-7-FIG-1" /><div class="figure"><img height="92" alt="Figure 7-1" src="figs/dns4_0701.gif" width="309" /></div><h4 class="objtitle">Figure 7-1. Logging categories to channels</h4>
+
+Channels allow you to filter by message
+<a name="INDEX-1087" />severity. Here's the list of
+severities, from most severe to least:</p><p>
+
+
+<blockquote><pre class="code">critical
+error
+warning
+notice
+info
+debug [level]
+dynamic</pre></blockquote>
+
+
+The top five severities
+(<em class="emphasis">critical</em><a name="INDEX-1088" />,
+<em class="emphasis">error</em><a name="INDEX-1089" />,
+<em class="emphasis">warning</em><a name="INDEX-1090" />,
+<em class="emphasis">notice</em><a name="INDEX-1091" />, and
+<em class="emphasis">info</em><a name="INDEX-1092" />) are the familiar severity levels used
+by <em class="emphasis">syslog</em>. The other two
+(<em class="emphasis">debug</em> and <em class="emphasis">dynamic</em>) are
+unique to BIND 8 and 9.</p><p>
+
+
+<em class="emphasis">debug</em><a name="INDEX-1093" /> is name server debugging for which you
+can specify a debug level. If you omit the debug level, then the
+level is assumed to be 1. If you specify a debug level, you will see
+messages of that level when name server debugging is turned on (e.g.,
+if you specify "debug 3", then you will see level 3
+debugging messages even when you send only one trace command to the
+name server). If you specify
+<em class="emphasis">dynamic</em><a name="INDEX-1094" /> severity, then the name server will
+log messages that match its debug level (e.g., if you send one trace
+command to the name server, it will log messages from level 1. If you
+send three trace commands to the name server, it will log messages
+from levels 1 through 3.) The
+<a name="INDEX-1095" />default
+<a name="INDEX-1097" /> 
+severity is <em class="emphasis">info</em>, which means that you
+<a name="INDEX-1096" />
+won't see debug messages unless you specify the severity.</p><p>
+
+
+
+<a name="ch07-21-fm2xml" /><blockquote><b>TIP: </b>
+You can configure a channel to log both 
+debug messages and
+<em class="emphasis">syslog</em>
+messages to a file. However, the
+converse is not true: you cannot configure a channel to log both
+debug messages and <em class="emphasis">syslog</em> messages with
+<em class="emphasis">syslog -- </em>debug messages can't be sent
+to <em class="emphasis">syslog</em>.</p><p>
+
+</blockquote>
+
+<a name="INDEX-1098" />Let's configure a couple of
+<a name="INDEX-1099" />
+<a name="INDEX-1100" />channels
+to show you how this works. The first channel will go to
+<em class="emphasis">syslog</em> and log with facility
+<em class="emphasis">daemon</em>, sending those messages of severity
+<em class="emphasis">info</em> and above. The second channel will go to a
+file, logging debug messages at any level as well as
+<em class="emphasis">syslog</em> messages. Here is the <em class="emphasis">logging
+</em>statement for the BIND 8 or 9 configuration file:</p><p>
+
+
+<blockquote><pre class="code">logging {
+  channel my_syslog {
+     syslog daemon;
+     // Debug messages will not be sent to syslog, so
+     // there is no point to setting the severity to
+     // debug or dynamic; use the lowest syslog level: info.
+     severity info;
+  };
+  channel my_file {
+     file "log.msgs";
+     // Set the severity to dynamic to see all the debug messages.
+     severity dynamic;
+  };
+};</pre></blockquote>
+
+
+Now that we've configured a couple of channels, we have to tell
+the name server exactly what to send to those channels. Let's
+implement what was pictured in <a href="ch07_05.html#dns4-CHP-7-FIG-1">Figure 7-1</a>, with
+statistics going to <em class="filename">syslog</em> and to the file, and
+queries going to the file. The category specification is part of the
+<em class="filename">logging</em> statement, so we'll build on the
+previous <em class="filename">logging</em> statement:</p><p>
+
+
+<blockquote><pre class="code">logging {
+  channel my_syslog {
+     syslog daemon;
+     severity info;
+  };
+  channel my_file {
+     file "log.msgs";
+     severity dynamic;
+  };
+
+  category statistics { my_syslog; my_file; };
+  category queries { my_file; };
+};</pre></blockquote>
+
+
+With this <em class="emphasis">logging</em> statement in your
+configuration file, start your name server and send it a few queries.
+But nothing is written to <em class="filename">log.msgs </em>! (Well, if
+you wait long enough, the name server's statistics will show up
+in <em class="filename">log.msgs</em>.) You expected queries to be logged.
+Alas, you have to turn on name server debugging to get queries
+logged:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc trace</b></tt></pre></blockquote>
+
+
+Now if you send your name server some queries they're logged to
+<em class="filename">log.msgs</em>. But look around the name
+server's working directory -- there's a new file
+called <a name="INDEX-1101" /><em class="filename">named.run</em>. It has all
+the other debugging information written to it. You didn't want
+all this other debugging, though; you just wanted the statistics and
+queries. How do you get rid of <em class="filename">named.run</em>?</p><p>
+
+
+There's a special category we haven't told you about:
+<a name="INDEX-1102" />
+<a name="INDEX-1103" /><em class="emphasis">default</em>.
+If you don't specify any channels for a category, BIND sends
+those messages to whichever channel the <em class="emphasis">default
+</em>category is assigned to. Let's change the
+<em class="emphasis">default</em> category to discard all logging messages
+(there's a channel called <em class="emphasis">null</em> for this
+purpose):</p><p>
+
+
+<blockquote><pre class="code">logging {
+  channel my_syslog {
+     syslog daemon;
+     severity info;
+  };
+  channel my_file {
+     file "log.msgs";
+     severity dynamic;
+  };
+
+  category default { null; };
+  category statistics { my_syslog; my_file; };
+  category queries { my_file; };
+};</pre></blockquote>
+
+
+Now, start your server, turn on debugging to level 1, and send some
+queries. The queries end up in <em class="filename">log.msgs</em>, and
+<em class="filename">named.run</em> is created but stays empty. Great!
+We're getting the hang of this after all.</p><p>
+
+
+A few days pass. One of your coworkers notices that the name server
+is sending many fewer messages to <em class="emphasis">syslog</em> than it
+used to. In fact, the only <em class="emphasis">syslog</em> messages are
+statistics messages. The ones your coworker watched, the zone
+transfer messages, are gone. What happened?</p><p>
+
+
+Well, the <em class="emphasis">default</em> category is set up, by
+default, to send messages to both <em class="emphasis">syslog</em> and to
+the debug file (<em class="filename">named.run</em>). When you assigned
+the <em class="emphasis">default</em> category to the <em class="emphasis">null
+</em>channel, you turned off the other <em class="emphasis">syslog
+</em>messages, too. Here's what we should have used:</p><p>
+
+
+<blockquote><pre class="code">category default { my_syslog; };</pre></blockquote>
+
+
+This sends the <em class="emphasis">syslog</em> messages to
+<em class="emphasis">syslog</em>, but does not write debug or
+<em class="emphasis">syslog</em> messages to a file.</p><p>
+
+
+Remember, we said you'd have to experiment for a while with
+<a name="INDEX-1104" />logging to get exactly what you want. We
+hope this example gives you a hint of what you might run into. Now,
+let's go over the details of logging.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">7.5.1. The Logging Statement</h3>
+
+
+Here's the syntax of the <em class="filename">logging</em>
+statement. It's rather intimidating. We'll go over some
+more examples as we explain what each substatement means:</p><p>
+
+
+<blockquote><pre class="code">logging {
+  [ channel channel_name {
+    ( file path_name
+       [ versions ( number | unlimited ) ]
+       [ size size_spec ]
+     | syslog ( kern | user | mail | daemon | auth | syslog | lpr |
+                news | uucp | cron | authpriv | ftp |
+                local0 | local1 | local2 | local3 |
+                local4 | local5 | local6 | local7 )
+     | stderr
+     | null );
+
+    [ severity ( critical | error | warning | notice |
+                 info  | debug [ level ] | dynamic ); ]
+    [ print-category yes_or_no; ]
+    [ print-severity yes_or_no; ]
+    [ print-time yes_or_no; ]
+  }; ]
+
+  [ category category_name {
+    channel_name; [ channel_name; ... ]
+  }; ]
+  ...
+};</pre></blockquote>
+
+
+Here are the default channels. The name server creates these channels
+even if you don't want them. You can't redefine these
+channels; you can only add more of them:</p><p>
+
+
+<blockquote><pre class="code">channel default_syslog {
+    syslog daemon;        // send to syslog's daemon facility
+    severity info;        // only send severity info and higher
+};
+
+channel default_debug {
+    file "named.run";     // write to named.run in the
+                          // working directory
+    severity dynamic;     // log at the server's current debug level
+};
+
+channel default_stderr {  // writes to stderr
+    stderr;               // only BIND 9 lets you define your own stderr
+                          // channel, though BIND 8 has the built-in
+                          // default_stderr channel.
+    severity info;        // only send severity info and higher
+};													
+
+channel null {
+    null;                 // toss anything sent to this channel
+};</pre></blockquote>
+
+
+If you don't assign channels to the categories
+<em class="emphasis">default</em>, <em class="emphasis">panic</em>,
+<em class="emphasis">packet</em>, and <em class="emphasis">eventlib</em>, a
+BIND 8 name server assigns them these channels by default:</p><p>
+
+
+<blockquote><pre class="code">logging {
+    category default { default_syslog; default_debug; };
+    category panic { default_syslog; default_stderr; };
+    category packet { default_debug; };
+    category eventlib { default_debug; };
+};</pre></blockquote>
+
+
+A BIND 9 name server uses this as the default logging statement:</p><p>
+
+
+<blockquote><pre class="code">logging {
+	category default {
+		default_syslog;
+		default_debug;
+	};
+};</pre></blockquote>
+
+
+As we mentioned earlier, the <em class="emphasis">default</em> category
+logs to both <em class="emphasis">syslog</em> and to the debug file (which
+by default is <em class="filename">named.run</em>). This means that all
+<em class="emphasis">syslog</em> messages of severity
+<em class="emphasis">info</em> and above are sent to
+<em class="emphasis">syslog</em>, and when debugging is turned on, the
+<em class="emphasis">syslog</em> messages and debug messages are written
+to <em class="filename">named.run</em>. This more or less matches the BIND
+4 behavior.<a name="INDEX-1105" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">7.5.2. Channel Details</h3>
+
+
+A <a name="INDEX-1106" />channel may be
+defined to go to a file, to <em class="emphasis">syslog</em>, or to null.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-5.2.1" /><div class="sect3">
+<h3 class="sect3">7.5.2.1. File channels </h3>
+
+
+<a name="INDEX-1107" />If a channel
+goes to a file, you must specify the file's pathname.
+Optionally, you can specify how many versions of the file can exist
+at one time and how big the file may grow.</p><p>
+
+
+If you specify that there can be three versions, BIND 8 or 9 will
+keep <em class="filename">file</em>, <em class="filename">file.0</em>,
+<em class="filename">file.1</em>, and <em class="filename">file.2 </em>around.
+After the name server starts or after it is reloaded, it will move
+<em class="filename">file.1 </em>to <em class="filename">file.2</em>,
+<em class="filename">file.0 </em>to <em class="filename">file.1</em>,
+<em class="filename">file </em>to <em class="filename">file.0</em>, and start
+writing to a new copy of <em class="filename">file</em>. If you specify
+unlimited versions, BIND will keep 99 versions.</p><p>
+
+
+If you specify a maximum file size, the name server will stop writing
+to the file after it reaches the specified size. Unlike the
+<em class="emphasis">versions</em> substatement (mentioned in the last
+paragraph), the file will not be rolled over and a new file opened
+when the specified size is reached. The name server just stops
+writing to the file. If you do not specify a file size, the file will
+grow indefinitely.</p><p>
+
+
+Here is an example file channel using the
+<em class="emphasis">versions</em> and <em class="emphasis">size</em>
+substatements:</p><p>
+
+
+<blockquote><pre class="code">logging{
+  channel my_file {
+     file "log.msgs" versions 3 size 10k;
+     severity dynamic;
+  };
+};</pre></blockquote>
+
+
+The size can include a scaling factor as in the example.
+<em class="emphasis">K</em> or <em class="emphasis">k</em> is kilobytes.
+<em class="emphasis">M</em> or <em class="emphasis">m</em> is megabytes.
+<em class="emphasis">G</em> or <em class="emphasis">g</em> is gigabytes.</p><p>
+
+
+It's important to specify the severity as either
+<em class="emphasis">debug</em> or <em class="emphasis">dynamic</em> if you
+want to see debug messages. The default severity is
+<em class="emphasis">info</em>, which will show you only
+<em class="emphasis">syslog</em> messages.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.2.2" /><div class="sect3">
+<h3 class="sect3">7.5.2.2. Syslog channels</h3>
+
+
+<a name="INDEX-1108" />If a channel
+goes to <em class="emphasis">syslog</em>, you can specify the facility to
+be any of the following: <em class="filename">kern</em>,
+<em class="filename">user</em>, <em class="filename">mail</em>,
+<em class="filename">daemon</em>, <em class="filename">auth</em>,
+<em class="filename">syslog</em>, <em class="filename">lpr</em>,
+<em class="filename">news</em>, <em class="filename">uucp</em>,
+<em class="filename">cron</em>, <em class="filename">authpriv</em>,
+<em class="filename">ftp</em>, <em class="filename">local0</em>,
+<em class="filename">local1</em>, <em class="filename">local2</em>,
+<em class="filename">local3</em>, <em class="filename">local4</em>,
+<em class="filename">local5</em>, <em class="filename">local6</em>, or
+<em class="filename">local7</em>. The default is
+<em class="filename">daemon</em>, and we recommend that you use that.</p><p>
+
+
+Here's an example <em class="emphasis">syslog</em> channel using the
+facility <em class="emphasis">local0</em> instead of
+<em class="emphasis">daemon</em>:</p><p>
+
+
+<blockquote><pre class="code">logging {
+    channel my_syslog {
+        syslog local0;        // send to syslog's local0 facility
+        severity info;        // only send severity info and higher
+    };
+};</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.2.3" /><div class="sect3">
+<h3 class="sect3">7.5.2.3. Stderr channel</h3>
+
+
+<a name="INDEX-1109" /><a name="INDEX-1110" />There is a predefined channel called
+<em class="emphasis">default_stderr</em> for any messages you'd like
+written to the <em class="emphasis">stderr</em> file descriptor of the
+name server. With BIND 8, you cannot configure any other file
+descriptors to use <em class="emphasis">stderr</em>. With BIND 9, you can.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.2.4" /><div class="sect3">
+<h3 class="sect3">7.5.2.4. Null channel</h3>
+
+
+There is a predefined channel called <a name="INDEX-1111" /><em class="emphasis">null</em> for messages
+you want to throw away.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.2.5" /><div class="sect3">
+<h3 class="sect3">7.5.2.5. Data formatting for all channels</h3>
+
+
+<a name="INDEX-1112" />
+<a name="INDEX-1113" /> <a name="INDEX-1114" />The BIND 8 and 9 logging facility also
+allows you some control over the formatting of messages. You can add
+a timestamp, a category, and a severity level to the messages.</p><p>
+
+
+Here's an example debug message that has all the extra goodies:</p><p>
+
+
+<blockquote><pre class="code">01-Feb-1998 13:19:18.889 config: debug 1: source = db.127.0.0</pre></blockquote>
+
+
+The category for this message is <em class="emphasis">config</em>, and the
+severity is <em class="emphasis">debug</em> level one.</p><p>
+
+
+Here's an example channel configuration that includes all three
+additions:</p><p>
+
+
+<blockquote><pre class="code">logging {
+  channel my_file {
+     file "log.msgs";
+     severity debug;
+     print-category yes;
+     print-severity yes;
+     print-time yes;
+  };
+};</pre></blockquote>
+
+
+There isn't much point in adding a timestamp for messages to a
+<em class="emphasis">syslog</em> channel because
+<em class="emphasis">syslog</em> adds the time and date itself.</p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">7.5.3. Category Details</h3>
+
+
+<a name="INDEX-1115" />Both
+BIND 8 and BIND 9 have lots of categories -- lots! Unfortunately,
+they're different categories. We'll list them here so you
+can see them all. Rather than trying to figure out which you want to
+see, we recommend that you configure your name server to print out
+all of its log messages with their category and severity, and then
+pick out the ones you want to see. We'll show you how to do
+this after describing the categories.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-5.3.1" /><div class="sect3">
+<h3 class="sect3">7.5.3.1. BIND 8 categories</h3>
+
+
+<dl>
+<dt><i>default</i></dt>
+<dd><a name="INDEX-1116" />If you don't specify any channels for
+a category, the <em class="emphasis">default</em> category is used. In
+that sense, <em class="emphasis">default</em> is synonymous with all
+categories. However, there are some messages that didn't end up
+in a category. So even if you specify channels for each category
+individually, you'll still want to specify a channel for the
+<em class="emphasis">default</em> category for all the uncategorized
+messages.</p><p>
+
+
+If you do not specify a channel for the <em class="emphasis">default</em>
+category, one will be specified for you:</p><p>
+
+
+<blockquote><pre class="code">category default { default_syslog; default_debug; };</pre></blockquote>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>cname</i></dt>
+<dd>CNAME errors (e.g., "... has CNAME and other
+data").<a name="INDEX-1117" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>config</i></dt>
+<dd>High-level configuration file processing.<a name="INDEX-1118" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>db</i></dt>
+<dd>Database operations.<a name="INDEX-1119" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>eventlib</i></dt>
+<dd>System events; must point to a single file
+channel<a name="INDEX-1120" />.
+The default is:</p><p>
+
+
+<blockquote><pre class="code">category eventlib { default_debug; };</pre></blockquote>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>insist</i></dt>
+<dd>Internal consistency check failures.<a name="INDEX-1121" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>lame-servers</i></dt>
+<dd>Detection of bad delegation.<a name="INDEX-1122" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>load</i></dt>
+<dd>Zone loading messages.<a name="INDEX-1123" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>maintenance</i></dt>
+<dd>Periodic maintenance events (e.g., system
+queries<a name="INDEX-1124" />).</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>ncache</i></dt>
+<dd>Negative caching events.<a name="INDEX-1125" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>notify</i></dt>
+<dd>Asynchronous zone change notifications.<a name="INDEX-1126" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>os</i></dt>
+<dd>Problems with the operating system.<a name="INDEX-1127" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>packet</i></dt>
+<dd>Decodes of packets received and sent; must point to a single file
+channel<a name="INDEX-1128" />. The
+default is:</p><p>
+
+
+<blockquote><pre class="code">category packet { default_debug; };</pre></blockquote>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>panic</i></dt>
+<dd>Problems that cause the shutdown of the server. These problems are
+logged both in the <em class="emphasis">panic</em> category and in their
+native category. The default is:</p><p>
+<a name="INDEX-1129" />
+<blockquote><pre class="code">category panic { default_syslog; default_stderr; };</pre></blockquote>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>parser</i></dt>
+<dd>Low-level configuration file<a name="INDEX-1130" /> processing.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>queries</i></dt>
+<dd>Analogous to BIND 4's query logging.<a name="INDEX-1131" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>response-checks</i></dt>
+<dd>Malformed responses, unrelated additional information,
+etc.<a name="INDEX-1132" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>security</i></dt>
+<dd>Approved/unapproved requests.<a name="INDEX-1133" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>statistics</i></dt>
+<dd>Periodic reports of activities.<a name="INDEX-1134" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>update</i></dt>
+<dd>Dynamic update events.<a name="INDEX-1135" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>xfer-in</i></dt>
+<dd>Zone transfers from remote name servers to the local name
+server.<a name="INDEX-1136" /></p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>xfer-out</i></dt>
+<dd>Zone transfers from the local name server to remote name
+servers.<a name="INDEX-1137" /></p></dd>
+
+</dl>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.3.2" /><div class="sect3">
+<h3 class="sect3">7.5.3.2. BIND 9 categories</h3>
+
+
+<dl>
+<dt><i>default</i></dt>
+<dd><a name="INDEX-1138" />As with BIND 8, BIND 9's
+<em class="emphasis">default</em> category matches all categories not
+specifically assigned to channels. However, BIND 9's
+<em class="emphasis">default</em> category, unlike BIND 8's,
+doesn't match BIND's messages that aren't
+categorized. Those are part of the category listed next.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>general</i></dt>
+<dd>The <em class="emphasis">general</em> category contains all of the BIND
+messages that aren't explicitly classified.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>client</i></dt>
+<dd>Processing client requests.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>config</i></dt>
+<dd>Configuration file parsing and processing.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>database</i></dt>
+<dd>Messages relating to BIND's internal database; used to store
+zone data and cache records.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>dnssec</i></dt>
+<dd>Processing DNSSEC-signed responses.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>lame-servers</i></dt>
+<dd>Detection of bad delegation (re-added in BIND 9.1.0; before that,
+lame server messages were logged to <em class="emphasis">resolver</em>).</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>network</i></dt>
+<dd>Network operations.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>notify</i></dt>
+<dd>Asynchronous zone change notifications.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>queries</i></dt>
+<dd>Analogous to BIND 8's query logging (added in BIND 9.1.0).</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>resolver</i></dt>
+<dd>Name resolution, including the processing of recursive queries from
+resolvers.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>security</i></dt>
+<dd>Approved/unapproved requests.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>update</i></dt>
+<dd>Dynamic update events.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>xfer-in</i></dt>
+<dd>Zone transfers from remote name servers to the local name
+server<a name="INDEX-1139" />.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>xfer-out</i></dt>
+<dd>Zone transfers from the local name server to remote name servers.</p></dd>
+
+</dl>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-5.3.3" /><div class="sect3">
+<h3 class="sect3">7.5.3.3. Viewing all category messages</h3>
+
+
+A good way to start your foray into logging is to configure your name
+server to log all its
+<a name="INDEX-1140" />messages
+to a file, including the category and severity, and then pick out
+which messages you are interested in.</p><p>
+
+
+Earlier, we listed the categories that are configured by default. For
+BIND 8, that's:</p><p>
+
+
+<blockquote><pre class="code">logging {
+    category default { default_syslog; default_debug; };
+    category panic { default_syslog; default_stderr; };
+    category packet { default_debug; };
+    category eventlib { default_debug; };
+};</pre></blockquote>
+
+
+For BIND 9, it's:</p><p>
+
+
+<blockquote><pre class="code">logging {
+    category default { default_syslog; default_debug; };
+};</pre></blockquote>
+
+
+By default, the category and severity are not included with messages
+written to the <em class="emphasis">default_debug</em> channel. In order
+to see all the log messages, with their category and severity,
+you'll have to configure each of these categories yourself.</p><p>
+
+
+Here's a BIND 8 <em class="emphasis">logging</em> statement that
+does just that:</p><p>
+
+
+<blockquote><pre class="code">logging {
+  channel my_file {
+     file "log.msgs";
+     severity dynamic;
+     print-category yes;
+     print-severity yes;
+  };
+
+  category default  { default_syslog; my_file; };
+  category panic    { default_syslog; my_file; };
+  category packet   { my_file; };
+  category eventlib { my_file; };
+  category queries  { my_file; };
+};</pre></blockquote>
+
+
+(A BIND 9 <em class="emphasis">logging</em> statement wouldn't have
+<em class="emphasis">panic</em>, <em class="emphasis">packet</em>, or
+<em class="emphasis">eventlib</em> categories.)</p><p>
+
+
+Notice that we've defined each category to include the channel
+<em class="emphasis">my_file</em>. We also added one category that
+wasn't in the previous default logging statement:
+<em class="emphasis">queries</em>. Queries aren't printed unless you
+configure the <em class="emphasis">queries</em> category.</p><p>
+
+
+Start your server and turn on debugging to level one. You'll
+then see messages in <em class="filename">log.msgs</em> that look like the
+following:</p><p>
+
+
+<blockquote><pre class="code">queries: info: XX /192.253.253.4/foo.movie.edu/A
+default: debug 1: req: nlookup(foo.movie.edu) id 4 type=1 class=1
+default: debug 1: req: found 'foo.movie.edu' as 'foo.movie.edu' (cname=0)
+default: debug 1: ns_req: answer -&gt; [192.253.253.4].2338 fd=20 id=4 size=87</pre></blockquote>
+
+
+Once you've determined the messages that interest you,
+configure your server to log only those<a name="INDEX-1141" /> messages.<a name="INDEX-1142" /> <a name="INDEX-1143" /></p><p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.4. Changing System File Locations in BIND 8 and 9</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.6. Keeping Everything Running Smoothly</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+</html>

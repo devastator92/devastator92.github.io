@@ -1,0 +1,305 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>What Makes a Good Firewalled Service? (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.4. What Makes a Good Firewalled Service?</h2>
+
+
+
+
+
+The ideal service to run through a firewall is one that makes a
+single TCP connection in one direction for each session. It should
+make that connection from a randomly allocated port on the client to
+an assigned port on the server, the server port should be used only
+by this particular service, and the commands it sends over that
+connection should all be secure. The following sections look at these
+ideal situations and some that aren't so ideal.</p><p>
+
+
+
+
+
+<a name="ch13-7323" /><div class="sect2">
+<h3 class="sect2">13.4.1. TCP Versus Other Protocols</h3>
+
+
+
+
+
+<a name="INDEX-1246" />Because TCP is a connection-oriented
+protocol, it's easy to proxy; you go through the overhead of
+setting up the proxy only once, and then you continue to use that
+connection. UDP has no concept of connections; every packet is a
+separate transaction requiring a separate decision from the proxy
+server. TCP is therefore easier to proxy (although there are UDP
+proxies). Similarly, ICMP is difficult to proxy because each packet
+is a separate transaction. Once again, ICMP is harder to proxy than
+TCP but not impossible; some ICMP proxies do exist.</p><p>
+
+
+
+
+
+<a name="INDEX-1247" />The situation is much the same for packet
+filters. It's relatively easy to allow TCP through a firewall
+and control what direction connections are made in; you can use
+filtering on the ACK bit to ensure that you allow internal clients
+only to initiate connections, while still letting in responses. With
+UDP or ICMP, there's no way to easily set things up this way.
+Using stateful packet filters, you can watch for packets that appear
+to be responses, but you can never be sure that a packet is genuinely
+a response to an earlier one, and you may be waiting for responses to
+packets that don't require one.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-20-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.4.2. One Connection per Session</h3>
+
+
+
+
+
+<a name="INDEX-1248" />It's easy for a firewall to
+intercept the initial connection from a client to a server.
+It's harder for it to intercept a return connection. With a
+proxy, either both ends of the conversation have to be aware of the
+existence of the proxy server, or the server needs to be able to
+interpret and modify the protocol to make certain the return
+connection is made correctly and uniquely. With plain packet
+filtering, the inbound connection has to be permitted all the time,
+which often will allow attackers access to ports used by other
+protocols. Stateful packet filtering, like proxying, has to be able
+to interpret the protocol to figure out where the return connection
+is going to be and open a hole for it.</p><p>
+
+
+
+
+
+For example, in normal-mode FTP the client opens a control connection
+to the server. When data needs to be transferred:</p><p>
+
+
+
+
+
+<ol><li>The client chooses a random port above 1023 and prepares it to accept
+a connection.</p><p></li><li>The client sends a PORT command to the server containing the IP
+address of the machine and the port the client is listening on.</p><p></li><li>The server then opens a new connection to that port.</p></li></ol>
+In order for a proxy server to work, the proxy server must:</p><p>
+
+
+
+
+
+<ol><li>Intercept the PORT command the client sends to the server.</p><p></li><li>Set up a new port to listen on.</p></li><li><p>Connect back to the client on the port the client specified.</p></li><li><p>Send a replacement PORT command (using the port number on the proxy)
+to the FTP server.</p><p></li><li>Accept the connection from the FTP server, and transfer data back and
+forth between it and the client.</p><p></li></ol>
+It's not enough for the proxy server to simply read the PORT
+command on the way past because that port may already be in use. A
+packet filter must either allow all inbound connections to ports
+above 1023, or intercept the PORT command and create a temporary rule
+for that port. Similar problems are going to arise in any protocol
+requiring a return connection.</p><p>
+
+
+
+
+
+<a name="INDEX-1249" />Anything more complex than an outbound
+connection and a return is even worse. The <em class="emphasis">talk
+</em>service is an example; see the discussion in <a href="ch19_01.html">Chapter 19, "Real-Time Conferencing Services"</a>, for an example of a service with a tangled
+web of connections that's almost impossible to pass through a
+firewall. (It doesn't help any that <em class="emphasis">talk</em>
+is partly UDP-based, but even if it were all TCP, it would still be a
+firewall designer's nightmare.)<a name="INDEX-1250" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-21-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.4.3. One Session per Connection</h3>
+
+
+
+
+
+It's almost as bad to have multiple sessions on the same
+connection as it is to have multiple connections for the same
+session. If a connection is used for only one purpose, the firewall
+can usually make security checks and logs at the beginning of the
+connection and then pay very little attention to the rest of the
+transaction. If a connection is used for multiple purposes, the
+firewall will need to continue to examine it to see if it's
+still being used for something that's acceptable.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">13.4.4. Assigned Ports</h3>
+
+
+
+
+
+<a name="INDEX-1251" />
+<a name="INDEX-1252" />For a firewall, the ideal thing is for
+each protocol to have its own port number. Obviously, this makes
+things easier for packet filters, which can then reliably identify
+the protocol by the port it's using, but it also simplifies
+life for proxies. The proxy has to get the connection somehow, and
+that's easier to manage if the protocol uses a fixed port
+number that can easily be redirected to the proxy. If the protocol
+uses a port number selected at configuration time, that port number
+will have to be configured into the proxy or packet filter as well.
+If the protocol uses a negotiated or dynamically assigned port, as
+RPC-based protocols do, the firewall has to be able to intercept and
+interpret the port negotiation or lookup. (See <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>, for more information about RPC.)</p><p>
+
+
+
+
+
+Furthermore, for security it's desirable for the protocol to
+have its very own assigned port. It's always tempting to layer
+things onto an existing protocol that the firewall already permits;
+that way, you don't have to worry about changing the
+configuration of the firewall. However, when you layer protocols that
+way, you change the security of the firewall, whether or not you
+change its configuration. There is no way to let a new protocol
+through without having the risks of that new protocol; hiding it in
+another protocol will not make it safer, just harder to inspect.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch13-7356" /><div class="sect2">
+<h3 class="sect2">13.4.5. Protocol Security</h3>
+
+
+
+
+
+<a name="INDEX-1253" /><a name="INDEX-1254" /><a name="INDEX-1255" />Some services are
+technically easy to allow through a firewall but difficult to secure
+with a firewall. If a protocol is inherently unsafe, passing it
+through a firewall, even with a proxy, will not make it any safer,
+unless you also modify it. For example, X11 is mildly tricky to
+proxy, for reasons discussed at length in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>, but the real reason it's difficult to
+secure through firewalls has nothing to do with technical issues
+(proxy X servers are not uncommon as ways to extend X capabilities).
+The real reason is that X provides a number of highly insecure
+abilities to a client, and an X proxy system for a firewall needs to
+provide extra security.</p><p>
+
+
+
+
+
+<a name="INDEX-1256" />
+<a name="INDEX-1257" />The
+two primary ways to secure inherently unsafe protocols are
+authentication and protocol modification.
+<em class="emphasis">Authentication</em> allows you to be certain that you
+trust the source of the communication, even if you don't trust
+the protocol; this is part of the approach to X proxying taken by
+SSH. <em class="emphasis">Protocol</em> <em class="emphasis">modification</em>
+requires you to catch unsafe operations and at least offer the user
+the ability to prevent them. This is reasonably possible with X (and
+TIS FWTK provides a proxy called <em class="emphasis">x-gw</em> that does
+this), but it requires more application knowledge than would be
+necessary for a safer protocol.</p><p>
+
+
+
+
+
+If it's difficult to distinguish between safe and unsafe
+operations in a protocol, or impossible to use the service at all if
+unsafe operations are prevented, and you cannot restrict connections
+to trusted sources, a firewall may not be a viable solution. In that
+case, there may be no good solution, and you may be reduced to using
+a victim host, as discussed in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>. Some
+people consider HTTP to be such a protocol (because it may end up
+transferring programs that are executed transparently by the client).</p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.3. Analyzing Other Protocols</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.5. Choosing Security-Critical Programs</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>

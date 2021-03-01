@@ -1,0 +1,480 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch02_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:59 GMT -->
+<head><title>Authentication by Cryptographic Key (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch02_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">2.4. Authentication by Cryptographic Key</h2>
+
+
+
+<a name="INDEX-148" />In <a name="INDEX-149" />our
+<a name="INDEX-150" />running
+example, the user pat is authenticated by the SSH server via login
+password. <a name="INDEX-151" /><a name="INDEX-152" /><a name="INDEX-153" />Passwords, however, have serious
+drawbacks:</p>
+
+
+
+<ul><li>In order for a password to be secure, it should be long and random,
+but such passwords are hard to memorize.</p></li><li>A password sent across the network, even protected by an SSH secure
+channel, can be captured when it arrives on the remote host if that
+host has been compromised.</p></li><li>Most operating systems support only a single password per account.
+For shared accounts (e.g., a superuser account), this presents
+difficulties:</p>
+
+<ul>
+<li>Password changes are inconvenient because the new password must be
+communicated to all people with access to the account.</p></li><li>Tracking usage of the account becomes difficult because the operating
+system doesn't distinguish between the different users of the
+account.</p></li></ul></li></ul>
+To address these problems, SSH supports <em class="emphasis">public-key
+authentication</em>: instead of relying on the password scheme
+of the host operating system, SSH may use cryptographic
+<em class="emphasis">keys.</em> [<a href="ch03_02.html#ch03-92389">Section 3.2.2, "Public- and Secret-Key Cryptography"</a>] Keys are more
+secure than passwords in general and address all the weaknesses
+mentioned earlier.</p>
+
+
+
+<a name="ch02-92834" /><div class="sect2">
+<h3 class="sect2">2.4.1. A Brief Introduction to Keys</h3>
+
+
+
+A key is a digital identity. It's a unique string of binary
+data that means, "This is me, honestly, I swear." And
+with a little cryptographic magic, your SSH client can prove to a
+server that its key is genuine, and you are really you.</p>
+
+
+
+An SSH identity uses a pair of keys, one private and one public. The
+<em class="emphasis">private key</em><a name="INDEX-154" /><a name="INDEX-155" /> is a closely guarded secret only you have.
+Your SSH clients use it to prove your identity to servers. The
+<em class="emphasis">public key</em><a name="INDEX-156" /> is, like the name says, public. You place
+it freely into your accounts on SSH server machines. During
+authentication, the SSH client and server have a little conversation
+about your private and public key. If they match (according to a
+cryptographic test), your identity is proven, and authentication
+succeeds.</p>
+
+
+
+The following sequence demonstrates the
+<a name="INDEX-157" />conversation between client and
+server. [<a href="ch03_04.html#ch03-62629">Section 3.4.1, "Establishing the Secure Connection"</a>] (It occurs behind the scenes, so
+you don't need to memorize it or anything; we just thought you
+might be interested.)</p>
+
+
+
+<ol><li>Your client says, "Hey server, I'd like to connect by SSH
+to an account on your system, specifically, the account owned by user
+smith."</p></li><li>The server says, "Well, maybe. First, I challenge you to prove
+your identity!" And the server sends some data, known as a
+<em class="emphasis">challenge,</em><a name="INDEX-158" />
+to the client.</p></li><li>Your client says, "I accept your challenge. Here is proof of my
+identity. I made it myself by mathematically using your challenge and
+my private key." This response to the server is called an
+<em class="emphasis">authenticator.</em><a name="INDEX-159" /></p></li><li>The server says, "Thanks for the authenticator. I will now
+examine the smith account to see if you may enter."
+Specifically, the server checks smith's public keys to see if
+the authenticator "matches" any of them. (The
+"match" is another cryptographic operation.) If so, the
+server says, "OK, come on in!" Otherwise, the
+authentication fails.</p></li></ol>
+Before you can use public-key authentication, some setup is required:</p>
+
+
+
+<ol><li>You need a private key and a public key, known collectively as a
+<em class="emphasis">key pair.</em><a name="INDEX-160" /> You also need a secret passphrase to
+protect your private key. [<a href="ch02_04.html#ch02-13083">Section 2.4.2, "Generating Key Pairs with ssh-keygen"</a>]</p></li><li>You need to install your public key on an SSH server machine. [<a href="ch02_04.html#ch02-31366">Section 2.4.3, "Installing a Public Key on an SSH ServerMachine"</a>]</p></li></ol>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch02-13083" /><div class="sect2">
+<h3 class="sect2">2.4.2. Generating Key Pairs with ssh-keygen</h3>
+
+
+
+To use cryptographic authentication, you must first generate a key
+pair for yourself, consisting of a private key (your digital identity
+that sits on the client machine) and a public key (that sits on the
+server machine). To do this, use the
+<em class="emphasis">ssh-keygen</em><a name="INDEX-161" />
+program. Its behavior differs for SSH1, SSH2, and OpenSSH. On an SSH1
+system, the program is called <tt class="command">ssh-keygen</tt> or
+<tt class="command">ssh-keygen1</tt><a name="INDEX-162" />.
+When you invoke it, <tt class="command">ssh-keygen</tt> creates an
+<a name="INDEX-163" />RSA
+key pair and asks you for a secret passphrase to protect the private
+key.<a href="#FOOTNOTE-8">[8]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-8" />[8]RSA is an encryption algorithm for SSH keys,
+among other things. [<a href="ch03_09.html#ch03-38868">Section 3.9.1, "Public-Key Algorithms"</a>] DSA is another, as
+you'll see later.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ ssh-keygen1
+Initializing random number generator...
+Generating p:  ..................................++ (distance 1368)
+Generating q:  ....++ (distance 58)
+Computing the keys...
+Testing the keys...
+Key generation complete.
+Enter file in which to save the key (/home/pat/.ssh/identity): 
+Enter passphrase: **************
+Enter the same passphrase again: **************
+Your identification has been saved in identity.
+Your public key is:
+1024 35 11272721957877936880509167858732970485872567486703821636830\
+1950099934876023218886571857276011133767701853088352661186539160906\
+9214986989240214507621864063548908730298546478215446737245984456708\
+9631066077107611074114663544313782992987840457273825436579285836220\
+2493395730648451296601594344979290457421809236729 path@shell.isp.com
+Your public key has been saved in identity.pub.</pre></blockquote>
+
+
+
+On SSH2 systems, the command is either <tt class="command">ssh-keygen</tt>
+or
+<tt class="command">ssh-keygen2</tt><a name="INDEX-164" />,
+and its behavior is a bit different and produces either a
+<a name="INDEX-165" />DSA
+key (the default) or an RSA key:</p>
+
+
+
+<blockquote><pre class="code">$ ssh-keygen2
+Generating 1024-bit dsa key pair
+   1 ..oOo.oOo.oO
+   2 o.oOo.oOo.oO
+   3 o.oOo.oOo.oO
+   4 o.oOo.oOo.oO
+Key generated.
+1024-bit dsa, created by pat@shell.isp.com Mon Mar 20 13:01:15 2000
+Passphrase : **************
+Again      : **************
+Private key saved to /home/pat/.ssh2/id_dsa_1024_a
+Public key saved to /home/pat/.ssh2/id_dsa_1024_a.pub</pre></blockquote>
+
+
+
+The OpenSSH version of <tt class="command">ssh-keygen</tt> also can produce
+either RSA or DSA keys, defaulting to RSA. Its operation is similar
+to that of <tt class="command">ssh-keygen1</tt>.</p>
+
+
+
+Normally, <tt class="command">ssh-keygen</tt> performs all necessary
+mathematics to generate a key, but on some operating systems you
+might be asked to assist it. Key generation requires some random
+numbers, and if your operating system doesn't supply a
+random-number generator, you may be asked to type some random text.
+<tt class="command">ssh-keygen</tt> uses the timings of your keystrokes to
+initialize its internal random-number generator. On a 300-MHz Pentium
+system running Linux, <a name="INDEX-166" />generating a 1024-bit RSA key takes about
+three seconds; if your hardware is slower than this or heavily
+loaded, generation may take significantly longer, up to a minute or
+more. It can also take longer if the process runs out of random bits,
+and <tt class="command">ssh-keygen</tt> has to wait to collect more.</p>
+
+
+
+<tt class="command">ssh-keygen</tt> then creates your local SSH directory
+(<em class="filename">~/.ssh</em> for SSH1 and OpenSSH or
+<em class="filename">~/.ssh2</em> for SSH2) if it doesn't already
+exist, and stores the private and public components of the generated
+key in two files there. By default, their names are
+<em class="filename">identity</em><a name="INDEX-167" /><a name="INDEX-168" /> and <em class="filename">identity.pub</em>
+(SSH1, OpenSSH) or <em class="filename">id_dsa_1024_a</em> and
+<em class="filename">id_dsa_1024_a.pub</em> (SSH2). SSH clients consider
+<a name="INDEX-169" /><a name="INDEX-170" /> <a name="INDEX-171" />
+these to be your default identity for authentication purposes.</p>
+
+
+
+<a name="ch02-6-fm2xml" /><blockquote><b>WARNING: </b>
+Never reveal your private key and
+passphrase to anyone else. They are
+just as sensitive as your login password. Anyone possessing them can
+log in as you!
+</blockquote>
+
+When created, the identity file is readable only by your account, and
+its contents are further protected by encrypting them with the
+<a name="INDEX-172" />passphrase
+you supplied during generation. We say "passphrase"
+instead of "password" both to differentiate it from a
+login password, and to stress that spaces and punctuation are allowed
+and encouraged. We recommend a passphrase at least 10 -15 characters
+long and not a grammatical sentence.</p>
+
+
+
+<tt class="command">ssh-keygen</tt> has numerous options for managing keys:
+changing the passphrase, choosing a different name for the key file,
+and so forth. [<a href="ch06_02.html#ch06-27359">Section 6.2, "Creating an Identity"</a>]</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch02-31366" /><div class="sect2">
+<h3 class="sect2">2.4.3. Installing a Public Key on an SSH ServerMachine</h3>
+
+
+
+<a name="INDEX-173" />When passwords are used for
+authentication, the host operating system maintains the association
+between the username and the password. For cryptographic keys, you
+must set up a similar association manually. After creating the key
+pair on the local host, you must install your public key in your
+account on the remote host. A remote account may have many public
+keys installed for accessing it in various ways.</p>
+
+
+
+Returning to our running example, you must install a public key into
+the "pat" account on <em class="emphasis">shell.isp.com</em>. This is done by editing a
+file in the SSH configuration directory:
+<em class="filename">~/.ssh/authorized_keys</em><a name="INDEX-174" />
+for SSH1 and OpenSSH<a href="#FOOTNOTE-9">[9]</a> or
+<em class="filename">~/.ssh2/authorization</em> for SSH2.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-9" />[9]OpenSSH uses
+<em class="filename">authorized_keys2 </em>for SSH-2 connections. For
+simplicity, we'll discuss OpenSSH later. [<a href="ch08_02.html#ch08-97216">Section 8.2.3, "OpenSSH Authorization Files "</a>]</p>
+
+
+</blockquote>
+
+
+
+<a name="INDEX-175" /><a name="INDEX-176" />For SSH1 or OpenSSH, create or edit
+the file <em class="filename">~/.ssh/authorized_keys</em> and append your
+public key, i.e., the contents of the
+<em class="filename">identity.pub</em> file you generated on the local
+machine. A typical <em class="filename">authorized_keys</em> file contains
+a list of public key data, one key per line. The example contains
+only two public keys, each on its own line of the file, but they are
+too long to fit on this page. The line breaks inside the long numbers
+are printing artifact; if they were actually in the file, it would be
+incorrectly formatted and wouldn't work:</p>
+
+
+
+<blockquote><pre class="code">1024 35 8697511247987525784866526224505474204292260357215616159982327587956883143
+362147028876494426516682677550219425827002174890309672203219700937187777979705864
+107549106608811204142046600066790196940691100768682518506600601481676686828742807
+11088849408310989234142475694298520575977312478025518391 my personal key
+1024 37 1140868200916227508775331982659387253607752793422843620910258618820621996
+941824516069319525136671585267698112659690736259150374130846896838697083490981532
+877352706061107257845462743793679411866715467672826112629198483320167783914580965
+674001731023872042965273839192998250061795483568436433123392629 my work key</pre></blockquote>
+
+
+
+These are RSA public keys: the first number in each entry is the
+<a name="INDEX-177" />number of bits in
+the key, while the second and third are RSA-specific parameters
+called the <em class="emphasis">public
+exponent</em><a name="INDEX-178" /><a name="INDEX-179" /> and
+<em class="emphasis">modulus</em>. After these comes an arbitrary amount
+of text treated as a comment. [<a href="ch08_02.html#ch08-27462">Section 8.2.1, "SSH1 Authorization Files "</a>]</p>
+
+
+
+For SSH2, you need to edit two files, one on the client machine and
+one on the server machine. On the client machine, create or edit the
+file <em class="filename">~/.ssh2/identification</em> and insert a line to
+identify your private key file:</p>
+
+
+
+<blockquote><pre class="code">IdKey id_dsa_1024_a</pre></blockquote>
+
+
+
+On the server machine, create or edit the file
+<em class="filename">~/.ssh2/authorization</em>, which contains
+information about public keys, one per line. But unlike SSH1's
+<em class="filename">authorized_keys</em> file, which contains copies of
+the public keys, the <em class="filename">authorization</em> file lists
+only the filename of the key:</p>
+
+
+
+<blockquote><pre class="code">Key id_dsa_1024_a.pub</pre></blockquote>
+
+
+
+Finally, copy <em class="filename">id_dsa_1024_a.pub</em> from your local
+machine to the remote SSH2 server machine, placing it in
+<em class="filename">~/.ssh2</em>.</p>
+
+
+
+<a name="INDEX-180" />Regardless of which SSH
+implementation you use, make sure your remote SSH directory and
+associated files are writable only by your account:<a href="#FOOTNOTE-10">[10]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-10" />[10]We make files world-readable and directories world-searchable,
+to avoid NFS problems. [<a href="ch10_07.html#ch10-69175">Section 10.7.2, "NFS Access Problems"</a>]</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ chmod 755 ~/.ssh
+$ chmod 644 ~/.ssh/authorized_keys
+
+# OpenSSH only
+$ chmod 644 ~/.ssh/authorized_keys2
+
+# SSH2 only
+$ chmod 755 ~/.ssh2
+$ chmod 644 ~/.ssh2/id_dsa_1024_a.pub
+$ chmod 644 ~/.ssh2/authorization</pre></blockquote>
+
+
+
+The SSH server is picky about file and directory permissions and may
+refuse authentication if the remote account's SSH configuration
+files have insecure permissions. [<a href="ch05_04.html#ch05-71848">Section 5.4.2.1, "Acceptable permissions for user files"</a>]</p>
+
+
+
+You are now ready to use your new key to access the "pat"
+account:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH; output shown is for SSH1
+$ ssh -l pat shell.isp.com
+Enter passphrase for RSA key 'Your Name &lt;you@local.org&gt;': ************
+Last login: Mon May 24 19:44:21 1999 from quincunx.nefertiti.org
+You have new mail.
+shell.isp.com&gt;</pre></blockquote>
+
+
+
+If all goes well, you are logged into the remote account. <a href="ch02_04.html#ch02-99646">Figure 2-2</a> shows the entire process.</p>
+
+
+
+<a name="ch02-99646" /><div class="figure"><img height="186" alt="Figure 2-2" src="figs/ssh_0202.gif" width="435" /></div><h4 class="objtitle">Figure 2-2. Public-key authentication</h4>
+
+Note the similarity to the earlier example with
+<a name="INDEX-181" />password authentication. [<a href="ch02_02.html#ch02-32343">Section 2.2, "Remote Terminal Sessions with ssh"</a>] On the surface, the only difference is that
+you provide the passphrase to your private key, instead of providing
+your login password. Underneath, however, something quite different
+is happening. In password authentication, the password is transmitted
+to the remote host. With cryptographic authentication, the passphrase
+serves only to decrypt the private key to create an authenticator.
+[<a href="ch02_04.html#ch02-92834">Section 2.4.1, "A Brief Introduction to Keys"</a>]</p>
+
+
+
+Public-key authentication is more secure than password authentication
+because:</p>
+
+
+
+<ul><li>It requires two secret components -- the identity file on disk,
+and the passphrase in your head -- so both must be captured in
+order for an adversary to access your account. Password
+authentication requires only one component, the password, which might
+be easier to steal.</p></li><li>Neither the passphrase nor the key is sent to the remote host, just
+the authenticator discussed earlier. Therefore, no secret information
+is transmitted off the client machine.</p></li><li>Machine-generated cryptographic keys are infeasible to guess.
+Human-generated passwords are routinely cracked by a
+password-guessing technique called a <em class="emphasis">dictionary
+attack</em><a name="INDEX-182" /><a name="INDEX-183" />. A dictionary attack may be mounted on
+the passphrase as well, but this requires stealing the private key
+file first.</p></li></ul>
+A host's security can be greatly increased by disabling
+password authentication altogether and permitting only SSH
+connections by key.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch02-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">2.4.4. If You Change Your Key</h3>
+
+
+<a name="INDEX-184" />
+
+Suppose you have generated a key pair, <em class="filename">identity</em>
+and <em class="filename">identity.pub</em>, and copied
+<em class="filename">identity.pub</em> to a bunch of SSH server machines.
+All is well. Then one day, you decide to change your identity, so you
+run <tt class="command">ssh-keygen</tt> a second time, overwriting
+<em class="filename">identity</em> and <em class="filename">identity.pub</em>.
+Guess what? Your previous public key file is now invalid, and you
+must copy the new public key to all those SSH server machines again.
+This is a maintenance headache, so think carefully before changing
+(destroying!) a key pair. Some caveats:</p>
+
+
+
+<ul><li>You are not limited to one key pair. You can generate as many as you
+like, stored in different files, and use them for diverse purposes.
+[<a href="ch06_04.html#ch06-27873">Section 6.4, "Multiple Identities"</a>]</p></li><li>If you just want to change your passphrase, you don't have to
+generate a new key pair. <tt class="command">ssh-keygen</tt> has
+command-line options for replacing the passphrase of an existing key:
+<a name="INDEX-185" /><span class="option">-p</span>
+for SSH1 and OpenSSH [<a href="ch06_02.html#ch06-63359">Section 6.2.1, "Generating RSA Keys for SSH1"</a>] and
+<span class="option">-e</span> for SSH2 [<a href="ch06_02.html#ch06-46568">Section 6.2.2, "Generating RSA/DSA Keys for SSH2"</a>]. In this
+case your public key remains valid since the private key hasn't
+changed, just the passphrase for decrypting it.<a name="INDEX-186" /></p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.3. Adding Complexity to the Example</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.5. The SSH Agent</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch02_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:59 GMT -->
+</html>

@@ -1,0 +1,348 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:23 GMT -->
+<head><title>Protocols, Ports, and Sockets (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">2.6. Protocols, Ports, and Sockets</h2>
+
+<p>Once data is routed through the network and delivered to a specific
+host, it must be delivered to the correct user or process. As the
+data moves up or down the TCP/IP layers, a mechanism is needed to
+deliver it to the correct protocols in each layer. The system must be
+able to combine data from many applications into a few transport
+protocols, and from the transport protocols into the Internet
+Protocol. Combining many sources of data into a single data stream is
+<a name="INDEX-452" />called
+<em class="emphasis">multiplexing</em>.
+</p>
+
+<p>Data arriving from the network must be
+<em class="emphasis">demultiplexed</em>: divided for delivery to multiple
+processes. To accomplish this task, IP uses <em class="emphasis">protocol
+numbers</em> <a name="INDEX-453" />to identify transport protocols, and the
+transport protocols use <em class="emphasis">port numbers</em>
+<a name="INDEX-454" />to identify
+applications.
+</p>
+
+<p>Some protocol and port numbers are reserved to identify
+<em class="emphasis">well-known
+services</em><a name="INDEX-455" />. Well-known services are standard
+network protocols, such as FTP and Telnet, that are commonly used
+throughout the network. The protocol numbers and port numbers are
+assigned to well-known services by the <a name="INDEX-456" /><a name="INDEX-457" />Internet Assigned Numbers
+Authority (IANA). Officially a<em class="emphasis">ssigned numbers</em>
+are documented at <a href="http://www.iana.org/">http://www.iana.org</a><a name="INDEX-458" />. Unix systems
+define protocol and port numbers in two simple text files.
+</p>
+
+<a name="tcp3-CHP-2-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">2.6.1. Protocol Numbers</h3>
+
+<p><a name="INDEX-459" />The
+protocol number is a single byte in the third word of the datagram
+<a name="INDEX-460" />
+<a name="INDEX-461" />header. The value identifies the
+protocol in the layer above IP to which the data should be passed.
+</p>
+
+<p><a name="INDEX-462" /><a name="INDEX-463" />On a Unix system, the protocol
+numbers are defined in <em class="emphasis">/etc/protocols</em>. This file
+is a simple table containing the protocol name and the protocol
+number associated with that name. The format of the table is a single
+entry per line, consisting of the official protocol name, separated
+by whitespace from the protocol number. The protocol number is
+separated by whitespace from the "alias" for the protocol
+name. Comments in the table begin with <tt class="literal">#</tt>. An
+<em class="emphasis">/etc/protocols</em> file is shown below:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">cat /etc/protocols</b>
+#ident  "@(#)protocols  1.5     99/03/21 SMI"   /* SVr4.0 1.1   */
+
+#
+# Internet (IP) protocols
+#
+ip            0     IP            # pseudo internet protocol number
+icmp          1     ICMP          # internet control message protocol
+ggp           3     GGP           # gateway-gateway protocol
+tcp           6     TCP           # transmission control protocol
+egp           8     EGP           # exterior gateway protocol
+pup           12    PUP           # PARC universal packet protocol
+udp           17    UDP           # user datagram protocol
+hmp           20    HMP           # host monitoring protocol
+xns-idp       22    XNS-IDP       # Xerox NS IDP
+rdp           27    RDP           # "reliable datagram" protocol
+
+#
+# Internet (IPv6) extension headers
+#
+hopopt        0     HOPOPT        # Hop-by-hop options for IPv6
+ipv6          41    IPv6          # IPv6 in IP encapsulation
+ipv6-route    43    IPv6-Route    # Routing header for IPv6
+ipv6-frag     44    IPv6-Frag     # Fragment header for IPv6
+esp           50    ESP           # Encap Security Payload for IPv6
+ah            51    AH            # Authentication Header for IPv6
+ipv6-icmp     58    IPv6-ICMP     # IPv6 internet control message protocol
+ipv6-nonxt    59    IPv6-NoNxt    # IPv6No next header extension header
+ipv6-opts     60    IPv6-Opts     # Destination Options for IPv6</pre></blockquote>
+
+<p>The listing above is the contents of the
+<em class="emphasis">/etc/protocols</em> file from a Solaris 8
+workstation. This list of numbers is by no means complete. If you
+refer to the Protocol Numbers section of the IANA web site,
+you'll see many more protocol numbers. However, a system needs
+to include only the numbers of the protocols that it actually uses.
+Even the list shown above is more than this specific workstation
+needed; for example, the second half of this table is used only on
+systems that run IPv6. Don't worry if your system doesn't
+use IPv6 or many of these other protocols. The additional entries do
+no harm.
+</p>
+
+<p>What exactly does this table mean? When a datagram arrives and its
+destination address matches the local IP address, the IP layer knows
+that the datagram has to be delivered to one of the transport
+protocols above it. To decide which protocol should receive the
+datagram, IP looks at the datagram's protocol number. Using
+this table, you can see that if the datagram's protocol number
+is 6, IP delivers the datagram to TCP; if the protocol number is 17,
+IP delivers the datagram to UDP. TCP and UDP are the two transport
+layer services we are concerned with, but all of the protocols listed
+in the first half of the table use IP datagram delivery service
+directly. Some, such as ICMP, EGP, and GGP, have already been
+mentioned. Others haven't, but you don't need to be
+concerned with the minor protocols in order to configure and manage a
+TCP/IP network.
+</p>
+
+</div>
+<a name="tcp3-CHP-2-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">2.6.2. Port Numbers</h3>
+
+<p><a name="INDEX-464" />After IP passes
+incoming data to the transport protocol, the transport protocol
+passes the data to the correct application process. Application
+processes (also called <em class="emphasis">network services</em>) are
+<a name="INDEX-465" /> <a name="INDEX-466" /><a name="INDEX-467" />identified by port numbers, which are
+16-bit values. The source port number, which identifies the process
+that sent the data, and the destination port number, which identifies
+the process that will receive the data, are contained in the first
+header word of each TCP segment and UDP packet.
+</p>
+
+<p>Port numbers below 1024 are reserved for well-known services (like
+FTP and Telnet) and are assigned by the IANA. Well-known port numbers
+are considered "privileged ports" that should not be
+bound to a user process. Ports numbered from 1024 to 49151 are
+"registered ports." IANA tries to maintain a registry of
+<a name="INDEX-468" />services
+that use these ports, but it does not officially assign port numbers
+in this range. The port numbers from 49152 to 65535 are the
+"private ports." Private port numbers are available for
+any use.
+</p>
+
+<p>Port numbers are not unique between transport layer protocols; the
+numbers are unique only within a specific transport protocol. In
+other words, TCP and UDP can and do assign the same port numbers. It
+is the combination of protocol and port numbers that uniquely
+identifies the specific process to which the data should be
+delivered.
+</p>
+
+<p>On Unix <a name="INDEX-469" /> <a name="INDEX-470" />systems, port
+numbers are defined in the <em class="emphasis">/etc/services</em> file.
+There are many more network applications than there are transport
+layer protocols, as the size of the
+<em class="emphasis">/etc/services</em> table shows. A partial
+<em class="emphasis">/etc/services</em> file from a Solaris 8 workstation
+is shown here:
+</p>
+
+<blockquote><pre class="code"><em class="replaceable">rodent</em>% <b class="emphasis-bold">head -22 /etc/services</b>
+#ident  "@(#)services   1.25    99/11/06 SMI"   /* SVr4.0 1.8   */
+#
+#
+# Copyright (c) 1999 by Sun Microsystems, Inc.
+# All rights reserved.
+#
+# Network services, Internet style
+#
+tcpmux          1/tcp
+echo            7/tcp
+echo            7/udp
+discard         9/tcp           sink null
+discard         9/udp           sink null
+systat          11/tcp          users
+daytime         13/tcp
+daytime         13/udp
+netstat         15/tcp
+chargen         19/tcp          ttytst source
+chargen         19/udp          ttytst source
+ftp-data        20/tcp
+ftp             21/tcp
+telnet          23/tcp</pre></blockquote>
+
+<p>The format of this file is very similar to the
+<em class="emphasis">/etc/protocols</em> file. Each single-line entry
+starts with the official name of the service separated by whitespace
+from the port number/protocol pairing associated with that service.
+The port numbers are paired with transport protocol names because
+different transport protocols may use the same port number. An
+optional list of aliases for
+<a name="INDEX-471" />
+<a name="INDEX-472" />the
+official service name may be provided after the port number/protocol
+pair.
+</p>
+
+<p>The <em class="filename">/etc/services</em> file, combined with the
+<em class="emphasis">/etc/protocols</em> file, provides all of the
+information necessary to deliver data to the correct application. A
+datagram arrives at its destination based on the destination address
+in the fifth word of the datagram header. Using
+<a name="INDEX-473" />
+<a name="INDEX-474" />
+<a name="INDEX-475" />the protocol number in the third word
+of the datagram header, IP delivers the data from the datagram to the
+proper transport layer protocol. The first word of the data delivered
+to the transport protocol contains the destination port number that
+tells the transport protocol to pass the data up to a specific
+application. <a href="ch02_06.html#tcp3-CHP-2-FIG-5">Figure 2-5</a> shows this delivery
+process.
+</p>
+
+<a name="tcp3-CHP-2-FIG-5" /><div class="figure"><img height="342" alt="Figure 2-5" src="figs/tcp3_0205.gif" width="420" /></div><h4 class="objtitle">Figure 2-5. Protocol and port numbers</h4>
+
+<p>Despite its size, the <em class="emphasis">/etc/services</em> file does
+not contain the port number of every important network service. You
+won't find the port number of every <em class="emphasis">Remote Procedure
+Call</em> (RPC) service <a name="INDEX-476" />in the
+<a name="INDEX-477" /><em class="emphasis">services</em>
+file. Sun developed a different technique for reserving ports for RPC
+services that doesn't involve getting a well-known port number
+assignment from IANA. RPC services generally use registered port
+numbers, which do not need to be officially assigned. When an RPC
+service starts, it registers its port number with the
+<tt class="literal">portmapper</tt>. The
+<a name="INDEX-478" /><tt class="literal">portmapper</tt>
+is a program that keeps track of the port numbers being used by RPC
+services. When a client wants to use an RPC service, it queries the
+<tt class="literal">portmapper</tt> running on the server to discover the
+port assigned to the service. The client can find
+<tt class="literal">portmapper</tt> because it is assigned well-known port
+111. <tt class="literal">portmapper</tt> makes it possible to install
+widely used services without formally obtaining a well-known port.
+</p>
+
+</div>
+<a name="tcp3-CHP-2-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">2.6.3. Sockets</h3>
+
+<p><a name="INDEX-479" />Well-known
+ports are standardized port numbers that enable
+<a name="INDEX-480" />remote
+computers to know which port to connect to for a particular network
+<a name="INDEX-481" />service.
+This simplifies the connection process because both the sender and
+receiver know in advance that data bound for a specific process will
+use a specific port. For example, all systems that offer Telnet do so
+on port 23. <a name="INDEX-482" />
+</p>
+
+<p>Equally important is a second type of port number called a
+<a name="INDEX-483" /><em class="emphasis">dynamically allocated
+port</em>. As the name implies, dynamically allocated ports are
+not pre-assigned; they are assigned to processes when needed. The
+system ensures that it does not assign the same port number to two
+processes, and that the numbers assigned are above the range of
+well-known port numbers, i.e., above 1024.
+</p>
+
+<p>Dynamically allocated ports provide the flexibility needed to support
+multiple users. If a telnet user is assigned port number 23 for both
+the source and destination ports, what port numbers are assigned to
+the second concurrent telnet user? To uniquely identify every
+connection, the source port is assigned a dynamically allocated port
+number, and the well-known port number is used for the destination
+port.
+</p>
+
+<p>In the telnet example, the first user is given a random source port
+number and a destination port number of 23 (telnet). The second user
+is given a different random source port number and the same
+destination port. It is the <em class="emphasis">pair</em> of port
+numbers, source and destination, that uniquely identifies each
+network connection. The destination host knows the source port
+because it is provided in both the TCP segment header and the UDP
+packet header. Both hosts know the destination port because it is a
+well-known port.
+</p>
+
+<p><a href="ch02_06.html#tcp3-CHP-2-FIG-6">Figure 2-6</a> shows the exchange of port numbers
+during the TCP handshake. The
+<a name="INDEX-484" />source host randomly generates a source
+port, in this example 3044. It sends out a segment with a source port
+of 3044 and a destination port of 23. The destination host receives
+the segment and responds back using 23 as its source port and 3044 as
+its destination port.
+</p>
+
+<a name="tcp3-CHP-2-FIG-6" /><div class="figure"><img height="196" alt="Figure 2-6" src="figs/tcp3_0206.gif" width="366" /></div><h4 class="objtitle">Figure 2-6. Passing port numbers</h4>
+
+<p>The combination of an IP address and a port number is called a
+<em class="emphasis">socket</em>. A socket uniquely identifies a single
+network process within the entire Internet. Sometimes the terms
+"socket" and "port number" are used
+interchangeably. In fact, well-known services are frequently referred
+to as "well-known sockets." In the context of this
+discussion, a "socket" is the combination of an IP
+address and a port number. A pair of sockets, one socket for the
+receiving host and one for the sending host, define the connection
+for connection-oriented protocols such as TCP.
+</p>
+
+<p>Let's build on the example of dynamically assigned ports and
+well-known ports. Assume a user on host 172.16.12.2 uses Telnet to
+connect to host 192.168.16.2. Host 172.16.12.2 is the source host.
+The user is dynamically assigned a unique port number, 3382. The
+connection is made to the telnet service on the remote host, which
+is, according to the standard, assigned well-known port 23. The
+socket for the source side of the connection is 172.16.12.2.3382 (IP
+address 172.16.12.2 plus port number 3382). For the destination side
+of the connection, the socket is 192.168.16.2.23 (address
+192.168.16.2 plus port 23). The port of the destination socket is
+known by both systems because it is a well-known port. The port of
+the source socket is known by both systems because the source host
+informed the destination host of the source socket when the
+connection request was made. The socket pair is therefore known by
+both the source and destination computers. The combination of the two
+sockets uniquely identifies this connection; no other connection in
+the Internet has this <a name="INDEX-485" />socket pair.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.5. Address Resolution</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.7. Summary</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:23 GMT -->
+</html>

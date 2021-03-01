@@ -1,0 +1,720 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>Exporting filesystems (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.2. Exporting filesystems</h2>
+
+Usually, a host decides to become an NFS server <a name="INDEX-842" />
+<a name="INDEX-843" />
+<a name="INDEX-844" />if it has
+filesystems to export to the network. A server does not explicitly
+advertise these filesystems; instead, it keeps a list of currently
+exported filesystems and associated access restrictions in a file and
+compares incoming NFS mount requests to entries in this table. It is
+up to the server to decide if a filesystem can be mounted by a
+client. You may change the rules at any time by rebuilding its
+exported filesystem table.
+</p>
+
+This section uses filenames and command names<a name="INDEX-845" /> <a name="INDEX-846" /> that are specific to Solaris. On
+non-Solaris systems, you will find the rough equivalents shown in
+<a href="ch06_02.html#nfs2-CHP-6-TABLE-1">Table 6-1</a>.
+</p>
+
+<a name="nfs2-CHP-6-TABLE-1" /><h4 class="objtitle">Table 6-1. Correspondence of Solaris and non-Solaris export components </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Description</p>
+</th>
+<th>
+Solaris</p>
+</th>
+<th>
+Non-Solaris</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+Initial list of filesystems to export</p>
+</td>
+<td>
+/etc/dfs/dfstab</p>
+</td>
+<td>
+/etc/exports</p>
+</td>
+</tr>
+<tr>
+<td>
+Command to export initial list</p>
+</td>
+<td>
+shareall</p>
+</td>
+<td>
+exportfs</p>
+</td>
+</tr>
+<tr>
+<td>
+List of currently exported filesystems</p>
+</td>
+<td>
+/etc/dfs/sharetab</p>
+</td>
+<td>
+/etc/xtab</p>
+</td>
+</tr>
+<tr>
+<td>
+Command to export one filesystem</p>
+</td>
+<td>
+share</p>
+</td>
+<td>
+exportfs</p>
+</td>
+</tr>
+<tr>
+<td>
+List of local filesystems on server</p>
+</td>
+<td>
+/etc/vfstab</p>
+</td>
+<td>
+/etc/fstab</p>
+</td>
+</tr>
+
+</table><p>
+
+The exported filesystem table is<a name="INDEX-847" /> <a name="INDEX-848" /> initialized from the /etc/dfs/dfstab
+file. The superuser may export other filesystems once the server is
+up and running, so the <em class="emphasis">/etc/dfs/dfstab</em> file and
+the actual list of currently exported filesystems,
+<em class="emphasis">/etc/dfs/sharetab</em>, are maintained separately.
+When a fileserver boots, it checks for the existence of
+<em class="emphasis">/etc/dfs/dfstab</em>and runs <em class="emphasis">shareall(1M)</em> on it to make
+filesystems available for client use. If, after
+<em class="emphasis">shareall</em> runs,
+<em class="emphasis">/etc/dfs/sharetab</em> has entries, the
+<em class="emphasis">nfsd</em> and <em class="emphasis">mountd</em>daemons are run.
+</p>
+
+After the system is up, the superuser can<a name="INDEX-849" />
+<a name="INDEX-850" />
+export additional filesystems via the <em class="emphasis">share</em>
+command.
+</p>
+
+
+<a name="ch06-4-fm2xml" /><blockquote><b>TIP: </b> 
+A common usage error is invoking the share command manually on a
+system that booted without entries in
+<em class="emphasis">/etc/dfs/dfstab</em>. If the nfsd and mountd daemons
+are not running, then invoking the share command manually does not
+enable NFS service. Before running the share command manually, you
+should verify that nfsd and mountd are running. If they are not, then
+start them. On Solaris, you would use the
+<em class="emphasis">/etc/init.d/nfs.server</em> script, invoked as
+<em class="emphasis">/etc/init.d/nfs</em>.server start. However, if there
+is no entry in /etc/dfs/dfstab, you must add one before the
+/etc/init.d/nfs.server script will have an effect.
+</p>
+</blockquote>
+
+<a name="nfs2-CHP-6-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">6.2.1. Rules for exporting filesystems</h3>
+
+There are four rules for making a <a name="INDEX-851" />
+<a name="INDEX-852" />server's
+filesystem available to NFS:
+</p>
+
+<ol><li>
+Any filesystem, or proper subset of a filesystem, can be exported
+from a server. A proper subset of a filesystem is a file or directory
+tree that starts below the mount point of the filesystem. For
+example, if <em class="emphasis">/usr</em> is a filesystem, and the
+<em class="emphasis">/usr/local</em> directory is part of that filesystem,
+then <em class="emphasis">/usr/local</em> is a proper subset of
+<em class="emphasis">/usr</em>.
+</p>
+</li><li>
+You cannot export any subdirectory of an exported filesystem unless
+the subdirectory is on a different physical device.
+</p>
+</li><li>
+You cannot export any parent directory of an exported filesystem
+unless the parent is on a different physical device.
+</p>
+</li><li>
+You can export only local filesystems.</p>
+</li></ol>
+The first rule allows you to export selected portions of a large
+filesystem. You can export and mount a single file, a feature that is
+used by diskless clients. The second and third rules seem both
+redundant and confusing, but are in place to enforce the selective
+views imposed by exporting a subdirectory of a filesystem.
+</p>
+
+The second rule allows you to export
+<em class="emphasis">/usr/local/bin</em> when
+<em class="emphasis">/usr/local</em> is already exported from the same
+server only if <em class="emphasis">/usr/local/bin</em> is on a different
+disk. For example, if your server mounts these filesystems using
+<em class="emphasis">/etc/vfstab</em> entries like:
+</p>
+
+<a name="ch06-5-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">/dev/dsk/c0t0d0s5</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/dev/rdsk/c0t0d0s5</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/usr/local</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">ufs</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">2</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">no</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">rw</pre></blockquote>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">/dev/dsk/c0t3d0s0</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/dev/rdsk/c0t3d0s0</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/usr/local/bin</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">ufs</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">2</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">no</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">rw</pre></blockquote>
+</td>
+</tr>
+
+</table><p>
+
+then exporting both of them is allowed, since the exported
+directories reside on different filesystems. If, however,
+<em class="emphasis">bin</em> was a subdirectory of
+<em class="emphasis">/usr/local</em>, then it could not be exported in
+conjunction with its parent.
+</p>
+
+The third rule is the converse of the second. If you have a
+subdirectory exported, you cannot also export its parent unless they
+are on different filesystems. In the previous example, if
+<em class="emphasis">/usr/local/bin</em> is already exported, then
+<em class="emphasis">/usr/local</em> can be exported only if it is on a
+different filesystem. This rule prevents entire filesystems from
+being exported on the fly when the system administrator has carefully
+chosen to export a selected set of subdirectories.
+</p>
+
+Together, the second and third rules say that you can export a local
+filesystem only one way. Once you export a subdirectory of it, you
+can't go and export the whole thing; and once you've made
+the whole thing public, you can't go and restrict the export
+list to a subdirectory or two.
+</p>
+
+One way to check the validity of subdirectory exports is to use the
+<em class="emphasis">df</em> command to determine on which local
+filesystem the current directory resides. If you find that the parent
+directory and its subdirectory appear in the output of
+<em class="emphasis">df</em>, then they are on separate filesystems, and
+it is safe to export them both.
+</p>
+
+Exporting subdirectories is similar to creating views on a relational
+database. You choose the portions of the database that a user needs
+to see, hiding information that is extraneous or sensitive. In NFS,
+exporting a subdirectory of a filesystem is useful if the entire
+filesystem contains subdirectories with names that might confuse
+users, or if the filesystem contains several parallel directory trees
+of which only <a name="INDEX-853" /> <a name="INDEX-854" />one is useful to the user.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">6.2.2. Exporting options</h3>
+
+The <em class="emphasis">/etc/dfs/dfstab</em> file contains a list of
+filesystems<a name="INDEX-855" />
+<a name="INDEX-856" /> that a server exports and any restrictions
+or export options for each. The <em class="emphasis">/etc/dfs/dfstab</em>
+file is really just a list of individual
+<em class="emphasis">share</em>commands,
+and so the entries in the file follow the command-line syntax
+<a name="INDEX-857" /> <a name="INDEX-858" /> <a name="INDEX-859" />of the <em class="emphasis">share</em>
+command:
+</p>
+
+<blockquote><pre class="code">share [ -d description ] [ -F nfs ] [ -o suboptions ] pathname</pre></blockquote>
+
+Before we discuss the options, <em class="emphasis">pathname</em>is the filesystem or subdirectory of the
+filesystem being exported.
+</p>
+
+The <em class="emphasis">-d</em> option allows you to insert a comment
+describing what the exported filesystem contains. This option is of
+little use since there are no utilities to let an NFS client see this
+information.
+</p>
+
+The <em class="emphasis">-F</em> option allows you to specify the type of
+fileserver to use. Since the share command supports just one
+fileserver -- NFS -- this option is currently redundant. Early
+releases of Solaris supported a distributed file-sharing system known
+as RFS, hence the historical reason for this option. It is
+conceivable that another file sharing system would be added to
+Solaris in the future. For clarity, you should specify <b class="emphasis-bold">-</b><em class="emphasis">F nfs</em> to ensure that the
+NFS service is used.
+</p>
+
+The -o option allows you to specify a list of suboptions. (Multiple
+suboptions would be separated by commas.) For example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>share -F nfs /export/home</b></tt> 
+# <tt class="userinput"><b>share -F nfs -o rw=corvette /usr/local</b></tt></pre></blockquote>
+
+Several options modify the way a filesystem is exported to the
+network:
+</p>
+
+<dl>
+<dt><i>rw</i></dt>
+<dd>
+Permits NFS clients to read from or write to the filesystem. This
+option is the default; i.e., if none of <em class="emphasis">rw</em>,
+<em class="emphasis">ro</em>,
+<em class="emphasis">ro</em>=<em class="emphasis">client_list</em>, or
+<em class="emphasis">rw</em>=<em class="emphasis">client_list</em> are
+specified, then read/write access to the world is granted.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>ro </i></dt>
+<dd>
+Prevents NFS clients from writing to the filesystem. Read-only
+restrictions are enforced when a client performs an operation on an
+NFS filesystem: if the client has mounted the filesystem with read
+and write permissions, but the server specified
+<em class="emphasis">ro</em> when exporting it, any attempt by the client
+to write to the filesystem will fail, with "Read-only
+filesystem" or "Permission denied" messages.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>rw=client_list</i></dt>
+<dd>
+Limits the set of hosts that may write to the filesystem to the NFS
+clients identified in <em class="emphasis">client_list.</em>
+</p>
+
+A <em class="emphasis">client_list</em> has the form of a colon-separated
+list of components, such that a component is one of the following:
+</p>
+
+
+<dl>
+<dt><i>hostname</i></dt>
+<dd>
+The hostname of the NFS client.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>netgroup</i></dt>
+<dd>
+The NIS directory services support the concept of a set of hostnames
+named collectively as a <em class="emphasis">netgroup</em>. See <a href="ch07_01.html">Chapter 7, "Network File System Design and Operation"</a> for a description on how to set up netgroups
+under NIS.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>DNS domain</i></dt>
+<dd>
+An Internet Domain Name Service domain is indicated by a preceding
+dot. For example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>share -o rw=.widget.com /export2</b></tt></pre></blockquote>
+
+grants access to any host in the <em class="emphasis">widget.com</em>
+domain. In order for this to work, the NFS server must be using DNS
+as its primary directory service ahead of NIS (see <a href="ch04_01.html">Chapter 4, "System Management Using NIS"</a>). 
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>netmask</i></dt>
+<dd>
+A netmask is indicated by a preceding at-sign (@) and possibly by a
+suffix with a slash and length to indicate the number of bits in the
+netmask. Examples will help here:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>share -o rw=@129.100.0.0 /export</b></tt>
+# <tt class="userinput"><b>share -o rw=@193.150.145.63/27 /export2</b></tt></pre></blockquote>
+
+
+The notation of four decimal values separated by periods is known as
+a <em class="emphasis">dotted quad</em>.
+</p>
+
+In the first example, any client with an Internet Protocol (IP)
+address such that its first two octets are 129 and 100 (in decimal),
+will get read/write access to <em class="emphasis">/export</em>.
+</p>
+
+In the second example, a client with an address such that the first
+27 bits match the first 27 bits of
+<em class="emphasis">193.150.145.63</em> will get read/write access. The
+notation <em class="emphasis">193.150.145.63/27</em> is an example of
+<em class="emphasis">classless addressing,</em> which was previously
+discussed in <a href="ch01_03.html#nfs2-CHP-1-SECT-3.3">Section 1.3.3, "IPv4 address classes"</a>.
+</p>
+
+So in the second example, a client with an address of
+<em class="emphasis">193.150.145.33</em>would get access, but another client with the address
+<em class="emphasis">193.150.145.128</em>would not. <a href="ch06_01.html">Chapter 6, "System Administration Using the Network File System"</a> clarifies this.
+</p>
+</dd>
+
+</dl>
+
+<a name="nfs2-CHP-6-TABLE-2" /><h4 class="objtitle">Table 6-2. Netmask matching </h4><table border="1">
+
+
+
+
+
+
+<tr>
+<th>
+Client Address dotted quad</p>
+</th>
+<th>
+Client Address hexadecimal</p>
+</th>
+<th>
+Netmask dotted quad</p>
+</th>
+<th>
+Netmask hexadecimal</p>
+</th>
+<th>
+Access?</p>
+</th>
+</tr>
+
+
+
+<tr>
+<td>
+193.150.145.33</p>
+</td>
+<td>
+0xc1969121</p>
+</td>
+<td>
+193.150.145.63/27</p>
+</td>
+<td>
+0xc1969120</p>
+</td>
+<td>
+Yes</p>
+</td>
+</tr>
+<tr>
+<td>
+193.150.145.128</p>
+</td>
+<td>
+0xc1969180</p>
+</td>
+<td>
+193.150.145.63/27</p>
+</td>
+<td>
+0xc1969120</p>
+</td>
+<td>
+No</p>
+</td>
+</tr>
+
+</table><p>
+<p>
+<dl>
+<dt><i>-component</i></dt>
+<dd>
+Each component in the <em class="emphasis">client_list</em> can be
+prefixed with a minus sign (<em class="emphasis">-</em>) to offer negative
+matching. This indicates that the component should not get access,
+even if it is included in another component in the
+<em class="emphasis">client_list</em>. For example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>share -o rw=-wrench.widget.com:.widget.com /dir</b></tt></pre></blockquote>
+
+would exclude the host <em class="emphasis">wrench</em> in the domain
+<em class="emphasis">widget.com</em>, but would give access to all other
+hosts in the domain <em class="emphasis">widget.com</em>. Note that order
+matters. If you did this:
+</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>share -o rw=.widget.com:-wrench.widget.com /dir</b></tt></pre></blockquote>
+
+host <em class="emphasis">wrench</em> would <em class="emphasis">not</em> be
+denied access. In other words, the NFS server will stop processing
+the <em class="emphasis">client_list</em> once it gets a positive or
+negative match.
+</p>
+</dd>
+
+</dl>
+
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>ro=client_list</i></dt>
+<dd>
+Limits the set of hosts that may read (but not write to) the
+filesystem to the NFS clients identified in
+<em class="emphasis">client_list</em>. The form of
+<em class="emphasis">client_list</em> is the same as that described for
+the <em class="emphasis">rw</em>=<em class="emphasis">client_list</em> option.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>anon=uid</i></dt>
+<dd>
+Maps anonymous, or unknown, users to the user identifier
+<em class="emphasis">uid</em>. Anonymous users are those that do not
+present valid credentials in their NFS requests. Note that an
+anonymous user is <em class="emphasis">not</em> one that does not appear
+in the server's password file or NIS
+<em class="emphasis">passwd</em> map. If no credentials are included with
+the NFS request, it is treated as an anonymous request. NFS clients
+can submit requests from unknown users if the proper user validation
+is not completed; we'll look at both of these problems in later
+chapters. <a href="ch12_04.html#nfs2-CHP-12-SECT-4">Section 12.4, "NFS security"</a> discusses the
+<em class="emphasis">anon</em> option in more detail.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>root=client_list</i></dt>
+<dd>
+Grants superuser access to the NFS clients identified in
+<em class="emphasis">client_list</em>. The form of
+<em class="emphasis">client_list</em> is the same as that described for
+the <em class="emphasis">rw</em>=<em class="emphasis">client_list</em> option.
+To enforce basic network security, by default, superuser privileges
+are not extended over the network. The <em class="emphasis">root</em>
+option allows you to selectively grant root access to a filesystem.
+This security feature will be covered in <a href="ch12_04.html#nfs2-CHP-12-SECT-4.2">Section 12.4.2, "Superuser mapping"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>sec=mode[:mode ...]</i></dt>
+<dd>
+Requires that NFS clients use the security mode(s) specified.
+Security modes can be:
+</p>
+
+
+<dl>
+<dt><i>sys</i></dt>
+<dd>
+This is the default form of security, which assumes a trusted
+relationship between NFS clients and servers.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>dh</i></dt>
+<dd>
+This is a stronger form of security based on a cryptographic
+algorithm known as Diffie-Hellman Key Exchange.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>krb5</i></dt>
+<dd><p /><blockquote class="footnote"> <a name="FOOTNOTE-9" />[9]The <em class="emphasis">getcwd( )</em> routine builds
+
+</dl>
+<dl>
+<dt><i>krb5i</i></dt>
+
+</dl>
+
+<dl>
+<dt><i>krb5p</i></dt>
+<dd>
+This is a trio of stronger forms of security based on a key
+management system called Kerberos Version 5.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>none</i></dt>
+<dd>
+This is the weakest form of security. All users are treated as
+unknown and are mapped to the anonymous user.
+</p>
+</dd>
+
+</dl>
+
+The <em class="emphasis">sec=</em> option can be combined with
+<em class="emphasis">rw</em>, <em class="emphasis">ro</em>,
+<em class="emphasis">rw=</em>, <em class="emphasis">ro=</em>, and
+<em class="emphasis">root=</em> in interesting ways. We will look at that
+and other security modes in more detail in <a href="ch12_04.html#nfs2-CHP-12-SECT-4.4">Section 12.4.4, "Access to filesystems"</a>. 
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>aclok</i></dt>
+<dd>
+ACL stands for Access Control List. The <em class="emphasis">aclok</em>
+option can sometimes prevent interoperability problems involving NFS
+Version 2 clients that do not understand Access Control Lists. We
+will explore ACLs and the <em class="emphasis">aclok</em>option in <a href="ch12_04.html#nfs2-CHP-12-SECT-4.8">Section 12.4.8, "Access control lists"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>nosub</i></dt>
+
+
+<dt><i>nosuid</i></dt>
+<dd>
+Under some situations, the <em class="emphasis">nosub</em> and
+<em class="emphasis">nosuid</em> options prevent security exposures. We
+will go into more detail in <a href="ch12_01.html">Chapter 12, "Network Security"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>public</i></dt>
+<dd>
+This option is useful for environments that have to cope with
+firewalls. We will discuss it in more detail also in <a href="ch12_01.html">Chapter 12, "Network Security"</a><em class="emphasis">.</em>
+</p>
+</dd>
+
+</dl>
+
+Your system may support additional options, so<a name="INDEX-860" /> <a name="INDEX-861" /> <a name="INDEX-862" /> check <a name="INDEX-863" /> <a name="INDEX-864" />your vendor's
+<a name="INDEX-865" />
+<a name="INDEX-866" />
+<a name="INDEX-867" />relevant
+manual pages.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6. System Administration Using the Network File System</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.3. Mounting filesystems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

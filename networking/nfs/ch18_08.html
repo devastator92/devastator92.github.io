@@ -1,0 +1,131 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:44 GMT -->
+<head><title>Stale filehandles (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="appa_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">18.8. Stale filehandles</h2>
+
+A filehandle becomes stale whenever the file <a name="INDEX-2715" /> <a name="INDEX-2716" />or directory referenced by the handle is
+removed by another host, while your client still holds an active
+reference to the object. A typical example occurs when the current
+directory of a process, running on your client, is removed on the
+server (either by a process running on the server or on another
+client). For example, the following sequence of operations produces a
+stale filehandle error for the current directory of the process
+running on <em class="emphasis">client1</em>:
+</p><p>
+
+<blockquote><pre class="code">client1                 client2 or server
+% <tt class="userinput"><b>cd /shared/mod1</b></tt> 
+                        % <tt class="userinput"><b>cd /shared</b></tt> 
+                        % <tt class="userinput"><b>rm -rf mod1</b></tt> 
+% <tt class="userinput"><b>ls</b></tt> 
+.: Stale File Handle</pre></blockquote>
+
+It is important to note that recreating the removed directory before
+<em class="emphasis">client1</em> lists the directory would not have
+prevented the stale filehandle problem:
+</p><p>
+
+<blockquote><pre class="code">client1                 client2 or server
+% <tt class="userinput"><b>cd /shared/mod1</b></tt> 
+                        % <tt class="userinput"><b>cd /shared</b></tt> 
+                        % <tt class="userinput"><b>rm -rf mod1</b></tt>
+                        % <tt class="userinput"><b>mkdir mod1</b></tt>
+% <tt class="userinput"><b>ls</b></tt> 
+.: Stale File Handle</pre></blockquote>
+
+This occurs because the client filehandle is tied to the inode number
+and generation count of the file or directory. Removing and
+recreating the directory <em class="emphasis">mod1</em> results in the
+creation of a new directory entry with the same name as before but
+with a different inode number and generation count (and consequently
+a different filehandle). This explains why clients get stale
+filehandle errors when files or directories on the server are moved
+to a different filesystem. Be careful when you perform filesystem
+maintenance on the NFS server. Unfortunately you cannot bring a
+server down, move files to a new filesystem (perhaps to a larger
+disk), and reshare the new filesystem without risking your clients
+getting stale filehandles. Moving the files to a new filesystem on
+the server results in new inode numbers and generation counts for the
+files since inode numbers are not preserved across filesystem moves.
+If your client gets stale filehandles, then you may need to terminate
+all processes accessing the filesystem on the client, and unmount the
+NFS filesystem in order to clear the large number of stale
+filehandles. Unfortunately, identifying all the processes that hold a
+filesystem busy is not always feasible, in which case you may have to
+resort to forcibly unmounting the filesystem:
+</p><p>
+
+<blockquote><pre class="code"> # <tt class="userinput"><b>umount -f /shared</b></tt></pre></blockquote>
+
+Specify the <em class="emphasis">-f</em> option to the <em class="emphasis">umount
+<a href="#FOOTNOTE-59">[59]</a></em> command to forcibly unmount a filesystem. This
+should be done only as a last resort, since using this option can
+cause data loss for open files.
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-59" />[59]The ability to forcibly unmount a filesystem was
+introduced in Solaris 8. This feature is supported by the Linux
+kernel 2.1.116 or later. Previously, you would have had to reboot the
+NFS client to clear the stale filehandles.</p><p>
+</blockquote>
+
+You will also get stale filehandle errors when the server or another
+client removes a file that your client currently has open:
+</p><p>
+
+<blockquote><pre class="code">Process A on client1                 client2 or server
+...
+fd = open("/shared/foo", O_RDONLY);
+                                     % <tt class="userinput"><b>rm /shared/foo</b></tt>       
+read(fd, &amp;buffer, buffer_len);
+Read fails! Stale File Handle</pre></blockquote>
+
+If you consistently suffer from stale filehandle errors, you should
+look at the way in which users share files using NFS. Even though
+users see the same set of files, they do not necessarily have to do
+their work in the same directories. Watch out for users who share
+directories or copies of code. Use a source code control system that
+lets them make private copies of source files in their own
+directories. NFS provides an excellent mechanism for allowing all
+users to see the common source tree, but nobody should be doing
+development in it. Similarly, users who share scratch space may
+decide to clean it out periodically. Any user who had a scratch file
+open when another user on another NFS client purged the scratch
+directory will receive stale filehandle errors on the next reference
+to the (now removed) scratch file.
+</p><p>
+
+As with most things, it helps to have an understanding of how your
+users are using the filesystems presented to them by NFS. In many
+cases, users want access to a wide variety of filesystems, but they
+do not want all of them mounted at all times (for fear of server
+crashes), nor do they want to keep track of where all filesystems are
+exported from and where they should be mounted. The NFS automounter
+solves all of these problems by applying NIS management to NFS mount
+information. As part of your client tuning, consider using the
+automounter to make<a name="INDEX-2717" /> <a name="INDEX-2718" /> client NFS administration <a name="INDEX-2719" /> <a name="INDEX-2720" />easier. <a href="ch09_01.html">Chapter 9, "The Automounter"</a> describes the automounter in detail.
+</p><p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appa_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">18.7. Mount point constructions</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">A. IP Packet Routing</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:44 GMT -->
+</html>

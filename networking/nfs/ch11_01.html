@@ -1,0 +1,229 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:46 GMT -->
+<head><title>File Locking  (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 11. File Locking </h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-11-SECT-1">What is file locking? </a><br />
+<a href="ch11_02.html">NFS and file locking</a><br />
+<a href="ch11_03.html">Troubleshooting locking problems</a><br /></p><p></div>
+
+In <a href="ch07_05.html#nfs2-CHP-7-SECT-5">Section 7.5, "File locking"</a>, we introduced the concept of file
+locking and the two primary components: the RPC lock daemon and the
+status monitor. This chapter will delve more deeply into file locking
+and will examine the administrative aspects.
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-11-SECT-1" /></a>
+<h2 class="sect1">11.1. What is file locking? </h2>
+
+File locking is the act of ensuring that when <a name="INDEX-1575" /></a>
+<a name="INDEX-1576" /></a>you access
+a file, usually via a software application, no one can change the
+file until you are done examining it. If you want to modify the file,
+then file locking ensures that no one else can examine or modify the
+file until you are done modifying it.
+</p><p>
+
+The earliest versions of Unix had no way to lock files except to
+create lock files. The idea is that two or more processes would more
+or less simultaneously try to create a lock file in exclusive mode,
+via the O_EXCL flag of the <em class="emphasis">open</em>( ) system call.
+The <a name="INDEX-1577" /></a> <a name="INDEX-1578" /></a>
+<a name="INDEX-1579" /></a>operating system would return success to
+the process that won the race, and a "file exists" error
+to losing processes. One problem with this scheme is that it relies
+on the winning process to remove the lock file before it exits. If
+the process is running buggy software, this might not happen. Some
+applications mitigate this problem by recording the process ID of the
+winner into the contents of the lock file. A process that finds that
+it gets a "file exists" error can then read the lock file
+to see if the owning process is still running.
+</p><p>
+
+Still, lock files can be clumsy. In the 1980s, Unix versions were
+released with file locking support built into the operating system.
+The System V branch of Unix offered file locking via the
+<em class="emphasis">fcntl</em>( ) system call, whereas the BSD branch
+<a name="INDEX-1580" /></a>provided the flock( ) system call. In
+both cases, when the process that creates the lock dies, the lock
+will be automatically released.
+</p><p>
+
+<a name="nfs2-CHP-11-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">11.1.1. Exclusive and shared locks</h3>
+
+Both <em class="emphasis">fcntl</em> and <em class="emphasis">flock</em> give
+the choice of either an exclusive lock, where only one process could
+hold the lock, or a shared lock, where multiple holders could
+simultaneously exist, to the exclusion of holders of the exclusive
+lock. The exclusive lock is sometimes called a "single
+writer" lock, because its exclusive nature lends itself to
+allowing safe writes to a file. The shared lock is sometimes called a
+"multiple readers" lock because its shared nature lends
+itself to allowing multiple safe reads of a file.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">11.1.2. Record locks</h3>
+
+The <em class="emphasis">fcntl</em> system call also has
+the<a name="INDEX-1581" /></a>
+<a name="INDEX-1582" /></a> feature of byte range record locking.
+This means that the application can partition a file into as many
+arbitrarily sized segments or records that it wants, and by
+specifying a file offset and length, lock them. Thus, it is possible
+to have both an exclusive lock and a shared lock on a file, provided
+the file offsets and lengths of each record lock do not overlap.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">11.1.3. Mandatory versus advisory locking</h3>
+
+Both <em class="emphasis">fcntl</em> and <em class="emphasis">flock</em> offer
+<em class="emphasis">advisory</em> locking. Advisory locking <a name="INDEX-1583" /></a>
+<a name="INDEX-1584" /></a>
+<a name="INDEX-1585" /></a> <a name="INDEX-1586" /></a> <a name="INDEX-1587" /></a>
+<a name="INDEX-1588" /></a>is
+locking that requires the cooperation of participating processes.
+Suppose process A acquires an exclusive lock on the file, with the
+intent to write it. Suppose process B opens the file with the intent
+to write it. If process B fails to acquire a lock, there is nothing
+to prevent it from issuing a write system call and corrupting the
+process that A is writing. For this reason, advisory locking is
+<a name="INDEX-1589" /></a>
+<a name="INDEX-1590" /></a> <a name="INDEX-1591" /></a>sometimes called
+<em class="emphasis">unenforced</em> locking.
+</p><p>
+
+System V (and therefore Solaris) offers
+<em class="emphasis">mandatory</em> or <em class="emphasis">enforced</em>
+locking as an option. This option is enabled if mandatory lock
+permissions are set on a file. Mandatory lock permissions are an
+overload of the set group ID execution bit (02000 in octal). If the
+set group ID execution bit is set, and if the group execution bit is
+not set, then all reads and writes to the file will use enforced
+locking. So, for example:
+</p><p>
+
+<blockquote><pre class="code">% chmod 2644 example
+% ls -l example
+-rw-r-lr--   1 mre      staff            9 Dec 28 10:52 example</pre></blockquote>
+
+This makes file <em class="emphasis">example</em> readable and writable by
+the file's owner, and readable by everyone else. The appearance
+of the l in the first field of the output of the
+<em class="emphasis">ls</em> command tells you that mandatory locking is
+enabled. Of course, you can use any combination of read or write
+permissions for the file's owner, group, and world.
+</p><p>
+
+If the mandatory lock permissions are set on a file, then every
+<em class="emphasis">write( )</em> or <em class="emphasis">read( )</em> system
+call results in an implicit sequence of:
+</p><p>
+
+<blockquote><pre class="code">fcntl(...); /* lock the file at the range we are reading or writing */
+read(...); /* or */ write(...);
+fcntl(...); /* unlock the file at the range locked above */</pre></blockquote>
+
+What if the process has already acquired a lock by an explicit
+<em class="emphasis">fcntl</em> call? If the range locked is equal to or
+encompasses the range the read or write is done on, then no implicit
+pair of <em class="emphasis">fcntl</em> calls are done. If the range
+explicitly locked partly overlaps the range read or write will do,
+then implicit fcntl calls are done on the unlocked portion of the
+range.
+</p><p>
+
+Mandatory locking seems very useful, but it is open to denial of
+service attacks. Suppose mandatory lock permissions are set on a
+file. An attacker named Mallet decides to issue an
+<em class="emphasis">fcntl</em> call to get an exclusive lock on the
+entire file. Bob now tries to read the file and finds that his
+application hangs. A proponent of mandatory locking might point out
+that the mistake was in allowing the file to be accessible by Mallet
+(if Mallet can't open the file, he can't lock it). The
+counter argument is that if you are going to rely on permissions to
+avoid a denial of service (and restricted permissions are a good
+thing to have for critical applications), then the set of users who
+can access the file is limited to those with a vested interest in
+avoiding denial of service. In that case, mandatory <a name="INDEX-1592" /></a> <a name="INDEX-1593" /></a> <a name="INDEX-1594" /></a> <a name="INDEX-1595" /></a> <a name="INDEX-1596" /></a> <a name="INDEX-1597" /></a>locking is no more
+useful than advisory locking.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">11.1.4. Windows/NT locking scheme</h3>
+
+The discussion so far has been about Unix
+locking<a name="INDEX-1598" /></a>
+<a name="INDEX-1599" /></a>
+paradigms. The Windows world has a different paradigm. There are two
+major differences between Unix and Windows locking:
+</p><p>
+
+<ul><li>
+The first difference is that the Windows world supports a share
+reservation programming interface. Share reservations apply to the
+entire file and are specified at the time a file is created or
+opened. A share reservation consists of a pair of modes. The first is
+the access mode, which is how the application will access the file:
+read, write, or read/write. The second is the access that the
+application will deny to other applications: none, read, write, or
+read/write. When the application attempts to open a file, the
+operating system checks to see if there are any other open requests
+on the file. If so, it first compares the application's access
+mode with the deny mode of the other openers. If there is a match,
+then the open is denied. If not, then the operating system compares
+the application's deny mode with the access mode of the other
+openers. Again, if there is a match, the open is denied.
+</p><p>
+</li><li>
+The second difference is that there is no advisory locking. Whole
+file locking, byte range locking, and share reservation<a name="INDEX-1600" /></a> <a name="INDEX-1601" /></a> locking are all
+mandatory or enforced.<a href="#FOOTNOTE-18">[18]</a>
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-18" /></a>[18]As it turns out, very few
+Windows programs rely on byte range mandatory locking.</p><p>
+</blockquote>
+</li></ul>
+
+<a name="ch11-8-fm2xml" /></a><blockquote><b>TIP: </b> 
+Share reservations in the Windows world do not interact at all with
+Windows byte range or whole file locking.
+</p><p>
+</blockquote>
+
+</div>
+</div>
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.5. Printer services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.2. NFS and file locking</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:46 GMT -->
+</html>

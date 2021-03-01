@@ -1,0 +1,507 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+<head><title>File Synchronization (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch22_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">22.6. File Synchronization</h2>
+
+
+
+
+
+<a name="INDEX-2105" /> <a name="INDEX-2106" />
+<a name="INDEX-2107" /> <a name="INDEX-2108" />Strictly speaking, protocols that
+synchronize files between two computers are file transfer programs.
+However, they are primarily used for administrative purposes, so we
+cover them here. These services are intended to make files identical
+on two computers. They are usually used to synchronize multiple
+servers that are supposed to be interchangeable or to make certain
+that all the machines in a group have the same application versions.</p><p>
+
+
+
+
+
+Some systems use normal file transfer protocols to do
+synchronization -- for instance, to synchronize laptops to servers
+when they are present on a network. To figure out how to use such
+systems with a firewall, first figure out what file transfer protocol
+they're using and then look up the details of that protocol in
+<a href="ch17_01.html">Chapter 17, "File Transfer, File Sharing, and Printing"</a>.</p><p>
+
+
+
+
+
+<a name="ch22-38-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.6.1. rdist</h3>
+
+
+
+
+
+<em class="emphasis">rdist</em><a name="INDEX-2109" /> is the best known of the Unix programs
+for file synchronization. Two versions are in widespread use: version
+5 (sometimes known as <em class="emphasis">ordist</em>) and version 6.
+Version 6 is not compatible with version 5, but most version 6
+servers will fall back to using the version 5 executables if they are
+available. <em class="emphasis">rdist</em> version 5 uses
+<em class="emphasis">rsh</em> to communicate between machines;
+<em class="emphasis">rdist</em> version 6 can use either
+<em class="emphasis">rsh</em> or SSH. The characteristics of
+<em class="emphasis">rsh</em> and SSH (for packet filtering, proxying, and
+network address translation) are discussed in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>, and are not changed by using them for
+<em class="emphasis">rdist</em>.</p><p>
+
+
+
+
+
+<a name="INDEX-2110" />While <em class="emphasis">rdist</em> is an
+incredibly useful system administration tool, it also has a long and
+sad history of security problems, mostly related to its use of
+<em class="emphasis">setuid</em> to run as root, sometimes at
+inappropriate moments. This is only made worse by using
+<em class="emphasis">rsh</em> as its base. You should not use
+<em class="emphasis">rdist</em> version 5 through a firewall or to any
+bastion host; use SSH-based <em class="emphasis">rdist</em> version 6 or
+<em class="emphasis">rsync</em> instead (see the next section for more
+information about <em class="emphasis">rsync</em>).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-39-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.6.2. rsync</h3>
+
+
+
+
+
+<em class="emphasis">rsync</em><a name="INDEX-2111" />
+is a synchronization protocol that uses checksums to determine
+differences (instead of relying on modification dates) and does
+partial file transfers (transferring only the differences instead of
+the entire files). <em class="emphasis">rsync</em> was developed by Andrew
+Tridgell and Paul Mackerras.</p><p>
+
+
+
+
+
+<em class="emphasis">rsync</em> may either be run like
+<em class="emphasis">rdist</em> on top of a remote shell protocol
+(preferably <em class="emphasis">ssh</em> but <em class="emphasis">rsh</em> is
+also possible), or use its own daemon, <em class="emphasis">rsyncd</em>.
+<em class="emphasis">rsyncd</em> does authentication but does not encrypt
+the data being transferred. <em class="emphasis">rsyncd</em> is useful if
+you are interested in using <em class="emphasis">rsync</em> to distribute
+publicly available files; it allows you to use
+<em class="emphasis">rsync</em> like FTP, without allowing remote shell
+access to the Internet. It is arguably more secure than FTP (it
+provides less functionality) and will certainly be more efficient in
+situations where people need to transfer updated files repeatedly. If
+you are transferring confidential data, you should use
+<em class="emphasis">rsync</em> over SSH instead of using
+<em class="emphasis">rsyncd</em>.</p><p>
+
+
+
+
+
+<a name="ch22-40-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.6.2.1. Packet filtering characteristics of rsync</h3>
+
+
+
+
+
+<em class="emphasis">rsync</em> is generally run over SSH, although it is
+possible to run it over <em class="emphasis">rsh</em> if you are not
+concerned with security. Packet filtering characteristics of SSH and
+<em class="emphasis">rsh</em> are discussed in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>. The dedicated <em class="emphasis">rsync</em>
+daemon, <em class="emphasis">rsyncd</em>, uses TCP port 873.</p><p>
+
+
+
+
+
+<a name="ch22-41-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+873</p><p></td>
+<td>
+<a href="#FOOTNOTE-162">[162]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Request, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+873</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+873</p><p></td>
+<td><a href="#FOOTNOTE-162">[162]</a></td>
+<td>
+Request, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+873</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-162" />[162]ACK will not be set on the first packet
+(establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-42-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.6.2.2. Proxying characteristics of rsync</h3>
+
+
+
+
+
+<em class="emphasis">rsync</em> is normally run over SSH or
+<em class="emphasis">rsh</em>; proxying characteristics of these protocols
+are discussed in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>. The
+<em class="emphasis">rsync</em> client provides support for using an HTTP
+proxy for <em class="emphasis">rsync</em> connections, as long as the HTTP
+proxy is willing to connect to port 873. (For more information about
+HTTP proxies, see "Proxying Characteristics of HTTP" in
+<a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>.) <em class="emphasis">rsync</em>'s own
+protocol is straightforward to proxy and could also easily be used
+with SOCKS, for instance. However, since <em class="emphasis">rsyncd</em>
+is not terribly widespread, proxies for it are not available. You
+will need to set them up yourself.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-43-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.6.2.3. Network address translation characteristics of rsync</h3>
+
+
+
+
+
+<em class="emphasis">rsync</em> is normally run over SSH or
+<em class="emphasis">rsh</em>; network address translation characteristics
+of these protocols are discussed in <a href="ch18_01.html">Chapter 18, "Remote Access to Hosts"</a>.
+<em class="emphasis">rsync</em>'s own protocol does not use embedded
+IP addresses and should function through a network address
+translation system without problems.<a name="INDEX-2112" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-44-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.6.3. Windows NT Directory Replication</h3>
+
+
+
+
+
+<a name="INDEX-2113" /> <a name="INDEX-2114" /> <a name="INDEX-2115" />Directory Replication
+(also known as LMRepl) is used to automatically copy information from
+machines running Windows NT Server to machines running Windows NT 4
+or OS/2. Windows 2000 does not support this service. It is used to
+copy login scripts and policy information between domain controllers
+and package information between SMS servers in the same site; it can
+also be used to copy whatever other information administrators want
+to distribute.</p><p>
+
+
+
+
+
+In Directory Replication, there is an exporting computer and at least
+one importing computer. Each machine has a special account that is
+used for replication. These accounts have the permissions for the
+"Backup Operators" group, which will allow them to read
+and write any file on the computer, regardless of its permissions.
+Furthermore, the accounts have to be effectively equivalent on the
+exporting and importing computer (either by having them actually be
+the same account, as part of a domain, or by giving them the same
+username and password). This means that two machines that replicate
+directories effectively trust each other completely; if either one of
+them is compromised, the other one will be too.</p><p>
+
+
+
+
+
+Windows NT Directory Replication is based on SMB transactions; see
+<a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>, for a discussion of the packet
+filtering, proxying, and network address translation characteristics
+of SMB.</p><p>
+
+
+
+
+
+Because Directory Replication is based on SMB transactions, it is
+difficult to allow it securely through a firewall. Because it
+involves extensive trust, it is a bad idea to use it to or from
+machines that make up part of a firewall.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-45-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.6.4. Windows 2000 File Replication Service (FRS)</h3>
+
+
+
+
+
+<a name="INDEX-2116" /> <a name="INDEX-2117" /> <a name="INDEX-2118" />In Windows 2000, the service that's
+used to automatically synchronize files is the File Replication
+Service (FRS). Like directory replication, FRS is used routinely as
+part of the process of synchronizing information among domain
+controllers, but it can also be used explicitly to maintain replicas
+of other files. When FRS is used to synchronize information among
+domain controllers, it is referred to as SYSVOL replication.</p><p>
+
+
+
+
+
+Directory replication is a single master system, where one machine
+maintains the master copy and propagates it to other machines. Files
+can be changed only on the machine with the master copy. FRS is a
+multiple master system, where files can be changed on any machine,
+and the changes will be propagated to the other systems.</p><p>
+
+
+
+
+
+FRS uses authenticated RPC calls to distribute information between
+replicas. For more information about the firewall characteristics of
+RPC, see <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.<a name="INDEX-2119" /> <a name="INDEX-2120" /> <a name="INDEX-2121" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-46-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.6.5. Summary of Recommendations for File Synchronization</h3>
+
+
+
+
+
+<ul><li>Do not allow file synchronization across your firewall. (You may wish
+to make an exception for <em class="emphasis">rsyncd</em> if you are
+distributing information to the public with it.)<a name="INDEX-2122" /> <a name="INDEX-2123" /> <a name="INDEX-2124" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch22_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">22.5. Network Time Protocol </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">22.7. Mostly Harmless Protocols</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+</html>

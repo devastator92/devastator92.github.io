@@ -1,0 +1,1055 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Disabling Nonrequired Services (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.3. Disabling Nonrequired Services</h2>
+
+
+
+
+
+When you have a secure machine, you can start to set up the services
+on it. The first step is to remove the services that you don't
+want to run. Consult <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, for more
+information about deciding which services you don't want to
+run. The main idea is to remove all services that you don't
+actually need for the machine to do the work it's designed to
+do, even if they seem convenient or harmless.</p><p>
+
+
+
+
+
+<a name="ch11-3034" /><div class="sect2">
+<h3 class="sect2">11.3.1. How Are Services Managed Under Unix?</h3>
+
+
+
+
+
+<a name="INDEX-901" /> <a name="INDEX-902" /> <a name="INDEX-903" />On Unix machines, most services
+are managed in one of two ways:</p><p>
+
+
+
+
+
+<ul><li>By controlling when they start and who can use them</p><p></li><li>By service-specific configuration files</p></li></ul>
+There are two ways services get started on Unix systems:</p><p>
+
+
+
+
+
+<ul><li>At boot time from a machine's configuration files (for example
+in <em class="filename">/etc/inittab</em> and <em class="filename">/etc/rc</em>
+files or directories)</p><p></li><li>On demand by the <em class="emphasis">inetd</em> daemon (which is itself
+started at boot time)</p><p></li></ul>
+A few services  --  for example, Sendmail  --  can be
+configured to run under either or both mechanisms, but most of them
+strongly prefer one of the two options.</p><p>
+
+
+
+
+
+<a name="ch11-3053" /><div class="sect3">
+<h3 class="sect3">11.3.1.1. Services started by /etc/rc files or directories</h3>
+
+
+
+
+
+<a name="INDEX-904" /><a name="INDEX-905" /><a name="INDEX-906" /><a name="INDEX-907" />Services in the first category are
+designed to run indefinitely. They are started once (when the machine
+boots), and they are never supposed to exit. (Of course, sometimes
+they do exit, either because they're killed by a system
+administrator, or because they trip over a bug or some other error.)
+Servers are written in this way if they need to handle small
+transactions quickly, or if they need to "remember"
+information. Writing them in this way avoids the delays associated
+with starting a new copy of the server to handle each request made to
+it.<a name="INDEX-908" />
+<a name="INDEX-909" /></p><p>
+
+
+
+
+
+Servers of this kind are started from a Unix system's
+<em class="emphasis">/etc/rc</em> files, which are shell scripts executed
+when the machine boots. Examples of servers typically started from
+<em class="emphasis">/etc/rc</em> files are those that handle NFS, SMTP,
+and DNS. In BSD-based versions of Unix, there are customarily a few
+files in <em class="emphasis">/etc</em> with names that start with
+"rc". (for example <em class="emphasis">/etc/rc.boot</em>). In
+other versions of Unix, there are customarily directories in
+<em class="emphasis">/etc</em> instead of files (for instance,
+<em class="emphasis">/etc/rc0.d</em>); the directories contain the various
+startup commands, each in its own little file.</p><p>
+
+
+
+
+
+In either case, you need to be careful to look at all of the startup
+scripts and all of the scripts they call, recursively. Usually, more
+than one script is run in the process of bringing a system all the
+way up. On modern Unix systems, those scripts often call others,
+sometimes through multiple levels of indirection. For example, you
+may find that a startup script calls another script to start up
+networking, and that one calls yet another script to start up file
+service. You may also find that startup scripts use mystical options
+to familiar commands (e.g., they often run
+<em class="emphasis">ifconfig</em> with little-used options that cause
+<em class="emphasis">ifconfig</em> to pick up configuration information
+from obscure places). Be sure that you understand these options and
+that you replace any that tell the machine to pick up information
+about itself from the network (or from services it normally provides
+but that you are going to turn off).</p><p>
+
+
+
+
+
+Linux and some versions of Unix have a utility called
+<em class="emphasis">chkconfig</em><tt class="command"> </tt>that is used to
+determine whether or not services are started up. When a service is
+installed on a system that's using
+<em class="emphasis">chkconfig</em>, a startup script is also installed
+and always runs, but the startup script uses the
+<em class="emphasis">chkconfig</em> command to determine whether or not it
+should actually start the service. Administrators also use the
+<em class="emphasis">chkconfig</em> command to change or check the status
+of services. Different versions of the <em class="emphasis">chkconfig</em>
+system use different methods of storing the configuration status;
+some of them create files, while others store the status in the
+startup scripts themselves.</p><p>
+
+
+
+
+
+Some versions of Unix and Linux have a file called
+<em class="filename">/etc/inittab</em>. On these systems, the
+<tt class="command">init</tt> process uses information in this file to
+control how the boot process is performed and to keep a number of
+system processes running. Normally the processes configured to be run
+from <em class="filename">/etc/inittab</em> allow interactive logins from
+terminal and workstation console devices. The <tt class="command">init</tt>
+process will start and monitor these processes and, if configured to
+do so, will restart them when they terminate or die. Disabling these
+processes can usually be performed by commenting out the
+configuration line or by instructing <em class="emphasis">init</em> not to
+start them at all. If you change the contents of
+<em class="filename">/etc/inittab,</em> there is usually a special and
+operating system-dependent way to signal the <tt class="command">init</tt>
+process to re-read the file.</p><p>
+
+
+
+
+
+In some versions of Unix, one of the servers that is run from the
+startup files is designed to restart other servers if they fail. If
+such a program exists on a system, it will try to start the other
+servers if they are removed from the startup files but not from its
+configuration file. Either turn off this program or be sure to remove
+from the program's configuration file any servers removed from
+the startup files. You'll notice the program when you work
+through the startup files.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3085" /><div class="sect3">
+<h3 class="sect3">11.3.1.2. Services started by inetd</h3>
+
+
+
+
+
+<a name="INDEX-910" />Some servers are designed to be
+started "on demand" and to exit after they provide the
+requested service. Such servers are typically used for services that
+are requested infrequently, for services that aren't sensitive
+to delays in starting a new server from scratch, and for services
+that require a new server process to deal with each request (for
+example, Telnet or FTP sessions, where a separate server is used for
+each active session).</p><p>
+
+
+
+
+
+Servers of this kind are usually run from the
+<em class="emphasis">inetd</em> server. (The <em class="emphasis">inetd</em>
+server itself, because it runs indefinitely, is started from the
+<em class="emphasis">/etc/rc</em> files, as described in the previous
+section.) The <em class="emphasis">inetd</em> server listens for requests
+for services specified in the <em class="emphasis">/etc/inetd.conf</em>
+configuration file. When it hears such a request, it starts the right
+server to process the request.<a name="INDEX-911" /><a name="INDEX-912" /> <a name="INDEX-913" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-3-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.3.2. Disabling Services Under Unix</h3>
+
+
+
+
+
+<a name="INDEX-914" />
+<a name="INDEX-915" /> <a name="INDEX-916" /><a name="INDEX-917" /> <a name="INDEX-918" />As we discussed in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, there are four general precautions to take
+when disabling services:</p><p>
+
+
+
+
+
+<ul><li>Make sure that you have a way to boot the machine if you disable a
+critical service (for instance, a secondary hard disk with a full
+operating system image or a bootable CD-ROM).</p><p></li><li>Save a clean copy of everything you modify so that you know how to
+put it back the way it was if you do something wrong.</p><p></li><li>When you disable a service, disable everything that depends on it.</p></li><li>Don't connect the machine you are trying to protect to a
+hostile network before you have completed the process of disabling
+services. It is possible for the machine to be compromised while you
+are preparing it.</p><p></li></ul>
+Once you've set up your alternate boot process, check the
+startup files and directories for your system. This should be done
+line by line, making sure you know exactly what each line does
+ --  including any command-line options.</p><p>
+
+
+
+
+
+In a perfect world, you would like to disable everything, and then
+enable only the services you need. Unfortunately, if you do this, you
+may find that the machine is no longer able to boot. It is slightly
+easier to work from the other direction by disabling services you
+definitely don't need, and then examining the rest of the boot
+process and adjusting it slowly so that the machine will always boot.</p><p>
+
+
+
+
+
+One way to start this process is to take a snapshot of all the
+services that are running on your machine by using the
+<em class="emphasis">netstat</em> utility. This utility allows you to list
+all of the open network connections and, with additional options, the
+TCP and UDP network ports that have a service configured to listen or
+accept datagrams. The Linux <em class="emphasis">netstat</em> utility has
+a very useful feature that allows you to directly list the numeric
+process identifier and name associated with each network port. Other
+versions of Unix are supplied with tools, such as
+<em class="emphasis">fuser</em><tt class="command">, </tt>which will map the
+network ports to the numeric process identifier. You can also use the
+<em class="emphasis">lsof</em> utility (see <a href="appb_01.html">Appendix B, "Tools"</a>
+for information on where to get <em class="emphasis">lsof</em> ). Once the
+process name is known, it can be used to search through the
+configuration files to find where it is started.</p><p>
+
+
+
+
+
+As mentioned before, some versions of Unix and Linux include the
+<em class="emphasis">chkconfig</em> program that can administratively
+enable and disable services. The command can be used to test whether
+a service is turned on, to list the services that can be controlled,
+and to enable or disable services. These systems work because the
+startup file checks to see if the service should be run. Disabling a
+service can be as simple as using <em class="emphasis">chkconfig</em> to
+turn the service off. This is a convenient and standard way to
+disable a service, but it doesn't leave any documentation of
+why the service is off, and it's very easy to re-enable a
+service that's been disabled this way.</p><p>
+
+
+
+
+
+Although it's more work, it's a good idea to comment out
+the code that starts the service or to remove the startup file
+altogether. This will prevent people from simply turning it back on
+with <em class="emphasis">chkconfig</em>, and will give you a good place
+to put comments about why you've disabled the service. If you
+do disable services with <em class="emphasis">chkconfig</em>, you should
+be sure to keep a list in a standard place that says what services
+are supposed to be disabled and why. This will help keep people from
+re-enabling them by mistake, and it will also allow you to easily
+reconfirm the list if you upgrade, patch, or reinstall software,
+which may change the <em class="emphasis">chkconfig</em> status of
+services.</p><p>
+
+
+
+
+
+On other versions of Unix, you will have no choice; you will have to
+comment out or delete the lines that start services you don't
+need. You will frequently see services that are started after a check
+for some configuration file. If you don't want the service to
+run, comment out the entire code block. Don't leave the code
+active simply because the configuration file doesn't currently
+exist and the service won't currently be started. Someone or
+something might create the configuration file some time in the
+future. Commenting out the entire thing is more secure and less
+risky.</p><p>
+
+
+
+
+
+Commenting out lines is preferable to removing them because it leaves
+evidence of your intent. When you comment something out, add a
+comment about why you have commented it out. If you delete something,
+replace it with a comment about why you have deleted it. Make sure
+that the next person to look at the files knows that you got rid of
+things on purpose and doesn't helpfully "fix" it
+for you. If you comment out a call to another script, add a comment
+in that script indicating that it's not supposed to be started
+and why. Renaming it or commenting out its contents are also good
+ways to help ensure that it won't accidentally reappear.</p><p>
+
+
+
+
+
+For every service that you leave enabled, apply the same line-by-line
+procedure to the service's configuration files. Obviously, you
+want to pay particular attention to <em class="emphasis">inetd</em>
+'s configuration file. On most systems, this file is called
+<em class="emphasis">/etc/inetd.conf</em>. (On other systems, this file
+might be called <em class="emphasis">/etc/servers</em> or something else;
+check your manual pages for <em class="emphasis">inetd</em> ). If you have
+a daemon-watcher and have decided to leave it on, its configuration
+files are also particularly important.</p><p>
+
+
+
+
+
+This process will need to be repeated if you install new software or
+a patch, because sometimes the startup scripts are modified or
+replaced. Installation scripts often assume that you will want to run
+all the software you are installing, and will helpfully turn it on
+for you, in its default, insecure configuration, even when you are
+upgrading an old installation on which it was turned off. You will
+want to have good documentation about your desired configuration to
+refer to when you install upgrades, patches, or new software. In any
+case, you should certainly disconnect the system from any hostile
+networks before performing any software installation or
+patching.<a name="INDEX-919" />
+<a name="INDEX-920" />
+<a name="INDEX-921" />
+<a name="INDEX-922" />
+<a name="INDEX-923" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-3128" /><div class="sect2">
+<h3 class="sect2">11.3.3. Which Services Should You Leave Enabled?</h3>
+
+
+
+
+
+<a name="INDEX-924" /> <a name="INDEX-925" /> <a name="INDEX-926" />Certain services are essential to
+the operation of the machine, and you'll probably need to leave
+these enabled, no matter what else the machine is configured to do.
+On a Unix system, these processes include:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>init, swap, and page</i></dt>
+<dd><a name="INDEX-927" />
+<a name="INDEX-928" />
+<a name="INDEX-929" />The three
+kernel pseudo-processes used to manage all other processes.</p><p></dd>
+
+
+
+
+
+<dt><i>cron</i></dt>
+<dd><a name="INDEX-930" />Runs other jobs
+at fixed times, for housekeeping and so on.</p><p></dd>
+
+
+
+
+
+<dt><i>syslogd</i></dt>
+<dd><a name="INDEX-931" />Collects and
+records log messages from the kernel and other daemons. If the
+<em class="emphasis">syslog</em> daemon is only going to send messages,
+check to see if it is possible to disable the ability to log remote
+<em class="emphasis">syslog</em> events.</p><p></dd>
+
+
+
+
+
+<dt><i>inetd</i></dt>
+<dd><a name="INDEX-932" />Starts network
+servers (such as <em class="emphasis">telnetd</em> and <em class="emphasis">ftpd
+</em>) when such services are requested by other machines.</p><p></dd>
+
+</dl>
+
+
+
+
+
+In addition, you'll obviously need server processes for the
+services that you've decided to provide on your bastion host
+(e.g., real or proxy Telnet, FTP, SMTP, and DNS servers). You will
+also need servers for any protocols you intend to use for remote
+administration of the machine (usually, <em class="emphasis">sshd</em>).</p><p>
+
+
+
+
+
+You should audit the configuration files for the services you leave
+enabled, to be sure that they are configured appropriately. The
+manual page for a service is a good place to find out which
+configuration files are used. In the preceding list, we have already
+discussed the configuration files for <em class="emphasis">syslogd</em>
+and <em class="emphasis">inetd</em>. Checking the configuration files for
+the <em class="emphasis">cron</em> service is frequently overlooked.
+Vendors typically provide a number of housekeeping functions that are
+not suitable for a bastion host. In particular, you should check for
+places where the system log files are rotated. You will typically
+find that <em class="emphasis">cron</em> will attempt to rotate log files
+on a weekly basis and may discard information older than two weeks.
+We suggest that you check these housekeeping rules and bring them
+into alignment with your policy on how long to keep log
+files.<a name="INDEX-933" />
+<a name="INDEX-934" />
+<a name="INDEX-935" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-3161" /><div class="sect2">
+<h3 class="sect2">11.3.4. Specific Unix Services to Disable</h3>
+
+
+
+
+
+<a name="INDEX-936" />
+<a name="INDEX-937" /> <a name="INDEX-938" /><a name="INDEX-939" /> <a name="INDEX-940" />You will want to disable all
+unneccessary services, but some are particularly dangerous and
+particularly unlikely to be needed on a firewall.</p><p>
+
+
+
+
+
+<a name="ch11-3174" /><div class="sect3">
+<h3 class="sect3">11.3.4.1. NFS and related services</h3>
+
+
+
+
+
+Start with NFS and related network services. You aren't going
+to need them. No internal machine should trust your bastion host
+enough to let the bastion host mount the internal machine's
+disks via NFS. Besides that, there probably won't be anything
+on the bastion host that you'll want to export via NFS. NFS is
+very convenient, but it's incredibly insecure.</p><p>
+
+
+
+
+
+<a name="INDEX-941" />NFS
+services are provided by a whole set of servers; the specific set of
+servers, and the names of the individual servers, varies slightly
+from one version of Unix to the next. Look for these names or names
+like them:</p><p>
+
+
+
+
+
+<ul><li><em class="emphasis">nfsd</em></p><p></li><li><em class="emphasis">biod</em></p></li><li><p><em class="emphasis">mountd</em></p></li><li><p><em class="emphasis">statd</em></p></li><li><p><em class="emphasis">lockd</em></p></li><li><p><em class="emphasis">automount</em></p></li><li><p><em class="emphasis">keyserv</em></p></li><li><p><em class="emphasis">rquotad</em></p></li><li><p><em class="emphasis">amd</em><a name="INDEX-942" /></p></li></ul>
+ost of these services are started at boot time from the
+<em class="emphasis">/etc/rc</em> files, although some are started on
+demand by <em class="emphasis">inetd</em>. <em class="emphasis">mountd</em> is
+somewhat peculiar in that it is often started at boot time
+<em class="emphasis">and</em> is listed in the <em class="emphasis">inetd</em>
+configuration file, apparently so that it will be restarted if the
+copy that was started at boot time crashes for some reason.<a name="INDEX-943" /><a name="INDEX-944" />
+<a name="INDEX-945" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3227" /><div class="sect3">
+<h3 class="sect3">11.3.4.2. Other RPC services</h3>
+
+
+
+
+
+<a name="INDEX-946" />You should also disable other
+services based on the Remote Procedure Call (RPC) system. The most
+critical of these is NIS, a service that is provided by the following
+servers:</p><p>
+
+
+
+
+
+<ul><li><em class="emphasis">ypserv</em></p><p></li><li><em class="emphasis">ypbind</em></p></li><li><p><em class="emphasis">ypupdated</em></p></li></ul>
+These servers are generally started at boot time from the
+<em class="emphasis">/etc/rc</em> files.</p><p>
+
+
+
+
+
+Also disable these RPC-based services:</p><p>
+
+
+
+
+
+<ul><li><em class="emphasis">rexd</em> (the remote execution service, started by
+<em class="emphasis">inetd</em> )</p><p></li><li><em class="emphasis">walld</em> (the "write all", or
+<em class="emphasis">wall</em> daemon, started by <em class="emphasis">inetd
+</em>)</p><p></li></ul>
+<a name="INDEX-947" /><a name="INDEX-948" />All RPC-based services depend on a
+single service usually called <em class="emphasis">portmap</em> (on some
+machines it is known as <em class="emphasis">rpcbind</em> ). If
+you've disabled all of the RPC-based services, you can (and
+should) also disable the <em class="emphasis">portmap</em> service. How
+can you tell if you've disabled all the RPC-based services?
+Before disabling <em class="emphasis">portmap</em>, but after disabling
+what you think are the rest of the RPC-based services, reboot the
+machine and then issue a <em class="emphasis">rpcinfo -p</em> command. If
+the output of that command shows only entries for
+<em class="emphasis">portmap</em> itself, this means that no other RPC
+services are running. On the other hand, if the output shows that
+other RPC services are still running, you will need to investigate
+further to determine what and why. If you decide to provide any
+RPC-based services, you must also provide the
+<em class="emphasis">portmap</em> service. In that case, consider using
+Wietse Venema's replacement <em class="emphasis">portmap</em>, which
+is more secure than the versions shipped with most Unix systems (see
+<a href="appb_01.html">Appendix B, "Tools"</a> for information on where to find
+it).<a name="INDEX-949" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3293" /><div class="sect3">
+<h3 class="sect3">11.3.4.3. Booting services</h3>
+
+
+
+
+
+<a name="INDEX-950" /><a name="INDEX-951" />Your
+bastion host should probably not provide booting services; nothing
+should trust the host enough to be willing to boot from it. This
+means that, in most cases, you should disable these services:</p><p>
+
+
+
+
+
+<ul><li><em class="emphasis">tftpd</em></p><p></li><li><em class="emphasis">bootd</em></p></li><li><p><em class="emphasis">bootpd</em></p></li><li><p><em class="emphasis">dhcpd</em></p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3311" /><div class="sect3">
+<h3 class="sect3">11.3.4.4. BSD "r" command services</h3>
+
+
+
+
+
+<a name="INDEX-952" /> <a name="INDEX-953" /><a name="INDEX-954" /><a name="INDEX-955" />These should
+all be disabled. The servers for these services are typically named
+<em class="emphasis">rshd</em>, <em class="emphasis">rlogind,</em> and
+<em class="emphasis">rexecd</em> and are typically started by
+<em class="emphasis">inetd</em>. The remaining "r" services
+are based on them and will not run without them.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3326" /><div class="sect3">
+<h3 class="sect3">11.3.4.5. routed</h3>
+
+
+
+
+
+<a name="INDEX-956" /><a name="INDEX-957" />Another
+server that your bastion host probably doesn't need is
+<em class="emphasis">routed</em>. This server is started at boot time from
+the <em class="emphasis">/etc/rc</em> files, listens to routing
+information broadcasts, and updates the kernel routing table based on
+what it hears.</p><p>
+
+
+
+
+
+You probably don't need <em class="emphasis">routed</em> on your
+bastion host because your bastion host is probably located on the
+perimeter of your network, where routing should be fairly simple. A
+more secure approach is to create static routes pointing to your
+internal networks and a default route pointing to your Internet
+gateway router. You do this at boot time by adding appropriate
+"route add" commands to the <em class="emphasis">/etc/rc</em>
+files.</p><p>
+
+
+
+
+
+<a name="INDEX-958" />If you
+must do dynamic routing on your bastion host, obtain and use a
+routing daemon that will provide some sort of authentication on the
+source of routing information. Either it should filter routes based
+on their source address, or it should support an authenticated
+routing protocol like RIP v2. If you want to use an authenticated
+routing protocol, be sure that your routers also support it; if you
+want to filter on source address, be sure to actually configure the
+daemon to do so. Traditionally, the most popular routing daemon of
+this type has been GateD, but others are now available, including
+Zebra. <a href="appb_01.html">Appendix B, "Tools"</a>, has information on how to get
+these daemons.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3350" /><div class="sect3">
+<h3 class="sect3">11.3.4.6. fingerd</h3>
+
+
+
+
+
+<a name="INDEX-959" />The <em class="emphasis">finger</em> server
+supplies information about existing accounts and accounts on Unix
+systems. This server is started on demand by
+<em class="emphasis">inetd</em>. The information provided by
+<em class="emphasis">fingerd</em> can be valuable to attackers; it tells
+them information about potential targets, such as:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Which accounts exist</i></dt>
+<dd>This tells them which accounts they should try to guess passwords for.</p><p></dd>
+
+
+
+
+
+<dt><i>Personal information about the people with accounts</i></dt>
+<dd>This tells them what passwords to start guessing with.</p><p></dd>
+
+
+
+
+
+<dt><i>Which accounts are in use</i></dt>
+<dd>This tells them which accounts should be avoided, at least until
+they're not in use.</p><p></dd>
+
+
+
+
+
+<dt><i>Which accounts haven't been used lately</i></dt>
+<dd>This tells them which accounts are good targets for attack because
+the owners probably won't notice that the accounts are being
+used.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="INDEX-960" />On the other
+hand, Internet users often use <em class="emphasis">finger</em> (the
+program that talks to your <em class="emphasis">fingerd</em> daemon) quite
+legitimately. <em class="emphasis">finger</em> is helpful in locating
+email addresses and telephone numbers. Instead of simply disabling
+<em class="emphasis">fingerd</em>, you might want to replace it with a
+program that obtains information from a more basic source of contact
+information for your site; the information might include:</p><p>
+
+
+
+
+
+<ul><li>Your main phone number</p><p></li><li>Who to contact if they have questions about your site's
+products or services</p><p></li><li>Sample email addresses if standardized aliases such as
+<em class="emphasis">Firstname_Lastname</em> are maintained for users at
+your site</p><p></li><li>Who to contact in case of network or security problems involving your
+site</p><p></li></ul>
+You can provide this kind of generic information to anybody who uses
+<em class="emphasis">finger</em> to check on your site, regardless of what
+specific information they've requested. The easiest way to
+accomplish this is to put the information in a file (for example,
+<em class="emphasis">/etc/finger_info</em>) and then replace the part of
+the <em class="emphasis">/etc/inetd.conf</em> entry for
+<em class="emphasis">fingerd</em> that specifies the program to run with
+something like <em class="emphasis">/bin/cat /etc/finger_info</em>. Doing
+this causes the contents of the <em class="emphasis">/etc/finger_info</em>
+file to be returned to anyone contacting your
+<em class="emphasis">fingerd</em> server.</p><p>
+
+
+
+
+
+For example, here is the old <em class="emphasis">/etc/inetd.conf</em>
+line from Great Circle Associate's system:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">finger stream tcp nowait nobody /usr/libexec/fingerd fingerd</pre></blockquote>
+
+
+
+
+
+and here is the new <em class="emphasis">/etc/inetd.conf</em> line:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">finger stream tcp nowait nobody /bin/cat cat /etc/finger_info</pre></blockquote>
+
+
+
+
+
+and here are the contents of the
+<em class="emphasis">/etc/finger_info</em> file:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">Great Circle Associates 
+Phone: +1 415 555 0841 
+Email: Info@GreatCircle.COM 
+ 
+For more information, or to report system problems, please  
+send email or call.<a name="INDEX-961" /></pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3403" /><div class="sect3">
+<h3 class="sect3">11.3.4.7. ftpd</h3>
+
+
+
+
+
+<a name="INDEX-962" /><a name="INDEX-963" /><a name="INDEX-964" />If you're going to provide
+anonymous FTP service on your bastion host, you need to reconfigure
+the FTP server appropriately. You should replace the
+<em class="emphasis">ftpd</em> program with one more suited to providing
+anonymous FTP service than the standard <em class="emphasis">ftpd</em>
+programs shipped by most Unix vendors. (See <a href="ch17_01.html">Chapter 17, "File Transfer, File Sharing, and Printing"</a>, for information about providing anonymous FTP
+service.)</p><p>
+
+
+
+
+
+If you're <em class="emphasis">not</em> going to provide anonymous
+FTP, you can probably disable your FTP server entirely; it's
+started on demand by <em class="emphasis">inetd</em>.</p><p>
+
+
+
+
+
+Even if you've disabled the FTP server on your bastion host,
+you can still use the FTP client program (typically called simply
+<em class="emphasis">ftp</em>) on the bastion host to transfer files to
+and from other systems. You'll just have to do the work from
+the bastion host, instead of from the other systems.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch11-3429" /><div class="sect3">
+<h3 class="sect3">11.3.4.8. Other services</h3>
+
+
+
+
+
+There are lots of other services you probably don't need and
+should disable. Although the specific list depends on your own
+site's security policy and needs, and on the platform
+you're using, it should probably include the following:</p><p>
+
+
+
+
+
+<dl>
+<dt><i><em class="emphasis">uucpd</em></i></dt>
+<dd>UUCP over TCP/IP</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">rwhod</em></i></dt>
+<dd>Sort of like <em class="emphasis">fingerd</em>, in that it tells you
+who's currently logged in on the system</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">lpd</em></i></dt>
+<dd>The BSD printer daemon or other printing services<a name="INDEX-965" /> <a name="INDEX-966" /><a name="INDEX-967" /> <a name="INDEX-968" /></p><p></dd>
+
+</dl>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-4-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.3.5. Running Services on Specific Networks</h3>
+
+
+
+
+
+In some cases, you want to run some services that need to respond to
+only one network on a machine with multiple network interfaces. You
+may be able to limit those services to just the networks you wish to
+use them on. Under Unix, this usually means specifying which IP
+addresses and/or network interfaces you want the service to respond
+to as part of the service's startup options; this will be
+slightly different for every service, and not all services provide
+this facility.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-5-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.3.6. Turning Off Routing</h3>
+
+
+
+
+
+<a name="INDEX-969" /><a name="INDEX-970" />As we discussed in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, most machines with more than one network
+interface will automatically attempt to route traffic between
+interfaces. You do not normally want a bastion host to do this. If
+you are not trying to configure a bastion host that is also a router,
+you should turn off routing, which is a three-part process:</p><p>
+
+
+
+
+
+<ol><li>Turn off services that advertise the system as a router.</p><p></li><li>Turn off IP forwarding, which actually does the routing.</p></li><li><p>If necessary, turn off source routing separately.</p></li></ol>
+We discussed turning off routing services in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>. If you have decided to leave these services
+running (perhaps you are running <em class="emphasis">routed</em> or GateD
+because the bastion host is in a complex and changeable routing
+environment), you will need to explicitly configure these services
+not to advertise the machine as a router.</p><p>
+
+
+
+
+
+You will also need to turn off IP forwarding. Turning off routing
+services merely keeps the machine from advertising itself as a
+router; it doesn't keep the machine from routing packets.
+Preventing the machine from routing packets requires modifications to
+the kernel. Fortunately, these days most Unix vendors provide
+supported parameters for turning off IP forwarding. Even for vendors
+that don't, it's about as easy as kernel patches get on
+most machines: turning off IP forwarding requires a change in the
+value of only a single kernel variable. You need to consult your
+vendor to find out how to turn off IP forwarding on your machines.</p><p>
+
+
+
+
+
+On some machines, turning off normal IP forwarding will not also turn
+off source routing; it will still be possible for an attacker to get
+packets through the machine. (Source routing is discussed further in
+<a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>.) If you are not screening out all source
+routed packets before they reach the bastion host, you should consult
+your vendor to find out how to disable source routing in addition to
+normal IP forwarding.<a name="INDEX-971" /><a name="INDEX-972" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. Securing Unix</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.4. Installing and Modifying Services</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>

@@ -1,0 +1,326 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:05 GMT -->
+<head><title>Device Identification (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.3. Device Identification</h2>
+
+<a name="INDEX-1421" /><a name="INDEX-1422" /><a name="INDEX-1423" /><a name="INDEX-1424" /><a name="INDEX-1425" />At times it can be helpful to
+identify the operating system used on a remote machine. For example,
+you may need to identify systems vulnerable to some recently
+disclosed security hole. Or if you are faced with a duplicate IP
+address, identifying the type of machine is usually the best first
+step in locating it. Using <em class="filename">arp</em> to discover the
+type of hardware may be all that you will need to do. If you have
+identified the interface as a Cisco interface and you have only a
+half dozen Cisco devices on your network, you should be able to
+easily find the one with the duplicate address. If, on the other
+hand, you can identify it only as one of several hundred PCs,
+you'll want more information. Knowing the operating system on
+the computer may narrow your search.
+</p>
+
+The obvious, simple strategies are usually the best place to start,
+since these are less likely to offend anyone. Ideally, you will have
+collected additional information as you set systems up, so all
+you'll need to do is consult your database, DHCP records, or
+DNS files or, perhaps, give the user a call. But if your records are
+incomplete, you'll need to probe the device.
+</p>
+
+<a name="INDEX-1426" /><a name="INDEX-1427" /><a name="INDEX-1428" /><a name="INDEX-1429" />Begin by using
+<em class="filename">telnet</em> to connect to the device to check for
+useful banners. Often login banners are changed or suppressed, so
+don't restrict yourself to just the Telnet port. Here is an
+example of trying the SMTP port (25):
+</p>
+
+<blockquote><pre class="code">bsd1# telnet 172.16.2.233 25
+Trying 172.16.2.233...
+Connected to 172.16.2.233.
+Escape character is '^]'.
+220 sol1. ESMTP Sendmail 8.9.1b+Sun/8.9.1; Fri, 2 Jun 2000 09:02:45 -0400 (EDT)
+quit
+221 sol1. closing connection
+Connection closed by foreign host.</pre></blockquote>
+
+<a name="INDEX-1430" /><a name="INDEX-1431" /><a name="INDEX-1432" /><a name="INDEX-1433" /><a name="INDEX-1434" /><a name="INDEX-1435" /><a name="INDEX-1436" /><a name="INDEX-1437" />This simple test tells us
+the host is <em class="filename">sol1</em>, and it is using a Sun port of
+<em class="filename">sendmail</em>. The most likely ports to try are FTP
+(21), Telnet (23), SNMP (25), HTTP (80), POP2 (109), POP3 (110), and
+NTTP (119), but, depending on the systems, others may be informative
+as well.
+</p>
+
+Often, you don't even have to get the syntax correct to get
+useful information. Here is an example of an ill-formed GET request
+(the REQUEST_URI is omitted) sent using <em class="filename">telnet</em>:
+</p>
+
+<blockquote><pre class="code">bsd1# telnet 172.16.2.230 80
+Trying 172.16.2.230...
+Connected to 172.16.2.230.
+Escape character is '^]'.
+GET HTTP/1.0
+HTTP/1.1 400 Bad Request
+Server: Microsoft-IIS/4.0
+...</pre></blockquote>
+
+Additional output has been omitted, but the system has been
+identified in the last line shown. (See <a href="ch10_01.html">Chapter 10, "Application-Level Tools"</a>
+for other examples.)
+</p>
+
+<a name="INDEX-1438" />Port scanning is one of the
+tools described in <a href="ch02_01.html">Chapter 2, "Host Configurations"</a> that can also be used
+here. To do the tests described in <a href="ch02_01.html">Chapter 2, "Host Configurations"</a>, you
+need change only the host address. The interpretation of the results
+is the same. The only thing you need worry about is the possibility
+that some of the services you are testing may be blocked by a
+firewall. Of course, the presence or absence of a service may provide
+insight into the role of the device. An obvious example is an open
+HTTP port. If it is open, you are looking at a web server (or,
+possibly, a machine misconfigured as a web server) and can probably
+get more information by using your web browser on the site.
+</p>
+
+When these obvious tests fail, as they often will, you'll need
+a more sophisticated approach such as stack fingerprinting.
+</p>
+
+<a name="nettroubletools-CHP-6-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">6.3.1. Stack Fingerprinting</h3>
+
+<a name="INDEX-1439" /><a name="INDEX-1440" /><a name="INDEX-1441" /><a name="INDEX-1442" /><a name="INDEX-1443" />The standards that describe
+TCP/IP stack implementations are incomplete in the sense that they
+sometimes do not address how the stack should respond in some
+degenerate or pathological situations. For example, there may be no
+predefined way for dealing with a packet with contradictory flags or
+with a meaningless sequence of inconsistent packets. Since these
+situations should not normally arise, implementers are free to
+respond in whatever manner they see fit. Different implementations
+respond in different ways.
+</p>
+
+<a name="INDEX-1444" /><a name="INDEX-1445" />There are also optional features that
+stack implementers may or may not choose to implement. The presence
+or absence of such support is another useful clue to the identity of
+a system. Even when behavior is well defined, some TCP/IP stacks do
+not fully conform to standards. Usually, the differences are minor
+inconsistencies that have no real impact on performance or
+interoperability. For example, if an isolated FIN packet is sent to
+an open port, the system should ignore the packet. Microsoft Windows,
+among others, will send a RESET instead of ignoring the packet. This
+doesn't create any problems for either of the devices involved,
+but it can be used to distinguish systems.
+</p>
+
+<a name="INDEX-1446" />Collectively, these different
+behaviors can be exploited to identify which operating system (OS) is
+being used on a remote system. A carefully chosen set of packets is
+sent and the responses are examined. It is necessary only to compare
+the responses seen against a set of known behaviors to deduce the
+remote system. This technique is known as <em class="emphasis">stack
+fingerprinting</em> or <em class="emphasis">OS fingerprinting</em>.
+</p>
+
+<a name="INDEX-1447" /><a name="INDEX-1448" /><a name="INDEX-1449" />A fingerprinting program will be
+successful only if it has a set of anomalies or, to mix metaphors, a
+<em class="emphasis">signature</em> that distinguishes the device of
+interest from other devices. Since devices change and new devices are
+introduced, it is not uncommon for a stack fingerprinting program not
+to know the signature for some devices. Ideally, the program will
+have a separate signature file or database so that it can be easily
+updated. From the user's perspective, it may also be helpful to
+have more than one program since each may be able to identify devices
+unknown to the other. Consequently, both <em class="filename">queso</em>
+and the stack fingerprinting option for <em class="filename">nmap</em> are
+described here.
+</p>
+
+<a name="INDEX-1450" /><a name="INDEX-1451" /><a name="INDEX-1452" /><a name="INDEX-1453" />It should also be noted that
+<em class="emphasis">passive fingerprinting</em> is possible. With passive
+fingerprinting, the idea is to examine the initialization packets
+that come into your machine. Of course, this will only identify
+systems that try to contact you, but this can be a help in some
+circumstances, particularly with respect to security. In some ways,
+this approach is more reliable. When a remote machine sends the first
+packet, it must fill in all the fields in the headers. When you probe
+a remote machine, many of the fields in the headers in the reply
+packet will have been copied directly from your probe packets. If you
+are interested in this approach, you might want to look at
+<a name="INDEX-1454" /><a name="INDEX-1455" />
+<em class="filename">siphon</em> or <em class="filename">p0f</em>.
+</p>
+
+<a name="ch06-12-fm2xml" /><blockquote><b>WARNING: </b>
+When using stack
+fingerprinting, whether active or passive, you must realize that you
+are fingerprinting the machine you are actually communicating with.
+Normally, that is exactly what you want. But if there is a proxy
+server between your machine and the target, you will fingerprint the
+proxy server, not the intended target.
+</p>
+</blockquote>
+
+</div>
+<a name="nettroubletools-CHP-6-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">6.3.2. queso</h3>
+
+<a name="INDEX-1456" /><a name="INDEX-1457" />A number of programs do stack
+fingerprinting. One simple program that works well is
+<em class="filename">queso</em>. Its sole function is stack
+fingerprinting. The syntax is straightforward:
+</p>
+
+<blockquote><pre class="code">bsd1# queso 172.16.2.230
+172.16.2.230:80 * Windoze 95/98/NT</pre></blockquote>
+
+<a name="INDEX-1458" />By default, <em class="filename">queso</em>
+probes the HTTP port (80). If that port is not in use,
+<em class="filename">queso</em> will tell you to try another port:
+</p>
+
+<blockquote><pre class="code">bsd1# queso 172.16.2.1
+172.16.2.1:80   *- Not Listen, try another port</pre></blockquote>
+
+<a name="INDEX-1459" /><a name="INDEX-1460" />You
+can do this with the <em class="filename">-p</em> option. In this example,
+the Telnet port is being checked:
+</p>
+
+<blockquote><pre class="code">bsd1# queso -p23 172.16.2.1
+172.16.2.1:23   * Cisco 11.2(10a), HP/3000 DTC, BayStack Switch</pre></blockquote>
+
+This is not a definitive answer, but it has certainly narrowed down
+the field.
+</p>
+
+<a name="INDEX-1461" />You can call
+<em class="filename">queso</em> with multiple addresses by simply putting
+all the addresses on the command line. You can also use subnet masks,
+as shown in the following:
+</p>
+
+<blockquote><pre class="code">bsd1# queso -p23 172.16.2.232/29
+172.16.2.233:23 * Solaris 2.x
+172.16.2.234:23 * Linux 2.1.xx
+172.16.2.235:23 *- Not Listen, try another port
+172.16.2.236:23 * Dead Host, Firewalled Port or Unassigned IP
+172.16.2.237:23 * Dead Host, Firewalled Port or Unassigned IP
+172.16.2.238:23 * Dead Host, Firewalled Port or Unassigned IP</pre></blockquote>
+
+Notice from this example that mask selection doesn't have to
+fall on a class boundary.
+</p>
+
+<em class="filename">queso</em> maintains a separate configuration file.
+If it doesn't recognize a system, it will prompt you to update
+this file:
+</p>
+
+<blockquote><pre class="code">bsd1# queso -p23 205.153.60.1
+205.153.60.1:23 *- Unknown OS, pleez update /usr/local/etc/queso.conf</pre></blockquote>
+
+<a name="INDEX-1462" />You can update this file with the
+<em class="filename">-w</em> option. <em class="filename">queso</em> can
+identify a hundred or so different systems. It is not a particularly
+fast program but gives acceptable results. It can take several
+seconds to scan each machine on the same subnet. If you invoke
+<em class="filename">queso </em>without any argument, it will provide a
+brief summary of its options.
+</p>
+
+</div>
+<a name="nettroubletools-CHP-6-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">6.3.3. nmap Revisited</h3>
+
+<a name="INDEX-1463" /><a name="INDEX-1464" /><a name="INDEX-1465" />You can also do stack fingerprinting with
+<em class="filename">nmap</em> by using the <em class="filename">-O</em>
+option:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap -O 172.16.2.230
+
+Starting nmap V. 2.12 by Fyodor (fyodor@dhp.com, www.insecure.org/nmap/)
+WARNING: OS didn't match until the 2 try
+Interesting ports on  (172.16.2.230):
+Port    State       Protocol  Service
+21      open        tcp        ftp
+80      open        tcp        http
+135     open        tcp        loc-srv
+139     open        tcp        netbios-ssn
+443     open        tcp        https
+1032    open        tcp        iad3
+6666    open        tcp        irc-serv
+7007    open        tcp        afs3-bos
+
+TCP Sequence Prediction: Class=trivial time dependency
+                         Difficulty=0 (Trivial joke)
+Remote operating system guess: Windows NT4 / Win95 / Win98
+
+Nmap run completed -- 1 IP address (1 host up) scanned in 5 seconds</pre></blockquote>
+
+You can suppress most of the port information by specifying a
+particular port. For example:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap -p80 -O 172.16.2.230
+
+Starting nmap V. 2.12 by Fyodor (fyodor@dhp.com, www.insecure.org/nmap/)
+Interesting ports on  (172.16.2.230):
+Port    State       Protocol  Service
+80      open        tcp        http
+
+TCP Sequence Prediction: Class=trivial time dependency
+                         Difficulty=0 (Trivial joke)
+Remote operating system guess: Windows NT4 / Win95 / Win98
+
+Nmap run completed -- 1 IP address (1 host up) scanned in 1 second</pre></blockquote>
+
+You will probably want to do this if you are scanning a range of
+machines to save time. However, if you don't restrict
+<em class="filename">nmap</em> to a single port, you are more likely to
+get a useful answer.
+</p>
+
+Results can be vague at times. This is what <em class="filename">nmap</em>
+returned on one device:
+</p>
+
+<blockquote><pre class="code">...
+Remote OS guesses: Cisco Catalyst 1900 switch or Netopia 655-U/POTS ISDN Router,
+ Datavoice TxPORT PRISM 3000 T1 CSU/DSU 6.22/2.06, MultiTech CommPlete Controlle
+r, IBM MVS TCP/IP stack V. 3.2, APC MasterSwitch Network Power Controller, AXIS
+or Meridian Data Network CD-ROM server, Meridian Data Network CD-ROM Server (V4.
+20 Nov 26 1997), WorldGroup BBS (MajorBBS) w/TCP/IP</pre></blockquote>
+
+The correct answer is none of the above. A system that may not be
+recognized by <em class="filename">nmap</em> may be recognized by
+<em class="filename">queso</em> or vice versa.<a name="INDEX-1466" /><a name="INDEX-1467" /><a name="INDEX-1468" /><a name="INDEX-1469" /><a name="INDEX-1470" /><a name="INDEX-1471" /><a name="INDEX-1472" /><a name="INDEX-1473" /><a name="INDEX-1474" />
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.2. Device Discovery</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.4. Scripts</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:05 GMT -->
+</html>

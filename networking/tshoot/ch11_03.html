@@ -1,0 +1,164 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:15 GMT -->
+<head><title>NTP (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.3. NTP</h2>
+
+<a name="INDEX-2778" /><a name="INDEX-2779" /><a name="INDEX-2780" /><a name="INDEX-2781" /><a name="INDEX-2782" /><a name="INDEX-2783" /><a name="INDEX-2784" />One problem with logging events
+over a network is that differences in system clocks can make
+correlating events on different systems very difficult. It is not
+unusual for the clock on a system to have drifted considerably. Thus,
+there may be discrepancies among timestamps for the same events
+listed in different log files. Fortunately, there is a protocol you
+can use to synchronize the clocks on your system.
+</p>
+
+<a name="INDEX-2785" />Network
+Time Protocol (NTP) provides a mechanism so that one system can
+compare and adjust its clock to match another system's clock.
+Ideally, you should have access to a very accurate clock as your
+starting point. In practice, you will have three choices. The best
+choice is an authoritative reference clock. These devices range from
+atomic clocks to time servers that set their clocks based on time
+signals from radios or GPS satellites.
+</p>
+
+<a name="INDEX-2786" /><a name="INDEX-2787" /><a name="INDEX-2788" /><a name="INDEX-2789" /><a name="INDEX-2790" />The next best source is from a
+system that gets its clock setting from one of these reference
+clocks. Such systems are referred to as stratum 1 servers. If you
+can't get your signal from a stratum 1 server, the next best
+choice is to get it from a system that does, a stratum 2 server. As
+you might guess, there is a whole hierarchy of servers with the
+stratum number incrementing with each step you take away from a
+reference clock. There are public time servers available on the
+Internet with fairly low stratum numbers that you can coordinate to
+occasionally, but courtesy dictates that you ask before using these
+systems.
+</p>
+
+Finally, if you are not attached to the Internet, you can elect to
+simply designate one of your systems as the master system and
+coordinate all your other systems to that system. Your clocks
+won't be very accurate, but they will be fairly consistent, and
+you will be able to compare system logs.
+</p>
+
+<a name="INDEX-2791" /><a name="INDEX-2792" /><a name="INDEX-2793" />NTP works in one of several ways. You can
+set up a server to broadcast time messages periodically. Clients then
+listen for these broadcasts and adjust their clocks accordingly.
+Alternately, the server can be queried by the client. NTP uses UDP,
+typically port 123. Over the years, NTP has gone through several
+versions. Version 4 is the current one, but Version 3 is probably
+more commonly used at this point. There is also a lightweight time
+protocol, Simple Network Time Protocol (SNTP), used by clients that
+need less accuracy. SNTP is interoperable with NTP.
+</p>
+
+<a name="INDEX-2794" /><a name="INDEX-2795" /><a name="INDEX-2796" /><a name="INDEX-2797" /><a name="INDEX-2798" />For Unix systems, the most common
+implementation is <em class="filename">ntpd</em>, formerly
+<em class="filename">xntpd</em>, which is described here. This is actually
+a collection of related programs including the daemon
+<em class="filename">ntpd</em> and support programs such as<em class="filename">
+ntpq</em>, <em class="filename">ntpdate</em>, and
+<em class="filename">ntptrace</em>. You'll want to start
+<em class="filename">ntpd</em> automatically each time you boot your
+system. <em class="filename">ntpd</em> uses a configuration file,
+<em class="filename">/etc/ntp.conf</em>, to control its operation. This
+configuration file can get quite complicated depending on what you
+want to do, but a basic configuration file is fairly simple. Here is
+a simple three-line example:
+</p>
+
+<blockquote><pre class="code">server 205.153.60.20
+logconfig =syncevents +peerevents +sysevents +allclock
+driftfile /etc/ntp.drift</pre></blockquote>
+
+<a name="INDEX-2799" /><a name="INDEX-2800" />The
+first line identifies the server. This is the minimum you'll
+need. The second establishes which events will be logged. The last
+line identifies a drift file. This is used by
+<em class="filename">ntpd</em> to store information about how the clock on
+the system drifts. If <em class="filename">ntpd</em> is stopped and
+restarted, it can use the old drift information to help keep the
+clock aligned rather than waiting to calculate new drift information.
+</p>
+
+<a name="INDEX-2801" />One
+minor warning about <em class="filename">ntpd</em> is in order. If your
+clock is too far off, <em class="filename">ntpd</em> will not reset it.
+(Among other things, this prevents failures from propagating
+throughout a network.) This is rarely a problem with computers, but
+it is not unusual to have a networking device whose clock has never
+been set. Just remember that you may need to manually set your clock
+to something reasonable before you run <em class="filename">ntpd</em>.
+</p>
+
+<em class="filename">ntpdate</em> can be used to do a onetime clock set:</p>
+
+<blockquote><pre class="code">bsd2# ntpdate 205.153.60.20
+ 4 Jan 10:07:36 ntpdate[13360]: step time server 205.153.60.20 offset 11.567081
+sec</pre></blockquote>
+
+<em class="filename">ntpdate</em> cannot be used if
+<em class="filename">ntpd</em> is running, but there shouldn't be
+any need for it if that is the case.
+</p>
+
+<em class="filename">ntpq</em> can be used to query servers about their
+state:
+</p>
+
+<blockquote><pre class="code">bsd2# ntpq -p 172.16.2.1
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+*ntp.lander.edu  .GPS.            1 u   18   64  173    5.000   -1.049 375.210
+ CHU_AUDIO(1)    CHU_AUDIO(1)     7 -   34   64  177    0.000    0.000 125.020
+ 172.16.3.3      0.0.0.0         16 -    -   64    0    0.000    0.000 16000.0
+ 172.16.2.2      0.0.0.0         16 u    -   64    0    0.000    0.000 16000.0</pre></blockquote>
+
+In this example, we have queried a system for a list of its peers.</p>
+
+<em class="filename">ntptrace</em> can be used to discover the chain of
+NTP servers, i.e., who gets their signal from whom:
+</p>
+
+<blockquote><pre class="code">bsd2# ntptrace 172.16.2.1
+NLCisco.netlab.lander.edu: stratum 2, offset 0.009192, synch distance 0.00526
+ntp.lander.edu: stratum 1, offset 0.007339, synch distance 0.00000, refid 'GPS '</pre></blockquote>
+
+Only two servers were involved in this example, but you should get
+the basic idea.
+</p>
+
+Each of these tools has other features that are documented in their
+manpages. NTP can be an involved protocol if used to its fullest.
+Fortunately, a lot of documentation is available. Whatever you
+want -- information, software, a list of public NTP
+servers -- the best place to start is at <a href="http://www.eecis.udel.edu/~ntp">http://www.eecis.udel.edu/~ntp</a>. The work of
+Dave Mills and others, this is a remarkable site.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. Log Files and Auditing</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.4. Security Tools</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:15 GMT -->
+</html>

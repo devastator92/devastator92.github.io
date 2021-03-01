@@ -1,0 +1,363 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>Replication (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.5. Replication</h2>
+
+Solaris 2.6 introduced the concept of<a name="INDEX-955" />
+<a name="INDEX-956" /> <a name="INDEX-957" />
+<a name="INDEX-958" /> replication to NFS clients. This
+feature is known as <em class="emphasis">client-side failover</em>.
+Client-side failover is useful whenever you have read-only data that
+you need to be highly available. An example will illustrate this.
+</p>
+
+Suppose your user community needs to access a collection of
+historical data on the last 200 national budgets of the United
+States. This is a lot of data, and so is a good candidate to store on
+a central NFS server. However, because your users' jobs depend
+on it, you do not want to have a single point of failure, and so you
+keep the data on several NFS servers. (Keeping the data on several
+NFS servers also gives one the opportunity to load balance). Suppose
+you have three NFS servers, named <em class="emphasis">hamilton</em>,
+<em class="emphasis">wolcott</em>, and <em class="emphasis">dexter</em>, each
+exporting a copy of data. Then each server might have an entry like
+this in its <em class="emphasis">dfstab</em> file:
+</p>
+
+<blockquote><pre class="code">share -o ro /export/budget_stats</pre></blockquote>
+
+Now, without client-side failover, each NFS client might have one of
+the following <em class="emphasis">vfstab</em> entries:
+</p>
+
+<blockquote><pre class="code">hamilton:/export/budget_stats    -    /stats/budget     nfs      -     yes     ro
+wolcott:/export/budget_stats     -    /stats/budget     nfs      -     yes     ro
+dexter:/export/budget_stats      -    /stats/budget     nfs      -     yes     ro</pre></blockquote>
+
+Suppose an NFS client is mounting
+<em class="emphasis">/stats/budget</em>from NFS server <em class="emphasis">hamilton</em>, and
+<em class="emphasis">hamilton</em> stops responding. The user on that
+client will want to mount a different server. In order to do this,
+he'll have to do all of the following:
+</p>
+
+<ol><li>
+Terminate any applications that are currently accessing files under
+the <em class="emphasis">/budget_stats</em> mount point.
+</p>
+</li><li>
+Unmount <em class="emphasis">/stats/budget</em>.</p>
+</li><li>
+Edit the <em class="emphasis">vfstab</em> file to point at a different
+server.
+</p>
+</li><li>
+Mount <em class="emphasis">/stats/budget</em>.</p>
+</li></ol>
+The user might have a problem with the first step, especially if the
+application has buffered some unsaved critical information. And the
+other three steps are tedious.
+</p>
+
+With client side failover, each NFS client can have a single entry in
+the <em class="emphasis">vfstab</em> file such as:
+</p>
+
+<blockquote><pre class="code">hamilton,wolcott,dexter:/export/budget_stat   -   /budget_stats   nfs   -  yes  ro</pre></blockquote>
+
+This <em class="emphasis">vfstab</em> entry defines a
+<em class="emphasis">replicated</em> NFS filesystem. When this
+<em class="emphasis">vfstab</em> entry <a name="INDEX-959" />is
+mounted, the NFS client will:
+</p>
+
+<ol><li>
+Contact each server to verify that each is responding and exporting
+<em class="emphasis">/export/budget_stats</em>.
+</p>
+</li><li>
+Generate a list of the NFS servers that are responding and exporting
+<em class="emphasis">/export/budget_stats</em> and associate that list
+with the mount point.
+</p>
+</li><li>
+Pick one of the servers to get NFS service from. In other words, the
+NFS traffic for the mount point is bound to one server at a time.
+</p>
+</li></ol>
+As long as the server selected to provide NFS service is responding,
+the NFS mount operates as a normal non-client-side failover mount.
+Assuming the NFS client selected server
+<em class="emphasis">hamilton</em>, if
+<em class="emphasis">hamilton</em>stops
+responding, the NFS client will automatically select the next server,
+in this case <em class="emphasis">wolcott,</em> without requiring that one
+manually unmount <em class="emphasis">hamilton</em>, and mount
+<em class="emphasis">wolcott</em>. And if <em class="emphasis">wolcott</em>
+later stops responding, the NFS client would then select
+<em class="emphasis">dexter</em>. As you might expect, if later on
+<em class="emphasis">dexter</em> stops responding, the NFS client will
+bind the NFS traffic back to <em class="emphasis">hamilton</em>. Thus,
+client-side failover uses a round-robin scheme.
+</p>
+
+You can tell which server a replicated
+mount<a name="INDEX-960" />
+<a name="INDEX-961" />
+is using via the <em class="emphasis">nfsstat</em> command:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -m</b></tt>
+...
+/budget_stats from hamilton,wolcott,dexter:/export/budget_stats
+ Flags:   
+vers=3,proto=tcp,sec=sys,hard,intr,llock,link,symlink,acl,rsize=32768,wsize=32768,
+retrans=5
+ Failover:noresponse=1, failover=1, remap=1, currserver=wolcott</pre></blockquote>
+
+The <em class="emphasis">currserver</em> value tells us that NFS traffic for the
+<em class="emphasis">/budget_stats</em> mount point is bound to server
+<em class="emphasis">wolcott</em>. Apparently
+<em class="emphasis">hamilton</em> stopped responding at one point,
+because we see non-zero values for the counters
+<em class="emphasis">noresponse</em>, <em class="emphasis">failover</em> and
+<em class="emphasis">remap</em>. The counter
+<em class="emphasis">noresponse</em> counts the number of times a remote
+procedure call to the currently bound NFS server timed out. The
+counter <em class="emphasis">failover</em>counts the number of times the NFS client has
+"failed over" or switched to another NFS server due to a
+timed out remote procedure call. The counter
+<em class="emphasis">remap</em> counts the number of files that were
+"mapped" to another NFS server after a failover. For
+example, if an application on the NFS client had
+<em class="emphasis">/budget_stats/1994/deficit</em> open, and then the client
+failed over to another server, the next time the application went to
+read data from <em class="emphasis">/budget_stats/1944/deficit</em>, the
+open file reference would be re-mapped to the corresponding
+<em class="emphasis">1944/deficit</em> file on the newly bound NFS server.
+</p>
+
+Solaris will also notify you when a failover happens. Expect a
+message like:
+</p>
+
+<blockquote><pre class="code">NOTICE: NFS: failing over from hamilton to wolcott</pre></blockquote>
+
+on both the NFS client's system console and in its
+<em class="emphasis">/var/adm/messages</em> file.
+</p>
+
+By the way, it is not required that each server have the same
+pathname mounted. The <em class="emphasis">mount</em> command will let you
+mount replica servers with different directories. For example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o ro serverX:/q,serverY:/m /mnt</b></tt></pre></blockquote>
+
+As long as the contents of <em class="emphasis">serverX:/q</em> and
+<em class="emphasis">serverY:/m</em> are the same, the top level directory
+name does not have to be. The next section discusses rules for
+content of replicas.
+</p>
+
+<a name="nfs2-CHP-6-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">6.5.1. Properties of replicas</h3>
+
+Replicas on each server in the replicated <a name="INDEX-962" /> <a name="INDEX-963" />filesystem have to be the same in
+content. For example, if on an NFS client we have done:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o ro serverX,serverY:/export /mnt</b></tt></pre></blockquote>
+
+then <em class="emphasis">/export</em> on both servers needs to be an
+exact copy. One way to generate such a copy would be:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>rlogin serverY</b></tt>
+serverY # <tt class="userinput"><b>cd /export</b></tt>
+serverY # <tt class="userinput"><b>rm -rf ../export</b></tt>
+serverY # <tt class="userinput"><b>mount serverX:/export /mnt</b></tt>
+serverY # <tt class="userinput"><b>cd /mnt</b></tt>
+serverY # <tt class="userinput"><b>find . -print | cpio -dmp /export</b></tt>
+serverY # <tt class="userinput"><b>umount /mnt</b></tt>
+serverY # <tt class="userinput"><b>exit</b></tt>
+#</pre></blockquote>
+
+The third command invoked here, <em class="emphasis">rm -rf ../export</em>
+is somewhat curious. What we want to do is remove the contents of
+<em class="emphasis">/export</em> in a manner that is as fast and secure
+as possible. We could do <em class="emphasis">rm -rf /export</em>but that has the side of effect of removing
+<em class="emphasis">/export</em> as well as its contents. Since
+<em class="emphasis">/export</em> is exported, any NFS client that is
+currently mounting <em class="emphasis">serverY:/export</em> will
+experience stale filehandles (see <a href="ch18_08.html#nfs2-CHP-18-SECT-8">Section 18.8, "Stale filehandles"</a>). Recreating <em class="emphasis">/export</em>
+immediately with the <em class="emphasis">mkdir</em> command
+does not suffice because of the way NFS servers generate filehandles
+for clients. The filehandle contains among other things the inode
+number (a file's or directory's unique identification
+number) and this is almost guaranteed to be different. So we want to
+remove just what is under <em class="emphasis">/export</em>. A commonly
+used method for doing that is:
+</p>
+
+<blockquote><pre class="code"># cd /export ; find . -print | xargs rm -rf</pre></blockquote>
+
+but the problem there is that if someone has placed a filename like
+<em class="emphasis">foo /etc/passwd</em> (i.e., a file with an embedded
+space character) in <em class="emphasis">/export</em>, then the
+<em class="emphasis">xargs rm -rf</em> command will remove a file called
+<em class="emphasis">foo</em> and a file called
+<em class="emphasis">/etc/passwd,</em> which on Solaris may prevent one
+from logging into the system. Doing <em class="emphasis">rm -rf
+../export</em> will prevent <em class="emphasis">/export</em> from
+being removed because <em class="emphasis">rm</em> will not remove the
+current working directory. Note that this behavior may vary with
+other systems, so test it on something unimportant to be sure.
+</p>
+
+At any rate, the aforementioned sequence of commands will create a
+replica that has the following properties:
+</p>
+
+<ul><li>
+Each regular file, directory, named pipe, symbolic link, socket, and
+device node in the original has a corresponding object with the same
+name in the copy.
+</p>
+</li><li>
+The file type of each regular file, directory, named pipe, symbolic
+link, socket, and device node in the original is the same in the
+corresponding object with same name in the copy.
+</p>
+</li><li>
+The contents of each regular file, directory, symbolic link and
+device node in the original are the equal to the contents of each
+corresponding object with same name in the copy.
+</p>
+</li><li>
+The user identifier, group identifier, and file permissions of each
+regular file, directory, name pipe, symbolic link, socket, and device
+node in the original are to equal the user identifier, group
+identifier, and file permissions of each corresponding object with
+the same name in the copy. Strictly speaking this last property is
+not mandatory for client-side failover to work, but if after a
+failover, the user on the NFS client no longer has access to the file
+his application was reading, then the user's <a name="INDEX-964" /> <a name="INDEX-965" />application will
+stop working.
+</p>
+</li></ul>
+</div>
+<a name="nfs2-CHP-6-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">6.5.2. Rules for mounting replicas</h3>
+
+In order to use client-side failover, the filesystem <a name="INDEX-966" /> <a name="INDEX-967" />must be mounted with
+<a name="INDEX-968" />
+<a name="INDEX-969" />the
+sub-options <em class="emphasis">ro</em> (read-only) and
+<em class="emphasis">hard</em>.
+</p>
+
+The reason why it has to be mounted read-only is that if NFS clients
+could write to the replica filesystem, then the replicas would be no
+longer synchronized, producing the following undesirable effects:
+</p>
+
+<ul><li>
+If another NFS client failed over from one server to the server with
+the modified file, it would encounter an unexpected inconsistency.
+</p>
+</li><li>
+Likewise, if the NFS client or application that modified the file
+failed over to another server, it would find that its changes were no
+longer present.
+</p>
+</li></ul>
+The filesystem has to be mounted <em class="emphasis">hard</em> because it
+is not clear what it would mean to mount a replicated filesystem
+<em class="emphasis">soft</em>. When a filesystem is mounted
+<em class="emphasis">soft</em>, it is supposed to return an error from a
+timed-out remote procedure call. When a replicated filesystem is
+mounted, after a remote procedure call times out, the NFS filesystem
+is supposed to try the next server in the list associated with the
+mount point. These two semantics are at odds, so replicated
+filesystems must be mounted <em class="emphasis">hard</em>.
+</p>
+
+The NFS servers in the replica list must support a common NFS
+version. When specifying a replicated filesystem that has some
+servers that support NFS Version 3, and some that support just NFS
+Version 2, the <em class="emphasis">mount</em> command will fail with the
+error "replicas must have the same version." Usually,
+though, the NFS servers that support Version 3 will also support
+Version 2. Thus, if you are happy with using NFS Version 2 for your
+replicated filesystem, then you can force the mount to succeed by
+specifying the <em class="emphasis">vers=2</em> suboption. For example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o vers=2 serverA,serverB,serverC:/export /mnt</b></tt></pre></blockquote>
+
+Note that it is not a requirement that all the NFS servers in the
+replicated filesystem support the same transport<a name="INDEX-970" /> <a name="INDEX-971" /> protocol (TCP or
+UDP).
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">6.5.3. Managing replicas</h3>
+
+In Solaris, the onus for creating, distributing, and maintaining
+replica filesystems is on the system administrator; there are no
+tools to manage replication. The techniques used in the example given
+in the <a href="ch06_05.html#nfs2-CHP-6-SECT-5.1">Section 6.5.1, "Properties of replicas"</a>, can
+be used, although the example script given in that subsection for
+generating a replica may cause stale filehandle problems when using
+it to update a replica; we will address this in <a href="ch18_08.html#nfs2-CHP-18-SECT-8">Section 18.8, "Stale filehandles"</a>. You will want to automate the replica
+distribution procedure. In the example, you would alter the
+aforementioned example to:
+</p>
+
+<ul><li>
+Prevent stale filehandles.</p>
+</li><li>
+Use the <em class="emphasis">rsh</em> command instead of the
+<em class="emphasis">rlogin</em> command.
+</p>
+</li></ul>
+Other methods of distribution to consider are ones that use tools
+like the <em class="emphasis">rdist</em>and<em class="emphasis">filesync</em>commands.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">6.5.4. Replicas and the automounter</h3>
+
+Replication is best combined with use of the <a name="INDEX-972" /> <a name="INDEX-973" /> <a name="INDEX-974" /> <a name="INDEX-975" />automounter. The
+integration of the two is described in <a href="ch09_05.html#nfs2-CHP-9-SECT-5.1">Section 9.5.1, "Replicated servers"</a>.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.4. Symbolic links</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.6. Naming schemes</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

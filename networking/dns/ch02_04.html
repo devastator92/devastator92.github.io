@@ -1,0 +1,240 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:21 GMT -->
+<head><title>Name Servers and Zones (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch02_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">2.4. Name Servers and Zones</h2>
+
+
+<a name="INDEX-160" /> <a name="INDEX-161" />The
+programs that store information about the domain name space are
+called <em class="emphasis">name servers</em>. Name servers generally have
+complete information about some part of the domain name space (a
+<em class="emphasis">zone</em>), which they load from a file or from
+another name server. The name server is then said to have
+<em class="emphasis">authority</em><a name="INDEX-162" /> <a name="INDEX-163" /> for
+that zone. Name servers can be authoritative for multiple zones, too.</p><p>
+
+
+<a name="INDEX-164" /> <a name="INDEX-165" />The <a name="INDEX-166" />difference between a zone and a domain
+is important, but subtle. All top-level domains, and many domains at
+the second level and lower, such as <em class="emphasis">berkeley.edu</em>
+and <em class="emphasis">hp.com</em>, are broken into smaller, more
+manageable units by delegation. These units are called zones. The
+<em class="emphasis">edu</em> domain, shown in <a href="ch02_04.html#dns4-CHP-2-FIG-8">Figure 2-8</a>, is divided into many zones, including the
+<em class="emphasis">berkeley.edu</em> zone, the
+<em class="emphasis">purdue.edu</em> zone, and the
+<em class="emphasis">nwu.edu</em> zone. At the top of the domain,
+there's also an <em class="emphasis">edu</em> zone. It's
+natural that the folks who run <em class="emphasis">edu</em> would break
+up the <em class="emphasis">edu</em> domain: otherwise, they'd have
+to manage the <em class="emphasis">berkeley.edu</em> subdomain themselves.
+It makes much more sense to delegate
+<em class="emphasis">berkeley.edu</em> to Berkeley. What's left for
+the folks who run <em class="emphasis">edu</em>? The
+<em class="emphasis">edu</em> zone, which would contain mostly delegation
+information for subdomains of <em class="emphasis">edu</em>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-8" /><div class="figure"><img height="298" alt="Figure 2-8" src="figs/dns4_0208.gif" width="381" /></div><h4 class="objtitle">Figure 2-8. The edu domain broken into zones</h4>
+
+The <em class="emphasis">berkeley.edu</em> subdomain is, in turn, broken
+up into multiple zones by delegation, as shown in <a href="ch02_04.html#dns4-CHP-2-FIG-9">Figure 2-9</a>. There are delegated subdomains called
+<em class="emphasis">cc</em>, <em class="emphasis">cs</em>,
+<em class="emphasis">ce</em>, <em class="emphasis">me</em>, and more. Each of
+these subdomains is delegated to a set of name servers, some of which
+are also authoritative for <em class="emphasis">berkeley.edu</em>.
+However, the zones are still separate, and may have a totally
+different group of authoritative name servers.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-9" /><div class="figure"><img height="310" alt="Figure 2-9" src="figs/dns4_0209.gif" width="353" /></div><h4 class="objtitle">Figure 2-9. The berkeley.edu domain broken into zones</h4>
+
+A zone and a domain may share the same domain name but contain
+different nodes. In particular, the zone doesn't contain any
+nodes in delegated subdomains. For example, the top-level domain
+<em class="emphasis">ca</em> (for Canada) has subdomains called
+<em class="emphasis">ab.ca</em>, <em class="emphasis">on.ca</em>, and
+<em class="emphasis">qc.ca</em>, for the provinces Alberta, Ontario, and
+Quebec. Authority for the <em class="emphasis">ab.ca</em>,
+<em class="emphasis">on.ca</em>, and <em class="emphasis">qc.ca</em> subdomains
+may be delegated to name servers in each of the provinces. The domain
+<em class="emphasis">ca</em> contains all the data in
+<em class="emphasis">ca</em> plus all the data in
+<em class="emphasis">ab.ca</em>, <em class="emphasis">on.ca</em>, and
+<em class="emphasis">qc.ca</em>. But the zone <em class="emphasis">ca</em>
+contains only the data in <em class="emphasis">ca</em> (see <a href="ch02_04.html#dns4-CHP-2-FIG-10">Figure 2-10</a>), which is probably mostly pointers to the
+delegated subdomains. And <em class="emphasis">ab.ca, on.ca,
+</em>and <em class="emphasis">qc.ca</em> are separate zones from the
+<em class="emphasis">ca</em> zone.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-10" /><div class="figure"><img height="250" alt="Figure 2-10" src="figs/dns4_0210.gif" width="388" /></div><h4 class="objtitle">Figure 2-10. The domain ca . . . </h4>
+
+If a subdomain of the domain isn't delegated away, however, the
+zone contains the domain names and data in the subdomain. So the
+<em class="emphasis">bc.ca</em> and <em class="emphasis">sk.ca</em> (British
+Columbia and Saskatchewan) subdomains of the <em class="emphasis">ca</em>
+domain may exist, but might not be delegated. (Perhaps the provincial
+authorities in B.C. and Saskatchewan aren't yet ready to manage
+their own zones, but the authorities running the top-level
+<em class="emphasis">ca</em> zone want to preserve the consistency of the
+namespace and implement subdomains for all of the Canadian provinces
+right away.) In this case, the zone <em class="emphasis">ca</em> has a
+ragged bottom edge, containing <em class="emphasis">bc.ca</em> and
+<em class="emphasis">sk.ca</em> but not the other <em class="emphasis">ca</em>
+subdomains, as shown in <a href="ch02_04.html#dns4-CHP-2-FIG-11">Figure 2-11</a>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-11" /><div class="figure"><img height="243" alt="Figure 2-11" src="figs/dns4_0211.gif" width="389" /></div><h4 class="objtitle">Figure 2-11.  . . . versus the zone ca</h4>
+
+Now it's clear why name servers load zones instead of domains:
+a domain might contain more information than the name server
+needs.<a href="#FOOTNOTE-12">[12]</a> A domain could contain data delegated
+to other name servers. Since a zone is bounded by delegation, it
+never includes delegated data.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-12" />[12]Imagine if a root name server loaded the root
+domain instead of the root zone: it would be loading the entire
+namespace!</p><p>
+
+</blockquote>
+
+
+If you're just starting out, however, your domain probably
+won't have any subdomains. In this case, since there's no
+delegation going on, your domain and your zone contain the
+same<a name="INDEX-167" />
+data<a name="INDEX-168" />
+<a name="INDEX-169" />.</p><p>
+
+
+<a name="dns4-CHP-2-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">2.4.1. Delegating Subdomains</h3>
+
+
+<a name="INDEX-170" />Even
+though you may not need to delegate parts of your domain just yet,
+it's helpful to understand a little more about how the process
+of delegating a subdomain works. Delegation, in the abstract,
+involves assigning responsibility for some part of your domain to
+another organization. What really happens, however, is the assignment
+of authority for your subdomains to different name servers. (Note
+that we said "name servers," not just "name
+server.")</p><p>
+
+
+Your zone's data, instead of containing information in the
+subdomain you've delegated, includes pointers to the name
+servers that are authoritative for that subdomain. Now if one of your
+name servers is asked for data in the subdomain, it can reply with a
+list of the right name servers to talk to.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">2.4.2. Types of Name Servers</h3>
+
+
+The DNS specs define two types of <a name="INDEX-171" />name
+servers: <a name="INDEX-172" /> <a name="INDEX-173" />primary masters <a name="INDEX-174" />and
+<a name="INDEX-175" /> <a name="INDEX-176" />secondary masters. A <em class="emphasis">primary
+master</em> name server for a zone reads the data for the zone
+from a file on its host. A <em class="emphasis">secondary master</em> name
+server for a zone gets the zone data from another name server that is
+authoritative for the zone, called its <em class="emphasis">master
+server</em><a name="INDEX-177" />. Quite often, the master name server is
+the zone's primary master, but that's not required: a
+secondary master can load zone data from another secondary. When a
+secondary starts up, it contacts its master server and, if necessary,
+pulls the zone data over. This is referred to as a
+<a name="INDEX-178" /><em class="emphasis">zone transfer</em>.
+Nowadays, the preferred term for a secondary master name server is a
+<em class="emphasis">slave,</em><a name="INDEX-179" /> though many people (and much software,
+including Microsoft's DNS Manager) still use the old term.</p><p>
+
+
+Both the primary master and slave name servers for a zone are
+authoritative for that zone. Despite the somewhat disparaging name,
+slaves aren't second-class name servers. DNS provides these two
+types of name servers to make administration easier. Once
+you've created the data for your zone and set up a primary
+master name server, you don't need to fool with copying that
+data from host to host to create new name servers for the zone. You
+simply set up slave name servers that load their data from the
+primary master for the zone. Once they're set up, the slaves
+transfer new zone data when necessary.</p><p>
+
+
+Slave name servers are important because it's a good idea to
+set up more than one name server for any given zone. You'll
+want more than one for redundancy, to spread the load around, and to
+ensure that all the hosts in the zone have a name server close by.
+Using <a name="INDEX-180" />slave name servers makes this
+administratively workable.</p><p>
+
+
+Calling a <em class="emphasis">particular</em> name server a primary
+master name server or a slave name server is a little imprecise,
+though. We mentioned earlier that a name server can be authoritative
+for more than one zone. Similarly, a name server can be a primary
+master for one zone and a slave for another. Most name servers,
+however, are either primary for most of the zones they load or slave
+for most of the zones they load. So if we call a particular name
+server a primary or a slave, we mean that it's the primary
+master or a slave for <em class="emphasis">most</em> of the zones
+it's authoritative for.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">2.4.3. Zone Data Files</h3>
+
+
+The files from which primary master name servers load their zone data
+are called, simply enough, <a name="INDEX-181" />zone data files. We often refer to them as
+<a name="INDEX-182" /> <a name="INDEX-183" />
+<a name="INDEX-184" />data files or database files. Slave name
+servers can also load their zone data from data files. Slaves are
+usually configured to back up the zone data they transfer from a
+master name server to data files. If the slave is later killed and
+restarted, it will read the backup data files first, then check to
+see whether its zone data is current. This both obviates the need to
+transfer the zone data if it hasn't changed and provides a
+source of the data if the master is down.</p><p>
+
+
+The data files contain resource records that describe the zone. The
+resource records describe all the hosts in the zone and mark any
+delegation of subdomains. BIND also allows special directives to
+include the contents of other data files in a zone data file, much
+like the <em class="emphasis">#include</em> statement in C
+programming.<a name="INDEX-185" /> <a name="INDEX-186" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.3. Delegation</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.5. Resolvers</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:22 GMT -->
+</html>

@@ -1,0 +1,496 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:05 GMT -->
+<head><title>Device Discovery (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.2. Device Discovery</h2>
+
+<a name="INDEX-1335" /><a name="INDEX-1336" /><a name="INDEX-1337" />The first step in managing a network
+is discovering which devices are on the network. There are some
+fairly obvious reasons why this is important. You will need to track
+address usage to manage services such as DNS. You may need this
+information to verify licensing information. From a security
+perspective, you will want to know if there are any devices on your
+network that shouldn't be there. And one particularly
+compelling reason for a complete picture of your network is IP
+address management.
+</p>
+
+<a name="nettroubletools-CHP-6-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">6.2.1. IP Address Management</h3>
+
+<a name="INDEX-1338" /><a name="INDEX-1339" /><a name="INDEX-1340" /><a name="INDEX-1341" />Management of IP addresses is often
+cited as the most common problem faced in the management of an IP
+network. There are two goals in IP management -- keeping track of
+the addresses in use so you know what is available and keeping track
+of the devices associated with each assigned IP address.
+</p>
+
+<a name="INDEX-1342" /><a name="INDEX-1343" /><a name="INDEX-1344" /><a name="INDEX-1345" /><a name="INDEX-1346" /><a name="INDEX-1347" /><a name="INDEX-1348" /><a name="INDEX-1349" /><a name="INDEX-1350" />Several developments over the
+last few years have helped to lessen the problems of IP management.
+First, DHCP servers, systems that automatically allocate and track IP
+addresses, help when dynamic allocation is appropriate. But there are
+a number of reasons why a system may require a static IP address. Any
+resource or server -- time server, name server, and so
+on -- should be given a static address. Network devices like
+switches and routers require static addresses. Some sites require
+reverse DNS lookup before allowing access. The easiest way to provide
+this is with a static IP address and with an appropriate DNS
+entry.<a href="#FOOTNOTE-26">[26]</a> Even when such issues don't
+apply, the cost and complexity of DHCP services may prevent their
+use. And even if you use DHCP, there is nothing to prevent a user
+from incorrectly assigning a static IP address in the middle of the
+block of addresses you have reserved for DNS assignment.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-26" />[26]<a name="INDEX-1351" /><a name="INDEX-1352" /><a name="INDEX-1353" />Strictly speaking, static addresses are not
+mandatory in every case. Support for dynamic DNS, or DDNS, has been
+available for several years. With DDNS, DNS entries can be mapped to
+dynamically assigned IP addresses. Unfortunately, many sites still do
+not use it.</p> </blockquote>
+
+<a name="INDEX-1354" /><a name="INDEX-1355" /><a name="INDEX-1356" /><a name="INDEX-1357" />Another development that has helped
+is automatic testing of newly assigned addresses. While earlier
+implementations of TCP/IP stacks sometimes neglected to test whether
+an IP address was being used, most systems, when booted, now first
+check to see if an IP address is in use before using it. The test,
+known as <em class="emphasis">gratuitous ARP</em>, sends out an ARP
+request for the IP address about to be used. If anyone replies, the
+address must already be in use. Of course, this test works only when
+the other machine is turned on. You may set up a machine with
+everything appearing to work correctly, only to get a call later in
+the day. Once such a problem has been detected, you will need to
+track it down.
+</p>
+
+<a name="INDEX-1358" /><a name="INDEX-1359" />While these and similar developments
+have gone a long way toward lessening the problems of IP management
+and duplicate IP addresses, IP management remains a headache on many
+networks. Ideally, you will keep careful records as IP addresses are
+assigned, but mistakes are unavoidable. Thus, an automated approach
+is often desirable.
+</p>
+
+<a name="INDEX-1360" /><a name="INDEX-1361" /><a name="INDEX-1362" /><a name="INDEX-1363" />The
+simplest way to collect MAC/IP address pairs is to ping the address
+and then examine your ARP table. The ping is necessary since most ARP
+tables are flushed frequently. At one time, it was possible to ping a
+broadcast address and get a number of replies at once. Most hosts are
+now configured to ignore ICMP requests sent to broadcast addresses.
+(See the discussion of Smurf Attacks in <a href="ch03_01.html">Chapter 3, "Connectivity Testing"</a>.) 
+</p>
+
+You will need to repeat ping scans very frequently if you want to get
+a picture over time. It is a simple matter to create a script that
+automates the process of pinging a range of IP addresses,
+particularly if you use a tool like <em class="filename">fping</em>.
+You'll need the output from the <em class="filename">arp</em>
+command if you want the MAC addresses. And you certainly will want to
+do some cleanup with <em class="filename">sort</em> or
+<em class="filename">sed</em>.
+</p>
+
+<a name="INDEX-1364" /><a name="INDEX-1365" /><a name="INDEX-1366" />Fortunately, there is a class of tools
+that simplifies this process -- IP scanner or
+<em class="filename">ping</em> scanner. These are usually very simple
+tools that send ICMP ECHO_REQUEST packets in a systematic manner to
+each IP address in a range of IP addresses and then record any
+replies. (These tools are not limited to using just ECHO_REQUEST
+packets.)
+</p>
+
+</div>
+<a name="nettroubletools-CHP-6-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">6.2.2. nmap</h3>
+
+<a name="INDEX-1367" /><a name="INDEX-1368" /><a name="INDEX-1369" /><a name="INDEX-1370" /><a name="INDEX-1371" />The
+program <em class="filename">nmap</em> is a multifunction tool that
+supports IP scanning. It also provides port scanning and stack
+fingerprinting. (Stack fingerprinting is described later in this
+chapter.) <em class="filename">nmap</em> is an extremely feature-rich
+program with lots of versatility. For many of its uses, root
+privileges are required, although some functions work without root
+privileges.
+</p>
+
+<em class="filename">nmap</em> certainly could have been described in
+<a href="ch02_01.html">Chapter 2, "Host Configurations"</a>, when port scanners were introduced. But
+if all you want is a port scan for a single machine, using
+<em class="filename">nmap</em> is overkill.<a href="#FOOTNOTE-27">[27]</a> Nonetheless, if you only want as few
+programs as possible and you need some of the other functionality
+that <em class="filename">nmap</em> provides, then you can probably get by
+with just <em class="filename">nmap</em>.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-27" />[27]There are also
+reasons, as will become evident, why you might not want
+<em class="filename">nmap </em>too freely available on your
+network.</p> </blockquote>
+
+To use <em class="filename">nmap</em> as a port scanner, the only
+information you need is the IP address or hostname of the target:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap sol1
+
+Starting nmap V. 2.12 by Fyodor (fyodor@dhp.com, www.insecure.org/nmap/)
+Interesting ports on sol1.lander.edu (172.16.2.233):
+Port    State       Protocol  Service
+21      open        tcp        ftp
+23      open        tcp        telnet
+25      open        tcp        smtp
+37      open        tcp        time
+111     open        tcp        sunrpc
+515     open        tcp        printer
+540     open        tcp        uucp
+6000    open        tcp        X11
+
+Nmap run completed -- 1 IP address (1 host up) scanned in 1 second</pre></blockquote>
+
+<a name="INDEX-1372" />The results should be self-explanatory.
+You can specify several IP addresses or you can span a segment by
+specifying an address with a mask if you want to scan multiple
+devices or addresses. The next example will scan all the addresses on
+the same subnet as the <em class="filename">lnx1</em> using a class C
+network mask:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap lnx1/24</pre></blockquote>
+
+While <em class="filename">nmap</em> skips addresses that don't
+respond, this can still produce a lot of output.
+</p>
+
+Fortunately, <em class="filename">nmap</em> will recognize a variety of
+address range options. Consider:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap 172.16.2.230-235,240</pre></blockquote>
+
+<a name="INDEX-1373" /><a name="INDEX-1374" /><a name="INDEX-1375" /><a name="INDEX-1376" />This will scan seven IP
+addresses -- those from <em class="emphasis">172.16.2.230</em> through
+<em class="emphasis">172.16.2.235</em> inclusive and
+<em class="emphasis">172.16.2.240</em>. You can use
+<em class="emphasis">172.16.2</em>.* to scan everything on the subnet. Be
+warned, however, that the shell you use may require you to use an
+escape sequence for the <tt class="literal">*</tt> to work correctly. For
+example, with C-shell, you could use
+<em class="emphasis">172.16.2.\</em>*. You should also note that the
+network masks do not have to align with a class boundary. For
+example, <tt class="literal">/29</tt> would scan eight hosts by working
+through the possibilities generated by changing the three low-order
+bits of the address.
+</p>
+
+<a name="INDEX-1377" />If you want to just do an IP scan to
+discover which addresses are currently in use, you can use the
+<em class="filename">-sP</em> option. This will do a
+<em class="filename">ping</em>-like probe for each address on the subnet:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap -sP lnx1/24
+
+Starting nmap V. 2.12 by Fyodor (fyodor@dhp.com, www.insecure.org/nmap/)
+Host   (172.16.2.0) seems to be a subnet broadcast address (returned 3 extra 
+pings).  Skipping host.
+Host cisco.lander.edu (172.16.2.1) appears to be up.
+Host  (172.16.2.12) appears to be up.
+Host  (172.16.2.230) appears to be up.
+Host bsd2.lander.edu. (172.16.2.232) appears to be up.
+Host sol1.lander.edu (172.16.2.233) appears to be up.
+Host lnx1.lander.edu (172.16.2.234) appears to be up.
+Host   (172.16.2.255) seems to be a subnet broadcast address (returned 3 extra 
+pings).  Skipping host.
+Nmap run completed -- 256 IP addresses (6 hosts up) scanned in 1 second</pre></blockquote>
+
+<a name="INDEX-1378" /><a name="INDEX-1379" /><a name="INDEX-1380" /><a name="INDEX-1381" />You should
+be warned that this particular scan uses both an ordinary ICMP packet
+and a TCP ACK packet to port 80 (HTTP). This second packet will get
+past routers that block ICMP packets. If an RST packet is received,
+the host is up and the address is in use. Unfortunately, some
+intrusion detection software that will ignore the ICMP packet will
+flag the TCP ACK as an attack. If you want to use only ICMP packets,
+use the <em class="filename">-PI</em> option. For example, the previous
+scan could have been done using only ICMP packets with the command:
+</p>
+
+<blockquote><pre class="code">bsd1# nmap -sP -PI lnx1/24</pre></blockquote>
+
+In this case, since the devices are on the same subnet and there is
+no intervening firewall, the same machines are found.
+</p>
+
+<a name="INDEX-1382" />Unfortunately,
+<em class="filename">nmap</em> stretches the limits of what might be
+considered appropriate at times. In particular,
+<em class="filename">nmap</em> provides a number of options for stealth
+scanning. There are two general reasons for using stealth scanning.
+One is to probe a machine without being detected. This can be
+extremely difficult if the machine is actively watching for such
+activity.
+</p>
+
+<a name="INDEX-1383" /><a name="INDEX-1384" />The other reason is to slip packets
+past firewalls. Because firewall configuration can be quite complex
+and because it can be very difficult to predict traffic patterns,
+many firewalls are configured in ways that allow or block broad,
+generic classes of traffic. This minimizes the number of rules that
+need to be applied and improves the throughput of the firewall. But
+blocking broad classes of traffic also means that it may be possible
+to sneak packets past such firewalls by having them look like
+legitimate traffic. For example, external TCP connections may be
+blocked by discarding the external SYN packets used to set up a
+connection. If a SYN/ACK packet is sent from the outside, most
+firewalls will assume the packet is a response for a connection that
+was initiated by an internal machine. Consequently, the firewall will
+pass the packet. With these firewalls, it is possible to construct
+such a packet and slip it through the firewall to see how an internal
+host responds.
+</p>
+
+<em class="filename">nmap</em><a name="INDEX-1385" /><a name="INDEX-1386" /> has several types of scans that are
+designed to do stealth probes. These include
+<em class="filename">-sF</em>, <em class="filename">-sX</em>, and
+<em class="filename">-sN</em>. (You can also use the
+<em class="filename">-f</em> option to break stealth probes into lots of
+tiny fragments.) But while these stealth packets may slip past
+firewalls, they should all be detected by any good intrusion
+detection software running on the target. You may want to try these
+on your network just to see how well your intrusion detection system
+works or to investigate how your firewall responds. But if you are
+using these to do clandestine scans, you should be prepared to be
+caught and to face the consequences.
+</p>
+
+<a name="INDEX-1387" /><a name="INDEX-1388" /><a name="INDEX-1389" />Another questionable feature of
+<em class="filename">nmap</em> is the ability to do decoy scans. This
+option allows you to specify additional forged IP source addresses.
+In addition to the probe packets that are sent with the correct
+source address, other similar packets are sent with forged source
+addresses. The idea is to make it more difficult to pinpoint the real
+source of the attack since only a few of the packets will have the
+correct source address. Not only does this create unnecessary network
+traffic, but it can create problems for hosts whose addresses are
+spoofed. If the probed site automatically blocks traffic from probing
+sites, it will cut off the spoofed sites as well as the site where
+the probe originated. Clearly, this is not what you really want to
+do. This calls into question any policy that simply blocks sites
+without further investigation. Such systems are also extremely
+vulnerable to denial-of-service attacks. Personally, I can see no
+legitimate use for this feature and would be happy to see it dropped
+from <em class="filename">nmap</em>.
+</p>
+
+<a name="INDEX-1390" /><a name="INDEX-1391" />But while
+there are some questionable options, they are easily outnumbered by
+useful options. If you want your output in greater detail, you might
+try the <em class="filename">-v</em> or the <em class="filename">-d</em>
+option. If information is streaming past you on the screen too fast
+for you to read, you can log the output to a file in human-readable
+or machine-parseable form. Use, respectively, the
+<em class="filename">-o</em> or <em class="filename">-m</em> options along with
+a filename. The <em class="filename">-h</em> option will give a brief
+summary of <em class="filename">nmap</em>'s many options. You may
+want to print this to use while you learn <em class="filename">nmap</em>.
+</p>
+
+<a name="INDEX-1392" />If
+you are using <em class="filename">nmap</em> to do port scans, you can use
+the <em class="filename">-p</em> option to specify a range of ports.
+Alternatively, the <em class="filename">-F</em>, or fast scan option, can
+be used to limit scans to ports in your services file. You'll
+certainly want to consider using one or the other of these. Scanning
+every possible port on a network can take a lot of time and generate
+a lot of traffic. A number of other options are described in
+<em class="filename">nmap</em>'s documentation.
+</p>
+
+Despite the few negative things I have mentioned,
+<em class="filename">nmap</em> really is an excellent tool. You will
+definitely want to add it to your collection.<a name="INDEX-1393" /><a name="INDEX-1394" /><a name="INDEX-1395" />
+</p>
+
+</div>
+<a name="nettroubletools-CHP-6-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">6.2.3. arpwatch</h3>
+
+<a name="INDEX-1396" /><a name="INDEX-1397" /><a name="INDEX-1398" /><a name="INDEX-1399" /><a name="INDEX-1400" />Active scans, such as those we have just
+seen with <em class="filename">nmap</em>, have both advantages and
+disadvantages. They allow scans of remote networks and give a good
+snapshot of the current state of the network. The major disadvantage
+is that these scans will identify only machines that are operational
+when you do the scan. If a device is on for only short periods at
+unpredictable times, it can be virtually impossible to catch by
+scanning. Tools that run constantly, like
+<em class="filename">arpwatch</em>, provide a better picture of activity
+over time.
+</p>
+
+<a name="INDEX-1401" /><a name="INDEX-1402" />For
+recording IP addresses and their corresponding MAC addresses,
+<em class="filename">arpwatch</em> is my personal favorite. It is a very
+simple tool that does this very well. Basically,
+<em class="filename">arpwatch</em> places an interface in promiscuous mode
+and watches for ARP packets. It then records IP/MAC address pairs.
+The primary limitation to <em class="filename">arpwatch</em> comes from
+being restricted to local traffic. It is not a tool that can be used
+across networks. If you need to watch several networks, you will need
+to start <em class="filename">arpwatch</em> on each of those networks.
+</p>
+
+<a name="INDEX-1403" /><a name="INDEX-1404" /><a name="INDEX-1405" />The information can be recorded in one
+of four ways. Data may be written directly to the system console, to
+the system's <em class="filename">syslog</em> file, or to a
+user-specified text file, or it can be sent as an email to root.
+(<em class="filename">syslog</em> is described in <a href="ch11_01.html">Chapter 11, "Miscellaneous Tools"</a>.) Output to the console or the
+<em class="filename">syslog</em> file is basically the same. An entry will
+look something like:
+</p>
+
+<blockquote><pre class="code">Mar 30 15:16:29 bsd1 arpwatch: new station 172.16.2.234 0:60:97:92:4a:6</pre></blockquote>
+
+<a name="INDEX-1406" />Of course, with
+the <em class="filename">syslog</em> file, these messages will be
+interspersed with many other messages, but you can easily use
+<em class="filename">grep</em> to extract them. For example, to write all
+the messages from <em class="filename">arpwatch</em> that were recorded in
+<em class="filename">/var/log/messages</em> into the file
+<em class="filename">/temp/arp.data</em>, you can use the command:
+</p>
+
+<blockquote><pre class="code">bsd1# grep arpwatch /var/log/messages &gt; /tmp/arp.list</pre></blockquote>
+
+If your <em class="filename">syslog</em> file goes by a different name or
+you want output in a different output file, you will need to adjust
+names accordingly. This approach will include other messages from
+<em class="filename">arpwatch</em> as well, but you can easily delete
+those that are not of interest.
+</p>
+
+<a name="INDEX-1407" />Email looks like:
+</p>
+
+<blockquote><pre class="code">From: arpwatch (Arpwatch)
+To: root
+Subject: new station (lnx1.lander.edu)
+
+            hostname: lnx1.lander.edu
+          ip address: 172.16.2.234
+    ethernet address: 0:60:97:92:4a:6
+     ethernet vendor: 3Com
+           timestamp: Thursday, March 30, 2000 15:16:29 -0500</pre></blockquote>
+
+<a name="INDEX-1408" /><a name="INDEX-1409" /><a name="INDEX-1410" />Email output has the advantage of doing
+name resolution for the IP address, and it gives the vendor for the
+MAC address. The vendor name is resolved using information in the
+file <em class="filename">ethercodes.dat</em>. This file, as supplied with
+<em class="filename">arpwatch</em>, is not particularly complete or
+up-to-date, but you can always go to the IEEE site as described in
+<a href="ch02_01.html">Chapter 2, "Host Configurations"</a> if you need this data for a particular
+interface. If you do this, don't forget to update the
+<em class="filename">ethercodes.dat</em> file on your system.
+</p>
+
+<em class="filename">arpwatch</em> can also record raw data to a file.
+This is typically the file <em class="filename">arp.dat</em>, but you can
+specify a different file with the <em class="filename">-f</em> option. The
+default location for <em class="filename">arp.dat</em> seems to vary with
+systems. The manpage for <em class="filename">arpwatch</em> specifies
+<em class="filename">/usr/operator/arpwatch</em> as the default home
+directory, but this may not be true for some ports. If you use an
+alternative file, be sure to give its full pathname. Whether you use
+<em class="filename">arp.dat</em> or another file, the file must exist
+before you start <em class="filename">arpwatch</em>. The format is pretty
+sparse:
+</p>
+
+<blockquote><pre class="code">0:60:97:92:4a:6 172.16.2.234    954447389       lnx1</pre></blockquote>
+
+Expect a lot of entries the first few days after you start
+<em class="filename">arpwatch</em> as it learns your network. This can be
+a little annoying at first, but once most machines are recorded, you
+shouldn't see much traffic -- only new or changed addresses.
+These should be very predictable. Of particular concern are
+frequently changing addresses. The most likely explanation for a
+single address change is that a computer has been replaced by
+another. Although less likely, a new adapter would also explain the
+change.
+</p>
+
+<a name="INDEX-1411" /><a name="INDEX-1412" />Frequent or unexplained changes deserve
+greater scrutiny. It could simply mean someone is using two
+computers. Perhaps a user is unplugging his desktop machine in order
+to plug in his portable. But it can also mean that someone is trying
+to hide something they are doing. On many systems, both the MAC and
+IP addresses can be easily changed. A cracker will often change these
+addresses to cover her tracks. Or a cracker could be using ARP
+poisoning to redirect traffic.
+</p>
+
+Here is an example of an email report for an address change:</p>
+
+<blockquote><pre class="code">From: arpwatch (Arpwatch)
+To: root
+Subject: changed ethernet address
+
+            hostname: &lt;unknown&gt;
+          ip address: 205.153.63.55
+    ethernet address: 0:e0:29:21:88:83
+     ethernet vendor: &lt;unknown&gt;
+old ethernet address: 0:e0:29:21:89:d9
+ old ethernet vendor: &lt;unknown&gt;
+           timestamp: Monday, April 3, 2000 4:57:16 -0400
+  previous timestamp: Monday, April 3, 2000 4:52:33 -0400
+               delta: 4 minutes</pre></blockquote>
+
+Notice that the subject line will alert you to the nature of the
+change. This change was followed shortly by another change as shown
+here:
+</p>
+
+<blockquote><pre class="code">From: arpwatch (Arpwatch)
+To: root
+Subject: flip flop
+
+            hostname: &lt;unknown&gt;
+          ip address: 205.153.63.55
+    ethernet address: 0:e0:29:21:89:d9
+     ethernet vendor: &lt;unknown&gt;
+old ethernet address: 0:e0:29:21:88:83
+ old ethernet vendor: &lt;unknown&gt;
+           timestamp: Monday, April 3, 2000 9:40:47 -0400
+  previous timestamp: Monday, April 3, 2000 9:24:07 -0400
+               delta: 16 minutes</pre></blockquote>
+
+This is basically the same sort of information, but
+<em class="filename">arpwatch</em> labels the first as a changed address
+and subsequent changes as flip-flops.
+</p>
+
+<a name="INDEX-1413" />If you are running DHCP and find
+<em class="filename">arpwatch</em>'s output particularly annoying,
+you may want to avoid <em class="filename">arpwatch</em>. But if you are
+having problems with DHCP, <em class="filename">arpwatch</em> might, in
+limited circumstances, be useful.<a name="INDEX-1414" /><a name="INDEX-1415" /><a name="INDEX-1416" /><a name="INDEX-1417" /><a name="INDEX-1418" /><a name="INDEX-1419" /><a name="INDEX-1420" /> 
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6. Device Discovery and Mapping</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.3. Device Identification</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch06_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:05 GMT -->
+</html>

@@ -1,0 +1,875 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Network analyzers (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch14_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.5. Network analyzers</h2>
+
+
+Network analyzers are ultimately the most useful <a name="INDEX-2113" />tools available when it comes to
+debugging network problems. They are powerful tools that allow you to
+inspect network traffic at every level of the network stack in
+various degrees of detail. Good network analyzers provide powerful
+filters that reduce the amount of information to what is relevant for
+the task at hand. <em class="emphasis">Snoop</em>,
+<em class="emphasis">ethereal</em>, and <em class="emphasis">tcpdump</em> are
+three of the most popular network analyzers available today.
+<em class="emphasis">Snoop</em> and <em class="emphasis">ethereal</em> provide
+excellent support for RPC protocols
+<a name="INDEX-2114" />
+<a name="INDEX-2115" />and we use them throughout the rest of
+this book. The <em class="emphasis">snoop</em> network analyzer is bundled
+with Solaris, it provides powerful filters for analysis of problems
+related to NFS, RPC and NIS. <em class="emphasis">ethereal</em> is a
+GUI-based network analyzer program available free of charge. It is
+available for various types of operating systems, including many
+flavors of Unix. These utilities require
+<em class="emphasis">superuser</em> privileges in order to open the
+network interface device.</p>
+
+
+<a name="nfs2-CHP-13-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">13.5.1. snoop </h3>
+
+
+The <em class="emphasis">snoop</em> network analyzer bundled
+with<a name="INDEX-2116" />
+<a name="INDEX-2117" /> Solaris
+captures packets from the network and displays them in various forms
+according to the set of filters specified. <em class="emphasis">Snoop</em>
+can capture network traffic and display it on the fly, or
+<a name="INDEX-2118" />save it into a file for future analysis.
+Being able to save the network traffic into a file allows you to
+display the same data set under various filters, presenting different
+views of the same information.</p>
+
+
+In its simplest form, <em class="emphasis">snoop</em> captures and
+displays all packets present
+<a name="INDEX-2119" />on the network interface:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop</b></tt>
+Using device /dev/hme (promiscuous mode)
+      narwhal -&gt; 192.32.99.10  UDP D=7204 S=32823 LEN=252
+2100::56:a00:20ff:fe8f:ba43 -&gt; ff02::1:ffb6:12ac ICMPv6 Neighbor solicitation
+      caramba -&gt; schooner       NFS C GETATTR3 FH=0CAE
+     schooner -&gt; caramba        NFS R GETATTR3 OK
+      caramba -&gt; schooner       TCP D=2049 S=1023     Ack=341433529 Seq=2752257980 Len=0 Win=24820
+      caramba -&gt; schooner       NFS C GETATTR3 FH=B083
+     schooner -&gt; caramba        NFS R GETATTR3 OK
+ mp-broadcast -&gt; 224.12.23.34   UDP D=7204 S=32852 LEN=177
+      caramba -&gt; schooner       TCP D=2049 S=1023     Ack=341433645 Seq=2752258092 Len=0 Win=24820
+...</pre></blockquote>
+
+
+By default <em class="emphasis">snoop</em> displays only a summary of the
+data pertaining to the highest level protocol. The first column
+displays the source and destination of the network packet in the form
+"source <tt class="literal">-&gt;</tt> destination".
+<em class="emphasis">Snoop</em> maps the IP address to the hostname when
+possible, otherwise it displays the IP address. The second column
+lists the highest level protocol type. The first line of the example
+shows the host <em class="emphasis">narwhal</em> sending a request to the
+address 192.32.99.10 over UDP. The second line shows a neighbor
+solicitation request initiated by the host with global IPv6 address
+2100::56:a00:20ff:fe8f:ba43<tt class="literal">.</tt> The destination is a
+link-local multicast address (prefix FF02:). The contents of the
+third column depend on the protocol. For example, the 252 byte-long
+UDP packet in the first line has a destination port = 7204 and a
+source port= 32823. NFS packets use a <em class="emphasis">C</em> to
+denote a call, and an <em class="emphasis">R</em> to denote a reply,
+listing the procedure being invoked.</p>
+
+
+The fourth packet in the example is the reply from the NFS server
+<em class="emphasis">schooner</em> to the client
+<em class="emphasis">caramba</em>. It reports that the NFS GETATTR (get
+attributes) call returned success, but it doesn't display the
+contents of the attributes. <em class="emphasis">Snoop</em> simply
+displays the summary of the packet before disposing of it. You can
+not obtain more details about this particular packet since the packet
+was not saved. To avoid this limitation, <em class="emphasis">snoop</em>
+should be instructed to save the captured network packets in a file
+for later processing and display by using the <em class="emphasis">-o</em>
+option:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -o /tmp/capture -c 100</b></tt>
+Using device /dev/hme (promiscuous mode)
+100 100 packets captured</pre></blockquote>
+
+
+The <em class="emphasis">-o</em> option instructs
+<em class="emphasis">snoop</em> to save the captured packets in the
+<em class="emphasis">/tmp/capture</em> file. The capture file mode bits
+are set using <em class="emphasis">root</em> 's file mode creation
+mask. Non-privileged users may be able to invoke
+<em class="emphasis">snoop</em> and process the captured file if given
+<em class="emphasis">read</em> access to the capture file. The
+<em class="emphasis">-c</em> option instructs <em class="emphasis">snoop</em>
+to capture only 100 packets. Alternatively, you can interrupt
+<em class="emphasis">snoop</em> when you believe you have captured enough
+packets.</p>
+
+
+The captured packets can then be analyzed as many times as necessary
+under different filters, each presenting a different view of data.
+Use the <em class="emphasis">-i</em> option to instruct
+<em class="emphasis">snoop</em> where to read the captured packets from:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -i /tmp/capture -c 5</b></tt>
+  1   0.00000    caramba -&gt; mickey       PORTMAP C GETPORT prog=100003 (NFS)
+                                          vers=3 proto=UDP
+  2   0.00072     mickey -&gt; caramba      PORTMAP R GETPORT port=2049
+  3   0.00077    caramba -&gt; mickey       NFS C NULL3
+  4   0.00041     mickey -&gt; caramba      NFS R NULL3 
+  5   0.00195    caramba -&gt; mickey       PORTMAP C GETPORT prog=100003 (NFS)
+                                          vers=3 proto=UDP
+5 packets captured</pre></blockquote>
+
+
+The <em class="emphasis">-i</em> option instructs
+<em class="emphasis">snoop</em> to read the packets from the
+<em class="emphasis">/tmp/capture</em> capture file instead of capturing
+new packets from the network device. Note that two new columns are
+added to the display. The first column displays the packet number,
+and the second column displays the time delta between one packet and
+the next in seconds. For example, the second packet's time
+delta indicates that the host <em class="emphasis">caramba</em> received a
+reply to its original portmap request 720 microseconds after the
+request was first sent.</p>
+
+
+By default, <em class="emphasis">snoop</em> displays summary information
+for the top-most protocol in the network stack for every packet. Use
+the <em class="emphasis">-V</em> option to instruct snoop to display
+information about every level in the network stack. You can also
+specify packets or a range of them with the <em class="emphasis">-p</em>
+option:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -i /tmp/capture -V -p 3,4</b></tt>
+_______________________________  _
+  3   0.00000    caramba -&gt; mickey     ETHER Type=0800 (IP), size = 82 bytes
+  3   0.00000    caramba -&gt; mickey     IP  D=131.40.52.27 S=131.40.52.223 LEN=68,
+                                        ID=35462
+  3   0.00000    caramba -&gt; mickey     UDP D=2049 S=55559 LEN=48
+  3   0.00000    caramba -&gt; mickey     RPC C XID=969440111 PROG=100003 (NFS)
+                                        VERS=3 PROC=0
+  3   0.00000    caramba -&gt; mickey     NFS C NULL3
+_______________________________  _
+  4   0.00041     mickey -&gt; caramba    ETHER Type=0800 (IP), size = 66 bytes
+  4   0.00041     mickey -&gt; caramba    IP  D=131.40.52.223 S=131.40.52.27 LEN=52,
+                                        ID=26344
+  4   0.00041     mickey -&gt; caramba    UDP D=55559 S=2049 LEN=32
+  4   0.00041     mickey -&gt; caramba    RPC R (#3) XID=969440111 Success
+  4   0.00041     mickey -&gt; caramba    NFS R NULL3</pre></blockquote>
+
+
+The <em class="emphasis">-V</em> option instructs
+<em class="emphasis">snoop</em> to display a summary line for each
+protocol layer in the packet. In the previous example, packet 3 shows
+the Ethernet, IP, UDP, and RPC summary information, in addition to
+the NFS NULL request. The <em class="emphasis">-p</em> option is used to
+specify what packets are to be displayed, in this case
+<em class="emphasis">snoop</em> displays packets 3 and 4.</p>
+
+
+Every layer of the network stack contains a wealth of information
+that is not displayed with the <em class="emphasis">-V</em> option. Use
+the <em class="emphasis">-v</em> option when you're interested in
+analyzing the full details of any of the network layers:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -i /tmp/capture -v -p 3</b></tt>
+ETHER:  ----- Ether Header -----
+ETHER:  
+ETHER:  Packet 3 arrived at 15:08:43.35
+ETHER:  Packet size = 82 bytes
+ETHER:  Destination = 0:0:c:7:ac:56, Cisco
+ETHER:  Source      = 8:0:20:b9:2b:f6, Sun
+ETHER:  Ethertype = 0800 (IP)
+ETHER:  
+IP:   ----- IP Header -----
+IP:   
+IP:   Version = 4
+IP:   Header length = 20 bytes
+IP:   Type of service = 0x00
+IP:         xxx. .... = 0 (precedence)
+IP:         ...0 .... = normal delay
+IP:         .... 0... = normal throughput
+IP:         .... .0.. = normal reliability
+IP:   Total length = 68 bytes
+IP:   Identification = 35462
+IP:   Flags = 0x4
+IP:         .1.. .... = do not fragment
+IP:         ..0. .... = last fragment
+IP:   Fragment offset = 0 bytes
+IP:   Time to live = 255 seconds/hops
+IP:   Protocol = 17 (UDP)
+IP:   Header checksum = 4503
+IP:   Source address = 131.40.52.223, caramba
+IP:   Destination address = 131.40.52.27, mickey
+IP:   No options
+IP:   
+UDP:  ----- UDP Header -----
+UDP:  
+UDP:  Source port = 55559
+UDP:  Destination port = 2049 (Sun RPC)
+UDP:  Length = 48 
+UDP:  Checksum = 3685 
+UDP:  
+RPC:  ----- SUN RPC Header -----
+RPC:  
+RPC:  Transaction id = 969440111
+RPC:  Type = 0 (Call)
+RPC:  RPC version = 2
+RPC:  Program = 100003 (NFS), version = 3, procedure = 0
+RPC:  Credentials: Flavor = 0 (None), len = 0 bytes
+RPC:  Verifier   : Flavor = 0 (None), len = 0 bytes
+RPC:  
+NFS:  ----- Sun NFS -----
+NFS:  
+NFS:  Proc = 0 (Null procedure)
+NFS:</pre></blockquote>
+
+
+The Ethernet header displays the source and destination addresses as
+well as the type of information embedded in the packet. The IP layer
+displays the IP version number, flags, options, and address of the
+sender and recipient of the packet. The UDP header displays the
+source and destination ports, along with the length and checksum of
+the UDP portion of the packet. Embedded in the UDP frame is the RPC
+data. Every RPC packet has a transaction ID used by the sender to
+identify replies to its requests, and by the server to identify
+duplicate calls. The previous example shows a request from the host
+<em class="emphasis">caramba</em> to the server
+<em class="emphasis">mickey</em>. The RPC version = 2 refers to the
+version of the RPC protocol itself, the program number 100003 and
+Version 3 apply to the NFS service. NFS procedure 0 is always the
+NULL procedure, and is most commonly invoked with no authentication
+information. The NFS NULL procedure does not take any arguments,
+therefore none are listed in the NFS portion of the packet.</p>
+
+
+The amount of traffic on a busy network can be overwhelming,
+containing many irrelevant packets to the problem at hand. The use of
+filters reduces the amount of noise captured and displayed, allowing
+you to focus on relevant data. A filter can be applied at the time
+the data is captured, or at the time the data is displayed. Applying
+the filter at capture time reduces the amount of data that needs to
+be stored and processed during display. Applying the filter at
+display time allows you to further refine the previously captured
+information. You will find yourself applying different display
+filters to the same data set as you narrow the problem down, and
+isolate the network packets of interest.</p>
+
+
+<em class="emphasis">Snoop</em> uses the same syntax for capture and
+display filters. For example, the <em class="emphasis">host</em> filter
+instructs <em class="emphasis">snoop</em> to only capture packets with
+source or destination address matching the specified host:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop host caramba</b></tt>
+Using device /dev/hme (promiscuous mode)
+     caramba -&gt; schooner     NFS C GETATTR3 FH=B083
+    schooner -&gt; caramba      NFS R GETATTR3 OK
+     caramba -&gt; schooner     TCP D=2049 S=1023     Ack=3647506101 Seq=2611574902 Len=0 Win=24820</pre></blockquote>
+
+
+In this example the <em class="emphasis">host</em> filter instructs
+<em class="emphasis">snoop</em> to capture packets originating at or
+addressed to the host <em class="emphasis">caramba</em>. You can specify
+the IP address or the hostname, and <em class="emphasis">snoop</em> will
+use the name service switch to do the conversion.
+<em class="emphasis">Snoop</em> assumes that the hostname specified is an
+IPv4 address. You can specify an IPv6 address by using the
+<em class="emphasis">inet6</em> qualifier in front of the
+<em class="emphasis">host</em> filter:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop inet6 host caramba</b></tt>
+Using device /dev/hme (promiscuous mode)
+     caramba -&gt; 2100::56:a00:20ff:fea0:3390    ICMPv6 Neighbor advertisement
+2100::56:a00:20ff:fea0:3390 -&gt; caramba         ICMPv6 Echo request (ID: 1294 Sequence number: 0)
+     caramba -&gt; 2100::56:a00:20ff:fea0:3390    ICMPv6 Echo reply (ID: 1294 Sequence number: 0)</pre></blockquote>
+
+
+You can restrict capture of traffic addressed to the specified host
+by using the <em class="emphasis">to</em> or <em class="emphasis">dst</em>
+qualifier in front of the host filter:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop to host caramba</b></tt>
+Using device /dev/hme (promiscuous mode)
+    schooner -&gt; caramba      RPC R XID=1493500696 Success
+    schooner -&gt; caramba      RPC R XID=1493500697 Success
+    schooner -&gt; caramba      RPC R XID=1493500698 Success</pre></blockquote>
+
+
+Similarly you can restrict captured traffic to only packets
+originating from the specified host by using the
+<em class="emphasis">from</em> or <em class="emphasis">src</em> qualifier:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop from host caramba</b></tt>
+Using device /dev/hme (promiscuous mode)
+     caramba -&gt; schooner     NFS C GETATTR3 FH=B083
+     caramba -&gt; schooner     TCP D=2049 S=1023     Ack=3647527137 Seq=2611841034 Len=0 Win=24820</pre></blockquote>
+
+
+Note that the <em class="emphasis">host</em> keyword is not required when
+the specified hostname does not conflict with the name of another
+<em class="emphasis">snoop</em> primitive.The previous <em class="emphasis">snoop
+from host caramba</em> command could have been invoked without
+the <em class="emphasis">host</em> keyword and it would have generated the
+same output:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation"> </i># <tt class="userinput"><b>snoop from caramba</b></tt>
+Using device /dev/hme (promiscuous mode)
+     caramba -&gt; schooner     NFS C GETATTR3 FH=B083
+     caramba -&gt; schooner     TCP D=2049 S=1023     Ack=3647527137 Seq=2611841034 Len=0 Win=24820</pre></blockquote>
+
+
+For clarity, we use the <em class="emphasis">host</em> keyword throughout
+this book. Two or more filters can be combined by using the logical
+operators <em class="emphasis">and</em> and <em class="emphasis">or</em> :</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -o /tmp/capture -c 20 from host caramba and rpc nfs 3</b></tt>
+Using device /dev/hme (promiscuous mode)
+20 20 packets captured</pre></blockquote>
+
+
+<em class="emphasis">Snoop</em> captures all NFS Version 3 packets
+originating at the host <em class="emphasis">caramba</em>. Here,
+<em class="emphasis">snoop</em> is invoked with the
+<em class="emphasis">-c</em> and <em class="emphasis">-o</em> options to save
+20 filtered packets into the <em class="emphasis">/tmp/capture</em> file.
+We can later apply other filters during display time to further
+analyze the captured information. For example, you may want to narrow
+the previous search even further by only listing TCP traffic by using
+the <em class="emphasis">proto</em> filter:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -i /tmp/capture proto tcp</b></tt>
+Using device /dev/hme (promiscuous mode)
+  1   0.00000     caramba -&gt; schooner    NFS C GETATTR3 FH=B083
+  2   2.91969     caramba -&gt; schooner    NFS C GETATTR3 FH=0CAE
+  9   0.37944     caramba -&gt; rea         NFS C FSINFO3 FH=0156
+ 10   0.00430     caramba -&gt; rea         NFS C GETATTR3 FH=0156
+ 11   0.00365     caramba -&gt; rea         NFS C ACCESS3 FH=0156 (lookup)
+ 14   0.00256     caramba -&gt; rea         NFS C LOOKUP3 FH=F244 libc.so.1
+ 15   0.00411     caramba -&gt; rea         NFS C ACCESS3 FH=772D (lookup)</pre></blockquote>
+
+
+<em class="emphasis">Snoop</em> reads the previously filtered data from
+<em class="emphasis">/tmp/capture</em>, and applies the new filter to only
+display TCP traffic. The resulting output is NFS traffic originating
+at the host <em class="emphasis">caramba</em> over the TCP protocol. We
+can apply a UDP filter to the same NFS traffic in the
+<em class="emphasis">/tmp/capture</em> file and obtain the NFS Version 3
+traffic over UDP from host <em class="emphasis">caramba</em> without
+affecting the information in the <em class="emphasis">/tmp/capture</em>
+file:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -i /tmp/capture proto udp</b></tt>
+Using device /dev/hme (promiscuous mode)
+  1   0.00000      caramba -&gt; rea          NFS C NULL3</pre></blockquote>
+
+
+So far, we've presented filters that let you specify the
+information you are interested in. Use the <em class="emphasis">not</em>
+operator to specify the criteria of packets that you wish to have
+excluded during capture. For example, you can use the
+<em class="emphasis">not</em> operator to capture all network traffic,
+except that generated by the remote shell:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop not port login</b></tt>
+Using device /dev/hme (promiscuous mode)
+      rt-086 -&gt; BROADCAST        RIP R (25 destinations)
+      rt-086 -&gt; BROADCAST        RIP R (10 destinations)
+     caramba -&gt; schooner         NFS C GETATTR3 FH=B083
+    schooner -&gt; caramba          NFS R GETATTR3 OK
+     caramba -&gt; donald           NFS C GETATTR3 FH=00BD
+    jamboree -&gt; donald           NFS R GETATTR3 OK
+     caramba -&gt; donald           TCP D=2049 S=657     Ack=3855205229 Seq=2331839250 Len=0 Win=24820
+     caramba -&gt; schooner         TCP D=2049 S=1023    Ack=3647569565 Seq=2612134974 Len=0 Win=24820
+     narwhal -&gt; 224.2.127.254    UDP D=9875 S=32825 LEN=368</pre></blockquote>
+
+
+On multihomed hosts (systems with more than one network interface
+device), use the <em class="emphasis">-d</em> option to specify the
+particular network interface to <em class="emphasis">snoop</em> on:</p>
+
+
+<blockquote><pre class="code">snoop -d hme2</pre></blockquote>
+
+
+You can <em class="emphasis">snoop</em> on multiple network interfaces
+concurrently by invoking separate instances of
+<em class="emphasis">snoop</em> on each device. This is particularly
+useful when you don't know what interface the host will use to
+generate or receive the requests. The <em class="emphasis">-d</em> option
+can be used in conjunction with any of the other options and filters
+previously described:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop -o /tmp/capture-hme0 -d hme0 not port login &amp;</b></tt>
+# <tt class="userinput"><b>snoop -o /tmp/capture-hme1 -d hme1 not port login &amp;</b></tt></pre></blockquote>
+
+
+Filters help refine the search for relevant packets. Once the packets
+of interest have been found, use the <em class="emphasis">-V</em> or
+<em class="emphasis">-v</em> options to display the packets in more
+detail. You will see how this top-down technique is used to debug
+NFS-related problems in <a href="ch14_01.html">Chapter 14, "NFS Diagnostic Tools"</a>. Often you can
+use more than one filter to achieve the same result. Refer to the
+documentation shipped with your OS for a complete list of <a name="INDEX-2120" /> <a name="INDEX-2121" />available filters.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">13.5.2. ethereal / tethereal</h3>
+
+
+<em class="emphasis">ethereal</em> is an open source free network
+<a name="INDEX-2122" /> <a name="INDEX-2123" />analyzer
+for Unix and Windows. It allows you to examine data from a live
+network or from a capture file on disk. You can interactively browse
+the capture data, viewing summary and detail information for each
+packet. It is very similar in functionality to
+<em class="emphasis">snoop</em>, although perhaps providing more powerful
+and diversified filters. At the time of this writing,
+<em class="emphasis">ethereal</em> is beta software and its developers
+indicate that it is far from complete. Although new features are
+continuously being added, it already has enough functionality to be
+useful. We use version 0.8.4 of <em class="emphasis">ethereal</em> in this
+book. Some of the functionality, as well as look-and-feel may have
+changed by the time you read these pages.</p>
+
+
+In addition to providing powerful display filters,
+<em class="emphasis">ethereal</em> provides a very nice Graphical User
+Interface (GUI) which allows you to interactively browse the captured
+data, viewing summary and detailed information for each packet. The
+official home of the <em class="emphasis">ethereal</em> software is
+<a href="http://www.zing.org/">http://www.zing.org</a>. You can
+download the source and documentation from this site and build it
+yourself, or follow the links to download precompiled binary packages
+for your environment. You can download precompiled Solaris packages
+from <a href="http://www.sunfreeware.com/">http://www.sunfreeware.com</a>.
+In either case, you will need to install the
+<em class="emphasis">GTK+</em> Open Source Free Software GUI Toolkit as
+well as the <em class="emphasis">libpcap</em> packet capture library. Both
+are available on the <em class="emphasis">ethereal</em> website.</p>
+
+
+<em class="emphasis">tethereal</em> is the text-only functional equivalent
+of <em class="emphasis">ethereal</em>. They
+<a name="INDEX-2124" />both
+share a large amount of the source code in order to provide the same
+level of data capture, filtering, and packet decoding. The main
+difference is the user interface: <em class="emphasis">tethereal</em> does
+not provide the nice GUI provided by <em class="emphasis">ethereal</em>.
+Due to its textual output, <em class="emphasis">tethereal</em> is used
+throughout this book.<a href="#FOOTNOTE-33">[33]</a>
+Examples and discussions concerning <em class="emphasis">tethereal</em>
+also apply to <em class="emphasis">ethereal</em>. Many of the concepts
+will overlap those presented in the <em class="emphasis">snoop</em>
+discussion, though the syntax will be different.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-33" />[33]In our examples, we reformat
+the output that <em class="emphasis">tetherea</em>l generates by adding or
+removing white spaces to make it easier to read.</p>
+
+</blockquote>
+
+
+In its simplest form, <em class="emphasis">tethereal</em> captures and
+displays all packets present on the network interface:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal</b></tt>
+Capturing on hme0
+     caramba -&gt; schooner     NFS V3 GETATTR Call XID 0x59048f4a
+    schooner -&gt; caramba      NFS V3 GETATTR Reply XID 0x59048f4a
+     caramba -&gt; schooner     TCP 1023 &gt; nfsd [ACK] Seq=2139539358 Ack=1772042332
+                              Win=24820 Len=0
+      concam -&gt; 224.12.23.34 UDP Source port: 32939  Destination port: 7204
+mp-broadcast -&gt; 224.12.23.34 UDP Source port: 32852  Destination port: 7204
+     narwhal -&gt; 224.12.23.34 UDP Source port: 32823  Destination port: 7204
+      vm-086 -&gt; 224.0.0.2    HSRP Hello (state Active)
+     caramba -&gt; mickey       YPSERV V2 MATCH Call XID 0x39c4533d
+      mickey -&gt; caramba      YPSERV V2 MATCH Reply XID 0x39c4533d</pre></blockquote>
+
+
+By default <em class="emphasis">tethereal</em> displays only a summary of
+the highest level protocol. The first column displays the source and
+destination of the network packet. <em class="emphasis">tethereal</em>
+maps the IP address to the hostname when possible, otherwise it
+displays the IP address. You can use the <em class="emphasis">-n</em>
+option to disable network object name resolution and have the IP
+addresses displayed instead. Each line displays the packet type, and
+the protocol-specific parameters. For example, the first line
+displays an NFS Version 3 GETATTR (get attributes) request from
+client <em class="emphasis">caramba</em> to server
+<em class="emphasis">schooner</em> with RPC transaction ID 0x59048f4a. The
+second line reports <em class="emphasis">schooner</em>
+<span class="acronym">'s</span> reply to the GETATTR request.
+You know that this is a reply to the previous request because of the
+matching transaction IDs.</p>
+
+
+Use the <em class="emphasis">-w</em> option to have
+<em class="emphasis">tethereal</em> write the packets to a data file for
+later display. As with <em class="emphasis">snoop</em>, this allows you to
+apply powerful filters to the data set to reduce the amount of noise
+reported. Use the <em class="emphasis">-c</em> option to set the number of
+packets to read when capturing data:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -w /tmp/capture -c 5</b></tt>
+Capturing on hme0
+10</pre></blockquote>
+
+
+Use the <em class="emphasis">-r</em> option to read packets from a capture
+file:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -t d</b></tt>
+  1  0.000000  caramba -&gt; mickey   PORTMAP V2 GETPORT Call XID 0x39c87b6e
+  2  0.000728   mickey -&gt; caramba  PORTMAP V2 GETPORT Reply XID 0x39c87b6e
+  3  0.00077   caramba -&gt; mickey   NFS V3 NULL Call XID 0x39c87b6f
+  4  0.000416   mickey -&gt; caramba  NFS V3 NULL Reply XID 0x39c87b6f
+  5  0.001957  caramba -&gt; mickey   PORTMAP V2 GETPORT Call XID 0x39c848db</pre></blockquote>
+
+
+<em class="emphasis">tethereal</em> reads the packets from the
+<em class="emphasis">/tmp/capture</em> file specified by the
+<em class="emphasis">-r</em> option. Note that two new columns are added
+to the display. The first column displays the packet number, and the
+second column displays the time delta between one packet and the next
+in seconds. The <em class="emphasis">-t d</em> option instructs
+<em class="emphasis">tethereal</em> to use delta timestamps, if not
+specified, <em class="emphasis">tethereal</em> reports timestamps relative
+to the time elapsed between the first packet and the current packet.
+Use the <em class="emphasis">-t a</em> option to display the actual date
+and time the packet was captured. <em class="emphasis">tethereal</em> can
+also read capture files generated by other network analyzers,
+including <em class="emphasis">snoop</em>'s capture files.</p>
+
+
+As mentioned in the <em class="emphasis">snoop</em> discussion, network
+analyzers are most useful when you have the ability to filter the
+information you need. One of <em class="emphasis">tethereal</em> 's
+strongest attributes is its rich filter set. Unlike
+<em class="emphasis">snoop</em>, <em class="emphasis">tethereal</em> uses
+different syntax for capture and display filters. Display filters are
+called read filters in <em class="emphasis">tethereal</em>, therefore we
+will use the <em class="emphasis">tethereal</em> terminology during this
+discussion. Note that a read filter can also be specified during
+packet capturing, causing only packets that pass the read filter to
+be displayed or saved to the output file. Capture filters are much
+more efficient than read filters. It may be more difficult for
+<em class="emphasis">tethereal</em> to keep up with a busy network if a
+read filter is specified during <a name="INDEX-2125" /> <a name="INDEX-2126" />a live capture.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">13.5.3. Capture filters</h3>
+
+
+Packet capture and filtering is performed by the<a name="INDEX-2127" />
+<a name="INDEX-2128" />
+<a name="INDEX-2129" /> Packet Capture
+<a name="INDEX-2130" /> <a name="INDEX-2131" />Library
+(<em class="emphasis">libpcap</em>). Use the <em class="emphasis">-f</em>
+option to set the capture filter expression:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -f "dst host donald"</b></tt>
+Capturing on hme0
+    schooner -&gt; donald    TCP nfsd &gt; 1023 [PSH, ACK] Seq=1773285388 Ack=2152316770
+                           Win=49640 Len=116
+      mickey -&gt; donald    UDP Source port: 934  Destination port: 61638
+      mickey -&gt; donald    UDP Source port: 934  Destination port: 61638
+      mickey -&gt; donald    UDP Source port: 934  Destination port: 61638
+    schooner -&gt; donald    TCP nfsd &gt; 1023 [PSH, ACK] Seq=1773285504 Ack=2152316882
+                           Win=49640 Len=116</pre></blockquote>
+
+
+The <em class="emphasis">dst host</em> filter instructs
+<em class="emphasis">tethereal</em> to only capture packets with a
+destination address equal to <em class="emphasis">donald</em>. You can
+specify the IP address or the hostname, and
+<em class="emphasis">tethereal</em> will use the name service switch to do
+the conversion. Substitute <em class="emphasis">dst</em> with
+<em class="emphasis">src</em> and <em class="emphasis">tethereal</em> captures
+packets with a source address equal to <em class="emphasis">donald</em>.
+Simply specifying <em class="emphasis">host</em>
+<em class="emphasis">donald</em> captures packets with either source or
+destination addresses equal to <em class="emphasis">donald</em>.</p>
+
+
+Use protocol capture filters to instruct
+<em class="emphasis">tethereal</em> to capture all network packets using
+the specified protocol, regardless of origin, destination, packet
+length, etc:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -f "arp"</b></tt>
+Sun_a0:33:90 -&gt; ff:ff:ff:ff:ff:ff         ARP   Who has 131.40.51.7?      Tell 131.40.51.125
+Sun_b9:2b:f6 -&gt; Sun_a0:33:90             ARP   131.40.51.223 is at 08:00:20:b9:2b:f6
+00:90:2b:71:e0:00 -&gt; ff:ff:ff:ff:ff:ff   ARP   Who has 131.40.51.77?   Tell 131.40.51.17</pre></blockquote>
+
+
+The <em class="emphasis">arp</em> filter instructs
+<em class="emphasis">tethereal</em> to capture all of the ARP packets on
+the network. Notice that <em class="emphasis">tethereal</em> replaces the
+Ethernet address prefix with the <em class="emphasis">Sun_</em> identifier
+(08:00:20). The list of prefixes known to
+<em class="emphasis">tethereal</em> can be found in
+/<em class="emphasis">etc/manuf</em> file located in the
+<em class="emphasis">tethereal</em> installation directory.</p>
+
+
+Use the <em class="emphasis">and</em>, <em class="emphasis">or,</em> and
+<em class="emphasis">not</em> logical operators to build complex and
+powerful filters:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -w /tmp/capture -f "host 131.40.51.7 and arp"</b></tt>
+#<tt class="userinput"><b> tethereal -r /tmp/capture</b></tt>
+Sun_a0:33:90 -&gt; ff:ff:ff:ff:ff:ff         ARP Who has 131.40.51.7?        Tell 131.40.51.125
+Sun_b9:2b:f6 -&gt; Sun_a0:33:90              ARP 131.40.51.7 is at 08:00:20:b9:2b:f6</pre></blockquote>
+
+
+<em class="emphasis">tethereal</em> captures all ARP requests for the
+131.40.51.7 address and writes the packets to the
+<em class="emphasis">/tmp/capture</em> file. We should point out that the
+source address of the first packet is not 131.40.51.7, and highlight
+the fact that the destination address is the Ethernet broadcast
+address. You may ask then, why is this packet captured by
+<em class="emphasis">tethereal</em> if neither the source nor destination
+address match the requested host? You can use the
+<em class="emphasis">-V</em> option to analyze the contents of the
+captured packet to answer this question:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/ether -V</b></tt>
+Frame 1 (60 on wire, 60 captured)
+    Arrival Time: Sep 25, 2000 13:34:08.2305
+    Time delta from previous packet: 0.000000 seconds
+    Frame Number: 1
+    Packet Length: 60 bytes
+    Capture Length: 60 bytes
+Ethernet II
+    Destination: ff:ff:ff:ff:ff:ff (ff:ff:ff:ff:ff:ff)
+    Source: 08:00:20:a0:33:90 (Sun_a0:33:90)
+    Type: ARP (0x0806)
+Address Resolution Protocol (request)
+    Hardware type: Ethernet (0x0001)
+    Protocol type: IP (0x0800)
+    Hardware size: 6
+    Protocol size: 4
+    Opcode: request (0x0001)
+    Sender hardware address: 08:00:20:a0:33:90
+    Sender protocol address: 131.40.51.125
+    Target hardware address: ff:ff:ff:ff:ff:ff
+    Target protocol address: 131.40.51.7
+...
+(Contents of second packet have been omitted)</pre></blockquote>
+
+
+The <em class="emphasis">-V</em> option displays the full protocol tree.
+Each layer of the packet is printed in detail (for clarity, we omit
+printing the contents of the second packet). The frame information is
+added by <em class="emphasis">tethereal</em> to identify the network
+packet. Note that the frame information is not part of the actual
+network packet, and is therefore not transmitted over the wire.</p>
+
+
+The Ethernet frame displays the broadcast destination address, and
+the source MAC address. Notice how the 08:00:20 prefix is replaced by
+the <em class="emphasis">Sun_</em> identifier. The Address Resolution
+Protocol (ARP) part of the frame, indicates that this is a request
+asking for the hardware address of 131.40.51.7. This explains why
+<em class="emphasis">tethereal</em> captures the packet when the
+<em class="emphasis">host 131.40.51.7 and arp</em> filter is specified.</p>
+
+
+Use the <em class="emphasis">not</em> operator to specify the criteria of
+packets that you wish to have excluded during capture. For example,
+use the <em class="emphasis">not</em> operator to capture all network
+packets, except ARP related network traffic:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -f "not arp"</b></tt>
+Capturing on hme0
+  concam -&gt; 224.12.23.34 UDP Source port: 32939  Destination port: 7204
+  donald -&gt; schooner     TCP 1023 &gt; nfsd [ACK] Seq=2153618946 Ack=1773368360 Win=24820 Len=0
+ narwhal -&gt; 224.12.23.34 UDP Source port: 32823  Destination port: 7204
+  donald -&gt; schooner     NFS V3 GETATTR Call XID 0x5904b03e
+schooner -&gt; caramba      NFS V3 GETATTR Reply XID 0x5904b03e</pre></blockquote>
+
+
+This section discussed how to restrict the amount of information
+captured by <em class="emphasis">tethereal</em>. In the next section, you
+see how to apply the more powerful read filters to find the exact
+information you need. Refer to <em class="emphasis">tethereal</em>
+'s documentation <a name="INDEX-2132" /> <a name="INDEX-2133" /> <a name="INDEX-2134" />for a complete set of capture filters.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">13.5.4. Read filters</h3>
+
+
+Capture filters provide limited means <a name="INDEX-2135" />
+<a name="INDEX-2136" />
+<a name="INDEX-2137" />of refining the amount of information
+gathered. To complement them, <em class="emphasis">tethereal</em> provides
+a rich read (display) filter language used to build powerful filters.
+Read filters further remove the noise from a packet trace to let you
+see packets of interest. A packet is displayed if it meets the
+requirements expressed in the filter. Read filters let you compare
+the fields within a protocol against a specific value, compare fields
+against fields, or simply check the existence of specified fields and
+protocols.</p>
+
+
+Use the <em class="emphasis">-R</em> option to specify a read filter. The
+simplest read filter allows you to check for the existence of a
+protocol or field:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -R "nfs"</b></tt>
+  3  0.001500   caramba -&gt; mickey    NFS V3 NULL Call XID 0x39c87b6f
+  4  0.001916    mickey -&gt; caramba   NFS V3 NULL Reply XID 0x39c87b6f
+ 54  2.307132   caramba -&gt; schooner  NFS V3 GETATTR Call XID 0x590289e7
+ 55  2.308824  schooner -&gt; caramba   NFS V3 GETATTR Reply XID 0x590289e7
+ 56  2.309622   caramba -&gt; mickey    NFS V3 LOOKUP Call XID 0x590289e8
+ 57  2.310400    mickey -&gt; caramba   NFS V3 LOOKUP Reply XID 0x590289e8</pre></blockquote>
+
+
+<em class="emphasis">tethereal</em> reads the capture file
+<em class="emphasis">/tmp/capture</em> and displays all packets that
+contain the NFS protocol.</p>
+
+
+You can specify a filter that matches the existence of a given field
+in the network packet. For example, use the
+<em class="emphasis">nfs.name</em> filter to instruct
+<em class="emphasis">tethereal</em> to display all packets containing the
+NFS <em class="emphasis">name</em> field in either requests or replies:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -R "nfs.name"</b></tt> 
+ 56  2.309622   caramba -&gt; mickey    NFS V3 LOOKUP Call XID 0x590289e8
+ 57  2.310400    mickey -&gt; caramba   NFS V3 LOOKUP Reply XID 0x590289e8</pre></blockquote>
+
+
+You can also specify the value of the field. For example use the
+<em class="emphasis">frame.number == 56</em> filter, to display packet
+number 56:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -R "frame.number == 56"</b></tt>
+ 56  2.309622   caramba -&gt; mickey    NFS V3 LOOKUP Call XID 0x590289e8</pre></blockquote>
+
+
+This is equivalent to <em class="emphasis">snoop</em>'s
+<em class="emphasis">-p</em> option. You can also specify ranges of values
+of a field. For example, you can print the first three packets in the
+capture file by specifying a range for
+<em class="emphasis">frame.number</em>:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -R "frame.number &lt;= 3"</b></tt>
+  1  0.000000   caramba -&gt; mickey    PORTMAP V2 GETPORT Call XID 0x39c87b6e
+  2  0.000728    mickey -&gt; caramba   PORTMAP V2 GETPORT Reply XID 0x39c87b6e
+  3  0.001500   caramba -&gt; mickey    NFS V3 NULL Call XID 0x39c87b6f</pre></blockquote>
+
+
+You can combine basic filter expressions and field values by using
+logical operators to build more powerful filters. For example, say
+you want to list all NFS Version 3 <em class="emphasis">Lookup</em> and
+<em class="emphasis">Getattr</em> operations. You know that NFS is an RPC
+program, therefore you first need to determine the procedure number
+for the NFS operations by finding their definition in the
+<em class="emphasis">nfs.h</em> include file:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>grep NFSPROC3_LOOKUP /usr/include/nfs/nfs.h</b></tt>
+#define        NFSPROC3_LOOKUP ((rpcproc_t)3)
+$ <tt class="userinput"><b>grep NFSPROC3_GETATTR /usr/include/nfs/nfs.h</b></tt>
+#define        NFSPROC3_GETATTR ((rpcproc_t)1)</pre></blockquote>
+
+
+The two <em class="emphasis">grep</em> operations help you determine that
+the NFS <em class="emphasis">Lookup</em> operation is RPC procedure number
+3 of the NFS Version 3 protocol, and the NFS
+<em class="emphasis">Getattr</em> operation is procedure number 1. You can
+then use this information to build a filter that specifies your
+interest in protocol NFS with RPC program Version 3, and RPC
+procedures 1 or 3. You can represent this with the filter expression:</p>
+
+
+<blockquote><pre class="code">nfs and rpc.programversion == 3 and(rpc.procedure == 1 or rpc.procedure == 3)</pre></blockquote>
+
+
+The <em class="emphasis">tethereal</em> invocation follows:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>tethereal -r /tmp/capture -R "nfs and rpc.programversion == 3 and \</b></tt>
+<tt class="userinput"><b> (rpc.procedure == 1 or rpc.procedure == 3)"</b></tt>
+ 54  2.307132   caramba -&gt; schooner  NFS V3 GETATTR Call XID 0x590289e7
+ 55  2.308824  schooner -&gt; caramba   NFS V3 GETATTR Reply XID 0x590289e7
+ 56  2.309622   caramba -&gt; mickey    NFS V3 LOOKUP Call XID 0x590289e8
+ 57  2.310400    mickey -&gt; caramba   NFS V3 LOOKUP Reply XID 0x590289e8</pre></blockquote>
+
+
+The filter displays all NFS Version 3 <em class="emphasis">Getattr</em>
+and all NFS Version 3 <em class="emphasis">Lookup</em> operations. Refer
+to <em class="emphasis">tethereal</em> 's documentation for a
+complete description of the rich filters provided. In <a href="ch14_01.html">Chapter 14, "NFS Diagnostic Tools"</a>, you will see how<a name="INDEX-2138" /> to use <em class="emphasis">tethereal</em> to
+debug NFS-<a name="INDEX-2139" /> <a name="INDEX-2140" /> <a name="INDEX-2141" />related <a name="INDEX-2142" />problems.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.4. NIS tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14. NFS Diagnostic Tools</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

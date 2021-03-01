@@ -1,0 +1,613 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>Managing map files (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.2. Managing map files</h2>
+
+
+Keeping map files updated on all servers<a name="INDEX-638" /> <a name="INDEX-639" /> is essential to the proper operation of
+NIS. There are two mechanisms for updating <a name="INDEX-640" />
+<a name="INDEX-641" />
+<a name="INDEX-642" />map files: using
+<em class="emphasis">make</em> and the NIS <em class="emphasis">Makefile</em>,
+which pushes maps from the master server to the slave servers, and
+the <em class="emphasis">ypxfr</em> utility, which pulls maps from the
+master server. This section starts with a look at how map file
+updates are made and how they get distributed to slave servers.</p>
+
+
+Having a single point of administration makes it easier to propagate
+configuration changes through the network, but it also means that you
+may have more than one person changing the same file. If there are
+several system administrators maintaining the NIS maps, they need to
+coordinate their efforts, or you will find that one person removes
+NIS map entries added by another. Using a source code control system,
+such as SCCS or RCS, in conjunction with NIS often solves this
+problem. In the second part of this section, we'll see how to
+use alternate map source files and source code control systems with
+NIS.</p>
+
+
+<a name="nfs2-CHP-4-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">4.2.1. Map distribution</h3>
+
+
+Master and slave servers are<a name="INDEX-643" />
+<a name="INDEX-644" /> distinguished by their ability to effect
+permanent changes to NIS maps. Changes may be made to an NIS map on a
+slave server, but the next map transfer from the master will overlay
+this change. Modify maps <em class="emphasis">only</em> on the master
+server, and push them from the master server to its slave servers. On
+the NIS master server, edit the source file for the map using your
+favorite text editor. Source files for NIS maps are listed in <a href="ch03_02.html#nfs2-CHP-3-TABLE-1">Table 3-1</a>. Then go to the NIS map directory <a name="INDEX-645" /> <a name="INDEX-646" />and build the
+new map using <em class="emphasis">make</em>, as shown here:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>vi /etc/hosts</b></tt> 
+# <tt class="userinput"><b>cd /var/yp</b></tt> 
+# <tt class="userinput"><b>make</b></tt> 
+<i class="lineannotation">...New hosts map is built and distributed...</i></pre></blockquote>
+
+
+Without any arguments, <em class="emphasis">make</em> builds all
+maps<a name="INDEX-647" />
+<a name="INDEX-648" /> that are
+out-of-date with respect to their ASCII source files. When more than
+one map is built from the same ASCII file, for example the
+<em class="emphasis">passwd.byname</em> and
+<em class="emphasis">passwd.byuid</em> maps built from
+<em class="emphasis">/etc/passwd</em>, they are all built when
+<em class="emphasis">make</em> is invoked.</p>
+
+
+When a map is rebuilt, the <em class="emphasis">yppush</em> utility is
+used
+<a name="INDEX-649" />
+<a name="INDEX-650" />
+<a name="INDEX-651" />to
+check the order number of the same map on each NIS server. If the
+maps are out-of-date, <em class="emphasis">yppush</em> transfers the map
+to the slave servers, using the server names in the
+<em class="emphasis">ypservers</em> map. Scripts to rebuild maps and push
+them to slave servers are part of the NIS
+<em class="emphasis">Makefile</em>, which is covered in <a href="ch04_02.html#nfs2-CHP-4-SECT-2.3">Section 4.2.3, "Map file dependencies"</a>.</p>
+
+
+Map transfers done on demand after<a name="INDEX-652" /> source file modifications may not always
+complete successfully. The NIS slave server may be down, or the
+transfer may timeout due to severe congestion or server host loading.
+To ensure that maps do not remain out-of-date for a long time (until
+the next NIS map update), NIS uses the <em class="emphasis">ypxfr</em>
+utility to transfer a map to a slave server. The slave transfers the
+map after checking the timestamp on its copy; if the master's
+copy has been modified more recently, the slave server will replace
+its copy of the map with the one it transfers from the server. It is
+possible to force a map transfer to a slave server, ignoring the
+slave's timestamp, which is useful if a map gets corrupted and
+must be replaced. Under Solaris, an additional master server daemon
+called <em class="emphasis">ypxfrd</em> is <a name="INDEX-653" />used to speed up map transfer
+operations, but the map distribution utilities resort to the old
+method if they cannot reach <em class="emphasis">ypxfrd</em> on the master
+server.</p>
+
+
+The map transfer  --  both in <em class="emphasis">yppush</em> and in
+<em class="emphasis">ypxfr</em>  --  is performed by requesting that
+the slave server walk through all keys in the modified map and build
+a map containing these keys. This seems quite counterintuitive, since
+you would hope that a map transfer amounts to nothing more than the
+master server sending the map to the slave server. However, NIS was
+designed to be used in a heterogeneous environment, so the master
+server's DBM file format may not correspond to that used by the
+slave server. DBM files are tightly tied to the byte ordering and
+file block allocation rules of the server system, and a DBM file must
+be created on the system that indexes it. Slave servers, therefore,
+have to enumerate the entries in an NIS map and rebuild the map from
+them, using their own local conventions for DBM file construction.
+Indeed, it is theoretically possible to have NIS server
+implementation that does not use DBM. When the slave server has
+rebuilt the map, it replaces its existing copy of the map with the
+new one. Schedules for transferring maps to slave servers and scripts
+to be run out of <em class="emphasis">cron</em> are provided in the next
+<a name="INDEX-654" />
+<a name="INDEX-655" />section.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-4-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">4.2.2. Regular map transfers</h3>
+
+
+Relying on demand-driven updates is <a name="INDEX-656" />overly optimistic, since a server
+may be down when the master is updated. NIS includes the
+<em class="emphasis">ypxfr</em> tool to perform <a name="INDEX-657" /> <a name="INDEX-658" />
+<a name="INDEX-659" /> <a name="INDEX-660" />periodic
+transfers of maps to slave servers, keeping them synchronized with
+the master server even if they miss an occasional
+<em class="emphasis">yppush</em>. The <em class="emphasis">ypxfr</em> utility
+will transfer a map only if the slave's copy is out-of-date
+with respect to the master's map.</p>
+
+
+Unlike <em class="emphasis">yppush</em>, <em class="emphasis">ypxfr</em> runs
+on the slave. <em class="emphasis">ypxfr</em>
+contacts<a name="INDEX-661" />
+<a name="INDEX-662" /> the
+master server for a map, enumerates the entries in the map, and
+rebuilds a private copy of the map. If the map is built successfully,
+<em class="emphasis">ypxfr</em> replaces the slave server's copy of
+the map with the newly created one. Note that doing a
+<em class="emphasis">yppush</em> from the NIS master essentially involves
+asking each slave server to perform a <em class="emphasis">ypxfr</em>
+operation if the slave's copy of the map is out-of-date. The
+difference between <em class="emphasis">yppush</em> and
+<em class="emphasis">ypxfr</em> (besides the servers on which they are
+run) is that <em class="emphasis">ypxfr</em> retrieves a map even if the
+slave server does not have a copy of it, while
+<em class="emphasis">yppush</em> requires that the slave server have the
+map in order to check its modification time.</p>
+
+
+<em class="emphasis">ypxfr</em> map updates should be scheduled out of
+<em class="emphasis">cron</em> based on how often the maps change. The
+<em class="emphasis">passwd</em> and <em class="emphasis">aliases</em> maps
+change most frequently, and could be transferred once an hour. Other
+maps, like the <em class="emphasis">services</em> and
+<em class="emphasis">rpc</em> maps, tend to be static and can be updated
+once a day. The standard mechanism for invoking
+<em class="emphasis">ypxfr</em> out of <em class="emphasis">cron</em> is to
+create two or more scripts based on transfer frequency, and to call
+<em class="emphasis">ypxfr</em> from the scripts. The maps included in the
+<em class="emphasis">ypxfr_1perhour</em> script are those that are likely
+to be modified several times during the day, while those in
+<em class="emphasis">ypxfr_2perday, and ypxfr_1perday</em> may change once
+every few days:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">ypxfr_1perhour script: </i>
+/usr/lib/netsvc/yp/ypxfr passwd.byuid 
+/usr/lib/netsvc/yp/ypxfr passwd.byname 
+ 
+<i class="lineannotation">ypxfr_2perday script: </i>
+/usr/lib/netsvc/yp/ypxfr hosts.byname
+/usr/lib/netsvc/yp/ypxfr hosts.byaddr
+/usr/lib/netsvc/yp/ypxfr ethers.byaddr
+/usr/lib/netsvc/yp/ypxfr ethers.byname
+/usr/lib/netsvc/yp/ypxfr netgroup
+/usr/lib/netsvc/yp/ypxfr netgroup.byuser
+/usr/lib/netsvc/yp/ypxfr netgroup.byhost
+/usr/lib/netsvc/yp/ypxfr mail.aliases 
+
+<i class="lineannotation">ypxfr_1perday script: </i>
+/usr/lib/netsvc/yp/ypxfr group.byname
+/usr/lib/netsvc/yp/ypxfr group.bygid 
+/usr/lib/netsvc/yp/ypxfr protocols.byname
+/usr/lib/netsvc/yp/ypxfr protocols.bynumber
+/usr/lib/netsvc/yp/ypxfr networks.byname
+/usr/lib/netsvc/yp/ypxfr networks.byaddr
+/usr/lib/netsvc/yp/ypxfr services.byname
+/usr/lib/netsvc/yp/ypxfr ypservers
+
+<i class="lineannotation">crontab entry: </i>
+0 *    * * * /usr/lib/netsvc/yp/ypxfr_1perhour 
+0 0,12 * * * /usr/lib/netsvc/yp/ypxfr_2perday
+0 0    * * * /usr/lib/netsvc/yp/ypxfr_1perday</pre></blockquote>
+
+
+<em class="emphasis">ypxfr</em> logs its activity on the slave <a name="INDEX-663" /> <a name="INDEX-664" /> <a name="INDEX-665" /> <a name="INDEX-666" />servers <a name="INDEX-667" />if the log file
+<em class="emphasis">/var/yp/ypxfr.log</em> exists when
+<em class="emphasis">ypxfr</em> starts.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-4-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">4.2.3. Map file dependencies</h3>
+
+
+Dependencies of NIS <a name="INDEX-668" />
+<a name="INDEX-669" />
+<a name="INDEX-670" />maps on ASCII source files are maintained
+by the NIS <em class="emphasis">Makefile</em>, located in the NIS
+directory <em class="emphasis">/var/yp</em> on the master server. The
+<em class="emphasis">Makefile</em>
+<a name="INDEX-671" />dependencies
+are built around timestamp files named after their respective source
+files. For example, the timestamp file for the NIS maps built from
+the password file is <em class="emphasis">passwd.time</em>, and the
+timestamp for the hosts maps is kept in
+<em class="emphasis">hosts.time</em>.</p>
+
+
+The timestamp files are
+empty<a name="INDEX-672" />
+<a name="INDEX-673" /> because only their modification dates
+are of interest. The <em class="emphasis">make</em> utility is used to
+build maps according to the rules in the
+<em class="emphasis">Makefile</em>, and <em class="emphasis">make</em> compares
+file modification times to determine which targets need to be
+rebuilt. For example, <em class="emphasis">make</em> compares the
+timestamp on the <em class="emphasis">passwd.time</em> file and that of
+the ASCII <em class="emphasis">/etc/passwd</em> file, and rebuilds the NIS
+<em class="emphasis">passwd</em> map if the ASCII source file was modified
+since the last time the NIS <em class="emphasis">passwd</em> map was
+built.</p>
+
+
+After editing a map source file, building the map (and any other maps
+that may depend on it) is done with <em class="emphasis">make</em>:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>cd /var/yp</b></tt> 
+# <tt class="userinput"><b>make passwd    </b></tt><i class="lineannotation">Rebuilds only password map. </i>
+# <tt class="userinput"><b>make           </b></tt><i class="lineannotation">Rebuilds all maps that are out-of-date.</i></pre></blockquote>
+
+
+If the source file has been modified more recently than the timestamp
+file, <em class="emphasis">make</em> notes that the dependency in the
+<em class="emphasis">Makefile</em> is not met and executes the commands to
+regenerate the NIS map. In most cases, map regeneration requires that
+the ASCII file be stripped of comments, fed to
+<em class="emphasis">makedbm</em> for conversion to DBM format, and then
+pushed to all slave servers using <em class="emphasis">yppush</em>.</p>
+
+
+Be careful when building a few selected maps; if other maps depend on
+the modified map, then you may distribute incomplete map information.
+For example, Solaris uses the <em class="emphasis">netid</em> map to
+combine password and group information. The
+<em class="emphasis">netid</em> map is used by login shells to determine
+user credentials: for every user, it lists all of the groups that
+user is a member of. The <em class="emphasis">netid</em> map depends on
+both the <em class="emphasis">/etc/passwd</em> and
+<em class="emphasis">/etc/group</em> files, so when either one is changed,
+the <em class="emphasis">netid</em> map should be rebuilt.</p>
+
+
+But let's say you make a change to the
+<em class="emphasis">/etc/groups</em> file, and decide to just rebuild and
+distribute the <em class="emphasis">group</em> map:</p>
+
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>cd /var/yp</b></tt> 
+nismaster# <tt class="userinput"><b>make group</b></tt></pre></blockquote>
+
+
+The commands in this example do not update the
+<em class="emphasis">netid</em> map, because the
+<em class="emphasis">netid</em> map doesn't depend on the
+<em class="emphasis">group</em> map at all. The <em class="emphasis">netid</em>
+map depends on the <em class="emphasis">/etc/group</em> file  --  as
+does the <em class="emphasis">group</em> map  --  but in the previous
+example, you would have instructed <em class="emphasis">make</em> to build
+only the <em class="emphasis">group</em> map. If you build the
+<em class="emphasis">group</em> map without updating the
+<em class="emphasis">netid</em> map, users will become very confused about
+their group memberships: their login shells will read
+<em class="emphasis">netid</em> and get old group information, even though
+the NIS map source files <em class="emphasis">appear</em> correct.</p>
+
+
+The best solution to this problem is to build all maps that are
+out-of-date by using <em class="emphasis">make</em> with no arguments:</p>
+
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>cd /var/yp</b></tt> 
+nismaster# <tt class="userinput"><b>make</b></tt></pre></blockquote>
+
+
+Once the map is built, the NIS <em class="emphasis">Makefile</em>
+distributes it, using <em class="emphasis">yppush</em>, to the slave
+servers named in the <em class="emphasis">ypservers</em> map.
+<em class="emphasis">yppush</em> walks through the list of NIS servers and
+performs an RPC call to each slave server to check the timestamp on
+the map to be transferred. If the map is out-of-date,
+<em class="emphasis">yppush</em> uses another RPC call to the slave server
+to initiate a transfer of the map.</p>
+
+
+A map that is corrupted or was not successfully transferred to all
+slave servers can be explicitly rebuilt and repushed by removing its
+timestamp file on the master server:</p>
+
+
+<blockquote><pre class="code">master# <tt class="userinput"><b>cd /var/yp</b></tt> 
+master# <tt class="userinput"><b>rm hosts.time</b></tt> 
+master# <tt class="userinput"><b>make hosts</b></tt></pre></blockquote>
+
+
+This procedure should be used if a map was built when the NIS master
+server's time was set incorrectly, creating a map that becomes
+out-of-date when the time is reset. If you need to perform a complete
+reconstruction of all NIS maps, for any reason, remove all of the
+timestamp files and run <em class="emphasis">make</em>:</p>
+
+
+<blockquote><pre class="code">master# <tt class="userinput"><b>cd /var/yp</b></tt> 
+master# <tt class="userinput"><b>rm *.time</b></tt> 
+master# <tt class="userinput"><b>make</b></tt></pre></blockquote>
+
+
+This extreme step is best reserved for testing the map distribution
+mechanism, or recovering from corruption of the NIS map<a name="INDEX-674" /> <a name="INDEX-675" /> <a name="INDEX-676" /> directory.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-4-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">4.2.4. Password file updates</h3>
+
+
+One exception to the <em class="emphasis">yppush</em> push-on-demand
+<a name="INDEX-677" /> <a name="INDEX-678" /> <a name="INDEX-679" />strategy is the
+<em class="emphasis">passwd</em> map. Users need to be able to change
+their passwords
+<a name="INDEX-680" />
+<a name="INDEX-681" />without system manager intervention.
+The hosts file, for example, is changed by the superuser and then
+pushed to other servers when it is rebuilt. In contrast, when you
+change your password, you (as a nonprivileged user) modify the local
+password file. To change a password in an NIS map, the change must be
+made on the master server and distributed to all slave servers in
+order to be seen back on the client host where you made the change.</p>
+
+
+<em class="emphasis">yppasswd</em> is a user utility
+<a name="INDEX-682" />
+<a name="INDEX-683" />that
+is similar to the <em class="emphasis">passwd</em> program, but it changes
+the user's password in the original source file on the NIS
+master server. <em class="emphasis">yppasswd</em> usually forces the
+password map to be rebuilt, although at sites choosing not to rebuild
+the map on demand, the new password will not be distributed until the
+next map transfer. <em class="emphasis">yppasswd</em> is used like
+<em class="emphasis">passwd</em>, but it reports the server name on which
+the modifications are made. Here is an example:</p>
+
+
+<blockquote><pre class="code">[wahoo]% <tt class="userinput"><b>yppasswd</b></tt> 
+Changing NIS password for stern on mahimahi. 
+Old password: 
+New password: 
+Retype new password: 
+NIS entry changed on mahimahi</pre></blockquote>
+
+
+Some versions of <em class="emphasis">passwd</em> (such as Solaris 2.6 and
+higher) check to see if the password file is managed by NIS, and
+invoke <em class="emphasis">yppasswd</em> if this is the case. Check your
+vendor's documentation for procedures particular to your
+system.</p>
+
+
+NIS provides read-only access to its maps. There
+<a name="INDEX-684" />is nothing in the NIS protocol that
+allows a client to rewrite the data for a key. To accept changes to
+<a name="INDEX-685" />maps, a server distinct from the NIS
+server is required that modifies the source file for the map and then
+rebuilds the NIS map from the modified ASCII file. To handle incoming
+<em class="emphasis">yppasswd</em> change<a name="INDEX-686" />
+requests, the master server must run the
+<em class="emphasis">yppasswdd</em> daemon (note the second
+"d" in the daemon's name). This RPC daemon gets
+started in the <em class="emphasis">/usr/lib/netsvc/yp/ypstart</em> boot
+script on the master NIS server only:</p>
+
+
+<blockquote><pre class="code">if [ "$master" = "$hostname" -a X$YP_SERVER = "XTRUE" ]; then
+                ...
+                if [ -x $YPDIR/rpc.yppasswdd ]; then
+                        PWDIR=`grep "^PWDIR" /var/yp/Makefile 2&gt; /dev/null` \
+                        &amp;&amp; PWDIR=`expr "$PWDIR" : `.*=[         ]*&lt;[^  ]*&gt;``
+                        if [ "$PWDIR" ]; then
+                                if [ "$PWDIR" = "/etc" ]; then
+                                        unset PWDIR
+                                else
+                                        PWDIR="-D $PWDIR"
+                                fi
+                        fi
+                        $YPDIR/rpc.yppasswdd $PWDIR -m \
+                                &amp;&amp; echo ` rpc.yppasswdd\c`
+                fi
+                ...
+        fi</pre></blockquote>
+
+
+The host making a password map change locates the master server by
+asking for the master of the NIS <em class="emphasis">passwd</em> map, and
+the <em class="emphasis">yppasswdd</em> daemon acts
+<a name="INDEX-687" />
+<a name="INDEX-688" />as
+a gateway between the user's host and a
+<em class="emphasis">passwd</em>-like utility on the master server. The
+location of the master server's password file and options to
+build a new map after each update are given as command-line arguments
+to <em class="emphasis">yppasswdd</em>, as shown in the previous example.</p>
+
+
+The <em class="emphasis">-D</em> argument specifies the name of the master
+server's source for the password map; it may be the default
+<em class="emphasis">/etc/passwd</em> or it may point to an alternative
+password file.<a href="#FOOTNOTE-7">[7]</a> The
+<em class="emphasis">-m</em> option specifies that
+<em class="emphasis">make</em> is to be performed in the NIS directory on
+the master server. You can optionally specify arguments after
+<em class="emphasis">-m</em> that are passed to make. With a default set
+up, the fragment in ypstart would cause
+<em class="emphasis">yppasswdd</em> to invoke <em class="emphasis">make</em>
+as:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-7" />[7]Recall from <a href="ch03_02.html#nfs2-CHP-3-SECT-2.2">Section 3.2.2, "Installing the NIS master server"</a>
+that we <a name="INDEX-689" />changed PWDR
+<a name="INDEX-690" />to
+<em class="emphasis">/etc/nispw</em>.</p>
+
+</blockquote>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>( cd /var/yp; make )</b></tt></pre></blockquote>
+
+
+after each change to the master's password source file. Since
+it is likely only the password file will have changed, only the
+password maps get rebuilt and pushed. You can ensure that only the
+password maps get pushed changing <a name="INDEX-691" /> <a name="INDEX-692" /> <a name="INDEX-693" />the <em class="emphasis">yppaswdd</em> line
+in <em class="emphasis">ypstart</em> to:</p>
+
+
+<blockquote><pre class="code">$YPDIR/rpc.yppasswdd $PWDIR -m <tt class="userinput"><b>passwd</b></tt> \
+                                &amp;&amp; echo ` rpc.yppasswdd\c`</pre></blockquote>
+</div>
+
+
+
+
+<a name="nfs2-CHP-4-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">4.2.5. Source code control for map files</h3>
+
+
+With multiple system administrators and a <a name="INDEX-694" /> <a name="INDEX-695" />single point of administration, it is
+possible for conflicting or unexplained changes to NIS maps to wreak
+havoc with the network. The best way to control modifications to maps
+and to track the change history of map source files is to put them
+under a source code control system <a name="INDEX-696" />such
+<a name="INDEX-697" />as SCCS.</p>
+
+
+Source code files usually contain the SCCS headers in a comment or in
+a global string that gets compiled into an executable. Putting SCCS
+keywords into comments in the <em class="emphasis">/etc/hosts</em> and
+<em class="emphasis">/etc/aliases</em> files allows you to track the last
+version and date of edit:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">header to be added to file: </i>
+#       /etc/hosts header 
+#       %M%      %I%         %H% %T% 
+#       %W% 
+<i class="lineannotation">keywords filled in after getting file from SCCS: </i>
+#       /etc/hosts header 
+#       hosts        1.32        12/29/90 16:37:52 
+#       @(#)hosts        1.32</pre></blockquote>
+
+
+Once the headers have been added to the map source files, put them
+under SCCS administration:</p>
+
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>cd /etc</b></tt> 
+nismaster# <tt class="userinput"><b>mkdir SCCS</b></tt> 
+nismaster# <tt class="userinput"><b>/usr/ccs/bin/sccs admin -ialiases aliases</b></tt> 
+nismaster# <tt class="userinput"><b>/usr/ccs/bin/sccs admin -ihosts hosts</b></tt> 
+nismaster# <tt class="userinput"><b>/usr/ccs/bin/sccs get aliases hosts</b></tt></pre></blockquote>
+
+
+The copies of the files that are checked out of SCCS control are
+read-only. Someone making a casual change to a map is forced to go
+and check it out of SCCS properly before doing so. Using SCCS, each
+change to a file is documented before the file gets put back under
+SCCS control. If you always return a file to SCCS before it is
+converted into an NIS map, the SCCS control file forms an audit trail
+for configuration changes:</p>
+
+
+<blockquote><pre class="code">nismaster# <tt class="userinput"><b>cd /etc</b></tt> 
+nismaster# <tt class="userinput"><b>sccs prs hosts</b></tt> 
+D 1.31 00/05/22 08:52:35 root 31 30     00001/00001/00117 
+MRs: 
+COMMENTS: 
+added new host for info-center group 
+D 1.30 00/06/04 07:19:04 root 30 29     00001/00001/00117 
+MRs: 
+COMMENTS: 
+changed bosox-fddi to jetstar-fddi 
+D 1.29 90/11/08 11:03:47 root 29 28     00011/00011/00107 
+MRs: 
+COMMENTS: 
+commented out the porting lab systems.</pre></blockquote>
+
+
+If any change to the hosts or aliases file breaks, SCCS can be used
+to find the exact lines that were changed and the time the change was
+made (for confirmation that the modification caused the network
+problems).</p>
+
+
+The two disadvantages to using SCCS for NIS maps are
+that<a name="INDEX-698" />
+<a name="INDEX-699" /> all changes must be made as
+root and that it won't work for the password file. The
+superuser must perform all file checkouts and modifications, unless
+the underlying file permissions are changed to make the files
+writable by nonprivileged users. If all changes are made by
+<em class="emphasis">root</em>, then the SCCS logs do not contain
+information about the user making the change. The password file falls
+outside of SCCS control because its contents will be modified by
+users changing their passwords, without being able to check the file
+out of SCCS first. Also, some files, such as
+<em class="emphasis">/etc/group</em>, have no comment lines, so you cannot
+use SCCS keywords <a name="INDEX-700" /> <a name="INDEX-701" />in them.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-4-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">4.2.6. Using alternate map source files</h3>
+
+
+You may decide to use nonstandard
+source<a name="INDEX-702" />
+<a name="INDEX-703" /> files for various NIS maps on the master
+server, especially if the master server is not going to be an NIS
+client. Alternatively, you may need to modify the standard NIS
+<em class="emphasis">Makefile</em> to build your own NIS maps. Approaches
+to both of these problems are discussed in this section.</p>
+
+
+Some system administrators prefer to build the NIS password map from
+a file other than <em class="emphasis">/etc/passwd</em>, giving them finer
+control over access to the server. Separating the host's and
+the NIS password files is also advantageous if there are password
+file entries on the server (such as those for dial-in UUCP) that
+shouldn't be made available on all NIS clients. To avoid
+distributing UUCP password file entries to all NIS clients, the NIS
+password file should be kept separately from
+<em class="emphasis">/etc/passwd</em> on the master server. The master can
+include private UUCP password file entries and can embed the entire
+NIS map file via <em class="emphasis">nsswitch.conf.</em></p>
+
+
+If you de-couple the NIS password map from the master server's
+password file, then the NIS <em class="emphasis">Makefile</em> should be
+modified to reflect<a name="INDEX-704" /> <a name="INDEX-705" /> the new dependency. Refer back to the
+procedure described in <a href="ch03_02.html#nfs2-CHP-3-SECT-2.2">Section 3.2.2, "Installing the NIS master server"</a>.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4. System Management Using NIS</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.3. Advanced NIS server administration</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch04_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

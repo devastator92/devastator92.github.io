@@ -1,0 +1,486 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+<head><title>Running a Primary Master Name Server (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">4.7. Running a Primary Master Name Server</h2>
+
+
+<a name="INDEX-563" />Now
+<a name="INDEX-564" />
+<a name="INDEX-565" />that you've created your zone data
+files, you are ready to start a couple of name servers. You'll
+need to set up two name servers: a primary master name server and a
+slave name server. Before you start a name server, though, make sure
+that the
+<em class="emphasis">syslog</em><a name="INDEX-566" /> daemon is
+running. If the name server reads the configuration file and zone
+data files and sees an error, it logs a message to the
+<em class="emphasis">syslog</em> daemon. If the error is bad enough, the
+name server exits.</p><p>
+
+
+<a name="dns4-CHP-4-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">4.7.1. Starting Up the Name Server</h3>
+
+
+<a name="INDEX-567" />
+<a name="INDEX-568" />At this point, we assume the machine
+you are running on has the BIND name server and the support tool
+<em class="filename">nslookup</em> installed. Check the
+<em class="filename">named</em> manual page to find the directory the name
+<a name="INDEX-569" /> <a name="INDEX-570" />server executable
+is in and verify that the executable is on your system. On BSD
+systems, the name server started its life in
+<em class="filename">/etc</em>, but may have migrated to
+<em class="emphasis">/usr/sbin</em>. Other places to look for
+<em class="filename">named</em> are <em class="filename">/usr/etc/in.named</em>
+and <em class="filename">/usr/sbin/in.named</em>. The following
+descriptions assume that the name server is in
+<em class="emphasis">/usr/sbin</em>.</p><p>
+
+
+To start up the name server, you must become root. The name server
+listens for queries on a reserved port, so it requires root
+privileges. The first time you run it, start the name server from the
+command line to test that it is operating correctly. Later,
+we'll show you how to start up the name server automatically
+when your system boots.</p><p>
+
+
+The following command starts the name server. We ran it on the host
+<em class="emphasis">terminator.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/sbin/named</b></tt></pre></blockquote>
+
+
+This command assumes that your configuration file is
+<em class="filename">/etc/named.boot</em> (BIND 4) or
+<em class="filename">/etc/named.conf </em>(BIND 8 or 9). You can put your
+configuration file elsewhere, but you have to tell the name server
+where it is using the <span class="option">-c</span> command-line option:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>/usr/sbin/named -c conf-file</b></tt></pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-7.2" /><div class="sect2">
+<h3 class="sect2">4.7.2. Check for Syslog Errors</h3>
+
+
+The first thing to do after starting your name server is to check the
+<em class="emphasis">syslog</em> file for <a name="INDEX-571" /> <a name="INDEX-572" />error messages. If you are not familiar
+with <em class="emphasis">syslog</em>, look at the
+<em class="filename">syslog.conf</em> manual page for a description of the
+<em class="emphasis">syslog</em><a name="INDEX-573" /> configuration file, or the
+<em class="filename">syslogd</em><a name="INDEX-574" /> manual page for a description of the
+<em class="emphasis">syslog</em> daemon. The name server logs messages
+with <a name="INDEX-575" />facility <em class="filename">daemon
+</em>under the name <em class="filename">named</em>. You might be
+able to find out where <em class="emphasis">syslog</em> messages are
+logged by looking for the <em class="filename">daemon </em>facility in
+<em class="filename">/etc/syslog.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>grep daemon /etc/syslog.conf</b></tt>
+*.err;kern.debug;daemon,auth.notice /var/adm/messages</pre></blockquote>
+
+
+On this host, the name server <em class="emphasis">syslog</em> messages
+are logged to <em class="filename">/var/adm/messages</em>, and
+<em class="emphasis">syslog</em> saves only the ones that are at severity
+LOG_NOTICE or higher. Some useful messages are sent at severity
+LOG_INFO -- you might like to see some of these. You can decide if
+you want to change the log level after reading <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a>, where we cover <em class="emphasis">syslog</em>
+messages in more detail.</p><p>
+
+
+When the name server starts, it logs a starting message:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>grep named /var/adm/messages</b></tt>
+Jan 10 20:48:32 terminator named[3221]: starting.</pre></blockquote>
+
+
+The <a name="INDEX-576" />
+<a name="INDEX-577" />
+<a name="INDEX-578" /><em class="filename">starting</em> message
+is not an error message, but there might be other messages with it
+that are error messages. (If your server said
+<em class="filename">restarted</em> instead of
+<em class="filename">starting</em>, that's okay too. The message
+changed at BIND 4.9.3.) The most common errors are
+<a name="INDEX-579" />
+<a name="INDEX-580" />syntax errors in the zone data files or
+configuration file. For example, if you forget the resource record
+type in an address record:</p><p>
+
+
+<blockquote><pre class="code">robocop  IN  192.249.249.2</pre></blockquote>
+
+
+you'll see the following <em class="emphasis">syslog</em> error
+messages:</p><p>
+
+
+<blockquote><pre class="code">Jan 10 20:48:32 terminator named[3221]: Line 24: Unknown type:
+                192.249.249.2
+Jan 10 20:48:32 terminator named[3221]: db.movie.edu Line 24:
+                Database error near (192.249.249.2)
+Jan 10 20:48:32 terminator named[3221]: master zone "movie.edu" (IN) rejected due 
+to errors (serial 1)</pre></blockquote>
+
+
+Or, if you misspell the word "zone" in
+<em class="filename">/etc/named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">zne "movie.edu" in {</pre></blockquote>
+
+
+you'll see the following <em class="emphasis">syslog</em> error
+message:</p><p>
+
+
+<blockquote><pre class="code">Mar 22 20:14:21 terminator named[1477]: /etc/named.conf:10:
+                syntax error near `zne'</pre></blockquote>
+
+
+If BIND Version 4.9.4 or later finds a name that doesn't
+conform to RFC 952, you'll see the following
+<em class="emphasis">syslog</em> error message:</p><p>
+
+
+<blockquote><pre class="code">Jul 24 20:56:26 terminator named[1496]: owner name "ID_4.movie.edu IN"
+                                     (primary) is invalid - rejecting
+Jul 24 20:56:26 terminator named[1496]: db.movie.edu:33: owner name error
+Jul 24 20:56:26 terminator named[1496]: db.movie.edu:33: Database error near (A)
+Jul 24 20:56:26 terminator named[1496]: master zone "movie.edu" (IN) rejected due 
+to errors (serial 1)</pre></blockquote>
+
+
+If you have a syntax error, check the line numbers mentioned in the
+<em class="emphasis">syslog</em> error message to see if you can figure
+out the problem. You've seen what the zone data files are
+supposed to look like; that should be enough to figure out most
+simple syntax errors. Otherwise, you'll have to go through
+<a href="appa_01.html">Appendix A, "DNS Message Format and Resource Records"</a>, to see the gory syntactic details of
+all the resource records. If you can fix the syntax error, do so and
+then reload the name server with <em class="filename">ndc,</em> the
+<a name="INDEX-581" /> <a name="INDEX-582" />name daemon controller:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc reload</b></tt></pre></blockquote>
+
+
+so that it rereads the zone data files.<a href="#FOOTNOTE-27">[27]</a> You'll see more
+information in <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a> on using <em class="filename">ndc
+</em>to control the name server.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-27" />[27]For a BIND 9
+name server, you'd need to use
+<em class="filename">rndc</em><a name="INDEX-583" />,
+but we haven't shown you how to configure that yet. Skip ahead
+to <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a> if you'd like to see how
+that's done. <em class="filename">ndc </em>works without much
+configuration, though.</p><p>
+
+</blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-7.3" /><div class="sect2">
+<h3 class="sect2">4.7.3. Testing Your Setup with nslookup</h3>
+
+
+<a name="INDEX-584" /> <a name="INDEX-585" /> <a name="INDEX-586" />If you have set up your local zones
+correctly and your connection to the Internet is up, you should be
+able to look up a local and a remote domain name. We'll now
+step you through the lookups with <em class="filename">nslookup</em>.
+There is a whole chapter in this book on
+<em class="filename">nslookup</em> (<a href="ch12_01.html">Chapter 12, "nslookup and dig"</a>), but we
+cover it in enough detail here to do basic name server testing.</p><p>
+
+
+<a name="dns4-CHP-4-SECT-7.3.1" /><div class="sect3">
+<h3 class="sect3">4.7.3.1. Set the local domain name</h3>
+
+
+<a name="INDEX-587" />
+<a name="INDEX-588" />
+<a name="INDEX-589" />Before running
+<em class="filename">nslookup</em>, you need to set the host's local
+domain name. With this configured, you can look up a name like
+<em class="emphasis">carrie</em> instead of having to
+spell out <em class="emphasis">carrie.movie.edu</em> -- the system adds
+the domain name <em class="emphasis">movie.edu</em>
+for you.</p><p>
+
+
+There are two ways to set the local domain name:
+<em class="filename">hostname(1)</em><a name="INDEX-590" /> or <a name="INDEX-591" /><em class="filename">/etc/resolv.conf</em><a name="INDEX-592" />. Some people say that, in practice, more sites
+set the local domain in <em class="filename">/etc/resolv.conf</em>. You
+can use either. Throughout the book, we assume the local domain name
+comes from <em class="filename">hostname(1)</em>.</p><p>
+
+
+Create a file called <em class="filename">/etc/resolv.conf</em> with the
+following line starting in the first column (substitute your local
+domain name for <em class="emphasis">movie.edu</em>):</p><p>
+
+
+<blockquote><pre class="code">domain movie.edu</pre></blockquote>
+
+
+Or, set <em class="filename">hostname(1)</em> to a domain name. On the
+host <em class="emphasis">terminator</em>, we set
+<em class="filename">hostname(1)</em> to <em class="emphasis">terminator.movie.edu</em>. Don't add a
+trailing dot to the name.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-4-SECT-7.3.2" /><div class="sect3">
+<h3 class="sect3">4.7.3.2. Look up a local domain name</h3>
+
+
+<a name="INDEX-593" /><em class="filename">nslookup</em> can be
+used to look up any type of resource record, and it can be directed
+to query any name server. By default, it looks up A (address) records
+using the first name server specified in
+<em class="filename">resolv.conf</em>. (Without a name specified in
+<em class="filename">resolv.conf</em>, the resolver defaults to querying
+the local name server.) To look up a host's address with
+<em class="filename">nslookup</em>, run <em class="filename">nslookup</em> with
+the host's domain name as the only argument. A lookup of a
+local domain name should return almost instantly.</p><p>
+
+
+We ran <em class="filename">nslookup</em> to look up <em class="emphasis">carrie</em> :</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup carrie</b></tt>
+Server: terminator.movie.edu
+Address: 192.249.249.3
+
+Name:    carrie.movie.edu
+Address: 192.253.253.4</pre></blockquote>
+
+
+If looking up a local domain name works, your local name server has
+been configured properly for your forward-mapping zone. If the lookup
+fails, you'll see something like this:</p><p>
+
+
+<blockquote><pre class="code">*** terminator.movie.edu can't find carrie: Non-existent domain</pre></blockquote>
+
+
+This means that either <em class="emphasis">carrie</em> is not in your zone
+data -- check your zone data file -- or you didn't set
+your local domain name in <em class="filename">hostname(1)</em>, or some
+name server error occurred (though you should have caught the error
+when you checked the <em class="emphasis">syslog</em> messages).</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-4-SECT-7.3.3" /><div class="sect3">
+<h3 class="sect3">4.7.3.3. Look up a local address</h3>
+
+
+When <em class="filename">nslookup</em> is given an
+<a name="INDEX-594" />address to
+look up, it knows to make a PTR query instead of an address query. We
+ran <em class="filename">nslookup</em> to look up <em class="emphasis">carrie</em> 's address:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup 192.253.253.4</b></tt>
+Server: terminator.movie.edu
+Address: 192.249.249.3
+
+Name:    carrie.movie.edu
+Address: 192.253.253.4</pre></blockquote>
+
+
+If looking up an address works, your local name server has been
+configured properly for your <em class="emphasis">in-addr.arpa</em> (reverse-mapping) zones. If
+the lookup fails, you'll see the same error messages as when
+you looked up a domain name.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-4-SECT-7.3.4" /><div class="sect3">
+<h3 class="sect3">4.7.3.4. Look up a remote domain name</h3>
+
+
+The next step is to try using the local name server to look up a
+<a name="INDEX-595" />remote domain name, like ftp.uu.net, or another system you know
+of on the Internet. This command may not return as quickly as the
+last one. If <em class="filename">nslookup</em> fails to get a response
+from your name server, it will wait a little longer than a minute
+before giving up:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup ftp.uu.net.</b></tt>
+Server: terminator.movie.edu
+Address: 192.249.249.3
+
+Name:      ftp.uu.net
+Addresses: 192.48.96.9</pre></blockquote>
+
+
+If this works, your name server knows where the root name servers are
+and how to contact them to find information about domain names in
+zones other than your own. If it fails, either you forgot to
+configure the root hints file (and a <em class="emphasis">syslog</em>
+message will show up) or the network is broken somewhere and you
+can't reach the name servers for the remote zone. Try a
+different remote domain name.</p><p>
+
+
+If these first lookups succeeded, congratulations! You have a primary
+master name server up and running. At this point, you are ready to
+start configuring your slave name server.<a name="INDEX-596" /></p><p>
+</div>
+
+
+
+<a name="dns4-CHP-4-SECT-7.3.5" /><div class="sect3">
+<h3 class="sect3">4.7.3.5. One more test</h3>
+
+
+While you're testing, though, run one more test. Try having a
+remote name server look up a domain name in one of your zones. This
+will work only if your parent zone's name servers have already
+delegated your <a name="INDEX-597" />zones to the name
+server you just set up. If your parent required you to have your two
+name servers running before delegating your zones, skip ahead to the
+next section.</p><p>
+
+
+To make <em class="filename">nslookup</em> use a remote name server to
+look up a local domain name, give the local host's domain name
+as the first argument and the remote server's domain name as
+the second argument. Again, if this doesn't work, it may take a
+little longer than a minute before <em class="filename">nslookup</em>
+gives you an error message. Here, for instance, <em class="emphasis">gatekeeper.dec.com</em> looks up <em class="emphasis">carrie.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup carrie gatekeeper.dec.com.</b></tt>
+Server: gatekeeper.dec.com.
+Address: 204.123.2.2
+
+Name:    carrie.movie.edu
+Address: 192.253.253.4</pre></blockquote>
+
+
+If the first two lookups worked, but using a remote name server to
+look up a local name failed, your zones may not be registered with
+your parent name servers. That's not a problem, at first,
+because systems within your zones can look up the domain names of
+other systems both within and outside of your zones. You'll be
+able to send email and to FTP to local and remote systems, though
+some systems won't allow FTP connections if they can't
+map your hosts' addresses back to domain names. But not being
+registered will shortly become a problem. Hosts outside your zones
+can't look up domain names in your zones -- you can send
+email to friends in remote zones but you won't get their
+responses. To fix this problem, contact the administrators of your
+parent zones and have them check the delegation of your
+zones.<a name="INDEX-598" />
+<a name="INDEX-599" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-4-SECT-7.4" /><div class="sect2">
+<h3 class="sect2">4.7.4. Editing the Startup Files</h3>
+
+
+<a name="INDEX-600" />
+<a name="INDEX-601" />
+<a name="INDEX-602" />Once
+you have confirmed that your name server is running properly and can
+be used from here on, you'll need to configure it to start
+automatically and set <em class="filename">hostname(1)</em> to a domain
+name in your system's startup files. Check to see if your
+vendor has already set up the name server to start on bootup. You may
+have to remove comment characters from the startup lines, or the
+startup file may test to see if <em class="filename">/etc/named.conf</em>
+or <em class="filename">/etc/named.boot</em> exists. To look for automatic
+startup lines, use:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>grep named /etc/*rc*</b></tt></pre></blockquote>
+
+
+or, if you have System V-style <em class="filename">rc</em> files, use:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>grep named /etc/rc.d/*/S*</b></tt></pre></blockquote>
+
+
+If you don't find anything, add lines like the following to the
+appropriate startup file somewhere after your interfaces are
+initialized by <em class="filename">ifconfig</em>:</p><p>
+
+
+<blockquote><pre class="code">if test -x /etc/named -a -f /etc/named.conf
+then
+        echo "Starting named"
+        /etc/named
+fi</pre></blockquote>
+
+
+You may want to wait to start the name server until after the default
+route is installed or your routing daemon
+(<em class="filename">routed</em> or <em class="filename">gated </em>) is
+started, depending upon whether these services need the name server
+or can get by with <em class="filename">/etc/hosts</em>.</p><p>
+
+
+Find out which startup file initializes the host name. Change
+<em class="filename">hostname(1)</em> to a domain name. For example, we
+changed:</p><p>
+
+
+<blockquote><pre class="code">hostname terminator</pre></blockquote>
+
+
+to:</p><p>
+
+
+<a name="INDEX-603" /><blockquote><pre class="code">hostname terminator.movie.edu</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.6. Tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.8. Running a Slave Name Server</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+</html>

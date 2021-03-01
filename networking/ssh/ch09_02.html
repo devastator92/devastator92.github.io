@@ -1,0 +1,1675 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:03 GMT -->
+<head><title>Port Forwarding (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.2. Port Forwarding</h2>
+
+
+
+<a name="INDEX-1353" />SSH uses TCP/IP as its transport
+mechanism, usually TCP port 22 on the server machine, as it encrypts
+and decrypts the traffic passing over the connection. We will now
+discuss a cool feature that encrypts and decrypts TCP/IP traffic
+belonging to other applications, on other TCP ports, using SSH. This
+process, called port forwarding, is largely transparent and quite
+powerful. Telnet, SMTP, NNTP, IMAP, and other insecure protocols
+running over TCP can be made secure by forwarding the connections
+through SSH. Port forwarding is sometimes called tunneling because
+the SSH connection provides a secure "tunnel" through
+which another TCP/IP connection may pass.</p>
+
+
+
+Suppose you have a home machine H that runs an IMAP-capable email
+reader, and you want to connect to an IMAP server on machine S to
+read and send mail. Normally, this connection is insecure, with your
+mail account password transmitted as plaintext between your mail
+program and the server. With SSH port forwarding, you can
+transparently reroute the IMAP connection (found on server S's
+TCP port 143) to pass through SSH, securely encrypting the data over
+the connection.<a href="#FOOTNOTE-120">[120]</a> The IMAP server machine must be running an SSH server for
+port forwarding to provide real protection.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-120" />[120]Our port forwarding example protects
+your IMAP connection but doesn't truly protect your email
+messages. Before reaching your IMAP server, the messages pass through
+other mail servers and may be intercepted in transit. For end-to-end
+email security, you and your correspondent should use tools such as
+PGP or S/MIME to sign and/or encrypt the messages themselves.</p>
+
+
+</blockquote>
+
+
+
+In short, with minimal configuration changes to your programs, SSH
+port forwarding protects arbitrary TCP/IP connections by redirecting
+them through an SSH session. Port forwarding can even pass a
+connection safely through a firewall if you configure things
+properly. Once you start securing your communications with port
+forwarding, you'll wonder how you ever got along without it.
+Here are examples of what you can do:</p>
+
+
+
+<ul><li>Access various kinds of TCP servers (e.g., SMTP, IMAP, POP, LDAP,
+etc.) across a firewall that prevents direct access.</p></li><li>Provide protection for your sessions with these same TCP servers,
+preventing disclosure or alteration of passwords and other content
+that would otherwise be sent in the clear as part of the session.</p></li><li>Tunnel the control connection of an FTP session, to encrypt your
+username, password, and commands. (It isn't usually possible to
+protect the data channels that carry the file contents, though. [<a href="ch11_02.html#ch11-55593">Section 11.2, "FTP Forwarding"</a>])</p></li><li>Use your ISP's SMTP servers for sending mail, even if
+you're connected outside the ISP's network and the ISP
+<a name="INDEX-1354" />
+forbids mail relaying from your current location. [<a href="ch11_03.html#ch11-51522">Section 11.3.2, "Mail Relaying and News Access"</a>]</p></li></ul>
+<a name="ch09-4-fm2xml" />
+<blockquote><b>TIP: </b>
+SSH port forwarding is a general
+proxying mechanism for TCP only. (See <a href="ch09_02.html#ch09-14086">the sidebar "TCP Connections"</a> for an overview of TCP concepts.)
+Forwarding can't work with protocols not built on TCP, such as
+the UDP-based DNS, DHCP, NFS, and NetBIOS,<a href="#FOOTNOTE-121">[121]</a> or with non-IP-based
+protocols, such as AppleTalk or Novell's SPX/IPX.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-121" />[121]We're being a little imprecise here. DHCP is entirely
+based on UDP, so SSH port forwarding can't do anything with it.
+The others, however, either use both TCP and UDP for different
+purposes or can sometimes be configured to run over TCP, though they
+generally use UDP. Nevertheless, in most common situations, SSH
+can't forward them.</p>
+
+
+</blockquote>
+
+
+</blockquote>
+
+<a name="ch09-96388" /><div class="sect2">
+<h3 class="sect2">9.2.1. Local Forwarding</h3>
+
+<a name="INDEX-1355" /> <a name="INDEX-1356" /><a name="INDEX-1357" />In our earlier example, we had an
+IMAP server running on machine S, and an email reader on home machine
+H, and we wanted to secure the IMAP connection using SSH. Let's
+delve into that example in more detail.</p>
+
+<a name="ch09-14086" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">TCP Connections</h4>
+
+
+
+<a name="INDEX-1358" />To understand port forwarding,
+it's important to know some details about TCP, the Transmission
+Control Protocol. TCP is a fundamental building block of the
+Internet. Built on top of IP, it is the transport mechanism for many
+application-level Internet protocols such as FTP, Telnet, HTTP, SMTP,
+POP, IMAP, and SSH itself.</p>
+
+
+
+TCP comes with strong guarantees. A TCP connection is a virtual,
+full-duplex circuit between two communicating parties, acting like a
+two-way pipe. Either side may write any number of bytes at any time
+to the pipe, and the bytes are guaranteed to arrive unaltered and in
+order at the other side. The mechanisms that implement these
+guarantees, though, are designed to counter transmission problems in
+the network, such as routing around failed links, or retransmitting
+data corrupted by noise or lost due to temporary network congestion.
+They aren't effective against deliberate attempts to steal a
+connection or alter data in transit. SSH provides this protection
+that TCP alone lacks.</p>
+
+
+
+If an application doesn't need these guarantees about data
+integrity and order, or doesn't want the overhead associated
+with them, another protocol called User Datagram Protocol
+<a name="INDEX-1359" /> <a name="INDEX-1360" />(UDP) often suffices. It is
+packet-oriented, and has no guarantees of delivery or packet
+ordering. Some protocols that run over UDP are NFS, DNS, DHCP,
+NetBIOS, TFTP, Kerberos, SYSLOG, and NTP.</p>
+
+
+
+When a program establishes a TCP connection to a service, it needs
+two pieces of information: the IP address of the destination machine
+and a way to identify the desired service. TCP (and UDP) use a
+positive integer, called a <em class="emphasis">port
+number</em><a name="INDEX-1361" />, to identify a service. For example,
+SSH uses port 22, <em class="emphasis">telnet</em> uses port 23, and IMAP
+uses port 143. Port numbers allow multiple services at the same IP
+address.</p>
+
+
+
+The combination of an IP address and a port number is called a
+<em class="emphasis">socket</em><a name="INDEX-1362" />.
+For example, if you run <em class="emphasis">telnet</em> to connect to
+port 23 on the machine at IP address 128.220.91.4, the socket is
+denoted "(128.220.91.4,23)." Simply put, when you make a
+TCP connection, its destination is a socket. The source (client
+program) also has a socket on its end of the connection, and the
+connection as a whole is completely defined by the pair of source and
+destination sockets.</p>
+
+
+
+In order for a connection attempt to a socket to succeed, something
+must be
+"<a name="INDEX-1363" />listening"
+on that socket. That is, a program running on the destination machine
+must ask TCP to accept connection requests on that port and to pass
+the connections on to the program. If you've ever attempted a
+TCP connection and received the response "connection
+refused," it means that the remote machine is up and running,
+but nothing is listening on the target socket.</p>
+
+
+
+How does a client program know the target port number of a listening server? Port numbers for many protocols are standardized, assigned by the 
+Internet Assigned Numbers Authority or IANA. (IANA's complete list of port numbers is found at <a href="http://www.isi.edu/in-notes/iana/assignments/port-numbers">
+http://www.isi.edu/in-notes/iana/assignments/port-numbers</a>.)
+For instance, the TCP port number assigned to the NNTP (Usenet news) protocol is 119. Therefore, news servers listen on port 119, and newsreaders (clients) connect to them via port 119. More specifically, if a newsreader is configured to talk to a news server at IP address 10.1.2.3, it requests a TCP connection to the socket (10.1.2.3,119).</p>
+
+Port numbers aren't always hardcoded into programs. Many operating systems let applications refer to protocols by name, instead of number, by defining a table of TCP names and port numbers. Programs can then look up port numbers by the protocol name. Under Unix, the table is often contained in the file <em class="filename">
+/etc/services</em>
+ or the NIS services map, and queries are performed using the library routines <tt class="literal">getservbyname()</tt>
+, <tt class="literal">getservbyport()</tt>
+, and related procedures. Other environments allow servers to register their listening ports dynamically via a naming service, such as the AppleTalk Name Binding Protocol or DNS's WKS and SRV records.</p> 
+
+
+So far, we've discussed the port number used by a TCP server when a TCP client program wants to connect. We call this the <em class="emphasis">
+target</em>
+ port number. The client also uses a port number, called the <em class="emphasis">
+source</em>
+ port number, so the server can transmit to the client. If you combine the client's IP address and its source port number, you get the client's socket.</p> 
+Unlike target port numbers, source port numbers aren't
+standard. In most cases, in fact, neither the client nor the server
+cares which source port number is used by the client. Often a client
+will let TCP select an unused port number for the source. (The
+Berkeley r-commands, however, do care about source ports. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>]) If you examine the existing TCP connections on a machine with a command such as <tt class="command">netstat -a</tt> or <tt class="command">lsof -i tcp</tt>
+, you will see connections to the well-known port numbers for common services (e.g., 23 for Telnet, 22 for SSH), with large, apparently random source port numbers on the other end. Those source ports were chosen from the range of unassigned ports by TCP on the machines initiating those connections.</p>
+
+Once established, a TCP connection is completely determined by the combination of its source and target sockets. Therefore, multiple TCP clients may connect to the same target socket. If the connections originate from different hosts, the IP address portions of their source sockets will differ, distinguishing the connections. If they come from two different programs running on the same host, TCP on that host ensures they have different source port numbers.</p>
+
+
+</td></tr></table><p></blockquote>
+
+
+
+
+
+IMAP uses TCP port 143; this means that an <a name="INDEX-1364" />IMAP server will be
+listening for connections on port 143 on the server machine. To
+<a name="INDEX-1365" />tunnel
+the IMAP connection through SSH, you need to pick a local port on
+home machine H (between 1024 and 65535) and forward it to the remote
+socket (S,143). Suppose you randomly pick local port 2001. The
+following command then creates the tunnel:<a href="#FOOTNOTE-122">[122]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-122" />[122]You can
+also use <tt class="command">ssh -L2001:S:143 S</tt>, substituting
+"S" for localhost, but we will discuss later why
+localhost is the better alternative when possible.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ ssh -L2001:localhost:143 S</pre></blockquote>
+
+
+
+The <span class="option">-L</span> option specifies local forwarding, in which
+the TCP client is on the local machine with the SSH client. The
+option is followed by three values separated by colons: a local port
+to listen on (2001), the remote machine name or IP address (S), and
+the remote, target port number (143).</p>
+
+
+
+The previous command logs you into S, as it will if you just type
+<tt class="literal">ssh</tt><tt class="command"> </tt><tt class="literal">S</tt>.
+However, this SSH session has also forwarded TCP port 2001 on H to
+port 143 on S; the forwarding remains in effect until you log out of
+the session. To make use of the tunnel, the final step is to tell
+your email reader to use the forwarded port. Normally your email
+program connects to port 143 on the server machine, that is, the
+socket (S,143). Instead, it's configured to connect to port
+2001 on home machine H itself, i.e., socket (localhost,2001). So the
+path of the <a name="INDEX-1366" />connection is now as follows:</p>
+
+
+
+<ol><li>The email reader on home machine H sends data to local port 2001.</p></li><li>The local SSH client on H reads port 2001, encrypts the data, and
+sends it through the SSH connection to the SSH server on S.</p></li><li>The SSH server on S decrypts the data and sends it to the IMAP server
+listening on port 143 on S.</p></li><li>Data is sent back from the IMAP server to home machine H by the same
+process in reverse.</p></li></ol>
+Port forwarding can be specified only when you create an SSH
+connection. You can't add a forwarding to an existing SSH
+connection with any SSH implementation we know of, though
+there's nothing intrinsic to the SSH protocol that would
+prevent it, and it would sometimes be a useful feature. Instead of
+using the <span class="option">-L</span> option to establish a local forwarding,
+you can use the
+<a name="INDEX-1367" /><tt class="literal">LocalForward</tt>
+keyword in your client configuration file:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+LocalForward 2001 localhost:143
+# SSH2 only
+LocalForward "2001:localhost:143"</pre></blockquote>
+
+
+
+Note the small syntactic differences. In SSH1 and OpenSSH, there are
+two arguments: the local port number, and the remote socket expressed
+as <tt class="command">host:port</tt>. In SSH2, the expression is just as
+on the command line, except that it must be enclosed in double
+quotes. If you forget the quotes, <tt class="command">ssh2</tt>
+doesn't complain, but it doesn't forward the port,
+either.</p>
+
+
+
+Our example with home machine H and IMAP server S can be set up like
+this:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+Host local-forwarding-example
+ HostName S
+ LocalForward 2001 localhost:143
+# Run on home machine H
+$ ssh local-forwarding-example</pre></blockquote>
+
+
+
+<a name="ch09-95066" /><div class="sect3">
+<h3 class="sect3">9.2.1.1. Local forwarding and GatewayPorts</h3>
+
+
+
+<a name="INDEX-1368" /><a name="INDEX-1369" />In SSH1 and OpenSSH, by default,
+only the host running the SSH client can connect to locally forwarded
+ports. This is because <tt class="command">ssh</tt> listens only on the
+machine's loopback interface for connections to the forwarded
+port; that is, it binds the socket (localhost,2001), a.k.a.
+(127.0.0.1,2001), and not (H,2001). So, in the preceding example,
+only machine H can use the forwarding; attempts by other machines to
+connect to (H,2001) get "connection refused." However,
+<tt class="command">ssh</tt> for SSH1 and OpenSSH has a command-line
+option, <span class="option">-g</span>, that disables this restriction,
+permitting any host to connect to locally forwarded ports:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh1 -g -L&lt;localport&gt;:&lt;remotehost&gt;:&lt;remoteport&gt; hostname</pre></blockquote>
+
+
+
+The client configuration keyword <tt class="literal">GatewayPorts</tt> also
+controls this feature; the default value is <tt class="literal">no</tt>,
+and giving <tt class="literal">GatewayPorts=yes</tt> does the same thing as
+<span class="option">-g</span>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+GatewayPorts yes</pre></blockquote>
+
+
+
+There's a reason why <tt class="literal">GatewayPorts</tt> and
+<span class="option">-g</span> are disabled by default: they represent a
+security risk. [<a href="ch09_02.html#ch09-17854">Section 9.2.4.2, "Access control and the loopback address"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch09-5-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.1.2. Remote forwarding</h3>
+
+
+
+A remotely forwarded port is just like a local one, but the
+directions are reversed. This time the TCP client is remote, its
+server is local, and a forwarded connection is initiated from the
+remote machine.</p>
+
+
+
+Continuing with our example, suppose instead that you are logged into
+server machine S to begin with, where the IMAP server is running. You
+can now create a secure tunnel for remote clients to reach the IMAP
+server on port 143. Once again, you select a random port number to
+forward (say, 2001 again) and create the tunnel:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -R2001:localhost:143 H</pre></blockquote>
+
+
+
+The <span class="option">-R</span> option specifies remote forwarding. It is
+followed by three values, separated by colons as before but
+interpreted slightly differently. The <em class="emphasis">remote</em>
+port to be forwarded (2001) is now first, followed by the machine
+name or IP address (localhost) and port number (143). SSH can now
+forward connections from (localhost,143) to (H,2001).</p>
+
+
+
+Once this command has run, a secure tunnel has been constructed from
+the port 2001 on the remote machine H, to port 143 on the server
+machine S. Now any program on H can use the secure tunnel by
+connecting to (localhost,2001). As before, the command also runs an
+SSH terminal session on remote machine H, just as <tt class="command">ssh
+H</tt> does.</p>
+
+
+
+As with local forwarding, you may establish a remote forwarding using
+a keyword in your client configuration file. The
+<tt class="literal">RemoteForward</tt><a name="INDEX-1370" />
+keyword is analogous to <tt class="literal">LocalForward</tt>, with the
+same syntactic differences between SSH1 and SSH2:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+RemoteForward 2001 S:143
+
+# SSH2 only
+RemoteForward "2001:S:143"</pre></blockquote>
+
+
+
+For example, here's the preceding forwarding defined in an
+SSH2-format configuration file:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+remote-forwarding-example:
+ Host H
+ RemoteForward "2001:S:143"
+ 
+$ ssh2 remote-forwarding-example</pre></blockquote>
+
+
+
+<a name="ch09-6-fm2xml" /><blockquote><b>TIP: </b>
+You might think that the <tt class="literal">GatewayPorts</tt> feature
+discussed in the last section applies equally well to remote port
+forwardings. This would make sense as a feature, but as it happens,
+it isn't done. There would have to be a way for the client to
+communicate this parameter to the server for a given forwarding, and
+that feature hasn't been included in the SSH protocol. In SSH1
+and SSH2, remotely forwarded ports always listen on all network
+interfaces and accept connections from anywhere. [<a href="ch09_04.html#ch09-66652">Section 9.4, "Forwarding Security: TCP-wrappers and libwrap"</a>] The OpenSSH server does accept the
+<tt class="literal">GatewayPorts</tt> configuration option, and it applies
+globally to all remote forwardings established by that server.
+</p>
+
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.2.2. Trouble with Multiple Connections</h3>
+
+
+<a name="INDEX-1371" />
+<a name="INDEX-1372" /><a name="INDEX-1373" />
+
+<a name="INDEX-1374" />If you use
+<tt class="literal">LocalForward</tt><a name="INDEX-1375" /> or
+<tt class="literal">RemoteForward</tt><a name="INDEX-1376" /> in your configuration file, you
+might run into a subtle problem. Suppose you have set up a section in
+your configuration file to forward local port 2001 to an IMAP server:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 syntax used for illustration
+Host server.example.com
+ LocalForward 2001 server.example.com:143</pre></blockquote>
+
+
+
+This configuration works fine if you connect once:</p>
+
+
+
+<blockquote><pre class="code">$ ssh server.example.com</pre></blockquote>
+
+
+
+But if you try to open a second <tt class="command">ssh</tt> connection to
+<em class="emphasis">server.example.com</em> at the same
+time -- perhaps to run a different program in another window of
+your workstation -- the attempt will fail:</p>
+
+
+
+<blockquote><pre class="code">$ ssh server.example.com
+Local: bind: Address already in use</pre></blockquote>
+
+
+
+Why does this happen? Because your configuration file section tries
+to forward port 2001 again but finds that port is already in use
+("bound" for listening) by the first instance of
+<tt class="command">ssh</tt>. You need some way to make the connection but
+omit the port forwarding.</p>
+
+
+
+SSH1 (but not OpenSSH) provides a solution, the client configuration
+keyword
+<tt class="literal">ClearAllForwardings</tt><a name="INDEX-1377" />.
+From the name, you might think it terminates existing forwardings,
+but it doesn't. Rather, it nullifies any forwardings specified
+in the current <em class="emphasis">ssh</em> command. In the previous
+example, you can connect without forwardings to <em class="emphasis">server.example.com</em> with:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ ssh1 -o ClearAllForwardings=yes server.example.com</pre></blockquote>
+
+
+
+The original tunnel, set up by the first invocation, continues to
+exist, but <tt class="literal">ClearAllForwardings</tt> prevents the second
+invocation from attempting to recreate the tunnel. To illustrate the
+point further, here's a rather silly command:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 -L2001:localhost:143 -o ClearAllForwardings=yes mymachine</pre></blockquote>
+
+
+
+The <span class="option">-L</span> option specifies a forwarding, but
+<tt class="literal">ClearAllForwardings</tt> cancels it. This silly command
+is identical in function to:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 mymachine</pre></blockquote>
+
+
+
+<tt class="literal">ClearAllForwardings</tt> may also be placed in your
+client configuration file, of course. It seems more useful on the
+command line, however, where it can be used on the fly without
+editing a file.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-80290" /><div class="sect2">
+<h3 class="sect2">9.2.3. Comparing Local and Remote PortForwarding</h3>
+
+
+
+<a name="INDEX-1378" />The differences between
+local and remote forwarding can be subtle. It can get a bit confusing
+to know which kind of forwarding to use in a given situation. The
+quick rule is look for the TCP client application.</p>
+
+
+
+<a name="ch09-8-fm2xml" /><blockquote><b>TIP: </b>
+If the TCP client application (whose connections you want to forward)
+is running locally on the SSH client machine, use local forwarding.
+Otherwise, the client application is on the remote SSH server
+machine, and you use remote forwarding.</p>
+
+
+</blockquote>
+
+The rest of this section is devoted to dissecting the forwarding
+process in detail and understanding where this rule comes from.</p>
+
+
+
+<a name="ch09-9-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.3.1. Common elements</h3>
+
+
+
+Local and remote forwarding can be confusing because of overloaded
+terminology. In a given port forwarding situation, there are two
+clients and two servers lying around. We have the SSH client and
+server programs (e.g., <tt class="command">ssh</tt> and <tt class="command">sshd
+</tt>), plus the TCP application's client and server
+programs whose connection you want to protect by port forwarding.</p>
+
+
+
+An SSH session has a direction of establishment. That is, you run an
+SSH client on one machine, and it initiates a session with an SSH
+server on another. Likewise, a forwarded connection has a direction
+of establishment: you run an application client on one machine, and
+it initiates a session with a service on another. These two
+directions may or may not match. This is the difference between local
+and remote forwarding. Let's introduce some terminology and
+provide some diagrams to make sense of this.</p>
+
+
+
+To begin with, we have an application client and server running on
+two hosts, A and B (<a href="ch09_02.html#ch09-30307">Figure 9-2</a>).</p>
+
+
+
+<a name="ch09-30307" /><div class="figure"><img height="181" alt="Figure 9-2" src="figs/ssh_0902.gif" width="336" /></div><h4 class="objtitle">Figure 9-2. Application client and server</h4>
+
+The application server is listening on a well-known port W for
+incoming client connections. Without SSH, you can tell the
+application client that its server is on host B, port W. The client
+makes a direct connection to the server, and all application protocol
+data go in the clear over the network (<a href="ch09_02.html#ch09-32975">Figure 9-3</a>).</p>
+
+
+
+<a name="ch09-32975" /><div class="figure"><img height="181" alt="Figure 9-3" src="figs/ssh_0903.gif" width="336" /></div><h4 class="objtitle">Figure 9-3. Direct client/server connection (no forwarding)</h4>
+
+To protect the application protocol data by forwarding, you establish
+an SSH session between these two hosts. When setting up the SSH
+session, you select an unused port number P on the application client
+side (host A), and request SSH port forwarding from the socket (A,P)
+to the socket (B,W). Once the session is established, the SSH process
+on A is listening for incoming TCP connection requests on port P.
+Tell the application client that its server is on (A,P) instead of
+(B,W), and the stage is now set for port forwarding (<a href="ch09_02.html#ch09-84267">Figure 9-4</a>).</p>
+
+
+
+<a name="ch09-84267" /><div class="figure"><img height="181" alt="Figure 9-4" src="figs/ssh_0904.gif" width="391" /></div><h4 class="objtitle">Figure 9-4. A forwarded port</h4>
+
+There are now two cooperating SSH processes with an established,
+encrypted SSH session between them; you don't yet distinguish
+between the SSH client and server. Inside that session, SSH creates
+multiple
+<em class="emphasis">channels</em><a name="INDEX-1379" />,
+or logical streams for carrying data. It uses channels to carry and
+distinguish the input, output, and error streams for an interactive
+login or remote command run via SSH, and similarly creates a new
+channel for each use of a port forwarding, to carry the forwarded
+data inside the protected SSH session.</p>
+
+
+
+<a href="ch09_02.html#ch09-87942">Figure 9-5</a> shows that now, when the application
+client tries to connect to its server, it connects instead to the
+listening SSH process (1). The SSH listener notices this and accepts
+the connection. It then notifies its partner SSH process that a new
+instance of this port forwarding is starting up, and they cooperate
+to establish a new channel for carrying the data for this forwarding
+instance (2). Finally, the partner SSH process initiates a TCP
+connection to the target of the port forwarding: the application
+server listening on (B,W) (3). Once this connection succeeds, the
+port forwarding instance is in place. The SSH processes cooperate to
+pass back and forth any data transmitted by the application client
+and server, over the channel inside the SSH session. This allows them
+to communicate and secures the application's activities on the
+network.</p>
+
+
+
+<a name="ch09-87942" /><div class="figure"><img height="181" alt="Figure 9-5" src="figs/ssh_0905.gif" width="417" /></div><h4 class="objtitle">Figure 9-5. A forwarded connection</h4>
+</div>
+
+
+
+
+
+<a name="ch09-10-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.3.2. Local versus remote forwarding: the distinction</h3>
+
+
+
+With this general framework in place, you can distinguish between
+local and remote forwarding. First we introduce some terms. In the
+generic port forwarding description in the last section, you saw that
+one SSH process listens for connections, while the other is ready to
+initiate connections in response to connections accepted on the other
+side, to complete the forwarded path. We call the first side the
+<em class="emphasis">listening</em><a name="INDEX-1380" /> side of the SSH session with respect
+to this forwarding, and the other, the
+<em class="emphasis">connecting</em><a name="INDEX-1381" /> side. For example, in <a href="ch09_02.html#ch09-84267">Figure 9-4</a>, host A is the listening side, while host B is
+the connecting side. Note that these terms aren't mutually
+exclusive. Since a single SSH session may have multiple forwardings
+in place, the same side of a session may be the listening side for
+some forwardings, and simultaneously the connecting side for others.
+But with respect to any particular forwarding, it is one or the
+other.</p>
+
+
+
+Now, recall that in the last section we didn't label the SSH
+processes according to which was the SSH client and which the SSH
+server, but simply referred to two cooperating SSH processes. We do
+so now, and can state succinctly the local versus remote distinction:</p>
+
+
+
+<ul><li>In a <em class="emphasis">local</em><a name="INDEX-1382" /><a name="INDEX-1383" /> forwarding (<a href="ch09_02.html#ch09-53890">Figure 9-6</a>), the application client and hence the
+listening side are located with the SSH client. The application
+server and connecting side are located with the SSH server.</p></li><li>In a <em class="emphasis">remote</em><a name="INDEX-1384" /><a name="INDEX-1385" /> forwarding (<a href="ch09_02.html#ch09-53819">Figure 9-7</a>), the situation is reversed: the application
+client and listening side are located with the SSH server, while the
+application server and connecting side are located with the SSH
+client.</p></li></ul>
+<a name="ch09-53890" /><div class="figure"><img height="181" alt="Figure 9-6" src="figs/ssh_0906.gif" width="391" /></div><h4 class="objtitle">Figure 9-6. Local port forwarding</h4>
+
+<a name="ch09-53819" /><div class="figure"><img height="181" alt="Figure 9-7" src="figs/ssh_0907.gif" width="391" /></div><h4 class="objtitle">Figure 9-7. Remote port forwarding</h4>
+
+So, as we said at the beginning of this section: use a local
+forwarding when the application client is on the local side of the
+SSH connection, and a remote forwarding when it's on the remote
+side.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-10068" /><div class="sect2">
+<h3 class="sect2">9.2.4. Forwarding Off-Host</h3>
+
+
+
+<a name="INDEX-1386" />In all
+our discussions of port forwarding so far, the application client and
+server have been located on the machines on the ends of the SSH
+session. This is reflected in our always using
+"localhost" in naming the target socket of a forwarding:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -L2001:localhost:143 server.example.com</pre></blockquote>
+
+
+
+Since the application server is located on the same machine as the
+connecting side of the SSH port forwarding, the target host can be
+"<a name="INDEX-1387" />localhost." But the connections
+between the application client and the SSH listening side, and
+between the application server and the SSH connecting side, are
+themselves TCP connections. For convenience, TCP implementations
+allow programs to make connections between two sockets on the same
+host. The connection data is simply transferred from one process to
+another without actually being transmitted on any real network
+interface. However, in principle, either the application client or
+server -- or both -- could be on different machines,
+potentially involving as many as four hosts in a single forwarding
+(<a href="ch09_02.html#ch09-49506">Figure 9-8</a>).</p>
+
+
+
+<a name="ch09-49506" /><div class="figure"><img height="238" alt="Figure 9-8" src="figs/ssh_0908.gif" width="348" /></div><h4 class="objtitle">Figure 9-8. Off-host port forwarding</h4>
+
+Although this situation is possible, you generally don't want
+to do it for security reasons, namely privacy and access control.</p>
+
+
+
+<a name="ch09-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.4.1. Privacy</h3>
+
+
+
+As shown in <a href="ch09_02.html#ch09-49506">Figure 9-8</a>, the complete path followed
+by forwarded data includes three TCP connections. But only the second
+connection, between the two SSH processes, is protected as a channel
+inside the SSH session. The other two connections are just simple TCP
+connections. Normally each of these is on a single host, and is
+therefore protected from network snooping or interference, so the
+entire forwarding path is secure. But if either of these two
+connections is between different hosts, its data will be vulnerable
+in transit.</p>
+</div>
+
+
+
+
+
+<a name="ch09-17854" /><div class="sect3">
+<h3 class="sect3">9.2.4.2. Access control and the loopback address</h3>
+
+
+
+The other security problem of off-host forwarding concerns the
+listening side. In short, the listening side of a forwarding has no
+access control, so intruders may gain access to it. To explain this
+problem, we must first discuss the <em class="emphasis">loopback
+address</em><a name="INDEX-1388" /><a name="INDEX-1389" /> of a host.</p>
+
+
+
+In addition to any physical network interfaces it may have, a host
+running IP has also has a virtual one called the
+<em class="emphasis">loopback</em> interface. This is a software
+construct, not corresponding to any network hardware. Nonetheless,
+the loopback appears and responds like a real interface. Under Unix,
+it is often named <em class="emphasis">lo0</em><a name="INDEX-1390" /> and is listed by
+<tt class="command">ifconfig</tt><a name="INDEX-1391" />:</p>
+
+
+
+<blockquote><pre class="code">$ ifconfig -a
+...
+lo0: flags=849&lt;UP,LOOPBACK,RUNNING,MULTICAST&gt; mtu 8232
+        inet 127.0.0.1 netmask ff000000</pre></blockquote>
+
+
+
+The loopback interface leads back to the host itself. A datagram
+"transmitted" on the loopback interface immediately
+appears as an incoming packet on the loopback interface and is picked
+up and processed by IP as being destined for the local host.</p>
+
+
+
+The loopback interface is always assigned the same IP address:
+<a name="INDEX-1392" />127.0.0.1, the loopback
+address,<a href="#FOOTNOTE-123">[123]</a> and the
+local naming service provides the name "localhost" for
+that address. This mechanism gives a reliable way for processes to
+communicate with one another on the local host via IP, regardless of
+what IP addresses the host may have on real connected networks, or
+indeed if the host has no real network connections at all. You can
+always refer to your local host using the well-known loopback
+address.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-123" />[123]Actually, the entire network
+127.0.0.0/8 -- comprising 24 million addresses -- is reserved
+for addresses that refer to the local host. Only the address
+127.0.0.1 is commonly used, although we have seen devices use a
+handful of others for special purposes, such as "reject"
+interfaces on a terminal server or router.</p>
+
+
+</blockquote>
+
+
+
+By design, a loopback address is local to its host. One machine
+can't contact the loopback address of another. Since the
+loopback address 127.0.0.1 is standard on all IP hosts, any
+connection to 127.0.0.1 leads a machine to talk to itself. (Plus, the
+loopback network isn't routed on the Internet.)</p>
+</div>
+
+
+
+
+
+<a name="ch09-31004" /><div class="sect3">
+<h3 class="sect3">9.2.4.3. Listening on ("binding") an interface</h3>
+
+
+
+<a name="INDEX-1393" /><a name="INDEX-1394" />When
+a host listens on a TCP port, it establishes a potential endpoint for
+a TCP connection. But the endpoints of a TCP connection are sockets,
+and a socket is an (address,port) pair, not a (host,port) pair.
+Listening must take place on a particular socket and thus be
+associated with a particular address, hence a particular interface on
+the host. This is called
+<em class="emphasis">binding</em><a name="INDEX-1395" /><a name="INDEX-1396" /> the
+interface.<a href="#FOOTNOTE-124">[124]</a> Unless otherwise specified, when
+asked to listen on a particular port, TCP binds all the host's
+interfaces and accepts connections on any of them. This is generally
+the right behavior for a server. It doesn't care how many
+network interfaces the local host has: it just accepts any connection
+made to its listening port, regardless of which host address was
+requested.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-124" />[124]Named after the Berkeley sockets library
+routine <em class="emphasis">bind</em>, commonly used to establish the
+association.</p>
+
+
+</blockquote>
+
+
+
+Consider, however, what this means in the case of SSH port
+forwarding. There is no authentication or access control at all
+applied to the listening side of a forwarding; it simply accepts any
+connection and forwards it. If the listening side binds all the
+host's interfaces for the forwarded port, this means that
+anyone at all with network connectivity to the listening
+host -- possibly the whole Internet! -- can use your
+forwarding. This is obviously not a good situation. To address it,
+SSH by default binds only the loopback address for the listening side
+of a forwarding. This means that only other programs on the same host
+may connect to the forwarded socket. This makes it reasonably safe to
+use port forwarding on a PC or other single-user machine but is still
+a security problem on multiuser hosts. On most Unix machines, for
+example, a knowledgeable user can connect to any listening sockets
+and see what's on them. Keep this in mind when using port
+forwarding on a Unix machine.</p>
+
+
+
+If you want to allow off-host connections to your forwarded ports,
+you can use the <span class="option">-g</span> switch or
+<tt class="literal">GatewayPorts</tt> option to have the listening side
+bind all interfaces, as we did in an earlier example: [<a href="ch09_02.html#ch09-10068">Section 9.2.4, "Forwarding Off-Host"</a>]</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 -g -L P:S:W B</pre></blockquote>
+
+
+
+But be aware of the security implications! You may want to exercise
+more control over the use of forwarded ports in this situation by
+using TCP-wrappers, which we discuss later in this chapter.
+<a name="INDEX-1397" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-12-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.2.5. Bypassing a Firewall</h3>
+
+
+
+<a name="INDEX-1398" />Let's
+<a name="INDEX-1399" />tackle a more complicated example
+of port forwarding. <a href="ch09_02.html#ch09-77504">Figure 9-9</a> returns us to the
+same company situation as in <a href="ch06_03.html#ch06-13980">Figure 6-5</a> when we
+discussed agent forwarding. [<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>] Your home
+machine H talks to work machine W via a bastion host, B, and you want
+to access your work email from home. Machine W runs an IMAP server,
+and your home machine H has an IMAP-capable email reader, but you
+can't hook them up. Your home IMAP client expects to make a TCP
+connection directly to the IMAP server on W, but unfortunately that
+connection is blocked by the firewall. Since host B is inside the
+firewall, and it's running an SSH server, there should be some
+way to put all the pieces together and make the IMAP connection from
+H to W.</p>
+
+
+
+<a name="ch09-77504" /><div class="figure"><img height="202" alt="Figure 9-9" src="figs/ssh_0909.gif" width="441" /></div><h4 class="objtitle">Figure 9-9. Port forwarding through a firewall</h4>
+
+Port forwarding can solve this problem. As before, the IMAP server is
+on port 143, and we select a random local port number, 2001. This
+time, however, we use a slightly different command to set up
+forwarding:</p>
+
+
+
+<blockquote><pre class="code"># Executed on home machine H
+$ ssh -L2001:W:143 B</pre></blockquote>
+
+
+
+This establishes an interactive SSH session from home machine H to
+bastion host B and also creates an SSH tunnel from local host H to
+the email server machine W. Specifically, in response to a connection
+on port 2001, the local SSH client directs the SSH server running on
+B to open a connection to port 143 on W, that is, socket W:143. The
+SSH server can do this because B is inside the firewall. If you
+configure your email reader to connect to local port 2001, as before,
+the communication path is now:</p>
+
+
+
+<ol><li>The email reader on home machine H sends data to local port 2001.</p></li><li>The local SSH client reads port 2001, encrypts the data, and sends it
+into the tunnel.</p></li><li>The tunnel passes through the firewall, because it is an SSH
+connection (port 22) that the firewall accepts.</p></li><li>The SSH server on bastion host B decrypts the data and sends it to
+port 143 on work machine W. This transmission isn't encrypted,
+but it's protected behind the firewall, so encryption
+isn't necessary. (Assuming you're not worried about
+snooping on your internal network.)</p></li><li>Data is sent back from the IMAP server to home machine H by the same
+process in reverse.</p></li></ol>
+You have now bypassed the firewall by tunneling the IMAP traffic
+through SSH.<a name="INDEX-1400" /></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-95987" /><div class="sect2">
+<h3 class="sect2">9.2.6. Port Forwarding Without a Remote Login</h3>
+
+
+
+<a name="INDEX-1401" />It may happen that you'd
+like to forward a port via SSH but don't want an SSH login
+session to the remote host. For example, if you're using the
+IMAP forwarding example we've been harping on, you may want
+only to read email, not open an unnecessary terminal connection at
+the same time. With SSH2, this is simple: just provide the
+<span class="option">-f</span> option to <tt class="command">ssh2</tt> in your port
+forwarding command:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh2 -f -L2001:localhost:143 server.example.com</pre></blockquote>
+
+
+
+or use the
+<tt class="literal">GoBackground</tt><a name="INDEX-1402" />
+keyword for the same effect:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+GoBackground yes</pre></blockquote>
+
+
+
+As a result, <tt class="command">ssh2</tt> puts itself into the background
+and handles connections to the forwarded port 2001, and that is all.
+It doesn't create an interactive terminal session with standard
+input, output, and error channels. The <span class="option">-S</span> option
+also avoids starting a terminal session but unlike
+<span class="option">-f</span>, it doesn't put the session in the
+background (in other words, the <span class="option">-f</span> option implies
+<span class="option">-S </span>):</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh2 -S -L2001:localhost:143 server.example.com</pre></blockquote>
+
+
+
+The <span class="option">-f</span> option is also supported by SSH1 and OpenSSH
+but its operation is different from that of SSH2. It is intended more
+for executing remote commands that don't require terminal
+interaction, such as graphical programs using X. Specifically:</p>
+
+
+
+<ul><li>It causes the backgrounded <tt class="command">ssh</tt> to connect the
+local end of the terminal session to <em class="filename">/dev/null</em>
+(that is, <span class="option">-f</span> implies the <span class="option">-n</span>
+option).</p></li><li>It requires you to specify a remote command, ideally one that
+doesn't read from standard input, since the backgrounded
+<tt class="command">ssh</tt> connects the local end of the session channel
+to <em class="filename">/dev/null</em> (that is, <span class="option">-f</span>
+implies the <span class="option">-n</span> option).</p></li></ul>
+For example, if X forwarding is turned on (which we'll discuss
+later), the following command puts itself into the background,
+popping up a graphical clock on your local display, with the clock
+program running on the remote host <em class="emphasis">zwei.uhr.org </em>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh -f zwei.uhr.org xclock</pre></blockquote>
+
+
+
+This is equivalent to the background command:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh -n zwei.uhr.org xclock &amp;</pre></blockquote>
+
+
+
+In contrast, SSH2 doesn't require a remote command when using
+the <span class="option">-f</span> option. You may provide one as earlier, and
+<tt class="command">ssh2</tt> behaves in the same way as its SSH1 or
+OpenSSH counterparts:</p>
+
+
+
+<blockquote><pre class="code">$ ssh2 -f zwei.uhr.org xclock</pre></blockquote>
+
+
+
+but the remote command isn't necessary; you can set up a
+forwarding and put <tt class="command">ssh2</tt> into the background
+conveniently:</p>
+
+
+
+<blockquote><pre class="code">$ ssh2 -f -L2001:localhost:143 server.example.com</pre></blockquote>
+
+
+
+If you tried this with SSH1 or OpenSSH, you see:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh -f -L2001:localhost:143 server.example.com
+Cannot fork into background without a command to execute.</pre></blockquote>
+
+
+
+To get around the nuisance of providing an unwanted remote command,
+use one that does nothing for a long time, such as <tt class="command">sleep
+</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh -f -L2001:localhost:143 server.example.com sleep 1000000</pre></blockquote>
+
+
+
+<a name="ch09-13-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.6.1. One shot forwarding</h3>
+
+
+
+When invoked with <span class="option">-f</span> or
+<tt class="literal">GoBackground</tt>, <tt class="command">ssh</tt> persists
+until you explicitly kill it with the Unix <tt class="command">kill</tt>
+command. (You can find its pid with the <tt class="command">ps</tt>
+command.) Alternatively, you can request <em class="emphasis">one shot
+forwarding</em><a name="INDEX-1403" />, which causes the client to exit
+when forwarding is over with. Specifically, the client waits
+indefinitely for the first forwarded connection. After that, when the
+number of forwarded connections drops to zero, the client exits.</p>
+
+
+
+One shot forwarding is accomplished easily in SSH2 with the
+<span class="option">-fo</span> command-line option, a variation on
+<span class="option">-f</span> (the "o" stands for "one shot
+"):</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh2 -fo -L2001:localhost:143 server</pre></blockquote>
+
+
+
+<a name="INDEX-1404" />One shot forwarding
+isn't directly supported by SSH1 or OpenSSH, but you can get
+the same effect with the following method:</p>
+
+
+
+<ol><li>Set up the forwarding with <tt class="command">ssh -f</tt>, and for the
+required remote command, use <tt class="command">sleep</tt> with a short
+duration:</p>
+
+<blockquote><pre class="code">$ ssh -f -L2001:localhost:143 server sleep 10</pre></blockquote>
+</li>
+
+
+<li>Before the sleep interval expires, use the forwarded connection:</p>
+<blockquote><pre class="code">$ ssh -p2001 localhost</pre></blockquote>
+</li></ol>
+
+
+Once the <tt class="command">sleep</tt> command finishes, the first
+<tt class="command">ssh</tt> tries to exit, but it notices a forwarded
+connection is in use and refuses to exit, printing a warning you can
+ignore:</p>
+
+
+
+<blockquote><pre class="code">Waiting for forwarded connections to terminate...
+The following connections are open:
+  port 2001, connection from localhost port 143</pre></blockquote>
+
+
+
+<tt class="command">ssh</tt> waits until that connection ends and then
+terminates, providing the behavior of one shot forwarding.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-14-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.2.7. The Listening Port Number</h3>
+
+
+
+<a name="INDEX-1405" /><a name="INDEX-1406" /><a name="INDEX-1407" />Earlier,
+<a name="INDEX-1408" /><a name="INDEX-1409" />we
+suggested selecting any unused port for the listening side of a
+forwarding. Port numbers are encoded in a 16-bit field and can have
+any value from 1 to 65535 (port
+is reserved). On multiuser operating systems such as Unix, ports 1
+through 1023 are called <em class="emphasis">privileged</em> and are
+reserved for processes run by the superuser (user ID zero). If a
+nonprivileged process tries to bind a privileged port for listening,
+it will fail with an error message such as "insufficient
+permission."<a href="#FOOTNOTE-125">[125]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-125" />[125]Microsoft Windows and MacOS have
+no privileged port restriction, so any user can listen on any free
+port.</p>
+
+
+</blockquote>
+
+
+
+When setting up the listening side of a tunnel, you generally must
+select a port number between 1024 and 65535, inclusive. This is
+because an SSH program running under your user ID, not the
+superuser's, is responsible for listening on that port. If SSH
+reports that your chosen port is in already in use, just choose
+another; it shouldn't be hard to find a free one.</p>
+
+
+
+For the target side of the tunnel, you can specify any port number,
+privileged or not. You are attempting to connect to the port, not
+listen on it. In fact, most of the time the target side is a
+privileged port, since the most common TCP services have ports in the
+privileged range.</p>
+
+
+
+If you are the superuser on a machine with SSH clients, you can
+perform local forwarding with a privileged port. Likewise, you can
+forward a remote privileged port if your remote account has superuser
+privileges.</p>
+
+
+
+Some TCP applications hardcode the server port numbers and
+don't permit them to be changed. These applications
+aren't usable with port forwarding if the operating system has
+a privileged port restriction. For example, suppose you have an FTP
+client that's hardwired to connect to the server on the
+standard FTP control port, 21. To set up port forwarding, you have to
+forward the local port 21 to the remote port 21. But since port 21 is
+privileged, you can't use it as a listening port number unless
+you are the superuser. Fortunately, most Unix TCP-based programs let
+you set the destination port number for connections, and on PCs and
+Macs, there's no privileged port restriction.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-27356" /><div class="sect2">
+<h3 class="sect2">9.2.8. Choosing the Target Forwarding Address</h3>
+
+
+
+<a name="INDEX-1410" />Suppose you want to forward a
+connection from your local machine to <em class="emphasis">remote.host.net</em>. The following two commands
+both work:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -L2001:localhost:143 remote.host.net
+$ ssh -L2001:remote.host.net:143 remote.host.net</pre></blockquote>
+
+
+
+The forwarded connection is made from the remote machine to either
+the loopback address or <em class="emphasis">remote.host.net</em>, and in either case, the
+connection stays on the remote machine and doesn't go over the
+network. However, the two connections are perceptibly different to
+the server receiving the forwarded connection. This is because the
+<em class="emphasis">source</em> sockets of the connections are different.
+The connection to localhost appears to come from source address
+127.0.0.1, whereas the connection to <em class="emphasis">remote.host.net</em> is from the address
+associated with that name.</p>
+
+
+
+Most of the time this difference doesn't matter, but sometimes
+you must take it into account. The application server (e.g., the IMAP
+daemon) might be doing access control based on source address and not
+be configured to accept the loopback address. Or it might be running
+on a multihomed host and have bound only a subset of the addresses
+the host has, possibly not including the loopback address. Each of
+these situations is usually an oversight, but you might not be able
+to do anything about it. If you're getting "connection
+refused" from the connecting side of the forwarding, but
+you've verified that the server appears to be running and
+responding to normal clients, this might be the problem. If the
+server machine is running Unix, the command <tt class="command">netstat -a
+-n</tt><a name="INDEX-1411" /> should list all the network
+connections and listeners on that machine. Look for listeners on the
+relevant port, and the addresses on which they are listening.</p>
+
+
+
+Sometimes, the problem can be more acute if the server uses the
+source IP address itself as part of whatever protocol it's
+speaking. This problem crops up when trying to forward FTP over SSH.
+[<a href="ch11_02.html#ch11-55593">Section 11.2, "FTP Forwarding"</a>]</p>
+
+
+
+In general, we recommend using localhost as the forwarding target
+whenever possible. This way, you are less likely to set up an
+insecure off-host forwarding by accident.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-87343" /><div class="sect2">
+<h3 class="sect2">9.2.9. Termination</h3>
+
+
+
+What happens to forwardings when an SSH connection
+<a name="INDEX-1412" /><a name="INDEX-1413" /><a name="INDEX-1414" />terminates?
+The ports simply cease being forwarded; that is, SSH is no longer
+listening on them, and connection attempts to those ports get
+"connection refused."</p>
+
+
+
+What happens if you try to terminate an SSH session while it still
+has active forwarded connections? SSH will notice and wait for them
+to disconnect before stopping the session. The details of this
+behavior differ among implementations.</p>
+
+
+
+In SSH2, if you log out of a session that has an active forwarded
+connection, the session stays open but sends itself into the
+background:</p>
+
+
+
+<blockquote><pre class="code">remote$ logout
+warning: ssh2[7021]: number of forwarded channels still open, forkedto background 
+to wait for completion.
+local$</pre></blockquote>
+
+
+
+The <tt class="command">ssh2</tt> process now waits in the background until
+the forwarded connections terminate, and then it exits. In contrast,
+with SSH1 and OpenSSH, if you disconnect a session with active
+forwardings, you get a warning, but the session stays in the
+foreground:</p>
+
+
+
+<blockquote><pre class="code">remote$ logout
+Waiting for forwarded connections to terminate...
+The following connections are open:
+  port 2002, connection from localhost port 1465</pre></blockquote>
+
+
+
+To send it into the background and return to your local shell prompt,
+use the <a name="INDEX-1415" />escape sequence
+return-tilde-ampersand: [<a href="ch02_03.html#ch02-71033">Section 2.3.2, "The Escape Character"</a>]</p>
+
+
+
+<blockquote><pre class="code">~&amp; [backgrounded]
+local$</pre></blockquote>
+
+
+
+and as with SSH2, the connection exits only after its forwarded
+connections terminate. Be careful not to use the SSH
+<tt class="literal">^Z</tt> escape for this purpose. That
+sends <tt class="command">ssh</tt> into the background but suspended,
+unable to accept TCP connections to its forwarded ports. If you do
+this accidentally, use your shell's job control commands (e.g.,
+<tt class="command">fg</tt> and <tt class="command">bg </tt>) to resume the
+process.</p>
+
+
+
+<a name="ch09-83769" /><div class="sect3">
+<h3 class="sect3">9.2.9.1. The TIME_WAIT problem</h3>
+
+
+
+<a name="INDEX-1416" /><a name="INDEX-1417" />Sometimes
+a forwarded port mysteriously hangs around after the forwarding SSH
+session has gone away. You try a command you've used
+successfully several times in a row and suddenly get an error
+message:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 -L2001:localhost:21 server.example.com
+Local: bind: Address already in use</pre></blockquote>
+
+
+
+(This happens commonly if you're experimenting with port
+forwarding, trying to get something to work.) You know that you have
+no active SSH command listening on port 2001, so what's going
+on? If you use the <tt class="command">netstat</tt> command to look for
+other listeners on that port, you may see a connection hanging around
+in the TIME_WAIT state:</p>
+
+
+
+<blockquote><pre class="code">$ netstat -an | grep 2001
+tcp    0   0   127.0.0.1:2001   127.0.0.1:1472    TIME_WAIT</pre></blockquote>
+
+
+
+The TIME_WAIT state is an artifact of the TCP protocol. In certain
+situations, the teardown of a TCP connection can leave one of its
+socket endpoints unusable for a short period of time, usually only a
+few minutes. As a result, you cannot reuse the port for TCP
+forwarding (or anything else) until the teardown completes. If
+you're impatient, choose another port for the time being (say,
+2002 instead of 2001) and get on with your work, or wait a short time
+for the port to become usable again.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.2.10. Configuring Port Forwarding in the Server</h3>
+
+
+
+<a name="INDEX-1418" />We've seen several
+keywords and command-line options for configuring SSH clients for
+port forwarding, such as <span class="option">-L</span> and <span class="option">-R</span>.
+In addition, the SSH server can be configured for port forwarding.
+We'll cover compile-time, serverwide, and per-account
+configuration.</p>
+
+
+
+<a name="ch09-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.10.1. Compile-time configuration</h3>
+
+
+
+<a name="INDEX-1419" />You can
+<a name="INDEX-1420" />enable or disable port forwarding
+at compile time with <tt class="command">configure</tt>. [<a href="ch04_01.html#ch04-40478">Section 4.1.5.5, "TCP port forwarding"</a>] It is enabled by default. For SSH1, the
+configure flags
+<tt class="literal"> -- disable-server-port-forwardings</tt><a name="INDEX-1421" />
+and <tt class="literal"> -- disable-client-port-forwardings</tt><a name="INDEX-1422" />
+turn off port forwarding capability for <tt class="command">sshd1</tt> and
+SSH1 clients, respectively. For SSH2, the single flag
+<tt class="literal"> -- disable-tcp-port-forwarding</tt><a name="INDEX-1423" />
+disables port forwarding for both clients and servers.</p>
+</div>
+
+
+
+
+
+<a name="ch09-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.10.2. Serverwide configuration</h3>
+
+
+
+<a name="INDEX-1424" />Port forwarding can be globally
+enabled or disabled in <tt class="command">sshd</tt>. This is done with the
+serverwide configuration keyword
+<tt class="literal">AllowTcpForwarding</tt><a name="INDEX-1425" />
+in <em class="filename">/etc/sshd_config.</em> The keyword may have the
+value <tt class="literal">yes</tt> (the default, enabling forwarding) or
+<tt class="literal">no</tt> (disabling forwarding):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowTcpForwarding no</pre></blockquote>
+
+
+
+In addition, SSH2 has the following options:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AllowTcpForwardingForUsers
+AllowTcpForwardingForGroups</pre></blockquote>
+
+
+
+The
+<a name="INDEX-1426" />syntax
+<a name="INDEX-1427" />of
+these is the same as for the <tt class="literal">AllowUsers</tt> and
+<tt class="literal">AllowGroups</tt> options. [<a href="ch05_05.html#ch05-56594">Section 5.5.2.1, "Account access control"</a>]
+They specify a list of users or groups that are allowed to use port
+forwarding; the server refuses to honor port forwarding requests for
+anyone else. Note that these refer to the target account of the SSH
+session, not the client username (which is often not known).</p>
+
+
+
+F-Secure SSH1 Server supports the additional keywords
+<tt class="literal">AllowForwardingPort</tt><a name="INDEX-1428" />,
+<tt class="literal">DenyForwardingPort</tt><a name="INDEX-1429" />,
+<tt class="literal">AllowForwardingTo</tt><a name="INDEX-1430" />,
+and
+<tt class="literal">DenyForwardingTo</tt><a name="INDEX-1431" />
+for finer-grained control over forwarding. The two
+<tt class="literal">...Port</tt> keywords let you control remote
+forwardings for given TCP ports, with support for wildcards and
+numeric ranges. For example, to permit remote forwardings for ports
+3000, 4000 through 4500 inclusive, 5000 and higher, and any port
+number ending in 7:</p>
+
+
+
+<blockquote><pre class="code"># F-Secure SSH1 only
+AllowForwardingPort 3000 4000..4050 &gt;5000 *7</pre></blockquote>
+
+
+
+The <tt class="literal">...To</tt> keywords are similar but control
+forwardings to particular hosts and ports (i.e., to particular
+sockets). Host and port specifications are separated by colons and
+use the same metacharacters as the <tt class="literal">...Port</tt>
+keywords:</p>
+
+
+
+<blockquote><pre class="code"># F-Secure SSH1 only
+DenyForwardingTo server.example.com:80 other.net:* yoyodyne.com:&lt;1024</pre></blockquote>
+
+
+
+The permissible <a name="INDEX-1432" /><a name="INDEX-1433" />metacharacters/wildcards
+are shown in the following table:</p>
+
+
+
+<a name="ch09-18-fm2xml" /><table border="1">
+
+
+
+
+<tr>
+<th>
+Metacharacter</p></th>
+<th>
+Meaning</p></th>
+<th>
+Example</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+*</p></td>
+<td>
+Any digit</p></td>
+<td>
+<blockquote><pre class="code">300*</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+&lt;</p></td>
+<td>
+All values less than</p></td>
+<td>
+<blockquote><pre class="code">&lt;200</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+&gt;</p></td>
+<td>
+All values greater than</p></td>
+<td>
+<blockquote><pre class="code">&gt;200</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">..</tt></p></td>
+<td>
+Range of values (inclusive)</p></td>
+<td>
+<blockquote><pre class="code">10..20</pre></blockquote></td>
+</tr>
+
+
+
+</table><p>
+
+It's important to realize that the directives in this section
+don't actually prevent port forwarding, unless you also disable
+interactive logins and restrict what programs may be run on the
+remote side. Otherwise, knowledgeable users can simply run their own
+port-forwarding application over the SSH session. These settings
+alone might be a sufficient deterrent in a nontechnical community,
+but they won't stop someone who knows what she's doing.</p>
+</div>
+
+
+
+
+
+<a name="ch09-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">9.2.10.3. Per-account configuration</h3>
+
+
+
+<a name="INDEX-1434" />In your account, you can disable
+port forwarding for any client that connects via a particular key.
+Locate the public key in your <em class="filename">authorized_keys</em>
+file and precede it with the option
+<a name="INDEX-1435" /><tt class="literal">no-port-forwarding</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+no-port-forwarding ...<em class="replaceable">key</em>...</pre></blockquote>
+
+
+
+(SSH2 doesn't currently have this feature.) Any SSH client that
+authenticates using this key can't perform port forwarding with
+your SSH server.</p>
+
+
+
+The same remarks we just made about serverwide port forwarding
+configuration apply here: the restriction isn't really
+meaningful unless you further restrict what this key is allowed to
+do.<a name="INDEX-1436" /></p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9. Port Forwarding and X Forwarding</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.3. X Forwarding</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:06 GMT -->
+</html>

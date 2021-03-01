@@ -1,0 +1,757 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>How to Become a Parent: Creating Subdomains (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch09_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.4. How to Become a Parent: Creating Subdomains</h2>
+
+
+<a name="INDEX-1443" /> <a name="INDEX-1444" />
+<a name="INDEX-1445" />Once
+you've decided on names, creating the child domains is easy.
+But first, you've got to decide how much autonomy you're
+going to give your subdomains. Odd that you have to decide that
+<em class="emphasis">before</em> you actually create them . . . .</p><p>
+
+
+<a name="INDEX-1446" />Thus
+far, we've assumed that if you create a subdomain, you'll
+want to delegate it to another organization, thereby making it a
+separate zone from the parent. Is this always true, though? Not
+necessarily.</p><p>
+
+
+Think carefully about how the computers and networks within a
+subdomain are managed when deciding whether or not to delegate it. It
+doesn't make sense to delegate a subdomain to an entity that
+doesn't manage its own hosts or networks. For example, in a
+large corporation, the personnel department probably doesn't
+run its own computers: the MIS (Management Information Systems) or IT
+(Information Technology -- same animal as MIS) department manages
+them. So while you may want to create a subdomain for personnel,
+delegating management for that subdomain to them is probably wasted
+effort.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">9.4.1. Creating a Subdomain in the Parent's Zone</h3>
+
+
+You can create a subdomain without delegating it, however. How? By
+creating resource records that refer to the subdomain within the
+parent's <a name="INDEX-1447" />zone. For example, <em class="emphasis">movie.edu</em> has a host that stores its
+complete database of employee and student records, called <em class="emphasis">brazil</em>. To put <em class="emphasis">brazil</em> in the <em class="emphasis">personnel.movie.edu</em> domain, we could add
+records to <em class="filename">db.movie.edu</em>.</p><p>
+
+
+Partial contents of file <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">brazil.personnel      IN  A      192.253.253.10
+                      IN  MX     10 brazil.personnel.movie.edu.
+                      IN  MX     100 postmanrings2x.movie.edu.
+employeedb.personnel  IN  CNAME  brazil.personnel.movie.edu.
+db.personnel          IN  CNAME  brazil.personnel.movie.edu.</pre></blockquote>
+
+
+Now users can log into <em class="emphasis">db.personnel.movie.edu</em> to get to the
+employee database. We could make this setup especially convenient for
+personnel department employees by adding <em class="emphasis">personnel.movie.edu</em> to their PCs'
+or workstations' search lists; they'd need to type only
+<em class="filename">telnet db</em> to get to the right host.</p><p>
+
+
+We can make this more convenient for ourselves by using the
+<a name="INDEX-1448" />$ORIGIN control statement to change
+the origin to <em class="emphasis">personnel.movie.edu</em> so that we can use
+shorter names.</p><p>
+
+
+Partial contents of file <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN personnel.movie.edu.
+brazil     IN A     192.253.253.10
+           IN MX    10 brazil.personnel.movie.edu.
+           IN MX    100 postmanrings2x.movie.edu.
+employeedb IN CNAME brazil.personnel.movie.edu.
+db         IN CNAME brazil.personnel.movie.edu.</pre></blockquote>
+
+
+If we had a few more records, we could create a separate file for
+them and use <a name="INDEX-1449" />$INCLUDE to include it in
+<em class="filename">db.movie.edu</em> and change the origin at the same
+time.</p><p>
+
+
+Notice that there's no SOA record for <em class="emphasis">personnel.movie.edu</em> ? There's no
+need for one, since the <em class="emphasis">movie.edu</em>SOA record indicates the start of authority for the
+entire <em class="emphasis">movie.edu</em> zone. Since
+there's no delegation to <em class="emphasis">personnel.movie.edu</em>, it's part of
+the <em class="emphasis">movie.edu</em> zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">9.4.2. Creating and Delegating a Subdomain</h3>
+
+
+If you decide to delegate your subdomains -- to send your children
+out into the world, as it were -- you'll need to do things a
+little differently. We're in the process of doing it now, so
+you can follow along with us.</p><p>
+
+
+We need to create a new subdomain of <em class="emphasis">movie.edu</em>
+for our special effects lab. We've chosen the name <em class="emphasis">fx.movie.edu</em> -- short, recognizable,
+unambiguous. Because we're delegating <em class="emphasis">fx.movie.edu</em> to administrators in the
+lab, it'll be a separate zone. The hosts <em class="emphasis">bladerunner</em> and <em class="emphasis">outland</em>, both within the special effects
+lab, will serve as the zone's name servers (<em class="emphasis">bladerunner</em> will serve as the primary
+master). We've chosen to run two name servers for the zone for
+redundancy -- a single <em class="emphasis">fx.movie.edu</em>name server would be a single point of failure that
+could effectively isolate the entire special effects lab. Since there
+aren't many hosts in the lab, though, we feel two name servers
+should be enough.</p><p>
+
+
+The special effects lab is on <em class="emphasis">movie.edu</em>'s new 192.253.254/24
+network.</p><p>
+
+
+Partial contents of <em class="filename">/etc/hosts</em>:</p><p>
+
+
+<blockquote><pre class="code">192.253.254.1 movie-gw.movie.edu movie-gw
+# fx primary
+192.253.254.2 bladerunner.fx.movie.edu bladerunner br
+# fx secondary
+192.253.254.3 outland.fx.movie.edu outland
+192.253.254.4 starwars.fx.movie.edu starwars
+192.253.254.5 empire.fx.movie.edu empire
+192.253.254.6 jedi.fx.movie.edu jedi</pre></blockquote>
+
+
+<a name="INDEX-1450" />First, we create a zone data file that
+includes records for all the hosts that will live in <em class="emphasis">fx.movie.edu</em>.</p><p>
+
+
+Contents of file <em class="emphasis">db.fx.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@  IN  SOA  bladerunner.fx.movie.edu. hostmaster.fx.movie.edu. (
+            1       ; serial
+            3h      ; refresh
+            1h      ; retry
+            1w      ; expire
+            1h )    ; negative caching TTL
+
+    IN  NS  bladerunner
+    IN  NS  outland
+
+; MX records for fx.movie.edu
+    IN  MX  10 starwars
+    IN  MX  100 wormhole.movie.edu.
+
+; starwars handles bladerunner's mail
+; wormhole is the movie.edu mail hub
+
+bladerunner  IN  A   192.253.254.2
+             IN  MX  10 starwars
+             IN  MX  100 wormhole.movie.edu.
+
+br           IN    CNAME    bladerunner
+
+outland      IN  A   192.253.254.3
+             IN  MX  10 starwars
+             IN  MX  100 wormhole.movie.edu.
+
+starwars     IN  A   192.253.254.4
+             IN  MX  10 starwars
+             IN  MX  100 wormhole.movie.edu.
+
+empire       IN  A   192.253.254.5
+             IN  MX  10 starwars
+             IN  MX  100 wormhole.movie.edu.
+
+jedi         IN  A   192.253.254.6
+             IN  MX  10 starwars
+             IN  MX  100 wormhole.movie.edu.</pre></blockquote>
+
+
+Then we create the <em class="filename">db.192.253.254</em> file:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@  IN  SOA  bladerunner.fx.movie.edu. hostmaster.fx.movie.edu. (
+            1       ; serial
+            3h      ; refresh
+            1h      ; retry
+            1w      ; expire
+            1h )    ; negative caching TTL
+
+       IN    NS    bladerunner.fx.movie.edu.
+       IN    NS    outland.fx.movie.edu.
+
+1      IN    PTR   movie-gw.movie.edu.
+2      IN    PTR   bladerunner.fx.movie.edu.
+3      IN    PTR   outland.fx.movie.edu.
+4      IN    PTR   starwars.fx.movie.edu.
+5      IN    PTR   empire.fx.movie.edu.
+6      IN    PTR   jedi.fx.movie.edu.</pre></blockquote>
+
+
+Notice that the PTR record for <em class="emphasis">1.254.253.192.in-addr.arpa</em> points to
+<em class="emphasis">movie-gw.movie.edu</em>.
+That's intentional. The router connects to the other
+<em class="emphasis">movie.edu</em> networks, so it
+really doesn't belong in <em class="emphasis">fx.movie.edu</em>, and there's no
+requirement that all the PTR records in <em class="emphasis">254.253.192.in-addr.arpa</em> map into a
+single zone -- though they should correspond to the canonical
+names for those hosts.</p><p>
+
+
+Next, we create an appropriate <em class="filename">named.conf</em> file
+for the primary master name server:</p><p>
+
+
+<blockquote><pre class="code">options {
+                directory "/var/named";
+};
+
+zone "0.0.127.in-addr.arpa" {
+                type master;
+                file "db.127.0.0";
+};
+
+zone "fx.movie.edu" {
+                type master;
+                file "db.fx.movie.edu";
+};
+
+zone "254.253.192.in-addr.arpa" {
+                type master;
+                file "db.192.253.254";
+};
+
+zone "." {
+                type hint;
+                file "db.cache";
+};</pre></blockquote>
+
+
+Here are the contents of the corresponding
+<em class="filename">named.boot</em> file for BIND 4:</p><p>
+
+
+<blockquote><pre class="code">directory     /var/named
+
+primary       0.0.127.in-addr.arpa      db.127.0.0  ; loopback
+primary       fx.movie.edu              db.fx.movie.edu
+primary       254.253.192.in-addr.arpa  db.192.253.254
+
+cache         .                         db.cache</pre></blockquote>
+
+
+Of course, if we'd used <em class="filename">h2n</em>, we could have
+just run:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>h2n -d fx.movie.edu -n 192.253.254 -s bladerunner -s outland \</b></tt>
+<tt class="userinput"><b>-u hostmaster.fx.movie.edu -m 10:starwars -m 100:wormhole.movie.edu</b></tt></pre></blockquote>
+
+
+and saved ourselves some typing. <em class="filename">h2n</em> would have
+created essentially the same <em class="filename">db.fx.movie.edu</em>,
+<em class="filename">db.192.253.254</em>, and <em class="filename">named.boot
+</em>files.</p><p>
+
+
+<a name="INDEX-1451" />
+<a name="INDEX-1452" />Now we need to configure
+<em class="emphasis">bladerunner</em> 's
+resolver. Actually, this may not require creating
+<em class="filename">resolv.conf</em>. If we set <em class="emphasis">bladerunner</em> 's
+<em class="filename">hostname</em> to its new domain name, <em class="emphasis">bladerunner.fx.movie.edu</em>, the resolver
+can derive the local domain name from the fully qualified domain
+name.</p><p>
+
+
+<a name="INDEX-1453" />Next
+we start up the <em class="filename">named</em> process on <em class="emphasis">bladerunner</em> and check for
+<em class="emphasis">syslog</em> errors. If <em class="filename">named
+</em>starts okay and there are no <em class="emphasis">syslog
+</em>errors that need tending to, we'll use
+<em class="filename">nslookup</em> to look up a few hosts in <em class="emphasis">fx.movie.edu</em> and in <em class="emphasis">254.253.192.in-addr.arpa</em>:</p><p>
+
+
+<blockquote><pre class="code">Default Server:  bladerunner.fx.movie.edu
+Address:  192.253.254.2
+
+&gt; <tt class="userinput"><b>jedi</b></tt>
+Server:  bladerunner.fx.movie.edu
+Address:  192.253.254.2
+
+Name:    jedi.fx.movie.edu
+Address:  192.253.253.6
+
+&gt; <tt class="userinput"><b>set type=mx</b></tt>
+&gt; <tt class="userinput"><b>empire</b></tt>
+Server:  bladerunner.fx.movie.edu
+Address:  192.253.254.2
+
+empire.fx.movie.edu     preference = 10,
+                        mail exchanger = starwars.fx.movie.edu
+empire.fx.movie.edu     preference = 100,
+                        mail exchanger = wormhole.movie.edu
+fx.movie.edu    nameserver = outland.fx.movie.edu
+fx.movie.edu    nameserver = bladerunner.fx.movie.edu
+starwars.fx.movie.edu   internet address = 192.253.254.4
+wormhole.movie.edu      internet address = 192.249.249.1
+wormhole.movie.edu      internet address = 192.253.253.1
+bladerunner.fx.movie.edu        internet address = 192.253.254.2
+outland.fx.movie.edu    internet address = 192.253.254.3
+&gt; <tt class="userinput"><b>ls -d fx.movie.edu</b></tt>
+[bladerunner.fx.movie.edu]
+$ORIGIN fx.movie.edu.
+@                       1D IN SOA       bladerunner hostmaster (
+                                        1               ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        1W              ; expiry
+                                        1H )            ; minimum
+
+                        1D IN NS        bladerunner
+                        1D IN NS        outland
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+bladerunner             1D IN A         192.253.254.2
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+br                      1D IN CNAME     bladerunner
+empire                  1D IN A         192.253.254.5
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+jedi                    1D IN A         192.253.254.6
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+outland                 1D IN A         192.253.254.3
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+starwars                1D IN A         192.253.254.4
+                        1D IN MX        10 starwars
+                        1D IN MX        100 wormhole.movie.edu.
+@                       1D IN SOA       bladerunner hostmaster (
+                                        1               ; serial
+                                        3H              ; refresh
+                                        1H              ; retry
+                                        1W              ; expiry
+                                        1H )            ; minimum
+ &gt; <tt class="userinput"><b>set type=ptr</b></tt>
+ &gt; <tt class="userinput"><b>192.253.254.3</b></tt>
+Server:  bladerunner.fx.movie.edu
+Address:  192.253.254.2
+
+3.254.253.192.in-addr.arpa      name = outland.fx.movie.edu
+
+&gt; <tt class="userinput"><b>ls -d 254.253.192.in-addr.arpa.</b></tt>
+[bladerunner.fx.movie.edu]
+$ORIGIN 254.253.192.in-addr.arpa.
+@             1D IN SOA       bladerunner.fx.movie.edu. hostmaster.fx.movie.edu. (
+                              1               ; serial
+                              3H              ; refresh
+                              1H              ; retry
+                              1W              ; expiry
+                              1H )            ; minimum
+
+              1D IN NS        bladerunner.fx.movie.edu.
+              1D IN NS        outland.fx.movie.edu.
+1             1D IN PTR       movie-gw.movie.edu.
+2             1D IN PTR       bladerunner.fx.movie.edu.
+3             1D IN PTR       outland.fx.movie.edu.
+4             1D IN PTR       starwars.fx.movie.edu.
+5             1D IN PTR       empire.fx.movie.edu.
+6             1D IN PTR       jedi.fx.movie.edu.
+@             1D IN SOA       bladerunner.fx.movie.edu. hostmaster.fx.movie.edu. (
+                              1               ; serial
+                              3H              ; refresh
+                              1H              ; retry
+                              1W              ; expiry
+                              1H )            ; minimum
+ &gt; <tt class="userinput"><b>exit</b></tt></pre></blockquote>
+
+
+The output looks reasonable, so it's now safe to set up a slave
+name server for <em class="emphasis">fx.movie.edu</em>and then delegate <em class="emphasis">fx.movie.edu</em><a name="INDEX-1454" /> from<a name="INDEX-1455" /> <em class="emphasis">movie.edu</em>.<a name="INDEX-1456" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">9.4.3. An fx.movie.edu Slave</h3>
+
+
+Setting up the <a name="INDEX-1457" />slave name server for <em class="emphasis">fx.movie.edu</em> is simple: copy
+<em class="filename">named.conf</em>, <em class="filename">db.127.0.0</em>, and
+<em class="filename">db.cache </em>over from <em class="emphasis">bladerunner</em>, and edit
+<em class="filename">named.conf </em>and <em class="filename">db.127.0.0
+</em>according to the instructions in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>.</p><p>
+
+
+Contents of file<em class="filename"> named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">options {
+                directory "/var/named";
+};
+
+zone "0.0.127.in-addr.arpa" {
+                type master;
+                file "db.127.0.0";               
+};
+
+zone "fx.movie.edu" {
+                type slave;
+                masters { 192.253.254.2; };
+                file "bak.fx.movie.edu";
+};
+
+zone "254.253.192.in-addr.arpa" {
+                type slave;
+                masters { 192.253.254.2; };
+                file "bak.192.253.254";
+};
+
+zone "." {
+                type hint;
+                file "db.cache";
+};</pre></blockquote>
+
+
+Or, the equivalent <em class="filename">named.boot</em> file:</p><p>
+
+
+<blockquote><pre class="code">directory  /var/named
+
+primary    0.0.127.in-addr.arpa      db.127.0.0
+secondary  fx.movie.edu              192.253.254.2  bak.fx.movie.edu
+secondary  254.253.192.in-addr.arpa  192.253.254.2  bak.192.253.254
+
+cache      .                         db.cache</pre></blockquote>
+
+
+Like <em class="emphasis">bladerunner</em>,
+<em class="emphasis">outland</em> really doesn't
+need a <em class="filename">resolv.conf</em> file, as long as its
+<em class="filename">hostname</em> is set to <em class="emphasis">outland.fx.movie.edu</em>.</p><p>
+
+
+Again, we start <em class="filename">named</em> and check for errors in
+the <em class="emphasis">syslog</em> output. If the <em class="emphasis">syslog
+</em>output is clean, we'll look up a few records in
+<em class="emphasis">fx.movie.edu</em>.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">9.4.4. On the movie.edu Primary Master Name Server</h3>
+
+
+All that's left now is to delegate the <em class="emphasis">fx.movie.edu</em> subdomain to the new
+<em class="emphasis">fx.movie.edu</em> name servers on
+<em class="emphasis">bladerunner</em> and <em class="emphasis">outland</em>. We add the appropriate NS
+records to <em class="filename">db.movie.edu</em>.</p><p>
+
+
+Partial contents of file <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">fx    86400    IN    NS    bladerunner.fx.movie.edu.
+      86400    IN    NS    outland.fx.movie.edu.</pre></blockquote>
+
+
+According to <a name="INDEX-1458" />RFC
+1034, the domain names in the resource record-specific portion of
+these two lines (<em class="emphasis">bladerunner.fx.movie.edu</em> and <em class="emphasis">outland.fx.movie.edu</em>) must be the
+canonical domain names for the name servers. A remote name server
+following delegation expects to find one or more address records
+attached to that domain name, not an alias (CNAME) record. Actually,
+the RFC extends this restriction to any type of resource record that
+includes a domain name as its value -- all must specify the
+canonical domain name.</p><p>
+
+
+These two records alone aren't enough, though. Do you see the
+problem? How can a name server outside <em class="emphasis">fx.movie.edu</em> look up information within
+<em class="emphasis">fx.movie.edu</em> ? Well, a
+<em class="emphasis">movie.edu</em> name server would
+refer it to the name servers authoritative for <em class="emphasis">fx.movie.edu</em>, right? That's true,
+but the NS records in <em class="filename">db.movie.edu</em> give only the
+<em class="emphasis">names</em> of the <em class="emphasis">fx.movie.edu</em> name servers. The foreign
+name server needs the IP addresses of the <em class="emphasis">fx.movie.edu</em> name servers in order to
+send queries to them. Who can give it those addresses? Only the
+<em class="emphasis">fx.movie.edu</em> name servers. A
+real chicken-and-egg problem!</p><p>
+
+
+The solution is to include the addresses of the <em class="emphasis">fx.movie.edu</em> name servers in the
+<em class="emphasis">movie.edu</em>
+<a name="INDEX-1459" />zone data
+file. While these aren't strictly part of the <em class="emphasis">movie.edu</em> zone, they're necessary
+for delegation to <em class="emphasis">fx.movie.edu</em> to work. Of course, if the
+name servers for <em class="emphasis">fx.movie.edu</em> weren't within
+<em class="emphasis">fx.movie.edu</em>, these
+addresses -- called <a name="INDEX-1460" /><em class="emphasis">glue
+records -- </em>wouldn't be necessary. A foreign name
+server would be able to find the address it needed by querying other
+name servers.</p><p>
+
+
+So, with the glue records, the records added look like the following.</p><p>
+
+
+Partial contents of file <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">fx    86400    IN    NS    bladerunner.fx.movie.edu.
+      86400    IN    NS    outland.fx.movie.edu.
+bladerunner.fx.movie.edu.  86400  IN  A  192.253.254.2
+outland.fx.movie.edu.      86400  IN  A  192.253.254.3</pre></blockquote>
+
+
+Be sure you don't include unnecessary glue records in the file.
+Older BIND name servers (pre-4.9) load these records into their
+caches and give them out in referrals to other name servers. If the
+name server listed in the address record changes IP addresses and you
+forget to update the glue, your name server will continue giving out
+the outdated address information, resulting in poor resolution
+performance for name servers looking for data in the delegated zone
+or even rendering them unable to resolve names in the delegated zone.</p><p>
+
+
+A BIND 4.9 or later name server automatically ignores any glue you
+include that isn't strictly necessary and logs the fact that it
+has ignored the record(s) to <em class="emphasis">syslog</em> on the
+primary master or in the slave's backup copy of the zone data.
+For example, if we had an NS record for <em class="emphasis">movie.edu</em> that pointed to an off-site
+name server, <em class="emphasis">ns-1.isp.net</em>,
+and we made the mistake of including its address in
+<em class="filename">db.movie.edu </em>on the <em class="emphasis">movie.edu</em> primary master name server,
+we'd see a message like this in <em class="filename">named
+</em>'s <em class="emphasis">syslog</em> output:</p><p>
+
+
+<blockquote><pre class="code">Aug  9 14:23:41 terminator named[19626]: dns_master_load: 
+db.movie.edu:55: ignoring out-of-zone data</pre></blockquote>
+
+
+If we were running a pre-4.9 name server as our primary master and it
+mistakenly included an unnecessary glue record in a zone transfer to
+a newer name server, we'd see a message like this in the backup
+zone data file:</p><p>
+
+
+<blockquote><pre class="code">; Ignoring info about ns-1.isp.net, not in zone movie.edu
+; ns-1.isp.net 258983  IN      A       10.1.2.3</pre></blockquote>
+
+
+Note that the extraneous A record has been commented out.</p><p>
+
+
+Also, remember to keep the glue up to date. If <em class="emphasis">bladerunner</em> gets a new network
+interface, and hence another IP address, then you should add another
+A record to the glue data.</p><p>
+
+
+We might also want to include aliases for any hosts moving into
+<em class="emphasis">fx.movie.edu</em> from
+<em class="emphasis">movie.edu</em>. For example, if
+we were to move <em class="emphasis">plan9.movie.edu</em>, a server with an
+important library of public domain special effects algorithms, into
+<em class="emphasis">fx.movie.edu</em>, we should
+create an alias in <em class="emphasis">movie.edu</em>pointing the old domain name to the new one:</p><p>
+
+
+<blockquote><pre class="code">plan9           IN      CNAME   plan9.fx.movie.edu.</pre></blockquote>
+
+
+This will allow people outside <em class="emphasis">movie.edu</em>to reach <em class="emphasis">plan9</em>
+even though they're using its old domain name, <em class="emphasis">plan9.movie.edu</em>.</p><p>
+
+
+You shouldn't put any information about domain names in
+<em class="emphasis">fx.movie.edu</em> into the
+<em class="filename">db.movie.edu</em> file. The <em class="emphasis">plan9</em> alias is actually in the
+<em class="emphasis">movie.edu</em> zone (the owner of
+the record is <em class="emphasis">plan9.movie.edu</em>), so it belongs in
+<em class="filename">db.movie.edu</em>. An alias pointing <em class="emphasis">p9.fx.movie.edu</em> to <em class="emphasis">plan9.fx.movie.edu</em>, on the other hand,
+is in the <em class="emphasis">fx.movie.edu</em> zone,
+and belongs in <em class="filename">db.fx.movie.edu</em>. If you were to
+put a record in the zone data file that was outside the zone the file
+described, a BIND 4.9 or later name server would ignore it, as shown
+earlier in the unnecessary glue example. An older name server might
+load it into cache or even into authoritative data, but since the
+behavior is unpredictable and is eliminated in newer versions of
+BIND, it's best to do it the right way even if the software
+doesn't force you to.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">9.4.5. Delegating an in-addr.arpa Zone</h3>
+
+
+We almost forgot to delegate the <em class="emphasis">254.253.192.in-addr.arpa</em><a name="INDEX-1461" />
+<a name="INDEX-1462" />zone! This is a little trickier than
+delegating <em class="emphasis">fx.movie.edu</em>
+because we don't manage the parent zone.</p><p>
+
+
+First, we need to figure out what <em class="emphasis">254.253.192.in-addr.arpa</em> 's parent
+zone is and who runs it. Figuring this out may take some sleuthing;
+we covered how to do this in <a href="ch03_01.html">Chapter 3, "Where Do I Start?"</a></p><p>
+
+
+As it turns out, the <em class="emphasis">in-addr.arpa</em>zone is <em class="emphasis">254.253.192.in-addr.arpa</em> 's
+parent. And, if you think about it, that makes some sense.
+There's no reason for the administrators of <em class="emphasis">in-addr.arpa</em> to delegate <em class="emphasis">253.192.in-addr.arpa</em> or <em class="emphasis">192.in-addr.arpa</em> to a separate
+authority, because unless 192/8 or 192.253/16 is all one big CIDR
+block, networks like 192.253.253/24 and 192.253.254/24 don't
+have anything in common with each other. They may be managed by
+totally unrelated organizations.</p><p>
+
+
+You might have remembered (from <a href="ch03_01.html">Chapter 3, "Where Do I Start?"</a>) that
+the <em class="emphasis">in-addr.arpa</em> zone is
+managed by ARIN, the American Registry of Internet Numbers. (Of
+course, if you didn't remember, you could always use
+<em class="filename">nslookup </em>to find the contact address in
+<em class="emphasis">in-addr.arpa</em> 's SOA
+record, like we showed you in that chapter.) All that's left is
+for us to use the web-based "<a name="INDEX-1463" />
+<a name="INDEX-1464" />
+<a name="INDEX-1465" />Modify Tool" at <a href="http://www.arin.net/cgi-bin/amt.pl">http://www.arin.net/cgi-bin/amt.pl</a> to request
+registration of our reverse-mapping zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-4.6" /><div class="sect2">
+<h3 class="sect2">9.4.6. Adding a movie.edu Slave</h3>
+
+
+If the special effects lab gets big enough, it may make sense to put
+a <em class="emphasis">movie.edu</em> slave somewhere
+on the 192.253.254/24 network. That way, a larger proportion of DNS
+queries from <em class="emphasis">fx.movie.edu</em>hosts can be answered locally. It seems logical to make
+one of the existing <em class="emphasis">fx.movie.edu</em>name servers into a <em class="emphasis">movie.edu</em> <a name="INDEX-1466" />
+<a name="INDEX-1467" />slave, too -- that way, we can make
+better use of an existing name server instead of setting up a
+brand-new name server.</p><p>
+
+
+We've decided to make <em class="emphasis">bladerunner</em> a slave for <em class="emphasis">movie.edu</em>. This won't interfere
+with <em class="emphasis">bladerunner</em> 's
+primary mission: acting as the primary master name server for
+<em class="emphasis">fx.movie.edu</em>, that is. A
+single name server, given enough memory, can be authoritative for
+literally thousands of zones. One name server can load some zones as
+a primary master and others as a slave.<a href="#FOOTNOTE-67">[67]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-67" />[67]Clearly,
+though, a name server can't be both the primary master and a
+slave for a single zone. Either the name server gets the data for a
+given zone from a local zone data file (and is a primary master for
+the zone) or from another name server (and is a slave for the
+zone).</p><p>
+
+</blockquote>
+
+
+The configuration change is simple: we add one statement to
+<em class="emphasis">bladerunner</em> 's
+<em class="filename">named.conf </em>file to tell <em class="filename">named
+</em>to load the <em class="emphasis">movie.edu</em>zone from the IP address of the <em class="emphasis">movie.edu</em> primary master name server,
+<em class="emphasis">terminator.movie.edu</em>.</p><p>
+
+
+Contents of file <em class="filename">named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+};
+
+zone "0.0.127.in-addr.arpa" {
+	type master;
+	file "db.127.0.0";
+};
+
+zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+};
+
+zone "254.253.192.in-addr.arpa" {
+	type master;
+	file "db.192.253.254";
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+};
+
+zone "." {
+	type hint;
+	file "db.cache";
+};</pre></blockquote>
+
+
+Or, if you're using a BIND 4 name server, here are the contents
+of the <em class="filename">named.boot</em> file:</p><p>
+
+
+<a name="INDEX-1468" /><a name="INDEX-1469" /><a name="INDEX-1470" /><blockquote><pre class="code">directory     /var/named
+
+primary       0.0.127.in-addr.arpa      db.127.0.0  ; loopback
+primary       fx.movie.edu              db.fx.movie.edu
+primary       254.253.192.in-addr.arpa  db.192.253.254
+secondary     movie.edu                 192.249.249.3     bak.movie.edu
+
+cache         .                         db.cache
+
+</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.3. What to Name Your Children</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.5. Subdomains of in-addr.arpa Domains</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

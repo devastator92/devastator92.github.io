@@ -1,0 +1,169 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+<head><title>Network Information Service (NIS) (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch20_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">20.2. Network Information Service (NIS)</h2>
+
+
+
+
+
+<a name="INDEX-1877" /><a name="INDEX-1878" />NIS<a href="#FOOTNOTE-120">[120]</a> is a protocol
+primarily used under Unix and designed to provide distributed access
+to centralized administrative information (such as host tables,
+password files, site-wide email aliases, and so on) shared by
+machines at a site. The advantage of NIS over DNS for hostname
+resolution on a local area network is that NIS is a broadcast-based
+protocol; clients do not have to have all of the configuration
+information necessary for them to use DNS. In addition, having a
+unified mechanism that distributes all of the administrative
+information simplifies site administration.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-120" />[120]NIS was formerly known as Yellow Pages (YP), and some commands
+still preserve this abbreviation.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="INDEX-1879" />The main problem with NIS is that its
+security isn't good enough to adequately protect some of the
+data it contains. In particular, a site's NIS servers generally
+contain the site's shared password file (equivalent to the
+<em class="emphasis">/etc/passwd</em> file on a single system), complete
+with encrypted passwords. All you need to get data from an NIS server
+is the NIS domain name with which the data is associated. An attacker
+who can talk to a site's NIS server, and who can guess what the
+site has chosen as its NIS domain name (often the same as, or a
+derivative of, its regular Internet domain name), can request any
+information the server has. If the attacker gets the shared password
+file, these passwords can be cracked at the attacker's leisure.
+You therefore do not want to allow NIS requests inbound.</p><p>
+
+
+
+
+
+<a name="ch20-14-fm2xml" /><blockquote><b>TIP:</b> 
+NIS transfers may include the encrypted passwords even if the
+machines are configured to use shadow passwords and the encrypted
+passwords are not readable on the NIS server. If NIS transfers do not
+include encrypted passwords, they cannot be used for authentication,
+so implementations that close this hole simply do not allow you to
+use both NIS and shadow passwords.</p><p>
+
+
+
+
+</blockquote>
+
+There is no reason to allow NIS requests outbound because most of the
+information provided is local to an individual site, and most NIS
+servers will act as gateways to DNS for external hostname information
+when correctly configured.</p><p>
+
+
+
+
+
+<a name="INDEX-1880" />A revised version of
+NIS, called NIS+, is available from some vendors. (It is the default
+version used on Suns.) NIS+ has not achieved wide acceptance, partly
+because of licensing and compatibility issues, but mostly because the
+majority of sites have managed to work around the deficiencies of NIS
+already, and therefore aren't motivated to switch to something
+new. NIS+ improves security only if it is configured so that it will
+not support NIS If you configure NIS+ to support NIS clients (and
+because few NIS+ clients are available, most NIS+ sites do use it in
+this mode), it is no more secure than original NIS.</p><p>
+
+
+
+
+
+A few NIS servers (notably Sun's) support a configuration file
+called <em class="emphasis">securenets</em>, which allows you to use IP
+address authentication to control which hosts your NIS server will
+release data to. This is an order of magnitude improvement in NIS
+security. It changes NIS attacks from guessing games (guess the
+domain name and the NIS server, and you get a free prize) to
+requiring you to do all the same guessing and then make a serious
+effort to determine what addresses the NIS server will respond to and
+forge packets from them. Unfortunately, an order of magnitude is
+probably not enough of an improvement for data as crucial as your
+encrypted passwords. While <em class="emphasis">securenets</em> (if you
+have it available) will protect you from casual attackers who want to
+get into any site they can, it will not protect you from an attacker
+who knows your site and who wants to attack it in particular. The
+trick, then, is to prevent an attacker from talking to your NIS
+servers.</p><p>
+
+
+
+
+
+NIS is an Sun RPC-based service, generally provided over UDP.
+Although NIS is an especially vulnerable service, it is otherwise the
+same as every other RPC-based service. We do not know of special
+proxies or packet filters for it. NIS+ may be provided over normal
+RPC, but this removes much of its extra security; by default,
+it's run over Secure RPC. The packet filtering, proxying, and
+network address translation characteristics of RPC and Secure RPC are
+discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+NIS clients may also use additional means to find servers. Older
+clients will do this via broadcast; newer ones will use multicast
+instead. Whichever method is used by clients, if you want NIS to work
+through a firewall, you will need to either make certain that the
+relevant queries are passed to the server, or explicitly configure
+clients with a server name.</p><p>
+
+
+
+
+
+<a name="ch20-16377" /><div class="sect2">
+<h3 class="sect2">20.2.1. Summary of Recommendations for NIS</h3>
+
+
+
+
+
+<ul><li>Don't allow NIS across your firewall.<a name="INDEX-1881" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch20_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">20. Naming and Directory Services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">20.3. NetBIOS for TCP/IP Name Service and Windows Internet Name Service</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+</html>

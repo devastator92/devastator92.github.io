@@ -1,0 +1,305 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_15.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>Addresses and Ports (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_14.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_16.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.15. Addresses and Ports</h2>
+
+
+<a name="INDEX-1748" />
+<a name="INDEX-1749" />BIND 9
+name servers can use both IPv4 and IPv6 as a transport; that is, they
+can send and receive queries and responses over IPv4 and IPv6. BIND 8
+name servers support only IPv4 as a transport. However, both name
+servers support similar substatements to configure which network
+interfaces and ports they listen on and send queries from.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-15.1" /><div class="sect2">
+<h3 class="sect2">10.15.1. Configuring the IPv4 Transport</h3>
+
+
+<a name="INDEX-1750" />
+<a name="INDEX-1751" />You can specify which network
+interface your BIND 8 or BIND 9 name server listens on for queries
+using the <em class="emphasis">listen-on
+</em><a name="INDEX-1752" />substatement. In its simplest form,
+<em class="emphasis">listen-on</em> takes an address match list as an
+argument:</p><p>
+
+
+<a name="INDEX-1753" /><blockquote><pre class="code">options {
+	listen-on { 192.249.249/24; };
+};</pre></blockquote>
+
+
+The name server listens on any of the local host's network
+interfaces whose addresses match the address match list. To specify
+an alternate port (one other than 53) to listen on, use the
+<em class="emphasis">port</em> modifier:</p><p>
+
+
+<blockquote><pre class="code">options {
+	listen-on port 5353 { 192.249.249/24; };
+};</pre></blockquote>
+
+
+In BIND 9, you can even specify a different port for each network
+interface:</p><p>
+
+
+<blockquote><pre class="code">options {
+	listen-on { 192.249.249.1 port 5353; 192.253.253.1 port 1053; };
+};</pre></blockquote>
+
+
+Note that there's no way to configure most resolvers to query a
+name server on an alternate port, so this name server might not be as
+useful as you'd think. Still, it can serve zone transfers,
+because you can specify an alternate port in a <em class="emphasis">masters
+</em><a name="INDEX-1754" />substatement:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type slave;
+	masters port 5353 { 192.249.249.1; };
+	file "bak.movie.edu";
+};</pre></blockquote>
+
+
+Or, if your BIND 9 name server has multiple master name servers, each
+listening on a different port, you can use something like:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.1 port 5353; 192.253.253.1 port 1053; };
+	file "bak.movie.edu";
+};</pre></blockquote>
+
+
+BIND 9 even allows you to send your <a name="INDEX-1755" />NOTIFY messages to alternate ports. To
+tell your master name server to notify all its slave name servers on
+the same oddball port, use:</p><p>
+
+
+<blockquote><pre class="code">also-notify port 5353 { 192.249.249.9; 192.253.253.9; }; // zardoz's two addresses</pre></blockquote>
+
+
+To notify each on a different port, use:</p><p>
+
+
+<blockquote><pre class="code">also-notify { 192.249.249.9 port 5353; 192.249.249.1 port 1053; };</pre></blockquote>
+
+
+If your slave name server needs to use a particular local network
+interface to send queries -- perhaps because one of its master
+name servers recognizes it by only one of its many
+addresses -- use the <em class="emphasis">query-source
+</em><a name="INDEX-1756" />substatement:</p><p>
+
+
+<a name="INDEX-1757" /><blockquote><pre class="code">options {
+	query-source address 192.249.249.1;
+};</pre></blockquote>
+
+
+Note that the argument isn't an address match list; it's
+a single IP address. You can also specify a particular source port to
+use for queries:</p><p>
+
+
+<blockquote><pre class="code">options {
+	query-source address 192.249.249.1 port 53;
+};</pre></blockquote>
+
+
+BIND's default behavior is to use whichever network interface
+the route to the destination points out and a random, unprivileged
+port, i.e.:</p><p>
+
+
+<blockquote><pre class="code">options {
+	query-source address * port *;
+};</pre></blockquote>
+
+
+Note that <em class="emphasis">query-source</em> applies only to UDP-based
+queries; TCP-based queries always choose the source address according
+to the routing table and use a random source port.</p><p>
+
+
+There's an analogous <em class="emphasis">transfer-source
+</em><a name="INDEX-1758" />substatement that controls the
+source address to use for zone transfers. In BIND 9, it also applies
+to a slave name server's SOA queries and to forwarded dynamic
+updates:</p><p>
+
+
+<a name="INDEX-1759" /><blockquote><pre class="code">options {
+	transfer-source 192.249.249.1;
+};</pre></blockquote>
+
+
+As with <em class="emphasis">query-source</em>, the argument is just a
+single IP address, but with no <em class="emphasis">address</em> keyword.
+With BIND 8, there's no <em class="emphasis">port</em> modifier.
+With BIND 9, you can specify a source port:</p><p>
+
+
+<blockquote><pre class="code">options {
+	transfer-source 192.249.249.1 port 1053;
+};</pre></blockquote>
+
+
+However, that source port applies only to UDP-based traffic (i.e.,
+SOA queries and forwarded dynamic updates).</p><p>
+
+
+<em class="emphasis">transfer-source</em> can also be used as a
+<em class="emphasis">zone</em> substatement, in which case it applies only
+to transfers (and, for BIND 9, SOA queries and dynamic updates) of
+that zone:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+	transfer-source 192.249.249.1; // always use IP address on same network
+                                   // for transfers of movie.edu
+};</pre></blockquote>
+
+
+Finally, as of BIND 9.1.0, there's even a substatement that
+lets you control which address you send <a name="INDEX-1760" />NOTIFY messages from, called
+<em class="emphasis">notify-source</em><a name="INDEX-1761" />. This comes in handy with
+multihomed name servers since slaves only accept NOTIFY messages for
+a zone from IP addresses in that zone's <em class="emphasis">masters
+</em>substatement. <em class="emphasis">notify-source</em>'s
+syntax is similar to the syntax of the other -<em class="emphasis">source
+</em>substatements; for example:</p><p>
+
+
+<a name="INDEX-1762" /><blockquote><pre class="code">options {
+	notify-source 192.249.249.1;
+};</pre></blockquote>
+
+
+As with <em class="emphasis">transfer-source</em>,
+<em class="emphasis">notify-source</em> can specify a source port and can
+be used as a <em class="emphasis">zone</em> statement to apply only to
+that zone:</p><p>
+
+
+<a name="INDEX-1763" /><a name="INDEX-1764" /><blockquote><pre class="code">zone {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+	notify-source 192.249.249.1 port 5353;
+};
+</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-15.2" /><div class="sect2">
+<h3 class="sect2">10.15.2. Configuring the IPv6 Transport</h3>
+
+
+<a name="INDEX-1765" />
+<a name="INDEX-1766" />By default, a BIND 9 name server
+won't listen for IPv6-based queries. To configure it to listen
+on the local host's IPv6 network interfaces, use
+the<a name="INDEX-1767" /> <em class="emphasis">listen-on-v6</em>
+substatement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	listen-on-v6 { any; };
+};</pre></blockquote>
+
+
+Unlike its IPv4 counterpart, the <em class="emphasis">listen-on-v6
+</em>substatement accepts only <em class="emphasis">any</em> and
+<em class="emphasis">none</em> as arguments. You can, however, configure a
+BIND 9 name server to listen on an alternate port -- or even
+multiple ports -- with the <em class="emphasis">port</em> modifier:</p><p>
+
+
+<blockquote><pre class="code">options {
+	listen-on-v6 port 1053 { any; };
+};</pre></blockquote>
+
+
+The default port is, of course, 53.</p><p>
+
+
+You can also determine which IPv6 address your name server uses as
+the source port for outgoing queries with the
+<em class="emphasis">transfer-source-v6
+</em><a name="INDEX-1768" />substatement, as in:</p><p>
+
+
+<a name="INDEX-1769" /><blockquote><pre class="code">options {
+	transfer-source-v6 222:10:2521:1:210:4bff:fe10:d24;
+};</pre></blockquote>
+
+
+or:</p><p>
+
+
+<blockquote><pre class="code">options {
+	transfer-source-v6 port 53 222:10:2521:1:210:4bff:fe10:d24;
+};</pre></blockquote>
+
+
+The default is to use the source address corresponding to whichever
+network interface the route points out and a random, unprivileged
+source port. As with <em class="emphasis">transfer-source</em>, you can
+use
+<em class="emphasis">transfer-source-v6</em><a name="INDEX-1770" /> as a <em class="emphasis">zone</em>
+substatement. And the source port applies only to SOA queries and
+forwarded dynamic updates.</p><p>
+
+
+Finally, BIND 9.1.0 and later let you determine which IPv6 address to
+use in NOTIFY messages, &agrave; la the
+<em class="emphasis">notify-source</em> substatement. The IPv6
+substatement is called, not surprisingly,
+<em class="emphasis">notify-source-v6</em><a name="INDEX-1771" />:</p><p>
+
+
+<a name="INDEX-1772" /><blockquote><pre class="code">options {
+	notify-source-v6 222:10:2521:1:210:4bff:fe10:d24;
+};</pre></blockquote>
+
+
+As with <em class="emphasis">transfer-source-v6</em>, you can specify a
+source port and use the substatement in a <em class="emphasis">zone</em>
+statement.<a name="INDEX-1773" /> <a name="INDEX-1774" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_14.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_16.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.14. The ABCs of IPv6 Addressing</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.16. IPv6 Forward and Reverse Mapping</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_15.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

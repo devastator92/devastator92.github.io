@@ -1,0 +1,229 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch05_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+<head><title>The MX Algorithm (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch06_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.3. The MX Algorithm</h2>
+
+
+<a name="INDEX-680" />That's the basic idea behind MX
+records and mail exchangers, but there are a few more wrinkles you
+should know about. To avoid <a name="INDEX-681" />
+<a name="INDEX-682" />routing loops, mailers need to use a
+slightly more complicated algorithm than what we've described
+when they determine where to send mail.<a href="#FOOTNOTE-29">[29]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-29" />[29]This
+algorithm is based on RFC 974, which describes how Internet mail
+routing works.</p><p>
+
+</blockquote>
+
+
+Imagine what would happen if mailers didn't check for routing
+loops. Let's say you send mail from your workstation to
+<em class="email">nuts@oreilly.com</em>, raving (or raging) about the quality
+of this book. Unfortunately, <em class="emphasis">ora.oreilly.com</em> is down at the moment.
+No problem! Recall <em class="emphasis">oreilly.com</em>'s MX records:</p><p>
+
+
+<blockquote><pre class="code">oreilly.com.    IN    MX    0  ora.oreilly.com.
+oreilly.com.    IN    MX    10 ruby.oreilly.com.
+oreilly.com.    IN    MX    10 opal.oreilly.com.</pre></blockquote>
+
+
+Your mailer falls back and sends your message to <em class="emphasis">ruby.oreilly.com</em>, which is up. The
+mailer of <em class="emphasis">ruby.oreilly.com</em>
+then tries to forward the mail on to <em class="emphasis">ora.reilly.com</em>, but can't, because
+<em class="emphasis">ora.oreilly.com</em> is down. Now
+what? Unless <em class="emphasis">ruby.oreilly.com</em> checks the sanity of
+what it's doing, it'll try to forward the message to
+<em class="emphasis">opal.oreilly.com</em>, or maybe
+even to itself. That's certainly not going to help get the mail
+delivered. If <em class="emphasis">ruby.oreilly.com</em> sends the message to
+itself, we have a mail routing loop. If <em class="emphasis">ruby.oreilly.com</em> sends the message to
+<em class="emphasis">opal.oreilly.com</em>,
+<em class="emphasis">opal.oreilly.com</em> will either
+send it back to <em class="emphasis">ruby.oreilly.com</em>or send it to itself, and we again have a mail routing
+loop.</p><p>
+
+
+<a name="INDEX-683" /> <a name="INDEX-684" />To
+prevent this from happening, mailers discard certain MX records
+before they decide where to send a message. A mailer sorts the list
+of MX records by preference value and looks in the list for the
+canonical domain name of the host it's running on. If the local
+host appears as a mail exchanger, the mailer discards that MX record
+and all MX records in which the preference value is equal or higher
+(that is, equally or less preferred mail exchangers). That prevents
+the mailer from sending messages to itself or to mailers
+"farther" from the eventual destination.</p><p>
+
+
+Let's think about this in the context of our airport analogy.
+This time, imagine you're an airline passenger (a message), and
+you're trying to get to Greeley, Colorado. You can't get
+a direct flight to Greeley, but you can fly to either Fort Collins or
+Denver (the two next highest mail exchangers). Since Fort Collins is
+closer to Greeley, you opt to fly to Fort Collins.</p><p>
+
+
+Now, once you've arrived in Fort Collins, there's no
+sense in flying to Denver, away from your destination (a lower
+preference mail exchanger). (And flying from Fort Collins to Fort
+Collins would be pretty silly, too.) So the only acceptable flight to
+get you to your destination is now a Fort Collins-Greeley flight. You
+eliminate flights to less preferred destinations to prevent frequent
+flyer looping and wasteful travel time.</p><p>
+
+
+One caveat: most mailers will <em class="emphasis">only</em> look for
+their local host's <em class="emphasis">canonical</em> domain name
+in the list of MX records. They don't check for
+<a name="INDEX-685" />aliases (domain names
+on the left side of CNAME records). Unless you always use canonical
+names in your MX records, there's no guarantee that a mailer
+will be able to find itself in the MX list, and you'll run the
+risk of having your mail loop.</p><p>
+
+
+If you do list a mail exchanger by an alias and it unwittingly tries
+to deliver mail to itself, it will detect the loop and bounce the
+mail with the error:</p><p>
+
+
+<blockquote><pre class="code">554 MX list for movie.edu points back to relay.isp.com
+554 &lt;root@movie.edu&gt;... Local configuration error</pre></blockquote>
+
+
+This replaces the quainter "I refuse to talk to myself"
+error in newer versions of <em class="emphasis">sendmail</em>. The moral:
+in an MX record, always use the mail exchanger's
+<a name="INDEX-686" />
+<a name="INDEX-687" />canonical name.</p><p>
+
+
+One more caveat: the hosts you list as <a name="INDEX-688" />
+<a name="INDEX-689" />mail exchangers <em class="emphasis">must</em>
+have address records. A mailer needs to find an address for each mail
+exchanger you name or else it can't attempt delivery there.</p><p>
+
+
+To go back to our <em class="emphasis">oreilly.com</em>example, when <em class="emphasis">ruby.oreilly.com</em> receives the message
+from your workstation, its mailer checks the list of MX records:</p><p>
+
+
+<blockquote><pre class="code">oreilly.com.    IN    MX    0  ora.oreilly.com.
+oreilly.com.    IN    MX    10 ruby.oreilly.com.
+oreilly.com.    IN    MX    10 opal.oreilly.com.</pre></blockquote>
+
+
+Finding the local host's domain name in the list at preference
+value 10, <em class="emphasis">ruby.oreilly.com</em>'s mailer discards
+all the records at preference value 10 or higher (the records in
+bold):</p><p>
+
+
+<blockquote><pre class="code">oreilly.com.    IN    MX    0  ora.oreilly.com.
+<tt class="userinput"><b>oreilly.com.    IN    MX    10 ruby.oreilly.com.</b></tt>
+<tt class="userinput"><b>oreilly.com.    IN    MX    10 opal.oreilly.com.</b></tt></pre></blockquote>
+
+
+leaving only:</p><p>
+
+
+<blockquote><pre class="code">oreilly.com.    IN    MX    0 ora.oreilly.com.</pre></blockquote>
+
+
+Since <em class="emphasis">ora.oreilly.com</em> is
+down, <em class="emphasis">ruby.oreilly.com</em>
+defers delivery until later and queues the message.</p><p>
+
+
+What happens if a mailer finds <em class="emphasis">itself</em> at the
+highest preference (lowest preference value) and has to discard the
+whole MX list? Some mailers attempt delivery directly to the
+destination host's IP address as a last-ditch effort. In most
+mailers, however, it's an error. It may indicate that DNS
+thinks the mailer should be processing (not just forwarding) mail for
+the destination, but the mailer hasn't been configured to know
+that. Or it may indicate that the administrator has ordered the MX
+records incorrectly by using the wrong preference values.</p><p>
+
+
+Say, for example, the folks who run <em class="emphasis">acme.com</em> add a mail exchanger record to
+direct mail addressed to <em class="emphasis">acme.com</em> to a mailer at their Internet
+Service Provider:</p><p>
+
+
+<blockquote><pre class="code">acme.com.    IN    MX    10 mail.isp.net.</pre></blockquote>
+
+
+Most mailers need to be configured to identify their aliases and the
+names of other hosts they process mail for. Unless the mailer on
+<em class="emphasis">mail.isp.net</em> is configured
+to recognize email addressed to <em class="emphasis">acme.com</em> as local mail, it will assume
+it's being asked to relay the mail and attempt to forward the
+mail to a mail exchanger closer to the final destination.<a href="#FOOTNOTE-30">[30]</a> When it looks up the MX records for
+<em class="emphasis">acme.com</em>, it finds itself as
+the most preferred mail exchanger and bounces the mail back to the
+sender with the familiar error:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-30" />[30]Unless, of course, <em class="emphasis">mail.isp.net</em>'s mailer is configured not to relay mail for
+unknown domain names. In this case, it would simply reject the
+mail.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">554 MX list for acme.com points back to mail.isp.com
+554 &lt;root@acme.com&gt;... Local configuration error</pre></blockquote>
+
+
+Many versions of
+<em class="filename">sendmail</em><a name="INDEX-690" /> <a name="INDEX-691" /> <a name="INDEX-692" /> use class <em class="emphasis">w</em> or fileclass
+<em class="emphasis">w</em> as the list of "local"
+destinations. Depending on your <em class="filename">sendmail.cf</em>
+file, adding an alias can be as easy as adding the line:</p><p>
+
+
+<blockquote><pre class="code">Cw acme.com</pre></blockquote>
+
+
+to <em class="filename">sendmail.cf</em>. If your mailer uses another mail
+transport, such as UUCP, to deliver mail to the hosts for which it
+acts as a mail exchanger, this will probably require more involved
+configuration.</p><p>
+
+
+You may have noticed that we tend to use multiples of 10 for our
+<a name="INDEX-693" />preference values. This is convenient
+because it allows you to insert other MX records temporarily at
+intermediate values without changing the other preferences, but
+otherwise there's nothing magical about it. We could just as
+easily use increments of 1 or 100  -- the effect would
+be<a name="INDEX-694" />
+<a name="INDEX-695" /><a name="INDEX-696" /> the<a name="INDEX-697" /> same.<a name="INDEX-698" /> <a name="INDEX-699" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.2. What's a Mail Exchanger, Again?</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6. Configuring Hosts</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch05_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+</html>

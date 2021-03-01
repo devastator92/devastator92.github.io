@@ -1,0 +1,368 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Diskless client boot process (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.3. Diskless client boot process</h2>
+
+Debugging any sort of diskless client <a name="INDEX-1256" />
+<a name="INDEX-1257" />problems requires some
+knowledge of the boot process. When a diskless client is powered on,
+it knows almost nothing about its configuration. It doesn't
+know its hostname, since that's established in the boot scripts
+that it hasn't run yet. It has no concept of IP addresses,
+because it has no hosts file or hosts NIS map to read. The only piece
+of information it knows for certain is its 48-bit Ethernet address,
+which is in the hardware on the CPU (or Ethernet interface) board. To
+be able to boot, a diskless client must convert the 48-bit Ethernet
+address into more useful information such as a boot server name, a
+hostname, an IP address, and the location of its root and swap
+filesystems.
+</p>
+
+<a name="nfs2-CHP-8-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">8.3.1. Reverse ARP requests</h3>
+
+The heart of the boot process is mapping 48-bit Ethernet
+<a name="INDEX-1258" />
+<a name="INDEX-1259" />addresses to IP
+addresses. The Address Resolution Protocol (ARP) is used to locate a
+48-bit Ethernet address for a known IP address. Its inverse, Reverse
+ARP (or RARP), is used by
+<a name="INDEX-1260" />
+<a name="INDEX-1261" />diskless clients to find
+their IP addresses given their Ethernet addresses.
+Servers<a name="INDEX-1262" />
+<a name="INDEX-1263" />
+run the <em class="emphasis">rarpd</em> daemon to accept and process RARP
+requests, which are broadcast on the network by diskless clients
+attempting to boot.
+</p>
+
+IP addresses are calculated in two steps. The 48-bit Ethernet address
+<a name="INDEX-1264" />
+<a name="INDEX-1265" />received in the RARP is used as a
+key in the <em class="emphasis">/etc/ethers</em> file or
+<em class="emphasis">ethers</em> NIS map. <em class="emphasis">rarpd</em>
+locates the hostname associated with the Ethernet address from the
+<em class="emphasis">ethers</em> database and uses that name as a key into
+the <em class="emphasis">hosts</em> map to find the appropriate IP
+address.
+</p>
+
+For the <em class="emphasis">rarpd</em> daemon to operate correctly, it
+must <a name="INDEX-1266" />
+<a name="INDEX-1267" />be
+able to get packets from the raw network interface. RARP packets are
+not <a name="INDEX-1268" /> <a name="INDEX-1269" />
+<a name="INDEX-1270" />
+<a name="INDEX-1271" />passed up through the TCP or UDP layers of
+the protocol stack, so <em class="emphasis">rarpd</em> listens directly on
+each network interface (e.g., hme0) device node for RARP requests.
+Make sure that all boot servers are running
+<em class="emphasis">rarpd</em> before examining other possible points of
+failure. The best way to check is with <em class="emphasis">ps</em>, which
+should show the <em class="emphasis">rarpd</em> process:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ps -eaf | grep rarpd</b></tt>
+    root   274     1  0   Apr 16 ?        0:00 /usr/sbin/in.rarpd -a</pre></blockquote>
+
+Some implementations of <em class="emphasis">rarpd</em> are multithreaded,
+and some will fork child processes. Solaris
+<em class="emphasis">rarpd</em> implementations will create a process or
+thread for each network interface the server has, plus one extra
+process or thread. The purpose of the extra thread or child process
+is to act as a delayed responder. Sometimes,
+<em class="emphasis">rarpd</em> gets a request but decides to delay its
+response by passing the request to the delayed responder, which waits
+a few seconds before sending the response. A per-interface
+<em class="emphasis">rarpd</em> thread/process chooses to send a delayed
+response if it decides it is not the best candidate to answer the
+request. To understand how this decision is made, we need to look at
+the process of converting Ethernet addresses into IP addresses in
+more <a name="INDEX-1272" />
+<a name="INDEX-1273" />detail.
+</p>
+
+The client broadcasts a RARP request containing its 48-bit Ethernet
+address and waits for a reply. Using the <em class="emphasis">ethers</em>
+and <em class="emphasis">hosts</em> maps, any <em class="emphasis">RARP</em>
+server <a name="INDEX-1274" /> <a name="INDEX-1275" />receiving the request attempts to match it
+to an IP address for the client. Before sending the reply to the
+client, the server verifies that it is the best candidate to boot the
+client by checking the <em class="emphasis">/tftpboot</em> directory (more
+on this soon). If the server has the client's boot parameters
+but might not be able to boot the client, it delays sending a reply
+(by giving the request to the delayed responder daemon) so that the
+correct server replies first. Because RARP requests are broadcast,
+they are received and processed in somewhat random order by all boot
+servers on the network. The reply delay compensates for the time skew
+in reply generation. The server that thinks it can boot the diskless
+client immediately sends its reply to the client; other machines may
+also send their replies a short time later.
+</p>
+
+You may ask "Why should a host other than the client's
+boot server answer its RARP request?" After all, if the boot
+server is down, the diskless client won't be able to boot even
+if it does have a hostname and IP address. The primary reason is that
+the "real" boot server may be very loaded, and it may not
+respond to the RARP request before the diskless client times out.
+Allowing other hosts to answer the broadcast prevents the client from
+getting locked into a cycle of sending a RARP request, timing out,
+and sending the request again. A related reason for having multiple
+RARP replies is that the RARP packet may be missed by the
+client's boot server. This is functionally equivalent to the
+server not replying to the RARP request promptly: if some host does
+not provide the correct answer, the client continues to broadcast
+RARP packets until its boot server is less heavily loaded. Finally,
+RARP is used for other network services as well as for booting
+diskless clients, so RARP servers must be able to reply to RARP
+requests whether they are diskless client boot servers or not.
+</p>
+
+After receiving any one of the RARP replies, the client knows its IP
+address, as well as the IP address of a boot server (found by looking
+in the packet returned by the server). In some implementations, a
+diskless client announces its IP addresses with a message of the
+form:
+</p>
+
+<blockquote><pre class="code">Using IP address 192.9.200.1 = C009C801</pre></blockquote>
+
+A valid IP address is only the first step in booting; the client
+needs to be able to load the boot code if it wants to eventually get
+a Unix kernel running.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">8.3.2. Getting a boot block</h3>
+
+A local and remote IP address are all that are needed to<a name="INDEX-1276" />
+<a name="INDEX-1277" />
+download the boot block using a simple file transfer program
+<a name="INDEX-1278" /> <a name="INDEX-1279" />called
+<em class="emphasis">tftp</em> (for trivial <em class="emphasis">ftp</em>).
+This minimal file transfer utility does no user or password checking
+and is small enough to fit in the boot PROM. Downloading a boot block
+to the client is done from the server's
+<em class="emphasis">/tftpboot</em> directory.
+</p>
+
+The server has no specific knowledge of the architecture of the
+client issuing a RARP or <em class="emphasis">tftp</em> request. It also
+needs a mechanism for determining if it can boot the client, using
+only its IP address  --  the first piece of information the client
+can discern. The server's <em class="emphasis">/tftpboot</em>
+directory contains boot blocks for each architecture of
+<a name="INDEX-1280" /> <a name="INDEX-1281" />client support, and a set of symbolic
+links that point to these boot blocks:
+</p>
+
+<blockquote><pre class="code">[wahoo]% <tt class="userinput"><b> ls -l /tftpboot</b></tt>
+total 282
+lrwxrwxrwx  1 root  root    26 Feb 17 12:43 828D0E09 -&gt; inetboot.sun4u.Solaris_2.7
+lrwxrwxrwx  1 root  root    26 Feb 17 12:43 828D0E09.SUN4U -&gt; inetboot.sun4u.Solaris_2.7
+lrwxrwxrwx  1 root  root    26 Apr 27 18:14 828D0E0A -&gt; inetboot.sun4u.Solaris_2.7
+lrwxrwxrwx  1 root  root    26 Apr 27 18:14 828D0E0A.SUN4U -&gt; inetboot.sun4u.Solaris_2.7
+-rw-r--r--  1 root root 129632 Feb 17 12:21 inetboot.sun4u.Solaris_2.7 
+lrwxrwxrwx  1 root root      1 Feb 17 12:17 tftpboot -&gt; .</pre></blockquote>
+
+The link names are the IP addresses of the clients in hexadecimal.
+The first client link  --  <em class="emphasis">828D0E09</em>  -- 
+corresponds to IP address 130.141.14.9:
+</p>
+
+<blockquote><pre class="code">828D0E09 
+<i class="lineannotation">Insert dots to put in IP address format: </i>
+82.8D.0E.09 
+<i class="lineannotation">Convert back to decimal: </i>
+130.141.14.9</pre></blockquote>
+
+Two links exist for each client  --  one with the IP address in
+hexadecimal, and one with the IP address and the machine
+architecture. The second
+<a name="INDEX-1282" />link is used by
+some versions of <em class="emphasis">tftpboot</em> that specify their
+architecture when asking for a boot block. It doesn't hurt to
+have both, as long as they point to the correct boot block for the
+client.
+</p>
+
+The previous section stated that a server delays its response to a
+RARP request if it doesn't think it's the best candidate
+to boot the requesting client. The server makes this determination by
+matching the client IP address to a link in
+<em class="emphasis">/tftpboot</em>. If the link exists, the server is the
+best candidate to boot the client; if the link is missing, the server
+delays its response to allow another server to reply first.
+</p>
+
+The client gets its boot block via <em class="emphasis">tftp</em>, sending
+its request to the server that answered its RARP request. When the
+<em class="emphasis">inetd</em> daemon on the server receives the
+<em class="emphasis">tftp</em> request, it starts an
+<em class="emphasis">in.tftpd</em> daemon that locates the right boot file
+by following the symbolic link representing the client's IP
+address. The <em class="emphasis">tftpd</em> daemon downloads the boot
+file to the client. In some implementations, when the client gets a
+valid boot file, it reports the address of its boot server:
+</p>
+
+<blockquote><pre class="code">Booting from tftp server at 130.141.14.2 = 828D0E02</pre></blockquote>
+
+It's possible that the first host to reply to the
+client's RARP request can't boot it  --  it may have
+had valid <em class="emphasis">ethers</em> and <em class="emphasis">hosts</em>
+map entries for the machine but not a boot file. If the first server
+chosen by the diskless client does not answer the
+<em class="emphasis">tftp</em> request, the client broadcasts this same
+request. If no server responds, the machine complains that it cannot
+find a <em class="emphasis">tftp</em> server.
+</p>
+
+The <em class="emphasis">tftpd</em> daemon should be run in secure mode
+using the <em class="emphasis">-s</em> option. This is usually the default
+configuration in its <em class="emphasis">/etc/inetd.conf</em> entry:
+</p>
+
+<blockquote><pre class="code">tftp dgram udp wait root /usr/sbin/in.tftpd in.tftpd -s /tftpboot</pre></blockquote>
+
+The argument after the <em class="emphasis">-s</em> is the directory that
+<em class="emphasis">tftp</em> uses as its root  --  it does a
+<em class="emphasis">chdir</em>( ) into this directory and then a
+<em class="emphasis">chroot</em>( ) to make it the root of the filesystem
+visible to the <em class="emphasis">tftp</em> process. This measure
+prevents <em class="emphasis">tftp</em> from being used to take any file
+other than a boot block in <em class="emphasis">tftpboot</em>.
+</p>
+
+The last directory entry in <em class="emphasis">/tftpboot</em> is a
+symbolic link to itself, using the current directory entry
+(<tt class="literal">.</tt>) instead of its full pathname. This symbolic
+link is used for compatibility with older systems that passed a full
+pathname to <em class="emphasis">tftp</em>, such as
+<em class="emphasis">/tftpboot/C009C801.SUN4U</em>. Following the symbolic
+link effectively removes the <em class="emphasis">/tftpboot</em> component
+and allows a secure <em class="emphasis">tftp</em> to find the request
+file in its root directory. Do not remove this symbolic link, or
+older diskless clients will not be able to download<a name="INDEX-1283" /> <a name="INDEX-1284" /> their <a name="INDEX-1285" /> <a name="INDEX-1286" />boot files.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">8.3.3. Booting a kernel</h3>
+
+Once the boot file is loaded, the <a name="INDEX-1287" /> <a name="INDEX-1288" /> <a name="INDEX-1289" />diskless client jumps out of its PROM
+monitor<a name="INDEX-1290" /> and into the boot code. To do
+anything useful, <em class="emphasis">boot</em> needs a root and swap
+filesystem, preferably with a bootable kernel on the root device. To
+get this information, <em class="emphasis">boot</em> broadcasts a request
+for boot parameters. The <em class="emphasis">bootparamd</em> RPC
+server<a name="INDEX-1291" />
+listens for these requests and returns a gift pack filled with the
+location of the root filesystem, the client's hostname, and the
+name of the boot server. The filesystem information is kept in
+<em class="emphasis">/etc/bootparams</em> or in the NIS
+<em class="emphasis">bootparams</em> map.
+</p>
+
+The diskless client mounts its root filesystem
+<a name="INDEX-1292" />
+<a name="INDEX-1293" />from the
+named boot server and boots the kernel image found there. After
+configuring root and swap devices, the client begins single user
+startup and sets its hostname, IP addresses, and NIS domain name from
+information in its <em class="emphasis">/etc</em> files. It is imperative
+that the names and addresses returned by
+<em class="emphasis">bootparamd</em> match those in the client's
+configuration files, which must also match the contents of the NIS
+maps.
+</p>
+
+As part of the single user boot, the client mounts its
+<em class="emphasis">/usr</em> filesystem from the server listed in its
+<em class="emphasis">/etc/vfstab</em> file. At this point, the client has
+root and swap filesystems, and looks (to the Unix kernel) no
+different than a system booting from a local disk. The diskless
+client executes its boot script files, and eventually enters
+multi-user mode and displays a login prompt. Any breakdowns that
+occur after the <em class="emphasis">/usr</em> filesystem is mounted are
+caused by problems in the boot scripts, not in the diskless client
+boot<a name="INDEX-1294" />
+<a name="INDEX-1295" />
+<a name="INDEX-1296" /> process
+itself.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">8.3.4. Managing boot parameters</h3>
+
+Every diskless client boot server <a name="INDEX-1297" /> <a name="INDEX-1298" />
+<a name="INDEX-1299" />has an
+<em class="emphasis">/etc/bootparams</em> file and/or uses a
+<em class="emphasis">bootparams</em> NIS map. On Solaris, the
+<em class="emphasis">/etc/nsswitch.conf</em> file's bootparams entry
+controls whether the information is read from
+<em class="emphasis">/etc/bootparams</em>, NIS, or both, and in what
+order.
+</p>
+
+Here are some suggestions for managing diskless client boot
+parameters:
+</p>
+
+<ul><li>
+Keep the boot parameters in the <em class="emphasis">bootparams</em> map
+if you are using NIS. Obviously, if your NIS master server is also a
+diskless client server, it will contain a complete
+<em class="emphasis">/etc/bootparams</em> file.
+</p>
+</li><li>
+If you have diskless clients in more than one NIS domain, make sure
+you have a separate NIS <em class="emphasis">bootparams</em> map for each
+domain.
+</p>
+</li><li>
+On networks with diskless clients from different vendors, make sure
+that the format of the boot parameter information used by each vendor
+is the same. If one system's <em class="emphasis">bootparamd</em>
+daemon returns a boot parameter packet that cannot be understood by
+another system, you will not be able to use the NIS
+<em class="emphasis">bootparams</em> map. We'll look at the problems
+caused by differing boot parameter packet formats in <a href="ch15_03.html#nfs2-CHP-15-SECT-3">Section 15.3, "Boot parameter confusion"</a>.
+</p>
+</li></ul>
+Eliminating copies of the boot parameter information on the other
+servers reduces the chances that you'll have out-of-date
+information on <a name="INDEX-1300" /> <a name="INDEX-1301" />boot servers <a name="INDEX-1302" /> <a name="INDEX-1303" /> <a name="INDEX-1304" />after you've
+made a configuration change.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.2. Setting up a diskless client</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.4. Managing client swap space</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

@@ -1,0 +1,193 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+<head><title>Views (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.6. Views</h2>
+
+
+<a name="INDEX-1606" />
+<a name="INDEX-1607" />BIND 9 introduced
+<em class="emphasis">views</em>, another mechanism that's very
+useful in firewalled environments. Views allow you to present one
+name server configuration to one community of hosts and a different
+configuration to another community. This is particularly handy if
+you're running a name server on a host that receives queries
+from both your internal hosts and hosts on the Internet (we'll
+cover this in the next chapter).</p><p>
+
+
+<a name="INDEX-1608" />If you don't configure any
+views, BIND 9 automatically creates a single, implicit view that it
+shows to all hosts that query it. To explicitly create a
+<a name="INDEX-1609" />view,
+you use the <em class="emphasis">view</em> statement, which takes the name
+of the view as an argument:</p><p>
+
+
+<blockquote><pre class="code">view "internal" {
+};</pre></blockquote>
+
+
+Although the name of the view can be just about anything, using a
+descriptive name is always a good idea. And while quoting the name of
+the view isn't necessary, it's helpful to do so to avoid
+conflict with words BIND reserves for its own use (like
+"internal," for example). The <em class="emphasis">view
+</em>statement must come after any <em class="emphasis">options</em>
+statement, though not necessarily right after it.</p><p>
+
+
+You select which hosts "see" a particular view using the
+<em class="emphasis">match-clients view
+</em><a name="INDEX-1610" />substatement, which takes an
+address match list as an argument. If you don't specify a
+community of hosts with <em class="emphasis">match-clients</em>, the view
+applies to all hosts.</p><p>
+
+
+Let's say we're setting up a special view of the
+<em class="emphasis">fx.movie.edu</em> zone on our name servers that we
+want only the Special Effects Department to see. We could create a
+view visible only to hosts on our subnet:</p><p>
+
+
+<blockquote><pre class="code">view "internal" {
+	match-clients { 192.253.254/24; };
+};</pre></blockquote>
+
+
+If you want to make that a little more readable, you can use an
+<em class="emphasis">acl</em> statement:</p><p>
+
+
+<blockquote><pre class="code">acl "fx-subnet" { 192.253.254/24; };
+
+view "internal" {
+	match-clients { "fx-subnet"; };
+};</pre></blockquote>
+
+
+Just be sure you define the ACL <em class="emphasis">outside</em> of the
+view, since you can't use <em class="emphasis">acl</em> statements
+inside views yet.</p><p>
+
+
+What can you put inside a <em class="emphasis">view</em> statement? Nearly
+anything else. You can define zones with <em class="emphasis">zone</em>
+statements, describe remote name servers with
+<em class="emphasis">server</em> statements, and configure TSIG keys with
+<em class="emphasis">key</em> statements. You can use most
+<em class="emphasis">options</em> substatements within a view, but if you
+do, don't enclose them in an <em class="emphasis">options</em>
+statement; just use them "raw" in the
+<em class="emphasis">view</em> statement:</p><p>
+
+
+<blockquote><pre class="code">acl "fx-subnet" { 192.253.254/24; };
+
+view "internal" {
+	match-clients { "fx-subnet"; };
+	recursion yes;  // turn recursion on for this view
+                    // (it's off globally, in the options statement)
+};</pre></blockquote>
+
+
+Any configuration option you specify within a view overrides the
+like-named global option (e.g., one in the <em class="emphasis">options
+</em>statement) for hosts that match
+<em class="emphasis">match-clients</em>.</p><p>
+
+
+For a complete list of what's supported inside the
+<em class="emphasis">view</em> statement on the version of BIND 9 you run
+(because it changes from release to release), see the file
+<em class="emphasis">doc/misc/options</em> in the BIND distribution.</p><p>
+
+
+Here's the Special Effects Lab's full
+<em class="emphasis">named.conf</em> file, to give you an idea of the
+power of views:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+};
+
+acl "fx-subnet" { 192.253.254/24; };
+
+view "internal" {  // internal view of our zones
+
+	match-clients { "fx-subnet"; };
+
+	zone "fx.movie.edu" {
+		type master;
+		file "db.fx.movie.edu";
+	};
+
+	zone "254.253.192.in-addr.arpa" {
+		type master;
+		file "db.192.253.254";
+	};
+};
+
+view "external" {  // view of our zones for the rest of the world
+
+	match-clients { any; };  // implicit
+	recursion no;            // outside of our subnet, they shouldn't be
+                             // requesting recursion
+	zone "fx.movie.edu" {
+		type master;
+		file "db.fx.movie.edu.external";  // external zone data file
+	};
+
+	zone "254.254.192.in-addr.arpa" {
+		type master;
+		file "db.192.253.254.external";   // external zone data file
+	};
+};</pre></blockquote>
+
+
+Notice that each view has an <em class="emphasis">fx.movie.edu</em> and a
+<em class="emphasis">254.253.192.in-addr.arpa</em> zone, but the zone data
+files are different in the "internal" and
+"external" views. This allows us to show the outside
+world a different "face" than we see internally.</p><p>
+
+
+The order of the <em class="emphasis">view</em> statements is important
+because the first view that a host's IP address matches is the
+one that dictates what it sees. If the "external" view
+were listed first in the configuration file, it would occlude the
+"internal" view because the "external" view
+matches all addresses.</p><p>
+
+
+One last note on views (before we use them in the next chapter,
+anyway): if you configure even one <em class="emphasis">view</em>
+statement, all of your <em class="emphasis">zone</em> statements must
+appear within explicit<a name="INDEX-1611" />
+views.<a name="INDEX-1612" /> <a name="INDEX-1613" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.5. Forwarding</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.7. Round Robin Load Distribution</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+</html>

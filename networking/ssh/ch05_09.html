@@ -1,0 +1,146 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Compatibility Between SSH-1 and SSH-2 Servers (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_10.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<a name="INDEX-1008" /><h2 class="sect1">5.9. Compatibility Between SSH-1 and SSH-2 Servers</h2>
+
+
+
+OpenSSH Version 2 has support for both the SSH-1 and SSH-2 protocols
+within a single daemon accepting both types of connections. For SSH1
+and SSH2, however, the story is more complicated.</p>
+
+
+
+The SSH2 server can accept connections from SSH1 clients. This
+compatibility is achieved by having the SSH2 server run the SSH1
+server program instead whenever an SSH-1 connection is requested.
+This compatibility feature is enabled and disabled with the SSH2
+<tt class="literal">Ssh1Compatibility</tt><a name="INDEX-1009" />
+keyword, given a value of <tt class="literal">yes</tt> or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Ssh1Compatibility yes</pre></blockquote>
+
+
+
+When <tt class="literal">Ssh1Compatibility</tt> is enabled, and an SSH-1
+client connects to the SSH2 server, the two programs exchange strings
+indicating their versions. [<a href="ch03_04.html#ch03-62629">Section 3.4.1, "Establishing the Secure Connection"</a>]
+<tt class="command">sshd2</tt> then locates the <tt class="command">sshd1</tt>
+executable by examining the value of the
+<tt class="literal">Sshd1Path</tt><a name="INDEX-1010" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+Sshd1Path /usr/local/bin/sshd1</pre></blockquote>
+
+
+
+<tt class="command">sshd2</tt> then invokes an <tt class="command">sshd1</tt>
+process, passing the client's version string to
+<tt class="command">sshd1</tt> using the <span class="option">-V</span> command-line
+option:<a href="#FOOTNOTE-75">[75]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-75" />[75]Note that you need at least Version 1.2.26
+(F-Secure 1.3.6) of SSH1 to use the compatibility mode, since this
+option isn't implemented in earlier versions.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH2 only, invoked automatically by sshd2
+/usr/local/bin/sshd1 -V "<em class="replaceable">client version string</em>" <em class="replaceable">&lt;other arguments&gt;</em></pre></blockquote>
+
+
+
+The <span class="option">-V</span> command-line option is for internal use only
+by <tt class="command">sshd2</tt>. It is necessary because when
+<tt class="command">sshd1</tt> starts this way, the client has already sent
+its initial version announcement, which <tt class="command">sshd1</tt>
+needs to get somehow. We can't think of any practical reason to
+use this option manually, but we mention it here for completeness.</p>
+
+
+
+When you compile and install SSH2, if SSH1 is already installed, then
+the configure script [<a href="ch04_01.html#ch04-59756">Section 4.1.4, "Building and Installing SSH2"</a>] automatically sets
+the internal, compiled-in defaults for
+<tt class="literal">Ssh1Compatibility</tt> to <tt class="literal">yes</tt>, and
+for <tt class="literal">Sshd1Path</tt> to the correct path to
+<tt class="command">sshd1</tt>. If SSH1 isn't installed, then the
+compiled defaults are <tt class="literal">no</tt> for
+<tt class="literal">Ssh1Compatibility</tt> and the null string for
+<tt class="literal">Sshd1Path</tt>.</p>
+
+
+
+The OpenSSH server also implements the <span class="option">-V</span> option, so
+that you can use OpenSSH instead of SSH1 for SSH2
+backward-compatibility mode.</p>
+
+
+
+<a name="ch05-53-fm2xml" /><blockquote><b>WARNING: </b>
+Although <tt class="command">sshd2</tt> can accept and reroute SSH1 client
+connections, the reverse isn't true: <tt class="command">sshd1</tt>
+can't accept SSH2 connections.</p>
+
+
+</blockquote>
+
+<a name="ch05-54-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.9.1. Security Issues with SSH-1 Compatibility Mode in SSH2</h3>
+
+
+
+There's one vital thing to keep in mind if you're using
+the SSH-1 compatibility feature in SSH2: you must maintain two
+separate SSH server configurations. When <tt class="command">sshd2</tt>
+starts<tt class="command"> sshd1</tt>, it is an entirely new process, with
+its own SSH1 server configuration file. No restrictions set in your
+SSH2 server configuration apply to it. Even restrictions that could
+apply, such as
+<tt class="literal">AllowHosts</tt><a name="INDEX-1011" />,
+don't, because <tt class="command">sshd2</tt> invokes
+<tt class="command">sshd1</tt> before performing such checks.</p>
+
+
+
+This means you must keep the two configurations synchronized with
+respect to your security intent. Otherwise, an attacker can
+circumvent your carefully crafted SSH2 configuration simply by
+connecting with an SSH-1 client.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_10.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.8. History, Logging, and Debugging</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.10. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

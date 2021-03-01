@@ -1,0 +1,482 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:48 GMT -->
+<head><title>Network Diagnostic and Administrative Tools (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<a name="INDEX-1941" /></a><a name="INDEX-1942" /></a><h1 class="chapter">Chapter 13. Network Diagnostic and Administrative Tools</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-13-SECT-1">Broadcast addresses</a><br />
+<a href="ch13_02.html">MAC and IP layer tools</a><br />
+<a href="ch13_03.html">Remote procedure call tools</a><br />
+<a href="ch13_04.html">NIS tools</a><br />
+<a href="ch13_05.html">Network analyzers</a><br /></p><p></div>
+
+
+Distributed computing architectures rely on a well-conditioned
+network and properly configured servers for their adequate
+performance and operation. NFS and NIS client performance degrades if
+your network is congested or your servers are unreliable.
+Retransmitted requests add to the noise level on the network or to
+the request backlog on the server, generally exacerbating any
+performance problems.</p><p>
+
+
+Whenever you make a change, you run the risk of affecting more than
+just one machine. If you add a new NFS client, for example, you
+should consider all possible impacts on the computing environment:
+network bandwidth consumed by traffic to and from this node, or the
+incremental workload imposed on any servers used by the client.
+Similarly, when upgrading server resources you must identify those
+areas that are the tightest constraints: CPU speed, disk speed, or
+aggregate disk space. Adding another server to a network may not be
+as economical or beneficial as upgrading to faster disks, adding CPUs
+to an expandable server or offloading other tasks, such as web
+service to another host.</p><p>
+
+
+This portion of the book focuses on network analysis, debugging, and
+performance tuning. Its goal is to present the tools, procedures, and
+evaluation criteria used for analyzing network, NFS, or NIS problems.
+In addition to tuning and administration, these techniques can be
+used to evaluate proposals for expanding an existing network with
+additional clients or servers. Symptoms and causes of common problems
+will be examined in detail, but the overall focus is on developing
+techniques to be used on complex problems peculiar to your specific
+combination of hardware and software.</p><p>
+
+
+In this chapter, we present tools for examining the configuration and
+performance of individual network components, starting at the lowest
+level of basic point-to-point connectivity and working up to the RPC
+layer where the NFS- and NIS-specific issues come into play. The
+chapter includes examples relevant to problem diagnosis to define the
+methods for collecting and interpreting data about the network and
+its components. A healthy network is essential to the proper behavior
+of NFS and NIS. Developing network diagnostic skills is necessary for
+resolving problems that may only be apparent at the application
+level. NFS may behave poorly because of a saturated network or due to
+an overloaded server; a thorough examination of the problem requires
+checking each component involved. If you fail to understand the
+low-level operation of a facility, you are more likely to
+misinterpret performance or usage statistics provided for that
+facility. We cover the lower layers of the network protocols in
+detail so that you can see how they affect the performance and
+behavior of the application layer protocols like NFS and NIS.</p><p>
+
+
+As explained in <a href="ch02_03.html#nfs2-CHP-2-SECT-3">Section 2.3, "Name service switch"</a>, NIS and DNS can be used
+concurrently to resolve hostnames on the same system, although
+throughout the remainder of this book, we assume that NIS is the only
+name service running. In some cases, we refer to local files that are
+used without NIS. However, examples and discussions refer to the most
+common NIS maps, as shown in <a href="ch13_01.html#nfs2-CHP-13-TABLE-1">Table 13-1</a>.</p><p>
+
+
+<a name="nfs2-CHP-13-TABLE-1" /></a><h4 class="objtitle">Table 13-1. Common NIS maps and their nicknames </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Map Name</p><p></th>
+<th>
+Nickname</p><p></th>
+<th>
+Local File</p><p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+passwd.byname</p><p></td>
+<td>
+passwd</p><p></td>
+<td>
+/etc/passwd</p><p></td>
+</tr>
+
+<tr>
+<td>
+group.byname</p><p></td>
+<td>
+group</p><p></td>
+<td>
+/etc/group</p><p></td>
+</tr>
+
+<tr>
+<td>
+hosts.byname</p><p></td>
+<td>
+hosts</p><p></td>
+<td>
+/etc/inet/hosts</p><p></td>
+</tr>
+
+<tr>
+<td>
+ipnodes.byname</p><p></td>
+<td>
+ipnodes</p><p></td>
+<td>
+/etc/inet/ipnodes</p><p></td>
+</tr>
+
+<tr>
+<td>
+rpc.bynumber</p><p></td>
+<td>
+rpc</p><p></td>
+<td>
+/etc/rpc</p><p></td>
+</tr>
+
+<tr>
+<td>
+services.byname</p><p></td>
+<td>
+services</p><p></td>
+<td>
+/etc/inet/services</p><p></td>
+</tr>
+
+<tr>
+<td>
+netmasks.byaddr</p><p></td>
+<td>
+netmasks</p><p></td>
+<td>
+/etc/inet/netmasks</p><p></td>
+</tr>
+
+
+</table><p>
+
+
+The <em class="emphasis">/etc/inet/ipnodes</em> file and
+<em class="emphasis">ipnodes</em> NIS map form a database that associates
+the names of nodes with their IP addresses. The IP addresses can be
+either IPv4 or IPv6 addresses. The <em class="emphasis">ipnodes</em>
+database was <a name="INDEX-1943" /></a>introduced in Solaris 8 to support
+IPv6-aware<a href="#FOOTNOTE-25">[25]</a>
+and IPv6-enabled<a href="#FOOTNOTE-26">[26]</a> applications
+that need to obtain IPv6 addresses. When these applications need IPv4
+addresses, they first consult the <em class="emphasis">ipnodes</em>
+database. If the address is not found, they then consult the
+traditional <em class="emphasis">hosts</em> database.
+IPv6-unaware<a href="#FOOTNOTE-27">[27]</a> applications simply
+consult the <em class="emphasis">hosts</em> database, as they are unaware
+of IPv6 extensions. Although not a requirement, IPv4 addresses
+defined in the <em class="emphasis">hosts</em> database should be copied
+to the <em class="emphasis">ipnodes</em> database in order to prevent
+delays in name resolution, and to keep the
+<em class="emphasis">ipnodes</em> and <em class="emphasis">hosts</em> database
+in sync.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-25" /></a>[25]IPv6-aware applications can communicate
+with nodes that do not have an IPv4 address. This means that the
+application can handle the larger IPv6 addresses.</p><p>
+
+</blockquote><blockquote class="footnote">
+
+<a name="FOOTNOTE-26" /></a>[26]IPv6-enabled applications take
+advantage of some IPv6-specific feature. The enabled applications can
+still operate over IPv4, though in a degraded mode. IPv6-enabled
+applications are also IPv6-aware.</p><p>
+
+</blockquote><blockquote class="footnote">
+
+<a name="FOOTNOTE-27" /></a>[27]IPv6-unaware applications cannot handle
+IPv6 addresses; therefore, they cannot communicate with nodes that do
+not have an IPv4 address.</p><p>
+
+</blockquote>
+
+
+Throughout this chapter we assume that your system is
+<a name="INDEX-1944" /></a>
+<a name="INDEX-1945" /></a>capable of using both IPv4 and IPv6, and
+uses the <em class="emphasis">ipnodes</em> database to obtain IP address
+mappings. If your system does not support IPv6 yet, then replace
+references to the <em class="emphasis">ipnodes</em> database with the
+<em class="emphasis">hosts</em> database. To reiterate, an unsuccessful
+lookup of an IPv4 address in the <em class="emphasis">ipnodes</em>
+database implies a subsequent lookup of the same address in the
+<em class="emphasis">hosts</em> database.</p><p>
+
+
+<div class="sect1"><a name="nfs2-CHP-13-SECT-1" /></a>
+<h2 class="sect1">13.1. Broadcast addresses</h2>
+
+
+Many network problems stem from <a name="INDEX-1946" /></a> <a name="INDEX-1947" /></a> <a name="INDEX-1948" /></a>confusion or inconsistency in the
+way hosts form their IP broadcast addresses. Broadcast addresses are
+used when a packet must be sent to all machines on the local area
+network. For example, if your host needs to send a packet to another
+machine, it must know the remote machine's IP address and
+Ethernet address. It can determine the remote IP address by looking
+up the remote hostname in the NIS <em class="emphasis">ipnodes</em> map,
+but it may not have the corresponding Ethernet address. If this is
+the first time your machine is talking to this particular remote
+host, it won't have had an opportunity to locate or save the
+remote Ethernet address. The way to
+determine<a name="INDEX-1949" /></a>
+<a name="INDEX-1950" /></a>
+the remote machine's Ethernet address is to ask all of the
+hosts on the network if they have the information, using the Address
+Resolution Protocol (ARP). To
+<a name="INDEX-1951" /></a>
+<a name="INDEX-1952" /></a>broadcast this request to
+all hosts on the network, your host uses a special kind of
+destination address called a broadcast address. A normal (or unicast)
+address identifies <a name="INDEX-1953" /></a>
+<a name="INDEX-1954" /></a>only
+one host; a broadcast address identifies all hosts on the network.</p><p>
+
+
+To be an effective broadcast, the packet must reach all nodes on the
+local area network and be recognized as a broadcast packet by them.
+An improperly formed broadcast address, or one that other systems do
+not recognize as such, can be responsible for failures ranging from
+NIS clients that cannot find servers to storms of broadcast packets
+initiated by a single packet sent with the wrong broadcast address.</p><p>
+
+
+Like host addresses, broadcast addresses<a name="INDEX-1955" /></a>
+<a name="INDEX-1956" /></a> exist in both the MAC and IPv4
+layers of the protocol stack. There are no broadcast addresses in
+IPv6; their function is superseded by multicast addresses.<a href="#FOOTNOTE-28">[28]</a> An IPv4 broadcast
+address is converted into a MAC broadcast address, just as a
+host-specific IP address is converted into a 48-bit Ethernet address.
+At the MAC layer, there is exactly one broadcast address; for
+Ethernet it is:</p><p><blockquote class="footnote">
+
+<a name="FOOTNOTE-28" /></a>[28]Multicast addresses are used to define subgroups of recipients
+of data. If a sender needs to contact a large number of hosts
+simultaneously, the sender can multicast a single message to all
+hosts listening on the given multicast address, instead of issuing
+multiple copies of the same message to every single host. The hosts
+listening on the multicast address do not need to be part of the same
+subnetwork as the sender.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">ff:ff:ff:ff:ff:ff</pre></blockquote>
+
+
+Every node on the local network receives a packet having this
+destination MAC address. A host may ignore a broadcast if the request
+is for a service that it does not provide. A host processes every
+broadcast packet, at the very least deciding to discard it.
+Therefore, a high level of broadcast traffic hurts the performance of
+each host on the network.</p><p>
+
+
+While the MAC layer broadcast address is very clearly defined, there
+is some variation in the form of IPv4 broadcast addresses. There are
+two distinct popular forms, mostly due to evolution of the networking
+code in Berkeley-based Unix systems.<a href="#FOOTNOTE-29">[29]</a> Examples of
+broadcast addresses of each form are shown for each IPv4 address
+class in <a href="ch13_01.html#nfs2-CHP-13-TABLE-2">Table 13-2</a>. IPv4 address classes are
+described in <a href="ch01_03.html#nfs2-CHP-1-SECT-3.3">Section 1.3.3, "IPv4 address classes"</a>.</p><p><blockquote class="footnote">
+
+<a name="FOOTNOTE-29" /></a>[29]The 4.2 BSD
+release of Unix introduced TCP/IP and required use of the zeros form
+of broadcast addresses. All derivatives of 4.2 BSD, including SunOS
+3.x and early versions of Ultrix, retained this broadcast address
+requirement. In 4.3 BSD, the ones form of broadcast addresses was
+adopted, although the zeros form was still supported. Unix operating
+systems that are descendants of 4.3 BSD  --  SunOS 4.x included
+ --  support both one- and zero-filled broadcast addresses.
+Solaris supports only the ones form.</p><p>
+
+</blockquote>
+
+
+<a name="nfs2-CHP-13-TABLE-2" /></a><h4 class="objtitle">Table 13-2. Broadcast address forms </h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Address Class</p><p></th>
+<th>
+Example</p><p></th>
+<th>
+Ones Form</p><p></th>
+<th>
+Zeros Form</p><p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Class A</p><p></td>
+<td>
+89.</p><p></td>
+<td>
+89.255.255.255</p><p></td>
+<td>
+89.0.0.0</p><p></td>
+</tr>
+
+<tr>
+<td>
+Class B</p><p></td>
+<td>
+129.7.</p><p></td>
+<td>
+129.7.255.255</p><p></td>
+<td>
+129.7.0.0</p><p></td>
+</tr>
+
+<tr>
+<td>
+Class C</p><p></td>
+<td>
+192.6.4.</p><p></td>
+<td>
+192.6.4.255</p><p></td>
+<td>
+192.6.4.0</p><p></td>
+</tr>
+
+<tr>
+<td>
+Classless</p><p></td>
+<td>
+192.1.2. /23</p><p></td>
+<td>
+192.1.3.255</p><p></td>
+<td>
+192.1.3.0</p><p></td>
+</tr>
+
+
+</table><p>
+
+
+The ones form is the most widely accepted and is used in all examples
+in this book. Octets of the IPv4 address that specify the host number
+are filled in with 1-valued bits. A variation on the ones form is the
+zeros form, in which the host number is expressed as zero-valued
+octets. The all-ones form:</p>
+
+
+<blockquote><pre class="code">255.255.255.255</pre></blockquote>
+
+
+is a variation of the proper ones form address where the 255-valued
+octets occupy only the host number portion of the address.</p><p>
+
+
+Confusion regarding the "proper" broadcast address stems
+from the interpretation of octet values 0 and 255 in IPv4 addresses.
+Zero-valued octets should be used as place holders when specifying a
+network number and imply "this" network, without any real
+implication for host numbers. For example, 129.7.0.0 means
+<em class="emphasis">network number</em> 129.7., but it does not
+necessarily name any hosts on the network.</p><p>
+
+
+Conversely, the one-filled octets are treated like wildcards and
+imply "any" host on the network. The network number is
+specified but the host number matches all hosts on that network.
+Using these connotations for octet values 0 and 255, the ones form of
+the broadcast address is "correct." There are cases in
+which the zeros form must be used for backwards compatibility with
+older operating system releases. Many systems were built using the
+zeros form of broadcast addresses.</p><p>
+
+
+The sole requirement in adopting a broadcast address form is to make
+the choice consistent across all machines on the network and
+compatible with your vendor's supported convention. Machines
+that expect a zeros-form broadcast address interpret a one-filled
+octet as part of a host number rather than a wildcard. Mixing
+broadcast address forms on the same network is the most common cause
+of broadcast storms, in which every confused node on the network
+transmits and retransmits replies to a broadcast address of a form
+complementary to the one it is using.</p><p>
+
+
+Broadcast addresses, muticast addresses, IP addresses, and other
+characteristics of the Ethernet interface are set with the
+<em class="emphasis">ifconfig</em> utility. Because
+<em class="emphasis">ifconfig</em> governs the lowest level interface of a
+node to the network, it is the logical place <a name="INDEX-1957" /></a> <a name="INDEX-1958" /></a> <a name="INDEX-1959" /></a>to begin the
+discussion of network tools.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.6. Viruses</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.2. MAC and IP layer tools</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:49 GMT -->
+</html>

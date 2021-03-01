@@ -1,0 +1,1671 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+<head><title>The DNS Security Extensions (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.4. The DNS Security Extensions</h2>
+
+
+<a name="INDEX-1924" />TSIG, <a name="INDEX-1925" />which we described
+earlier in this chapter, is well suited to securing the
+communications between two name servers or between an updater and a
+name server. However, it won't protect you if one of your name
+servers is compromised: if someone breaks into the host that runs one
+of your name servers, he may also gain access to its TSIG keys.
+Moreover, because TSIG uses shared secrets, it isn't practical
+to configure TSIG among many name servers. You couldn't use
+TSIG to secure your name servers' communications with arbitrary
+name servers on the Internet because you can't distribute and
+manage that many keys.</p><p>
+
+
+<a name="INDEX-1926" />
+<a name="INDEX-1927" />The most common way to deal with key
+management problems like these is to use <em class="firstterm">public key
+cryptography</em>. The DNS Security Extensions, described in
+RFC 2535, use public key cryptography to enable zone administrators
+to digitally sign their zone data, thereby proving its authenticity.</p><p>
+
+
+
+<a name="ch11-39-fm2xml" /><blockquote><b>TIP: </b>
+Note: we'll describe the DNS Security Extensions, or DNSSEC, in
+their current form as described by RFC 2535. However, the
+IETF's DNSEXT working group is still working on DNSSEC and may
+change aspects of it before it becomes a standard.Another note:
+though BIND 8 provided preliminary support of DNSSEC as early as BIND
+8.2,<a href="#FOOTNOTE-85">[85]</a>
+DNSSEC wasn't really usable before BIND 9. Consequently,
+we'll use BIND 9 in our examples. If you want to use DNSSEC,
+you really shouldn't use anything older.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-85" />[85]In particular, BIND 8 can't follow a chain
+of trust. It can verify SIG records only in zones it has
+<em class="emphasis">trusted-keys</em> statements for.</p><p>
+
+</blockquote>
+
+</blockquote>
+
+<a name="dns4-CHP-11-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">11.4.1. Public Key Cryptography and Digital Signatures</h3>
+
+
+Public key cryptography solves the key distribution problem by using
+asymmetric cryptographic algorithms. In an asymmetric cryptographic
+algorithm, one key is used to decrypt data that another has
+encrypted. These two keys -- a <em class="firstterm">key
+pair -- </em><a name="INDEX-1928" />are generated at the same time using a
+mathematical formula. That's the only easy way to find two keys
+that have this special asymmetry (one decrypts what the other
+encrypts): it's very difficult to determine one key given the
+other. (In the most popular asymmetric cryptographic algorithm, RSA,
+that determination involves factoring very large numbers.)</p><p>
+
+
+In public key cryptography, an individual first generates a key pair.
+Then one key of the key pair is made public (e.g., published in a
+directory) while the other is kept private. Someone who wants to
+communicate securely with that individual can encrypt a message with
+the individual's public key and then send the encrypted message
+to the individual. (Or he could even post the message to a newsgroup
+or on a web site.) If the recipient has kept his private key private,
+only he can decrypt the message.</p><p>
+
+
+Conversely, the individual can encrypt a message with his private key
+and send it to someone. The recipient can verify that it came from
+the individual by attempting to decrypt it with the
+individual's public key. If the message decrypts to something
+reasonable (i.e., not gibberish) and the sender kept his private key
+to himself, then the individual must have encrypted it. Successful
+decryption also proves that the message wasn't modified in
+transit (e.g., while passing through a mail server), because if it
+had been, it wouldn't have decrypted correctly. So the
+recipient has authenticated the message.</p><p>
+
+
+Unfortunately, encrypting large amounts of data with asymmetric
+encryption algorithms tends to be slow -- much slower than
+encryption using symmetric encryption algorithms. But when using
+public key encryption for authentication (and not for privacy), we
+don't have to encrypt the whole message. Instead, we run the
+message through a one-way hash function first. Then we can encrypt
+just the hash value, which represents the original data. We attach
+the encrypted hash value, now called a <em class="firstterm">digital
+signature</em>, to the message we want to authenticate. The
+recipient can still authenticate the message by decrypting the
+digital signature and running the message through her own copy of the
+one-way hash function. If the hash values match, the message is
+authentic. The process of signing and verifying a message is shown in
+<a href="ch11_04.html#dns4-CHP-11-FIG-7">Figure 11-7</a>.</p><p>
+
+
+<a name="dns4-CHP-11-FIG-7" /><div class="figure"><img height="552" alt="Figure 11-7" src="figs/dns4_1107.gif" width="434" /></div><h4 class="objtitle">Figure 11-7. Signing and verifying a message</h4>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">11.4.2. The KEY Record</h3>
+
+
+<a name="INDEX-1929" />In the DNS Security Extensions, or
+DNSSEC, each secure zone has a key pair associated with it. The
+zone's private key is stored somewhere safe, often in a file on
+the name server's filesystem. The zone's public key is
+advertised as a new type of record attached to the domain name of the
+zone, the KEY record.</p><p>
+
+
+The KEY record is actually a general-purpose record, as we'll
+see when we dissect one. You can use the KEY record to store
+different kinds of cryptographic keys, not just zones' public
+keys for use with DNSSEC. However, the only use we're going to
+explore in this book is to store a zone's public key.</p><p>
+
+
+A KEY record looks like this:</p><p>
+
+
+<blockquote><pre class="code">movie.edu. IN KEY 256 3 1 AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX7+uBxB11Bq
+L7 LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B</pre></blockquote>
+
+
+The owner is the domain name of the zone that owns this public key.
+The first field after the type, 256, is the flags field. The flags
+field is two bytes long and encodes a set of one- and two-bit values:</p><p>
+
+
+<blockquote><pre class="code">0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5
+   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+   |  A/C  | Z | XT| Z | Z | NAMTYP| Z | Z | Z | Z |      SIG      |
+   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+</pre></blockquote>
+
+
+If the value of the first bit is zero, the key can be used for
+authentication. Clearly, a key that we can't use for
+authentication isn't very useful in DNSSEC, so that bit is
+always zero.</p><p>
+
+
+If the value of the second bit is zero, the key can be used for
+confidentiality. DNSSEC doesn't make your zone data private,
+but also doesn't prohibit you from using your zone's
+public key for confidentiality, so this bit is always zero for a
+zone's public key.</p><p>
+
+
+A KEY record in which the first two bits are set to one is called a
+<em class="firstterm">null key</em>. Later on, we'll show you how
+null keys are used in parent zones.</p><p>
+
+
+The third bit is reserved for future use. For now, its value must be
+zero. The fourth bit is a "flag extension" bit.
+It's designed to provide future expandability. If it's
+set, the KEY record must include another two-byte field after the
+algorithm field (the third field after the type) and before the
+public key itself (normally the fourth field). The meanings of the
+bits in that additional two-byte field haven't been defined
+yet, so for now the fourth bit is always zero. Like the third bit,
+the fifth and sixth bits are reserved and must be zero.</p><p>
+
+
+The seventh and eighth bits encode the type of key:</p><p>
+
+
+<dl>
+<dt><i>00</i></dt>
+<dd>This is a user's key. A mail user agent might use a
+user's key to encrypt email addressed to that user. This type
+of key isn't used in DNSSEC.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>01</i></dt>
+<dd>This is a zone's public key. All DNSSEC keys are this type of
+key.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>10</i></dt>
+<dd>This is a host's key. An IPSEC implementation might use a
+host's key to encrypt all IP packets sent to that host. DNSSEC
+doesn't use host keys.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>11</i></dt>
+<dd>Reserved for future use.</p></dd>
+
+</dl>
+
+
+The ninth through twelfth bits are reserved and must be zero. The
+last four bits are the signatory field, which is now obsolete.</p><p>
+
+
+In the KEY record shown earlier, the flags field (the first field in
+the record after the type) says that this KEY is <em class="emphasis">movie.edu</em>'s zone key and can be
+used for authentication and confidentiality.</p><p>
+
+
+The next field in the record, which in the example has the value 3,
+is called the <em class="firstterm">protocol octet</em>. Since you can
+use KEY records for different purposes, you have to specify which
+purpose a particular key is intended for. The following values are
+defined:</p><p>
+
+
+<dl>
+<dt><i><em class="emphasis">0</em></i></dt>
+<dd>Reserved.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><em class="emphasis">1</em></i></dt>
+<dd>This key is used with Transport Layer Security (TLS), as described in
+RFC 2246.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><em class="emphasis">2</em></i></dt>
+<dd>This key is used in connection with email, e.g., an S/MIME key.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><em class="emphasis">3</em></i></dt>
+<dd>This key is used with DNSSEC. All DNSSEC keys, obviously, will have a
+protocol octet of 3.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><em class="emphasis">4</em></i></dt>
+<dd>This key is used with IPSEC.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>255</i></dt>
+<dd>This key is used with any protocol that can use a KEY record.</p></dd>
+
+</dl>
+
+
+All of the values between 4 and 255 are available for future
+assignment.</p><p>
+
+
+The next (third) field in the KEY record, which here has the value 1,
+is the algorithm number. DNSSEC can work with a number of public key
+encryption algorithms, so you need to identify which algorithm a zone
+uses and which algorithm this key is used with here. The following
+values are defined:</p><p>
+
+
+<dl>
+<dt><i>0</i></dt>
+<dd>Reserved.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>1</i></dt>
+<dd>RSA/MD5. RFC 2535 recommends, but doesn't require, the use of
+RSA/MD5. However, RSA is very popular and the patent covering the RSA
+algorithm recently ran out, so there has been some discussion of
+making the use of RSA mandatory.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>2</i></dt>
+<dd>Diffie-Hellman. RFC 2535 makes using Diffie-Hellman optional.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>3</i></dt>
+<dd>DSA. RFC 2535 makes <em class="emphasis">support</em> (not use) of DSA
+mandatory. However, as noted earlier, this may change soon.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>4</i></dt>
+<dd>Reserved for an elliptic curve-based public key algorithm.</p></dd>
+
+</dl>
+
+
+We'll use RSA keys in our examples because we think RSA keys
+are likely to become the standard.</p><p>
+
+
+The final field in the KEY record is the public key itself, encoded
+in base 64. DNSSEC supports keys of many lengths, as we'll see
+shortly when we generate the <em class="emphasis">movie.edu</em>public key. The longer the key, the harder it is to find
+the corresponding private key, but the longer it takes to sign zone
+data with the private key and verify it with the public key.</p><p>
+
+
+Null keys don't have a public key, though they do have a
+protocol octet and an algorithm number.<a name="INDEX-1930" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">11.4.3. The SIG Record</h3>
+
+
+If the KEY record stores a zone's public key, then there must
+be a new record to store the corresponding private key's
+signature, right? Sure enough, that's the SIG record. The
+<a name="INDEX-1931" />SIG record stores
+the private key's digital signature on an
+<em class="firstterm">RRset</em>. An RRset is a group of resource records
+with the same owner, class, and type; for example, all of <em class="emphasis">wormhole.movie.edu</em>'s address
+records make up an RRset. Likewise, all of <em class="emphasis">movie.edu</em>'s MX records are another
+RRset.</p><p>
+
+
+Why sign RRsets rather than individual records? It saves time.
+There's no way to look up just one of <em class="emphasis">wormhole.movie.edu</em>'s address
+records; a name server will always return them as a group. So why go
+to the trouble of signing each one individually when you can sign
+them together?</p><p>
+
+
+Here's the SIG record that "covers" <em class="emphasis">wormhole.movie.edu</em>'s address
+records:</p><p>
+
+
+<blockquote><pre class="code">wormhole.movie.edu.             SIG     A 1 3 86400 20010102235426 (
+                                20001203235426 27791 movie.edu.
+                                1S/LuuxhSHs2LknPC7K/7v4+PNxESKZnjX6CtgGLZDWf
+                                Rmovkw9VpW7htTNJYhzlFck/BO/k17tRj0fbQ6JWaA== )</pre></blockquote>
+
+
+The owner name is <em class="emphasis">wormhole.movie.edu</em>, the same as the
+owner of the records signed. The first field after the type, which
+holds the value A, is called the <em class="firstterm">type covered</em>.
+That tells us which of <em class="emphasis">wormhole.movie.edu</em>'s records were
+signed; in this case, its address records. There would be a separate
+SIG record for each type of record <em class="emphasis">wormhole.movie.edu</em> might own.</p><p>
+
+
+The second field, which has the value 1, is the algorithm number.
+This is one of the same values used in the KEY record's
+algorithm number field, so 1 means RSA/MD5. If you generate an RSA
+key and use it to sign your zone, you'll get RSA/MD5
+signatures, naturally. If you sign your zone with multiple types of
+keys, say an RSA key and a DSA key, you'll end up with two SIG
+records for each RRset, one with an algorithm number of 1 (RSA/MD5)
+and one with an algorithm number of 3 (DSA).<a href="#FOOTNOTE-86">[86]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-86" />[86]You
+might sign your zone with two different algorithms' keys so
+that people whose software supported only DSA could verify your data
+while people who preferred RSA could use RSA.</p><p>
+
+</blockquote>
+
+
+The third field is called the <em class="firstterm">labels field</em>. It
+indicates how many labels there are in the owner name of the records
+signed. <em class="emphasis">wormhole.movie.edu</em>obviously has three labels, so the labels field contains
+3. When would the labels field ever differ from the number of labels
+in the SIG's owner? When the SIG record covered a wildcard
+record of some type. Unfortunately (or maybe fortunately, for our
+sanity's sake), BIND doesn't support wildcard records in
+secure zones.</p><p>
+
+
+The fourth field is the original TTL on the records in the RRset that
+was signed. (All the records in an RRset are supposed to have the
+same TTL.) The TTL needs to be stored here because a name server
+caching the RRset that this SIG record covers will decrement the TTLs
+on the cached records. Without the original TTL, it's
+impossible to feed the original address records through the one-way
+hash function in their original state to verify the digital
+signature.</p><p>
+
+
+The next two fields are the signature expiration and inception
+fields, respectively. They're both stored as an unsigned
+integer number of seconds since the Unix epoch, January 1, 1970, but
+in the SIG record's text representation, they're
+presented in the format YYYYMMDDHHMMSSfor
+convenience. (The signature expiration time for the SIG record we
+showed you earlier is just after 11:54 p.m. on January 2, 2001.) The
+signature inception time is usually the time you ran the program to
+sign your zone. You choose the signature expiration time when you run
+that program, too. After the signature's expiration, the SIG
+record is no longer valid and can't be used to verify the
+RRset. Bummer. This means that you have to re-sign your zone data
+periodically to keep the signatures valid. Fun. Thankfully,
+re-signing takes much less time than signing it for the first time.</p><p>
+
+
+The next (seventh) field in the SIG record, which in this record
+contains 27791, is the <em class="firstterm">key tag</em> field. The key
+tag is a fingerprint derived from the public key that corresponds to
+the private key that signed the zone. If the zone has more than one
+public key (and yours will when you're changing keys), DNSSEC
+verification software uses the key tag to determine which key to use
+to verify this signature.</p><p>
+
+
+The eighth field, which contains <em class="filename">movie.edu</em>, is
+the <em class="firstterm">signer's name </em>field. As you'd
+expect, it's the domain name of the public key that a verifier
+should use to check the signature. It, together with the key tag,
+identifies the KEY record to use. In most cases, the signer's
+name field is the domain name of the zone the signed records are in.
+In one case, however -- which we'll cover soon -- the
+signer's name is the domain name of the parent zone.</p><p>
+
+
+The final field is the <em class="firstterm">signature field</em>. This
+is the digital signature of the zone's private key on the
+signed records and the SIG record itself, minus this field. Like the
+key in the KEY record, this signature is encoded in base 64.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">11.4.4. The NXT Record</h3>
+
+
+<a name="INDEX-1932" />DNSSEC introduces one more new record
+type: the NXT record. We'll explain what it's for.</p><p>
+
+
+What happens if you look up a domain name that doesn't exist in
+a secure zone? If the zone weren't secure, the name server
+would simply respond with the "no such domain name"
+response code. But how do you sign a response code? If you signed the
+whole response message, it would be difficult to cache.</p><p>
+
+
+The NXT record solves the problem of signing negative responses. It
+"spans" a gap between two consecutive domain names in a
+zone, telling you which domain name comes next after a given domain
+name -- hence the name of the record.</p><p>
+
+
+But doesn't the notion of "consecutive domain
+names" imply a canonical order to the domain names in a zone?
+Why, yes, it does.</p><p>
+
+
+To order the domain names in a zone, you begin by sorting by the
+rightmost label in those domain names, then by the next label to the
+left, and so on. Labels are sorted case-insensitively and
+lexicographically (by dictionary order), with numbers coming before
+letters and nonexistent labels before numbers (in other words,
+<em class="emphasis">movie.edu</em> would come before
+<em class="emphasis">0.movie.edu</em>). So the domain
+names in <em class="emphasis">movie.edu</em> would
+sort to the following:</p><p>
+
+
+<blockquote><pre class="code">movie.edu
+bigt.movie.edu
+carrie.movie.edu
+cujo.movie.edu
+dh.movie.edu
+diehard.movie.edu
+fx.movie.edu
+bladerunner.fx.movie.edu
+outland.fx.movie.edu
+horror.movie.edu
+localhost.movie.edu
+misery.movie.edu
+robocop.movie.edu
+shining.movie.edu
+terminator.movie.edu
+wh.movie.edu
+wh249.movie.edu
+wh253.movie.edu
+wormhole.movie.edu</pre></blockquote>
+
+
+Notice that just as <em class="emphasis">movie.edu</em> comes before <em class="emphasis">bigt.movie.edu</em>, <em class="emphasis">fx.movie.edu</em> precedes <em class="emphasis">bladerunner.fx.movie.edu</em>.</p><p>
+
+
+Once the zone is in canonical order, the NXT records make sense.
+Here's one NXT record (the first, in fact) from <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">movie.edu.                        NXT     bigt.movie.edu. ( NS SOA MX SIG NXT )</pre></blockquote>
+
+
+This record says that the next domain name in the zone after
+<em class="emphasis">movie.edu</em> is <em class="emphasis">bigt.movie.edu</em>, which we could see from
+our sorted list of domain names. It also says that <em class="emphasis">movie.edu</em> has NS records, an SOA record,
+MX records, a SIG record, and a NXT record.</p><p>
+
+
+The last NXT record in a zone is special. Since there's really
+no next domain name after the last one, the last NXT record
+"wraps around" to the first record in the zone:</p><p>
+
+
+<blockquote><pre class="code">wormhole.movie.edu.               NXT     movie.edu. ( A SIG NXT )</pre></blockquote>
+
+
+In other words, to indicate that <em class="emphasis">wormhole.movie.edu</em> is the last domain
+name in the zone, we say that the next domain name is <em class="emphasis">movie.edu</em>, the first domain name in the
+zone.</p><p>
+
+
+So how do NXT records provide authenticated negative responses? Well,
+if you looked up <em class="emphasis">www.movie.edu</em> internally, you'd
+get back the <em class="filename">wormhole.movie.edu</em> NXT record,
+telling you that there's no <em class="emphasis">www.movie.edu</em> because there are no
+domain names in the zone after <em class="emphasis">wormhole.movie.edu</em>. Similarly, if you
+tried to look up TXT records for <em class="emphasis">movie.edu</em>, you'd get the first NXT
+record we showed you, which tells you there are no TXT records for
+<em class="emphasis">movie.edu</em>, just NS, SOA, MX,
+SIG, and NXT records.</p><p>
+
+
+A SIG record covering the NXT record accompanies it in the response,
+authenticating the nonexistence of the domain name or type of data
+you asked for.</p><p>
+
+
+It's important that the NXT records, <em class="emphasis">in
+toto</em>, identify specifically what doesn't exist in the zone. A single catch-all record
+that simply says "That doesn't exist" could be
+sniffed off the wire and replayed to claim falsely that existing
+domain names or records don't actually exist.</p><p>
+
+
+For those of you worried about the prospects of adding of these new
+records to your zone and keeping them up to date
+manually -- uh-oh, now that I've added a host, I've
+got to adjust my NXT records -- take heart: BIND provides a tool
+to add NXT and SIG records for you automatically.</p><p>
+
+
+Some of you may also worry about the information NXT records reveal
+about your zone. A hacker could, for example, look up the NXT record
+attached to the domain name of your zone to find the
+lexicographically next domain name, then repeat the process to learn
+all the domain names in the zone. That, unfortunately, is an
+unavoidable side effect of securing your zone. Just repeat this
+mantra: "My zone data is secure, but public."<a name="INDEX-1933" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">11.4.5. The Chain of Trust</h3>
+
+
+<a name="INDEX-1934" />There's one more aspect of DNSSEC
+theory that we should discuss: the chain of trust. (No, this
+isn't some touchy-feely team-building exercise.) So far, each
+RRset in our secure zone has a SIG record associated with it. To let
+others verify those SIG records, our zone advertises its public key
+to the world in a KEY record. But imagine that someone breaks into
+our primary master name server. What's to keep him from
+generating his own key pair? Then he could modify our zone data,
+re-sign our zone with his newly generated private key, and advertise
+his newly generated public key in a KEY record.</p><p>
+
+
+To combat this problem, our public key is "certified" by
+a higher authority. This higher authority attests to the fact that
+the <em class="emphasis">movie.edu</em> public key in
+our KEY record really belongs to the organization that owns and runs
+the zone, and not to some random yahoo. Before certifying us, this
+higher authority demanded some sort of proof that we were who we said
+we were and that we were the duly authorized administrators of
+<em class="emphasis">movie.edu</em>.</p><p>
+
+
+This higher authority is our parent zone, <em class="emphasis">edu</em>. When we generated our key pair and
+signed our zone, we also sent our public key to the administrators of
+<em class="emphasis">edu</em>, along with proof of our
+identity and of our positions as the Two True Administrators of
+<em class="emphasis">movie.edu</em>.<a href="#FOOTNOTE-87">[87]</a> They
+signed our KEY record with the <em class="emphasis">edu</em>zone's private key and sent it back to us so that
+we could add it to our zone. Here's our KEY record and its
+accompanying SIG record:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-87" />[87]In fact, there aren't any top-level zones signing their
+child zone's KEY records yet, though some European registries
+will likely begin signing KEY records soon.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">movie.edu               IN SIG  KEY 1 2 3600 20010104010141 (
+                                20001205010141 65398 edu.
+                                aE4sCZKgFtp5RuD1sib0+19dc3MF/y9S2Fr8+h66g+Y2
+                                1bc31M4y0493cSoyRpapJrd7qfG+Cr7GK+uY+eLCRA== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )</pre></blockquote>
+
+
+Note that the signer's name field of the SIG record is
+<em class="emphasis">edu</em>, not <em class="emphasis">movie.edu</em>, showing that our KEY record
+was signed by our parent zone's private key, not our own.</p><p>
+
+
+What if someone were to break into the <em class="emphasis">edu</em> zone's primary master name
+server? The <em class="emphasis">edu</em> zone's
+KEY record is signed by the root zone's private key. And the
+root zone? Well, the root zone's public key is very widely
+known and configured on every name server that supports
+DNSSEC.<a href="#FOOTNOTE-88">[88]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-88" />[88]This reminds us of the tale of the man who
+asks the priest what holds the Earth up. The priest tells him that
+the Earth rests on the back of a turtle, which holds it up. The man
+then asks what the turtle rests on. "On the back of an
+elephant," replies the priest. "But what," the man
+asks, "does the elephant rest on?" The frustrated priest
+snaps back, "It's elephants all the way
+down!"</p><p>
+
+</blockquote>
+
+
+That is, the root zone's public key will beconfigured on every name server once DNSSEC is widely
+implemented. Right now, neither the root zone nor the <em class="emphasis">edu</em> zone is signed, and neither has a
+key pair. Until DNSSEC is widely implemented, though, it's
+possible to use DNSSEC piecemeal.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-4.5.1" /><div class="sect3">
+<h3 class="sect3">11.4.5.1. Security roots</h3>
+
+
+<a name="INDEX-1935" />Let's
+say we want to begin using DNSSEC at Movie U. to improve the security
+of our zone data. We've signed the <em class="emphasis">movie.edu</em> zone but can't have
+<em class="emphasis">edu</em> sign our KEY record
+since they haven't secured their zone yet and don't have
+a key pair. How can other name servers on the Internet verify our
+zone data? How can our own name servers verify our zone data, for
+that matter?</p><p>
+
+
+BIND 9 name servers provide a mechanism for specifying the public key
+that corresponds to a particular zone in the
+<em class="filename">named.conf</em> file: the <em class="emphasis">trusted-keys
+</em>statement. Here's the <em class="emphasis">trusted-keys
+</em>statement for <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">trusted-keys {
+	movie.edu. 256 3 1 "AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX7+uBxB11Bq
+L7 LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B";
+};</pre></blockquote>
+
+
+It's basically the KEY record without the class and type fields
+and with the key itself quoted. The domain name of the zone may be
+quoted, but it's not necessary. If <em class="emphasis">movie.edu</em> had more than one public
+key -- say a DSA key -- we could include it, too:</p><p>
+
+
+<blockquote><pre class="code">trusted-keys {
+	movie.edu. 256 3 1 "AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX7+uBxB11Bq
+L7 LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B";
+	movie.edu. 256 3 3 "AMnD8GXACuJ5GVnfCJWmRydg2A6JptSm6tjH7QoL81SfBY/kcz1Nbe
+Hh z4l9AT1GG2kAZjGLjH07BZHY+joz6iYMPRCDaPOIt9LO+SRfBNZg62P4 aSPT5zVQPahDIMZmTIvv
+O7FV6IaTV+cQiKQl6noro8uTk4asCADrAHw0 iVjzjaYpoFF5AsB0cJU18fzDiCNBUb0VqE1mKFuRA/K
+1KyxM2vJ3U7IS to0IgACiCfHkYK5r3qFbMvF1GrjyVwfwCC4NcMsqEXIT8IEI/YYIgFt4 Ennh";
+};</pre></blockquote>
+
+
+This <em class="emphasis">trusted-keys</em> statement enables a BIND 9
+name server to verify any records in the <em class="emphasis">movie.edu</em> zone. The name server can also
+verify any records in child zones like <em class="emphasis">fx.movie.edu</em>, assuming their KEY records
+are signed by <em class="emphasis">movie.edu</em>'s private key and it can
+verify records in <em class="emphasis">their</em> child zones (<em class="emphasis">movie.edu</em>'s grandchildren),
+assuming a valid chain of trust back to the <em class="emphasis">movie.edu</em> zone's public key. In
+other words, <em class="emphasis">movie.edu</em>becomes a <em class="firstterm">security root</em>, below
+which our name server can verify any secure zone data.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-4.5.2" /><div class="sect3">
+<h3 class="sect3">11.4.5.2. Null keys</h3>
+
+
+A security root lets your name server verify signed records below a
+certain point in the namespace. <em class="firstterm">Null keys
+</em><a name="INDEX-1936" />do the
+opposite: they tell your name server that records below a certain
+point aren't secured. Let's say the administrators of
+<em class="emphasis">fx.movie.edu</em> haven't
+secured their zone yet. When we sign <em class="emphasis">movie.edu</em>, the BIND 9 signer software
+adds a special null key to the <em class="emphasis">movie.edu</em>zone for <em class="emphasis">fx.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu.           KEY     49408 3 3 (
+                                 )</pre></blockquote>
+
+
+Note that there's no base 64 encoding of a public key in the
+record. If you look <em class="emphasis">very</em> closely (or get out
+your scientific calculator), you'll see that the flags field
+indicates that this key should not be used for either authentication
+or confidentiality; that is, it's a null key. DNSSEC-aware name
+servers interpret this to mean that the <em class="emphasis">fx.movie.edu</em> zone isn't secure and
+that they shouldn't expect signed data from it.</p><p>
+
+
+If BIND 9's signer software finds a file containing <em class="emphasis">fx.movie.edu</em>'s KEY record when it
+runs, it omits the null key, implying that <em class="emphasis">fx.movie.edu</em> is secure.<a name="INDEX-1937" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.6" /><div class="sect2">
+<h3 class="sect2">11.4.6. How the Records Are Used</h3>
+
+
+Let's go through what a <a name="INDEX-1938" />DNSSEC-capable name server does to verify
+a record in <em class="emphasis">movie.edu</em>. In
+particular, let's see what happens when it looks up the address
+of <em class="emphasis">wormhole.movie.edu</em>.
+First, of course, the name server sends a query for the address:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig +dnssec +norec wormhole.movie.edu.</b></tt>
+
+; &lt;&lt;&gt;&gt; DiG 9.1.0 &lt;&lt;&gt;&gt; +dnssec +norec wormhole.movie.edu.
+;; global options:  printcmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 15766
+;; flags: qr aa ra; QUERY: 1, ANSWER: 3, AUTHORITY: 4, ADDITIONAL: 6
+
+;; OPT PSEUDOSECTION:
+; EDNS: version:    0, udp=   4096
+;; QUESTION SECTION:
+;wormhole.movie.edu.            IN      A
+
+;; ANSWER SECTION:
+wormhole.movie.edu.     86400   IN      A       192.249.249.1
+wormhole.movie.edu.     86400   IN      A       192.253.253.1
+wormhole.movie.edu.     86400   IN      SIG     A 1 3 86400 20010215174848 
+20010116174848 27791 movie.edu. 
+cYKQvgVksHjwGedNz72iyIpjXBhtSOeUEQA6V0b6l8asG3mpV6hzrzNf 
+YwTpLoh9FSjSf0kUzmXkW9aYJmd5Bw==
+
+;; AUTHORITY SECTION:
+movie.edu.              86400   IN      NS      outland.fx.movie.edu.
+movie.edu.              86400   IN      NS      wormhole.movie.edu.
+movie.edu.              86400   IN      NS      terminator.movie.edu.
+movie.edu.              86400   IN      SIG     NS 1 2 86400 20010215174848 
+20010116174848 27791 movie.edu. 
+ZXRnlbJBWJa4XX3YTWgkYnoQjGLFDN+2JwoGpLpxTidwkJ0FT+N3gMSw anSxa22b+X/
+7v4b99t2WMcxCtUIXvw==
+
+;; ADDITIONAL SECTION:
+outland.fx.movie.edu.   86400   IN      A       192.253.254.3
+terminator.movie.edu.   86400   IN      A       192.249.249.3
+terminator.movie.edu.   86400   IN      SIG     A 1 3 86400 20010215174848 
+20010116174848 27791 movie.edu. 
+GSnxseyN4w5sA2Fb9uK9zVNSRJRbbcvr0DaDRwLDO8X2m6ZBbkRssSHJ tZYwoO4ZIFERLKakB//
+VTDMhYJmNvw==
+movie.edu.              86400   IN      KEY     256 3 1 
+AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX7+uBxB11BqL7 LAB7/
+C+eb0vCtI53FwMhkkNkTmA6bI8B
+movie.edu.              86400   IN      SIG     KEY 1 2 86400 20010215174837 
+20010116174837 65398 edu. LW+nc2gmz618u/LjDtlKSorv9OkJOwC8wj/sa/CpzCJJqceB/55JhsWI 
+t1ADlfQwb4h9hs6oMeN2sU9jHiYQmw==
+
+;; Query time: 3 msec
+;; SERVER: 206.168.194.122#53(206.168.194.122)
+;; WHEN: Tue Jan 16 10:49:48 2001
+;; MSG SIZE  rcvd: 671</pre></blockquote>
+
+
+Notice that we had to specify <em class="emphasis">+dnssec</em> on the
+command line. BIND 9.1.0 and later name servers include DNSSEC
+records (SIG, NXT, and KEY) in a response only if the querier
+indicates that it can handle DNSSEC. How do queriers do that? By
+setting a special flag in a "pseudosection" of the
+header. It's called a pseudosection because it's not
+actually part of the bits in the header. Instead, it's a new
+record type, OPT, that's carried in the DNS message. OPT
+records usually indicate the capabilities of the querier.</p><p>
+
+
+Also notice that the response includes four SIG records: one covering
+the records in the answer section, one covering the records in the
+authority section, one covering <em class="emphasis">terminator.movie.edu</em>'s address
+record in the additional section, and one covering <em class="emphasis">movie.edu</em>'s KEY record in the
+additional section. The additional section would have included a SIG
+record covering <em class="emphasis">outland.fx.movie.edu</em>, address records
+for <em class="emphasis">wormhole.movie.edu</em>, and
+a SIG record covering those addresses if they'd fit in a single
+UDP datagram, but there wasn't enough room.</p><p>
+
+
+To verify the SIG records, the name server must look at <em class="emphasis">movie.edu</em>'s KEY record, included
+in the additional section. But before using the key, it must verify
+the SIG on that key. That requires at least one additional query: to
+one of the <em class="emphasis">edu</em> name servers
+for the <em class="emphasis">edu</em> zone's
+public key -- unless, of course, the name server already knows the
+<em class="emphasis">movie.edu</em> public key from a
+<em class="emphasis">trusted-keys</em> statement.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.7" /><div class="sect2">
+<h3 class="sect2">11.4.7. DNSSEC and Performance</h3>
+
+
+It should be evident from this <em class="filename">dig</em> output that
+<a name="INDEX-1939" />
+<a name="INDEX-1940" />DNSSEC increases the average size of a DNS
+message, that it requires substantially more computational horsepower
+from name servers verifying zone data, and that signing a zone
+increases its size substantially -- current estimates are that
+signing multiplies the size of a zone by a factor of seven. Each of
+these effects has its own consequences, some of which are less
+obvious:</p><p>
+
+
+<ul><li>Larger DNS messages means more truncated messages, which means more
+fallback to the use of TCP. Using TCP, of course, is more
+resource-intensive than using UDP.</p></li><li>Verifying zone data takes time and slows the resolution process.</p></li><li>Larger zones mean larger and harder-to-administer
+<em class="filename">named</em> processes.</p></li></ul>
+In fact, DNSSEC's complexity meant that BIND 8's
+architecture couldn't support DNSSEC. DNSSEC also provided part
+of the impetus for developing BIND 9 and for designing it to run on
+multiprocessor hosts. If you're planning on signing your zones,
+make sure your authoritative name servers have enough memory to load
+the new, larger zones. If your name servers are resolving more
+records in secure zones, make sure they have enough processor power
+to verify all those digital signatures -- and remember that BIND 9
+can take advantage of any processors you can add to the host it runs
+on.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.8" /><div class="sect2">
+<h3 class="sect2">11.4.8. Signing a Zone</h3>
+
+
+<a name="INDEX-1941" />Okay,
+now you've got the theoretical background you need to actually
+sign your zone. We'll show you how we signed <em class="emphasis">movie.edu</em>. Remember, we used the BIND 9
+tools -- they're much easier to use than the BIND 8 tools,
+and of course BIND 9 supports DNSSEC much more completely than BIND 8
+does.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-4.8.1" /><div class="sect3">
+<h3 class="sect3">11.4.8.1. Generating your key pair</h3>
+
+
+First, we generated a <a name="INDEX-1942" />key pair
+for <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>cd /var/named</b></tt>
+# <tt class="userinput"><b>dnssec-keygen -a RSA -b 512 -n ZONE movie.edu.</b></tt>
+Kmovie.edu.+001+27791</pre></blockquote>
+
+
+We ran <em class="filename">dnssec-keygen</em> in our name server's
+working directory. That's mostly for convenience: the zone data
+files are in this directory, so we won't need to use full
+pathnames as arguments. If we want to use dynamic update with DNSSEC,
+though, we'd need the keys in the name server's working
+directory.</p><p>
+
+
+Recall <em class="filename">dnssec-keygen</em>'s options from the
+TSIG section of this chapter (oh, so long ago):</p><p>
+
+
+<dl>
+<dt><i><span class="option">-a</span></i></dt>
+<dd>The cryptographic algorithm to use, in this case RSA. We could also
+have used DSA, but RSA is more efficient.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><span class="option">-b</span></i></dt>
+<dd>The length of the keys to generate, in bits. RSA keys can be anywhere
+from 512 to 2000 bits long. DSA keys can be 512 to 1024 bits long, as
+long as the length is divisible by 64.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><span class="option">-n</span></i></dt>
+<dd>The type of key. DNSSEC keys are always zone keys.</p></dd>
+
+</dl>
+
+
+The only non-option argument is the domain name of the zone,
+<em class="emphasis">movie.edu</em>. The
+<em class="filename">dnssec-keygen </em>program prints the basename of the
+files it's written the keys to. The numbers at the end of the
+basename (001 and 27791), as we explained in the TSIG section, are
+the key's DNSSEC algorithm number as used in the KEY record
+(001 is RSA/MD5), and the key's fingerprint, used to
+distinguish one key from another when multiple keys are associated
+with the same zone.</p><p>
+
+
+The public key is written to the file
+<em class="filename">basename.key</em>
+(<em class="filename">Kmovie.edu.+001+27791.key</em>). The private key is
+written to the file <em class="filename">basename.private
+</em>(<em class="filename">Kmovie.edu.+001+27791.private).</em>
+Remember to protect the private key; anyone who knows the private key
+can forge signed zone data. <em class="filename">dnssec-keygen </em>does
+what it can to help you: it makes the <em class="filename">.private
+</em>file readable and writable only by the user who runs it.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-4.8.2" /><div class="sect3">
+<h3 class="sect3">11.4.8.2. Sending your keys to be signed</h3>
+
+
+Next, we sent our <a name="INDEX-1943" />KEY record to the administrator of
+our parent zone to sign. BIND 9 includes a nice little program to
+package up the key for transmission,
+<em class="filename">dnssec-makekeyset</em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-makekeyset -t 172800 Kmovie.edu.+001+27791.key</b></tt></pre></blockquote>
+
+
+<em class="filename">dnssec-makekeyset</em> created a file called
+<em class="filename">keyset-movie.edu,<a href="#FOOTNOTE-89">[89]</a> </em>which
+contains the following:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-89" />[89]In versions of
+<em class="filename">dnssec-makekeyset </em>shipped with BIND 9.0.1 and
+earlier, the name of the file would have been
+<em class="filename">movie.edu.keyset</em>. However, putting the domain
+name of the zone first caused problems: the name of the root
+zone's keyset file was <em class="filename">.keyset</em>, which is a
+hidden file on a Unix filesystem.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 172800      ; 2 days
+movie.edu               IN SIG  KEY 1 2 86400 20010104034839 (
+                                20001205034839 27791 movie.edu.
+                                M7RDKMyc9w1djDc0mQAXQc1PJdmLRBg3nfaGEUZe9Fbi
+                                mjiNVaQK33IWhzI95oD8AS0WqRDy5TusTXt4nx1/dQ== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )</pre></blockquote>
+
+
+The <span class="option">-t</span> option takes a TTL for the records to submit.
+This serves as a suggestion to your parent zone's administrator
+of the TTL (in seconds) you'd like for your record. They may
+ignore it, of course. The SIG record actually contains a signature
+covering your zone's KEY record, generated with your
+zone's private key. That proves you really have the private key
+that corresponds to the public key in the KEY
+record -- you're not just submitting a KEY record you found
+on the street.</p><p>
+
+
+The signature expiration and inception fields default to
+"now" and "30 days from now," respectively.
+These serve as a suggestion to the signer of the signature lifetime
+you'd like. You can use the <span class="option">-s</span> (start) and
+<span class="option">-e</span> (end) options to adjust the signature expiration
+and inception times. Both options accept either an absolute time as
+an argument, in the form YYYYMMDDHHMMSS<em class="emphasis">,</em> or an
+offset. For <span class="option">-s</span>, the offset is calculated from the
+current time. For <span class="option">-e</span>, the offset is calculated from
+the start time.</p><p>
+
+
+You can also use the signature expiration and inception fields to
+bundle up several keysets and submit them all at once to your parent
+zone's administrator to sign. For example, you could submit
+keysets valid for January, February, and March to your parent
+zone's administrator all at once, and then put them into
+production one per month.</p><p>
+
+
+Then we sent our file off to our parent zone's administrators
+to sign. Since the message included proof of our identity,<a href="#FOOTNOTE-90">[90]</a> they signed it with the
+<em class="filename">dnssec-signkey</em> program:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-90" />[90]Since top-level zones haven't started signing zones yet,
+there's still some question as to how they'll require us
+to authenticate ourselves. The use of cryptographically signed email
+messages is a possibility.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-signkey keyset-movie.edu Kedu.+001+65398.private</b></tt></pre></blockquote>
+
+
+and sent the resulting file,
+<em class="filename">movie.edu.signedkey</em>, back to us:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 172800       ; 1 hour
+movie.edu               IN SIG  KEY 1 2 3600 20010104010141 (
+                                20001205010141 65398 edu.
+                                aE4sCZKgFtp5RuD1sib0+19dc3MF/y9S2Fr8+h66g+Y2
+                                1bc31M4y0493cSoyRpapJrd7qfG+Cr7GK+uY+eLCRA== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )</pre></blockquote>
+
+
+If we didn't care about getting our KEY record signed, we could
+have skipped this step. But then only name servers with a
+<em class="emphasis">trusted-keys</em> entry for <em class="emphasis">movie.edu</em> could verify our data.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-4.8.3" /><div class="sect3">
+<h3 class="sect3">11.4.8.3. Signing your zone</h3>
+
+
+Before signing our zone, we had to add the KEY record to our
+plain-Jane zone data file:</p><p>
+
+
+<blockquote><pre class="code"># cat "$INCLUDE Kmovie.edu.+001+27791.key" &gt;&gt; db.movie.edu</pre></blockquote>
+
+
+That gave the signer program the information it needed to know which
+key to use to sign the zone. It automatically finds and includes the
+contents of <em class="filename">movie.edu.signedkey</em>.</p><p>
+
+
+Then we signed the zone with <em class="filename">dnssec-signzone </em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-signzone -o movie.edu. db.movie.edu</b></tt></pre></blockquote>
+
+
+We used the <span class="option">-o</span> option to specify the origin in the
+zone data file, because <em class="filename">dnssec-signzone
+</em>doesn't read <em class="filename">named.conf</em> to
+determine which zone the file describes. The only non-option argument
+is the name of the zone data file.</p><p>
+
+
+This produces a new zone data file,
+<em class="filename">db.movie.edu.signed</em>, which begins like this:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 86400      ; 1 day
+movie.edu               IN SOA  terminator.movie.edu. al.robocop.movie.edu. (
+                                2000092603 ; serial
+                                10800      ; refresh (3 hours)
+                                3600       ; retry (1 hour)
+                                604800     ; expire (1 week)
+                                3600       ; minimum (1 hour)
+                                )
+                        SIG     SOA 1 2 86400 20010104041530 (
+                                20001205041530 27791 movie.edu.
+                                aO1eZKhGSm99GgC9PfLXfHjl3tAWN/Vn33msppmyhN7a
+                                RlfvJMTpSoJ9XwQCdjqhz0lcnCnQiL+jZkqU3uUecg== )
+                        NS      terminator.movie.edu.
+                        NS      wormhole.movie.edu.
+                        NS      outland.fx.movie.edu.
+                        SIG     NS 1 2 86400 20010104041530 (
+                                20001205041530 27791 movie.edu.
+                                pkmZJHqFlNmZdNjyupBMMzDDGweGsf9TS1EGci9cwKe5
+                                c0o9h/yncInn2e8QSakjxpwKB8aw9D9uiStxJ/sLvQ== )
+                        SIG     MX 1 2 86400 20010104041530 (
+                                20001205041530 27791 movie.edu.
+                                ZcKKeT0XaNlw83eSzRxt74DaLXvQtPYCdgKGOfSiJmYQ
+                                WxI5zZUEWA6ku3w48mo9jbVF+/7nF3QcpFTIiwV1ug== )
+$TTL 3600       ; 1 hour
+                        SIG     NXT 1 2 3600 20010104041530 (
+                                20001205041530 27791 movie.edu.
+                                upMjK21eD7OQkrHpxSWqkOPcRXbfL8WAgQVK1aGHcTPE
+                                X3JtaLtCLuKLd3YFs7T8BuZoN7aJYRVREWSPVedYPw== )
+                        NXT     bigt.movie.edu. ( NS SOA MX SIG KEY NXT )
+$TTL 172800     ; 2 days
+                        SIG     KEY 1 2 172800 20001205040220 (
+                                20001205040219 65398 edu.
+                                HIReZ98rieIuRI04XsoL+xLRLe8tCQbNKD8USlV35vb4
+                                VsLUGCAEgBq7lLsHty7YCskbxhQu8ncysBKnR/muiA== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )
+$TTL 86400      ; 1 day
+                        MX      10 postmanrings2x.movie.edu.</pre></blockquote>
+
+
+Believe it or not, those are just the records attached to the domain
+name <em class="emphasis">movie.edu</em>. The zone
+data file as a whole nearly quadrupled in length and quintupled in
+size. Oy!</p><p>
+
+
+Finally, we changed the <em class="emphasis">zone</em> statement in
+<em class="filename">named.conf</em> so that <em class="filename">named
+</em>would load the new zone data file:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type master;
+	file "db.movie.edu.signed";
+};</pre></blockquote>
+
+
+Then we reloaded the zone and checked <em class="emphasis">syslog</em>.</p><p>
+
+
+<em class="filename">dnssec-signzone </em>does take some options that we
+didn't use:</p><p>
+
+
+<dl>
+<dt><i><span class="option">-s</span> , <span class="option">-e</span></i></dt>
+<dd>These options specify the signature inception and expiration times to
+use in SIG records; they have exactly the same syntax as in
+<em class="filename">dnssec-makekeyset</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-i</i></dt>
+<dd>Specifies as an option argument the cycle period for resigning
+records (which we'll cover in a minute). This was the
+-<span class="option">c</span> option before BIND 9.1.0.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i><span class="option">-f</span></i></dt>
+<dd>Specifies as an option argument the name of the file to write the
+signed zone to. The default is the name of the zone data file with
+<em class="filename">.signed</em> concatenated.</p></dd>
+
+</dl>
+
+
+You can also specify, as a second non-option argument, which private
+key to use to sign the zone. By default, <em class="filename">dnssec-signzone
+</em>signs the zone with each of the zone's private keys
+in the directory. If you specify the name of one or more files that
+contain the zone's private keys as arguments, it will sign
+using only those keys.</p><p>
+
+
+Remember, you'll need to re-sign the zone each time you change
+the zone data, though you certainly don't need to generate a
+new key pair or have your KEY record re-signed each time. You can
+re-sign the zone by running <em class="filename">dnssec-signzone</em> on
+the signed zone data:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-signzone -o movie.edu -f db.movie.edu.signed.new db.movie.edu.signed</b></tt>
+# <tt class="userinput"><b>mv db.movie.edu.signed db.movie.edu.signed.bak</b></tt>
+# <tt class="userinput"><b>mv db.movie.edu.signed.new db.movie.edu.signed</b></tt>
+# <tt class="userinput"><b>rndc reload movie.edu</b></tt></pre></blockquote>
+
+
+The program is smart enough to recalculate NXT records, sign new
+records, and re-sign records whose signature expiration times are
+approaching. By default, <em class="filename">dnssec-signzone</em>
+re-signs records whose signatures expire within 7.5 days (a quarter
+of the difference between the default signature inception and
+expiration times). If you specify different inception and expiration
+times, <em class="filename">dnssec-signzone</em> adjusts the re-signing
+cycle time accordingly. Or you can simply specify a cycle time with
+the <span class="option">-i</span> (formerly the -<span class="option">c</span>)
+option.<a name="INDEX-1944" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.9" /><div class="sect2">
+<h3 class="sect2">11.4.9. DNSSEC and Dynamic Update</h3>
+
+
+<a name="INDEX-1945" /> <a name="INDEX-1946" /><em class="filename">dnssec-signzone
+</em>isn't the only way to sign zone data. The BIND 9
+name server is capable of signing dynamically updated records on the
+fly.<a href="#FOOTNOTE-91">[91]</a> Color us impressed!</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-91" />[91]Yet another DNSSEC capability BIND 8
+doesn't have.</p><p>
+
+</blockquote>
+
+
+As long as the private key for a secure zone is available in the name
+server's working directory (in the correctly named
+<em class="filename">.private </em>file), a BIND 9 name server signs any
+records that are added via dynamic update. If any records are added
+to or deleted from the zone, the name server adjusts (and re-signs)
+the neighboring NXT records, too.</p><p>
+
+
+Let's show you this in action. First, we'll look up a
+domain name that doesn't yet exist in <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig +dnssec perfectstorm.movie.edu.</b></tt>
+
+; &lt;&lt;&gt;&gt; DiG 9.1.0 &lt;&lt;&gt;&gt; +dnssec perfectstorm.movie.edu.
+;; global options:  printcmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NXDOMAIN, id: 4705
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 4, ADDITIONAL: 3
+
+;; OPT PSEUDOSECTION:
+; EDNS: version:    0, udp=   4096
+;; QUESTION SECTION:
+;perfectstorm.movie.edu.                IN      A
+
+;; AUTHORITY SECTION:
+movie.edu.              3600    IN      SOA     terminator.movie.edu. al.robocop.
+movie.edu. 2001011600 10800 3600 604800 3600
+movie.edu.              3600    IN      SIG     SOA 1 2 86400 20010215174848 
+20010116174848 27791 movie.edu. 
+Ea0+xyEsj0Hy4JP115r0D0UFVpWfxqf0NQA8hpKwlLCsxJ3rA+sJBg2Q ZiCTEwfAcwGRfbNsRYu/CcuV/
+VJTDA==
+misery.movie.edu.       86400   IN      NXT     robocop.movie.edu. A SIG NXT
+misery.movie.edu.       86400   IN      SIG     NXT 1 3 86400 20010215174848 
+20010116174848 27791 movie.edu. ZVfV9KbPb8hKZdZirlpv+WnUxv72di8lUgZiot/
+JaWDsZPfNoYqSnKPW ND4H92guwj7oR6CgrhsgLJ9dMDYSpg==</pre></blockquote>
+
+
+(We trimmed the output a little.) Notice <em class="emphasis">misery.movie.edu</em>'s NXT record,
+indicating that the domain name doesn't exist. Now we'll
+use <em class="filename">nsupdate</em> to add an address record for
+<em class="emphasis">perfectstorm.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate</b></tt>
+&gt; <tt class="userinput"><b>update add perfectstorm.movie.edu. 3600 IN A 192.249.249.91</b></tt>
+&gt;</pre></blockquote>
+
+
+Now, let's look up <em class="emphasis">perfectstorm.movie.edu</em> again:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig +dnssec perfectstorm.movie.edu.</b></tt>
+
+; &lt;&lt;&gt;&gt; DiG 9.1.0 &lt;&lt;&gt;&gt; +dnssec perfectstorm.movie.edu.
+;; global options:  printcmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 11973
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 4, ADDITIONAL: 9
+
+;; OPT PSEUDOSECTION:
+; EDNS: version:    0, udp=   4096
+;; QUESTION SECTION:
+;perfectstorm.movie.edu.                IN      A
+
+;; ANSWER SECTION:
+perfectstorm.movie.edu. 3600    IN      A       192.249.249.91
+perfectstorm.movie.edu. 3600    IN      SIG     A 1 3 3600 20010215195456 
+20010116185456 27791 movie.edu. 
+C/JXdCLUdugxN91v0DZuUDTusi2XNNttb4bdB2nBujLxjwwPAf/D5MJz //
+cDtuZ3X+uYzhkN8MDROqOwUQuQSA==
+
+;; AUTHORITY SECTION:
+movie.edu.              86400   IN      NS      terminator.movie.edu.
+movie.edu.              86400   IN      NS      outland.fx.movie.edu.
+movie.edu.              86400   IN      NS      wormhole.movie.edu.
+movie.edu.              86400   IN      SIG     NS 1 2 86400 20010215195301 
+20010116195301 27791 movie.edu. 
+1ZR592izM1AjMusJ26e4lvQ0V9lFiFvQh6hCluBxSv7FwNqF7TcJFImc 
+W52XhXbHUEtiFOzDqYMHOzPV7j23nA==</pre></blockquote>
+
+
+(Again, we trimmed the output a little.) Now not only was an address
+record generated, but there is also a SIG record generated from
+<em class="emphasis">movie.edu</em>'s private
+key. The signature expiration is set to 30 days from the update by
+default, but you can change it with the
+<em class="emphasis">sig-validity-interval</em> substatement, which takes
+a number of days as an argument:<a href="#FOOTNOTE-92">[92]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-92" />[92]Before BIND 9.1.0,
+<em class="emphasis">sig-validity-interval</em> interpreted its argument
+as seconds, not days.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">options {
+	sig-validity-interval 7;  // We want SIG on updated records to last a week
+};</pre></blockquote>
+
+
+The signature inception is always set to one hour before the update
+to allow for verifiers with clocks that may be slightly skewed from
+ours.</p><p>
+
+
+If we look up <em class="emphasis">perfectstorm2.movie.edu</em> (though how
+there'd be a sequel to <em class="emphasis">that</em> movie I
+don't know), we find the following:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig +dnssec perfectstorm2.movie.edu.</b></tt>
+
+; &lt;&lt;&gt;&gt; DiG 9.1.0 &lt;&lt;&gt;&gt; +dnssec perfectstorm2.movie.edu.
+;; global options:  printcmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NXDOMAIN, id: 11232
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 4, ADDITIONAL: 3
+
+;; OPT PSEUDOSECTION:
+; EDNS: version:    0, udp=   4096
+;; QUESTION SECTION:
+;perfectstorm2.movie.edu.       IN      A
+
+;; AUTHORITY SECTION:
+movie.edu.              3600    IN      SOA     terminator.movie.edu. al.robocop.
+movie.edu. 2001011601 10800 3600 604800 3600
+movie.edu.              3600    IN      SIG     SOA 1 2 86400 20010215195456 
+20010116185456 27791 movie.edu. c1RwtgBX2SO8Q7Hz7vJD0aJfNfA6lsrqH4txHJI/slRpx/
+UFYbnz3Gje N0JspZEihdLw0ZYMEiN6hnwRAzB4ag==
+perfectstorm.movie.edu. 3600    IN      NXT     robocop.movie.edu. A SIG NXT
+perfectstorm.movie.edu. 3600    IN      SIG     NXT 1 3 3600 20010215195456 
+20010116185456 27791 movie.edu. 
+qsB9l5AmSrB+qKmv+cKa+htCw84zwaakTmPC2yl+shzSEparrKwIMSR6 x5N69w8cze/
+AW+gyFIwQZZkfZInJZA==</pre></blockquote>
+
+
+Notice the NXT record: it was added automatically when we added
+<em class="emphasis">perfectstorm.movie.edu</em>'s address
+record because <em class="emphasis">perfectstorm.movie.edu</em>was a new domain name in the zone. Sweet!</p><p>
+
+
+As impressive as this is, you should be careful when allowing dynamic
+updates to secure zones. You should make sure that you use strong
+authentication (e.g., TSIG) to authenticate the updates, or
+you'll give a hacker an easy backdoor to use to modify your
+"secure" zone. And you should ensure you have enough
+horsepower for the task: normally, dynamic updates don't take
+much to process. But dynamic updates to a secure zone require NXT
+recalculation and, more significantly, asymmetric encryption (to
+calculate new SIG records), so you should expect your name server to
+take longer and need more resources to process them.<a name="INDEX-1947" /> <a name="INDEX-1948" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.10" /><div class="sect2">
+<h3 class="sect2">11.4.10. Changing Keys</h3>
+
+
+<a name="INDEX-1949" />Though we said you don't need to
+generate a new key each time you sign your zone, there are occasions
+when you'll need to create a new key, either because
+you've "used up" your private key or, worse,
+because your private key has been cracked.</p><p>
+
+
+After a certain amount of use, it becomes dangerous to continue
+signing records with your private key. The larger the pool of
+available data that's been encrypted using your private key,
+the easier it is for a hacker to determine your private key using
+cryptanalysis. While there's no simple rule to tell you when
+your private key's time is up, here are some guidelines:</p><p>
+
+
+<ul><li>The larger your zone is, the more data your private key encrypts when
+it signs it. If your zone is very large, change keys more frequently.</p></li><li>The longer your key, the harder it is to crack. Long keys don't
+need to be changed as often as short keys.</p></li><li>The more frequently you update and sign your zone data, the more data
+encrypted by your private key is available. If you update your zone
+data frequently -- and particularly if you dynamically update your
+secure zone -- change keys frequently.</p></li><li>The more valuable it would be for a hacker to spoof your zone data,
+the more time and money he will spend trying to crack your private
+key. If the integrity of your zone data is particularly crucial,
+change keys frequently.</p></li></ul>
+Since we update <em class="emphasis">movie.edu</em>
+only about once a day and it's not particularly large, we
+change our key pair every six months. We're only a university,
+after all. If we were more concerned about our zone data, we would
+use longer keys or change keys more frequently.</p><p>
+
+
+Unfortunately, rolling over to a new key isn't as easy as just
+generating a new key and replacing the old one with it. If you did
+that, you'd leave name servers that had cached your
+zone's data with no way to retrieve your zone's KEY
+record and verify that data. So rolling over to a new key is a
+multistep process:</p><p>
+
+
+<ol><li>Generate a new key pair.</p></li><li>Make a new keyset that includes both your new KEY record and your old
+KEY record, and send it to your parent zone's administrator.</p></li><li>Make a keyset that includes just your new KEY record, and send that
+to your parent zone's administrator, too.</p></li><li>If you use <em class="emphasis">trusted-keys</em>, add an entry to the
+statement for your new KEY record. And tell others who use
+<em class="emphasis">trusted-keys</em>, too.</p></li><li>Incorporate the signed keyset from your parent zone's
+administrator that includes both KEY records.</p></li><li>Sign your zone data with the new private key, but leave the old KEY
+record in the zone.</p></li><li>After all records signed with the old private key have expired,
+remove the old KEY record from the zone.</p></li><li>Incorporate the signed keyset from your parent zone's
+administrator that includes just the new KEY record.</p></li><li>Sign your zone data with the new private key.</p></li></ol>
+Let's go through the process. First, we generate a new key pair:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-keygen -a RSA -b 512 -n ZONE movie.edu.</b></tt>
+Kmovie.edu.+001+47703</pre></blockquote>
+
+
+Next, we make a new keyset that contains both KEY records and send it
+to our parent zone's administrator:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-makekeyset -t 172800 Kmovie.edu.+001+27791.key Kmovie.edu.+001+47703.key</b></tt>
+# <tt class="userinput"><b>mail -s "Sign my keys, please" hostmaster@nsiregistry.net &lt; keyset-movie.edu</b></tt>
+# <tt class="userinput"><b>mv keyset-movie.edu keyset-movie.edu.2key</b></tt></pre></blockquote>
+
+
+Then we make a keyset that contains just the new KEY record and send
+it to our parent zone's administrator, too:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dnssec-makekeyset -t 172800 Kmovie.edu.+001+47703.key</b></tt>
+% <tt class="userinput"><b>mail -s "Sign my keys, please" hostmaster@nsiregistry.net &lt; keyset-movie.edu</b></tt></pre></blockquote>
+
+
+(Okay, it would take a lot more than just those messages to get
+anyone to sign our keys.)</p><p>
+
+
+The first keyset includes both KEY records and SIG records covering
+both:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 172800     ; 2 days
+movie.edu               IN SIG  KEY 1 2 172800 20010104060917 (
+                                20001205060917 27791 movie.edu.
+                                RyNYoZ/k0tHqnFhUiVs2yjJWPFNeP8BKZ/Jaw+7xO9Jl
+                                ZwJN2ZYQjVNVGLk30rJlxQRjCCdaaYQSq8u81up3xw== )
+                        IN SIG  KEY 1 2 172800 20010104060917 (
+                                20001205060917 47703 movie.edu.
+                                1JGNBQydq6U+qKfq1wxfu1nsu283Zf7mNDDmuBtuuB7o
+                                lwaeBL96tzBKpMUAcDYXsM8zxiStF+wTY+I5wfgevA== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )
+                        KEY     256 3 1 (
+                                AQPjAfGtDkx6PSgYFs6G2vY1bJEldAMudngn6ZpGJnyg
+                                k+LeU5PYiYd48wFLimihjyzlTWMb+C+egtQGpDVQulez )</pre></blockquote>
+
+
+Note that one of the SIG records was generated by the key with key
+tag 27791 (the old private key) while the other was generated by the
+key with tag 47703 (the new private key). This proves we have both of
+the corresponding private keys.</p><p>
+
+
+Once we get a response back from our parent zone's
+administrator, we save it to <em class="filename">/var/named </em>as
+<em class="filename">movie.edu.signedkey</em>, the filename we $INCLUDEd
+into <em class="filename">db.movie.edu.signed</em>. Here's what
+<em class="filename">movie.edu.signedkey </em>looks like:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 172800     ; 2 days
+movie.edu               IN SIG  KEY 1 2 172800 20010104060917 (
+                                20001205060917 65398 edu.
+                                qzvmuTVv9yGZf963ZuN2jxk8brEX/VP3sI5pOM/g2mU/
+                                EPa57fyhHDNo7ny8Q2Su5vXnAIoxaaKAR8VmognQ7A== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )
+                        KEY     256 3 1 (
+                                AQPjAfGtDkx6PSgYFs6G2vY1bJEldAMudngn6ZpGJnyg
+                                k+LeU5PYiYd48wFLimihjyzlTWMb+C+egtQGpDVQulez )</pre></blockquote>
+
+
+<em class="emphasis">edu</em>'s SIG record
+covers both KEY records, so we can use either or both to sign our
+zone data.</p><p>
+
+
+Then we sign our zone data using <em class="emphasis">only</em> the new
+private key:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-signzone -o movie.edu. db.movie.edu Kmovie.edu.+001+47703.private</b></tt></pre></blockquote>
+
+
+<em class="filename">dnssec-signzone </em>doesn't like re-signing
+zones that were signed with another key, so we started over from an
+unsigned version of the <em class="emphasis">movie.edu</em>zone. Here's a snippet from the signed zone data
+file, <em class="filename">db.movie.edu.signed</em>:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN .
+$TTL 86400      ; 1 day
+movie.edu               IN SOA  terminator.movie.edu. al.robocop.movie.edu. (
+                                2000092603 ; serial
+                                10800      ; refresh (3 hours)
+                                3600       ; retry (1 hour)
+                                604800     ; expire (1 week)
+                                3600       ; minimum (1 hour)
+                                )
+                        SIG     SOA 1 2 86400 20010104062430 (
+                                20001205062430 47703 movie.edu.
+                                LIsndGD5q2VPWb+Ha0ffFP54UE6RYPweqtTp1xhgw4B9
+                                Pyb/7z54J8q8LC0NmzQ6SthnfecBQhDBpc72HfNeJQ== )
+                        NS      terminator.movie.edu.
+                        NS      wormhole.movie.edu.
+                        NS      outland.fx.movie.edu.
+                        SIG     NS 1 2 86400 20010104062430 (
+                                20001205062430 47703 movie.edu.
+                                Ktq2mYMzTrBfGjdSb2F7ghyh2nXaLc0iTPV4k8I64jl0
+                                nJt/hsBZPpeyM2u+Zymvp3mJMWg66E4tirj0AvlGXw== )
+                        SIG     MX 1 2 86400 20010104062430 (
+                                20001205062430 47703 movie.edu.
+                                20001205062430 47703 movie.edu.
+                                l/XnJ+JWhmAZLp6YF27YQQl0yT7iZ0qGDXPw860P6U1H
+                                NmgDkUKoHfD6CdYwpKz15NyxRKilVmx2ne3oB0TUEQ== )
+$TTL 3600       ; 1 hour
+                        SIG     NXT 1 2 3600 20010104062430 (
+                                20001205062430 47703 movie.edu.
+                                2sxN3rQXn/JklugmyGV+on1Io6tV1wEYP6m4oD1xHCP1
+                                +NHPR+uT2IknW8SvGc3Kaj16kb2Ej+i3RvleWSI4Tg== )
+                        NXT     bigt.movie.edu. ( NS SOA MX SIG KEY NXT )
+$TTL 172800     ; 2 days
+                        SIG     KEY 1 2 172800 20010104060917 (
+                                20001205060917 65398 edu.
+                                qzvmuTVv9yGZf963ZuN2jxk8brEX/VP3sI5pOM/g2mU/
+                                EPa57fyhHDNo7ny8Q2Su5vXnAIoxaaKAR8VmognQ7A== )
+                        KEY     256 3 1 (
+                                AQPdWbrGbVv1eDhNgRhpJMPonJfA3reyEo82ekwRnjbX
+                                7+uBxB11BqL7LAB7/C+eb0vCtI53FwMhkkNkTmA6bI8B )
+                        KEY     256 3 1 (
+                                AQPjAfGtDkx6PSgYFs6G2vY1bJEldAMudngn6ZpGJnyg
+                                k+LeU5PYiYd48wFLimihjyzlTWMb+C+egtQGpDVQulez )
+$TTL 86400      ; 1 day
+                        MX      10 postmanrings2x.movie.edu.</pre></blockquote>
+
+
+Although the zone includes two KEY records and <em class="emphasis">edu</em>'s SIG record, which covers
+both, the other records in the zone were signed only by the new
+private key, with key tag 47703.</p><p>
+
+
+We need the second signed keyset when we delete the old KEY record:
+at that point, the SIG record <em class="emphasis">edu</em> sent us that covers both KEYs is no
+good. If we use the keyset that includes just the new KEY record,
+we'll be fine.</p><p>
+
+
+We're guessing that after reading that, you'll probably
+decide to use the longest keys available just to avoid ever needing
+to roll your keys over.<a name="INDEX-1950" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-4.11" /><div class="sect2">
+<h3 class="sect2">11.4.11. What Was That All About?</h3>
+
+
+We realize that DNSSEC is a bit, er, daunting. (We nearly fainted the
+first time we saw it.) But it's designed to do something very
+important: make DNS spoofing much, much harder. And as people do more
+and more business over the Internet, knowing you're really
+getting where you thought you were going becomes crucial.</p><p>
+
+
+That said, we realize that DNSSEC and the other security measures
+we've described in this chapter aren't for all of you.
+(Certainly they're not <em class="emphasis">all</em> for all of
+you.) You should balance your need for security against the cost of
+implementing it, in terms of the burden it places both on your
+infrastructure and on your<a name="INDEX-1951" /> productivity.<a name="INDEX-1952" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.3. DNS and Internet Firewalls</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12. nslookup and dig</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:32 GMT -->
+</html>

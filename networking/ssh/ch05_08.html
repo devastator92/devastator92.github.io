@@ -1,0 +1,1287 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>History, Logging, and Debugging (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.8. History, Logging, and Debugging</h2>
+
+
+
+<a name="INDEX-979" /><a name="INDEX-980" />As
+an SSH server runs, it optionally produces log messages to describe
+what it is doing. Log messages aid the system administrator in
+tracking the server's behavior and detecting and diagnosing
+problems. For example, if a server is mysteriously rejecting
+connections it should accept, one of the first places to seek the
+cause is the server's log output.</p>
+
+
+
+Logging works differently for the SSH1, SSH2, and OpenSSH servers, so
+we discuss each separately.</p>
+
+
+
+<a name="ch05-44-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.8.1. Logging and SSH1</h3>
+
+
+<a name="INDEX-981" />
+
+By default, <tt class="command">sshd1</tt> writes log messages to
+<a name="INDEX-982" />syslog, the standard
+Unix logging facility (see <a href="ch05_08.html#ch05-76467">the sidebar "The Syslog Logging Service"</a>). For example, a server startup
+generates these syslog entries:</p>
+
+
+
+<blockquote><pre class="code">log: Server listening on port 22.
+log: Generating 768 bit RSA key.
+log: RSA key generation complete.</pre></blockquote>
+
+
+
+and a client connection and disconnection appear as:</p>
+
+
+
+<blockquote><pre class="code">log: Connection from 128.11.22.33 port 1022
+log: Rhosts with RSA host authentication accepted for smith, smith on myhost.net
+log: Closing connection to 128.11.22.33</pre></blockquote>
+
+
+
+<tt class="command">sshd1</tt> permits logging to be controlled in three
+ways:</p>
+
+
+
+<dl>
+<dt><i>Fascist Logging mode </i></dt>
+<dd>Prints additional debug messages to the system log file. Enabled by
+the <tt class="literal">FascistLogging</tt> keyword.</p></dd>
+
+
+
+<dt><i>Debug mode</i></dt>
+<dd>A superset of Fascist Logging mode. Enabled by the
+<span class="option">-d</span> command-line option.</p></dd>
+
+
+
+<dt><i>Quiet mode</i></dt>
+<dd>Suppresses all log messages except fatal errors. Enabled by the
+<tt class="literal">QuietMode</tt> keyword or the <span class="option">-q</span>
+command-line option.</p></dd>
+
+</dl>
+
+
+
+<a name="ch05-76467" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">The Syslog Logging Service</h4>
+
+
+
+<a name="INDEX-983" />Syslog is the
+standard Unix logging service. Programs send their log messages to
+the syslog daemon, <tt class="command">syslogd</tt>, which forwards them to
+another destination such as a console or a file. Destinations are
+specified in the syslog configuration file,
+<em class="filename">/etc/syslog.conf</em>.</p>
+
+
+
+Messages received by <tt class="command">syslogd</tt> are processed
+according to their facility, which indicates a message's
+origin. Standard syslog facilities include <tt class="literal">KERN</tt>
+(messages from the operating system kernel),
+<tt class="literal">DAEMON</tt> (messages from system daemons),
+<tt class="literal">USER</tt> (messages from user processes),
+<tt class="literal">MAIL</tt> (messages from the email system), and others.
+By default, the facility for SSH server messages is
+<tt class="literal">DAEMON</tt>. This choice may be changed with the SSH
+keyword <tt class="literal">SyslogFacility</tt>, which determines the
+syslog facility code for logging SSH messages:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+SyslogFacility USER</pre></blockquote>
+
+
+
+Other possible values are <tt class="literal">USER</tt>,
+<tt class="literal">AUTH</tt>, <tt class="literal">LOCAL0</tt>,
+<tt class="literal">LOCAL1</tt>, <tt class="literal">LOCAL2</tt>,
+<tt class="literal">LOCAL3</tt>, <tt class="literal">LOCAL4</tt>,
+<tt class="literal">LOCAL5</tt>, <tt class="literal">LOCAL6</tt>, and
+<tt class="literal">LOCAL7</tt>. See the manpages for
+<tt class="command">syslog</tt>, <tt class="command">syslogd</tt>, and
+<em class="filename">syslog.conf</em> for more information about this
+logging service.</p>
+
+
+</td></tr></table><p></blockquote>
+
+<a name="ch05-45-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.8.1.1. SSH1 Fascist Logging mode</h3>
+
+
+
+<a name="INDEX-984" />Fascist
+Logging mode causes
+<tt class="command">sshd1</tt><a name="INDEX-985" /> to print debug messages to the
+system log file as it proceeds. For example:</p>
+
+
+
+<blockquote><pre class="code">debug: Client protocol version 1.5; client software version 1.2.26
+debug: Sent 768 bit public key and 1024 bit host key.
+debug: Encryption type: idea
+debug: Received session key; encryption turned on.</pre></blockquote>
+
+
+
+Fascist Logging mode is controlled by the
+<tt class="literal">FascistLogging</tt><a name="INDEX-986" />
+keyword in the server configuration file, given an argument of
+<tt class="literal">yes</tt> or <tt class="literal">no</tt> (the
+default):<a href="#FOOTNOTE-74">[74]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-74" />[74]But it's barely supported in SSH2, as
+we'll see. [<a href="ch05_08.html#ch05-76632">Section 5.8.2.5, "SSH2 Fascist Logging mode"</a>]</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH1 (and SSH2)
+FascistLogging yes</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-46-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.8.1.2. SSH1 Debug mode</h3>
+
+
+
+<a name="INDEX-987" />Like Fascist
+Logging mode, Debug mode causes the server to print debug messages.
+It is disabled by default, and is enabled by the <span class="option">-d</span>
+command-line option of <tt class="command">sshd</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -d</pre></blockquote>
+
+
+
+Debug mode prints the same diagnostic messages as Fascist Logging
+mode but also echoes them to standard error. For example, a server
+run in Debug mode on TCP port 9999 produces diagnostic output like
+the following:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -d -p 9999
+debug: sshd version 1.2.26 [sparc-sun-solaris2.5.1]
+debug: Initializing random number generator; seed file /etc/ssh_random_seed
+log: Server listening on port 9999.
+log: Generating 768 bit RSA key.
+Generating p:  .....++ (distance 100)
+Generating q:  .............++ (distance 122)
+Computing the keys...
+Testing the keys...
+Key generation complete.
+log: RSA key generation complete.</pre></blockquote>
+
+
+
+The server then waits in the foreground for connections. When one
+arrives, the server prints:</p>
+
+
+
+<blockquote><pre class="code">debug: Server will not fork when running in debugging mode.
+log: Connection from 128.11.22.33 port 1022
+debug: Client protocol version 1.5; client software version 1.2.26
+debug: Sent 768 bit public key and 1024 bit host key.
+debug: Encryption type: idea
+debug: Received session key; encryption turned on.
+debug: Installing crc compensation attack detector.
+debug: Attempting authentication for smith.
+debug: Trying rhosts with RSA host authentication for smith
+debug: Rhosts RSA authentication: canonical host myhost.net
+log: Rhosts with RSA host authentication accepted for smith, smith on myhost.net
+debug: Allocating pty.
+debug: Forking shell.
+debug: Entering interactive session.</pre></blockquote>
+
+
+
+When the client exits, the server exits as well, since (as the
+preceding messages show) the server doesn't fork subprocesses
+while running in Debug mode but handles a single connection within
+the one process:</p>
+
+
+
+<blockquote><pre class="code">debug: Received SIGCHLD.
+debug: End of interactive session; stdin 13, stdout (read 1244, sent 1244), stderr 0 bytes.
+debug: pty_cleanup_proc called
+debug: Command exited with status 0.
+debug: Received exit confirmation.
+log: Closing connection to 128.11.22.33</pre></blockquote>
+
+
+
+<a name="INDEX-988" />Debug mode
+has the following features beyond those of Fascist Logging mode:</p>
+
+
+
+<ul><li>It echoes log messages to standard error.</p></li><li>It prints a few extra messages to standard error that aren't
+written to the log file, such as RSA key generation messages.</p></li><li>It makes the server single-threaded, preventing it from forking
+subprocesses. (Hence the message "Server will not fork when
+running in debugging mode" in the preceding output.) The server
+exits after handling one connection request. This is helpful while
+troubleshooting so you can focus on a single client connection.</p></li><li>It sets <tt class="literal">LoginGraceTime</tt> to zero, so the connection
+doesn't drop while you are debugging a problem. (Very
+sensible.)</p></li><li>It causes a Unix SSH client, upon connection, to print the
+server-side environment variable settings on standard error. This can
+aid in debugging connection problems. For example, a connection on
+port 9999 to the server shown earlier produces diagnostic output
+like:</p>
+<blockquote><pre class="code">$ ssh -p 9999 myserver.net
+<i class="lineannotation">[...login output begins...]</i>
+Environment:
+HOME=/home/smith
+USER=smith
+LOGNAME=smith
+PATH=/bin:/usr/bin:/usr/ucb
+MAIL=/var/mail/smith
+SHELL=/usr/bin/ksh
+TZ=US/Eastern
+HZ=100
+SSH_CLIENT=128.11.22.33 1022 9999
+SSH_TTY=/dev/pts/3
+TERM=vt220
+REMOTEUSER=smith
+<i class="lineannotation">[...login output continues...]</i></pre></blockquote>
+
+</li></ul>
+
+Because of these convenience features, Debug mode is generally more
+useful than Fascist Logging mode.</p>
+</div>
+
+
+
+
+
+
+
+<a name="ch05-52107" /><div class="sect3">
+<h3 class="sect3">5.8.1.3. SSH1 Quiet mode</h3>
+
+
+
+<a name="INDEX-989" />Quiet mode
+suppresses some diagnostic messages from <tt class="command">sshd1</tt>,
+depending on the settings of the Fascist Logging and Debug modes.
+<a href="ch05_08.html#ch05-37788">Table 5-5</a> illustrates the behavior of Quiet mode
+when used in tandem with these modes.</p>
+
+
+
+<a name="ch05-37788" /><h4 class="objtitle">Table 5-5. Behavior of SSH1 Quiet Mode </h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Quiet</p></th>
+<th>
+Debug</p></th>
+<th>
+Fascist Logging</p></th>
+<th>
+Results</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Default logging (syslog); no "debug:" messages</p></td>
+</tr>
+
+
+<tr>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+Fascist Logging mode (syslog)</p></td>
+</tr>
+
+
+<tr>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+Yes/No</p></td>
+<td>
+Debug mode (syslog, stderr)</p></td>
+</tr>
+
+
+<tr>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+No</p></td>
+<td>
+Log fatal errors only (syslog)</p></td>
+</tr>
+
+
+<tr>
+<td>
+Yes</p></td>
+<td>
+No</p></td>
+<td>
+Yes</p></td>
+<td>
+Log fatal errors only (syslog)</p></td>
+</tr>
+
+
+<tr>
+<td>
+Yes</p></td>
+<td>
+Yes</p></td>
+<td>
+Yes/No</p></td>
+<td>
+Log fatal errors (syslog, stderr) and key generation messages</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+
+Quiet mode is controlled by the
+<tt class="literal">QuietMode</tt><a name="INDEX-990" />
+keyword in the server configuration file, given an argument of
+<tt class="literal">yes</tt> or <tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+QuietMode yes</pre></blockquote>
+
+
+
+or by the <span class="option">-q</span> command-line <a name="INDEX-991" />option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -q</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-28000" /><div class="sect2">
+<h3 class="sect2">5.8.2. Logging and SSH2</h3>
+
+
+<a name="INDEX-992" />
+
+The logging modes for SSH2 differ from those of SSH1. The keywords
+and options appear mostly the same, but their behaviors are
+different:</p>
+
+
+
+<dl>
+<dt><i>Debug mode </i></dt>
+<dd>Prints debug messages on standard error. Enabled by the
+<span class="option">-d</span> command-line option, followed by an integer (a
+debug level) or a module specification (for finer-grained logging).</p></dd>
+
+
+
+<dt><i>Verbose mode </i></dt>
+<dd>A shorthand for Debug mode level 2. Enabled with the
+<span class="option">-v</span> command-line option or the
+<tt class="literal">VerboseMode</tt> keyword.</p></dd>
+
+
+
+<dt><i>Fascist Logging mode </i></dt>
+<dd>Undocumented and has almost no purpose. Enabled by the
+<tt class="literal">FascistLogging</tt> keyword.</p></dd>
+
+
+
+<dt><i>Quiet mode </i></dt>
+<dd>Suppresses all log messages except fatal errors. Enabled by the
+<tt class="literal">QuietMode</tt> keyword or the <span class="option">-q</span>
+command-line option.</p></dd>
+
+</dl>
+
+
+
+<a name="ch05-47-fm2xml" /><blockquote><b>TIP: </b>
+We strongly recommend compiling SSH2 with heavy debugging turned on,
+using the flag
+<tt class="literal"> -- enable-debug-heavy</tt>. [<a href="ch04_01.html#ch04-63529">Section 4.1.5.14, "Debug output"</a>] The resulting log messages are far more
+detailed than those printed by default.</p>
+
+
+</blockquote>
+
+<a name="ch05-48-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.8.2.1. SSH2 Debug mode (general)</h3>
+
+
+
+SSH2's Debug mode is enabled only by command-line option, not
+keyword. As is the case for SSH1, Debug mode is controlled by the
+<span class="option">-d</span> command-line option. Unlike its SSH1 counterpart,
+the option requires an argument indicating the debug level, and
+output is sent to standard error (stderr).</p>
+
+
+
+A
+<a name="INDEX-993" />debug level may be indicated in two
+ways. The first is a nonnegative integer:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ sshd2 -d 1</pre></blockquote>
+
+
+
+The integer levels supported at press time are illustrated in <a href="ch05_08.html#ch05-75355">Example 5-1</a>. Specifying a debug level of
+<em class="replaceable">n</em> means that messages for all levels less
+than or equal to <em class="replaceable">n</em> will be printed. For
+instance, a debug level of 9 means that debug messages for levels 0-9
+are printed.</p>
+
+
+
+<a name="ch05-75355" /><div class="example">
+<a name="INDEX-994" /><h4 class="objtitle">Example 5-1. SSH2 Debug Levels</h4>
+
+
+<blockquote><pre class="code">Not to be used inside loops:
+
+   0) Software malfunctions
+   1) 
+   2) (0-2 should also be logged using log-event)
+   3) External non-fatal high level errors
+       - incorrect format received from an outside source
+       - failed negotiation
+   4) Positive high level info
+       - succeeded negotiation
+   5) Start of a high or middle level operation
+       - start of a negotiation
+       - opening of a device
+       - not to be used by functions which are called from inside loops
+
+Can be used inside loops:
+
+   6) Uncommon situations which might be caused by a bug
+   7) Nice-to-know info
+       - Entering or exiting a function
+       - A result of a low level operation
+   8) Data block dumps
+       - hash
+       - keys
+       - certificates
+       - other non-massive data blocks
+   9) Protocol packet dumps
+       - TCP
+       - UDP
+       - ESP
+       - AH
+   10) Mid-results
+       - inside loops
+       - non-final results
+   11-15) For programmers own debug use
+       - own discretion
+       - needed only by a person doing bughunt</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+<a name="ch05-36355" /><div class="sect3">
+<a name="INDEX-995" /><h3 class="sect3">5.8.2.2. SSH2 Debug mode (module-based)</h3>
+
+
+
+Debug levels can also be set differently for each source code
+"module" of SSH2. This permits finer-grained control over
+logging, as well as producing tons of output. This type of debugging
+is documented only within the source code
+(<em class="filename">lib/sshutil/sshcore/sshdebug.h</em>), so to use this
+mode effectively, you should have some C programming knowledge.</p>
+
+
+
+A SSH2 source file is defined to be a "module" for
+debugging purposes, by defining SSH_DEBUG_MODULE within the file. For
+example, the file <em class="filename">apps/ssh/auths-passwd.c</em> has
+the module name Ssh2AuthPasswdServer because it contains the line:</p>
+
+
+
+<blockquote><pre class="code">#define SSH_DEBUG_MODULE "Ssh2AuthPasswdServer"</pre></blockquote>
+
+
+
+The complete set of module names for SSH2 2.3.0 is found in <a href="ch05_08.html#ch05-22172">Table 5-6</a>.</p>
+
+
+
+<a name="ch05-22172" /><h4 class="objtitle">Table 5-6. SSH2 Module Names </h4><table border="1">
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">ArcFour</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">GetOptCompat</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Main</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Scp2</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Sftp2</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SftpCwd</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SftpPager</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh1KeyDecode</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2AuthClient</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthCommonServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthHostBasedClient</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2AuthHostBasedRhosts</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthHostBasedServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthKerberosClient</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2AuthKerberosServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthKerberosTgtClient</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthKerberosTgtServer</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2AuthPasswdClient</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthPasswdServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthPubKeyClient</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2AuthPubKeyServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2AuthServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2ChannelAgent</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2ChannelSession</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2ChannelSsh1Agent</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2ChannelTcpFwd</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2ChannelX11</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2Client</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2Common</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2PgpPublic</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2PgpSecret</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2PgpUtil</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">Ssh2Trans</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Ssh2Transport</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshADT</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshADTArray</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshADTAssoc</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshADTList</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshADTMap</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshADTTest</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshAdd</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshAgent</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshAgentClient</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshAgentPath</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshAppCommon</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshAskPass</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshAuthMethodClient</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshAuthMethodServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshBufZIP</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshBuffer</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshBufferAux</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshConfig</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshConnection</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshDSprintf</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshDebug</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshDecay</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshDirectory</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshEPrintf</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshEncode</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshEventLoop</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFCGlob</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFCRecurse</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshFCTransfer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFSM</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFastalloc</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshFileBuffer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFileCopy</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFileCopyConn</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshFileXferClient</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshFilterStream</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshGenCiph</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshGenMP</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshGetCwd</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshGlob</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshInet</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshKeyGen</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPacketImplementation</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshPacketWrapper</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPgpCipher</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPgpFile</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshPgpGen</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPgpKey</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPgpKeyDB</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshPgpPacket</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshPgpStringToKey</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshProbe</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshProtoSshCrDown</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshProtoSshCrup</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshProtoTrKex</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshReadLine</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshReadPass</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshRegex</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshSPrintf</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshServerProbe</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshSftpServer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshSigner2</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshStdIOFilter</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshStream</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshStreamPair</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshStreamstub</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshTUserAuth</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshTime</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshTimeMeasure</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshTimeMeasureTest</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshTtyFlags</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUdp</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshUdpGeneric</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUnixConfig</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUnixPtyStream</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshUnixTcp</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUnixUser</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUnixUserFiles</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">SshUserFileBuffer</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">SshUserFiles</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">Sshd2</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">TestMod</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">TestSshFileCopy</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">TestSshGlob</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">TestTtyFlags</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">t-fsm</pre></blockquote></td>
+<td>
+</td>
+</tr>
+
+
+
+</table><p>
+
+
+
+To extract the current set of module names from the source code,
+search for SSH_DEBUG_MODULE in all source files from the root of the
+SSH2 distribution:</p>
+
+
+
+<blockquote><pre class="code">$ find . -type f -exec grep SSH_DEBUG_MODULE '{}' \;</pre></blockquote>
+
+
+
+Once you have identified the name of your desired module, run the
+server in debug mode, providing the module's name and debug
+level:</p>
+
+
+
+<blockquote><pre class="code">$ sshd2 -d "<em class="replaceable">module_name</em>=<em class="replaceable">debug_level_integer"</em></pre></blockquote>
+
+
+
+This causes the given module to print log messages at the given debug
+level. For example:</p>
+
+
+
+<blockquote><pre class="code">$ sshd2 -d "Ssh2AuthPasswdServer=2"</pre></blockquote>
+
+
+
+causes the Ssh2AuthPasswdServer module to log at debug level 2. The
+messages provide the name of the function in which they occur and the
+name of the source file in which the code is found.</p>
+
+
+
+Multiple modules may be specified, separated by commas, each set to
+individual debug levels:</p>
+
+
+
+<blockquote><pre class="code">$ sshd2 -d "Ssh2AuthPasswdServer=2,SshAdd=3,SshSftp=1"</pre></blockquote>
+
+
+
+Additionally, the wildcards * and ? can specify multiple module
+names:</p>
+
+
+
+<blockquote><pre class="code">$ sshd2 -d 'Ssh2*=3'</pre></blockquote>
+
+
+
+Remember to enclose the patterns in single quotes to prevent their
+expansion by the Unix shell.</p>
+
+
+
+Note that just because a source code file has a debugging module name
+associated with it, doesn't mean it actually logs any
+information that way. You may find that turning on debugging for
+specific modules doesn't produce any extra debugging output.</p>
+</div>
+
+
+
+
+
+<a name="ch05-49-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.8.2.3. Debugging sshd2 -i</h3>
+
+
+
+If you use SSH2 from <tt class="command">inetd</tt>, debugging is a little
+tricky. If you don't take extra steps, the debugging output
+goes to the client along with the normal protocol conversation,
+messing it up and causing the connection to fail. What you need to do
+is redirect <tt class="command">sshd </tt>'s standard error to a
+file. Ideally, you do this in <em class="filename">/etc/inetd.conf </em>:</p>
+
+
+
+<blockquote><pre class="code">ssh stream tcp nowait root /bin/sh /bin/sh -c "/usr/sbin/sshd2 -i -d2 2&gt; /tmp/foo"</pre></blockquote>
+
+
+
+However, many <tt class="command">inetd </tt>'s don't allow
+embedded spaces in program arguments (i.e., they don't
+recognize the quoting used in this example). You can get around this
+using a separate script, like so:</p>
+
+
+
+<blockquote><pre class="code"><em class="replaceable">/etc/inetd.conf</em>
+  ssh stream tcp nowait root /path/to/debug-sshd2-i debug-sshd2-i
+
+<em class="replaceable">debug-sshd2-i</em>
+  #!/bin/sh
+  # redirect sshd2 standard error to a file
+  exec /usr/local/sbin/sshd2 -i -d2 2&gt; /tmp/sshd2.debug</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-50-fm2xml" /><div class="sect3">
+<a name="INDEX-997" /><h3 class="sect3">5.8.2.4. SSH2 verbose mode</h3>
+
+
+
+Verbose mode is exactly equivalent to Debug mode level two. It may be
+enabled by the <span class="option">-v</span> command-line option of
+<tt class="command">sshd2 </tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ sshd2 -v				<i class="lineannotation">Using
+-v</i>
+$ sshd2 -d 2				<i class="lineannotation">Identical to the preceding line</i></pre></blockquote>
+
+
+
+or by the
+<tt class="literal">VerboseMode</tt><a name="INDEX-998" />
+keyword in the server configuration file, with a value of
+<tt class="literal">yes</tt> or <tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+VerboseMode yes</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-76632" /><div class="sect3">
+<h3 class="sect3">5.8.2.5. SSH2 Fascist Logging mode</h3>
+
+
+
+Fascist Logging mode is undocumented in SSH2. Its only purpose seems
+to be to override Quiet mode. [<a href="ch05_08.html#ch05-29746">Section 5.8.2.6, "SSH2 quiet mode"</a>]
+Permissible values are <tt class="literal">yes</tt> and
+<tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+<a name="INDEX-999" />FascistLogging yes</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-29746" /><div class="sect3">
+<h3 class="sect3">5.8.2.6. SSH2 quiet mode</h3>
+
+
+
+In Quiet mode, only fatal errors are logged. It can be overridden by
+the undocumented Fascist Logging mode. As in SSH1, Quiet mode is
+controlled by the
+<tt class="literal">QuietMode</tt><a name="INDEX-1000" />
+keyword in the serverwide configuration file, given an argument of
+<tt class="literal">yes</tt> or <tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2
+QuietMode yes</pre></blockquote>
+
+
+
+Or by the <em class="emphasis">-q</em> command-line option of
+<tt class="command">sshd</tt>:<a name="INDEX-1001" /></p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -q</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-51-fm2xml" /><div class="sect2">
+<a name="INDEX-1002" /><h3 class="sect2">5.8.3. Logging and OpenSSH</h3>
+
+
+
+Logging in OpenSSH is done via syslog, and is controlled by two
+configuration keywords:
+<tt class="literal">SyslogFacility</tt><a name="INDEX-1003" />
+and
+<tt class="literal">LogLevel</tt><a name="INDEX-1004" />.
+<tt class="literal">SyslogFacility</tt><a name="INDEX-1005" />
+determines the "facility" code used when sending a
+message to the syslog service; depending on the syslog configuration,
+this helps determine what's done with the log messages (written
+to the console, stored in a file, etc.). <tt class="literal">LogLevel</tt>
+determines how much detail is supplied in the information logged. The
+values in order of increasing verbosity are:</p>
+
+
+
+<blockquote class="simplelist">
+
+<tt class="literal">QUIET</tt>, <tt class="literal">FATAL</tt>, <tt class="literal">ERROR</tt>, <tt class="literal">INFO</tt>, <tt class="literal">VERBOSE</tt>, <tt class="literal">DEBUG</tt></p>
+
+</blockquote>
+
+
+
+Logging with level <tt class="literal">DEBUG</tt> violates user privacy and
+should be used only to diagnose problems, not for normal operation.</p>
+
+
+
+If <tt class="command">sshd</tt> is run in debug mode (<span class="option">-d</span>
+), logging goes to standard error instead of to syslog. Quiet mode
+(<tt class="literal">LogLevel</tt> <tt class="literal">Quiet</tt> or
+<tt class="command">sshd -q</tt>) sends nothing to the system log (although
+some messages resulting from OpenSSH activity may still be recorded,
+such as those from PAM).</p>
+
+
+
+<a name="ch05-52-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.8.3.1. Absence of RSA support</h3>
+
+
+
+OpenSSH doesn't need to be compiled with RSA support if
+restricted to protocol 2, but if this support is missing,
+<tt class="command">sshd</tt> prints an error message. To suppress this
+error message, use the <em class="emphasis">-Q</em> option: <a name="INDEX-1006" /><a name="INDEX-1007" /></p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+$ sshd -Q</pre></blockquote>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.7. Subsystems</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.9. Compatibility Between SSH-1 and SSH-2 Servers</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

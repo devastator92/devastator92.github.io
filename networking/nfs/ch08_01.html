@@ -1,0 +1,163 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:41 GMT -->
+<head><title>Diskless Clients (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 8. Diskless Clients</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-8-SECT-1">NFS support for diskless clients</a><br />
+<a href="ch08_02.html">Setting up a diskless client</a><br />
+<a href="ch08_03.html">Diskless client boot process</a><br />
+<a href="ch08_04.html">Managing client swap space</a><br />
+<a href="ch08_05.html">Changing a client's name</a><br />
+<a href="ch08_06.html">Troubleshooting</a><br />
+<a href="ch08_07.html">Configuration options</a><br />
+<a href="ch08_08.html">Brief introduction to JumpStart administration</a><br />
+<a href="ch08_09.html">Client/server ratios</a><br /></p><p></div>
+
+This chapter is devoted to diskless clients running Solaris. Diskless
+Solaris clients need not be served by Solaris machines, since many
+vendors have adopted Sun's diskless boot protocols. The current
+Solaris diskless client support relies entirely on NFS for root and
+swap filesystem service and uses NIS maps for host configuration
+information. Diskless clients are probably the most troublesome part
+of NFS. It is a nontrivial matter to get a machine with no local
+resources to come up as a fully functioning member of the network,
+and the interactions between NIS servers, boot servers, and
+<a name="INDEX-1189" /></a>diskless
+clients
+create<a name="INDEX-1190" /></a> many ways for the boot procedure to fail.
+</p><p>
+
+There are many motivations for using<a name="INDEX-1191" /></a>
+diskless clients:
+</p><p>
+
+<ul><li>
+They are quieter than machines with disks.</p><p>
+</li><li>
+They are easier to administer, since there
+<a name="INDEX-1192" /></a>is no local copy of the operating
+system that requires updates.
+</p><p>
+</li><li>
+When using fast network media, like 100Mb ethernet, diskless clients
+can perform faster if the server is storing the client's data
+in a disk array. The reason is that client workstations typically
+have one or two disk spindles, whereas if the client data can be
+striped across many, usually faster spindles, on the server, the
+server can provide better response.
+</p><p>
+</li></ul>
+In Solaris 8, support for the unbundled tools (AdminSuite) necessary
+<a name="INDEX-1193" /></a>to configure
+<a name="INDEX-1194" /></a> <a name="INDEX-1195" /></a> <a name="INDEX-1196" /></a>a
+server for diskless client support was dropped. As the Solaris 8
+release notes stated:
+</p><p>
+
+
+Solstice AdminSuite 2.3 software is no longer supported with the
+Solaris 8 operating environment. Any attempt to run Solstice
+AdminSuite 2.3 to configure Solstice AutoClients or diskless clients
+will result in a failure for which no patch is available or planned.
+While it may be possible to manually edit configuration files to
+enable diskless clients, such an operation is not recommended or
+supported.
+</p><p>
+
+
+Setting up a diskless client from scratch without tools is very
+impractical. Fortunately, Solaris 8, 1/01 Update has been released,
+which replaces the unbundled AdminSuite with bundled tools for
+administering diskless support on the Solaris 8, 1/01 Update servers.
+Unfortunately, Solaris 8, 1/01 Update was not available in time to
+write about its new diskless tools in this book. Thus, the discussion
+in the remainder<a name="INDEX-1197" /></a> <a name="INDEX-1198" /></a> <a name="INDEX-1199" /></a> of this chapter focuses on diskless
+support in Solaris through and including Solaris 7.
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-8-SECT-1" /></a>
+<h2 class="sect1">8.1. NFS support for diskless clients</h2>
+
+Prior to SunOS 4.0, diskless clients were <a name="INDEX-1200" /></a>
+<a name="INDEX-1201" /></a>supported through a separate
+distributed filesystem protocol called
+<a name="INDEX-1202" /></a>
+<a name="INDEX-1203" /></a>Network Disk, or ND. A single
+<a name="INDEX-1204" /></a> <a name="INDEX-1205" /></a>raw
+disk partition was divided into several logical partitions, each of
+which had a root or swap filesystem on it. Once an ND partition was
+created, changing a client's partition size entailed rebuilding
+the diskless client's partition from backup or distribution
+tapes. ND also used a smaller buffer size than NFS, employing
+1024-byte buffers for filesystem read and write operations.
+</p><p>
+
+In SunOS 4.0 and Solaris, diskless clients are supported entirely
+through NFS. Two features in the operating system and NFS
+protocols<a name="INDEX-1206" /></a> <a name="INDEX-1207" /></a>
+allowed ND to be replaced: swapping to a file and mounting an NFS
+filesystem as the root directory. The page-oriented virtual memory
+management system in SunOS 4.0 and Solaris treats the swap device
+like an array of pages, so that files can be used as swap space.
+Instead of copying memory pages to blocks of a raw partition, the VM
+system copies them <a name="INDEX-1208" /></a> <a name="INDEX-1209" /></a>to
+blocks allocated for the swap file. Swap space added in the
+filesystem is addressed through a vnode, so it can either be a local
+Unix filesystem (UFS) file or an NFS-mounted file. Diskless clients
+now swap directly to a file on their boot servers, accessed via NFS.
+</p><p>
+
+The second change supporting diskless clients is the VFS_MOUNTROOT( )
+VFS <a name="INDEX-1210" /></a> <a name="INDEX-1211" /></a>operation. On the client, it makes
+the named filesystem the root device of the machine. Once the root
+filesystem exists, other filesystems can be mounted on any of its
+vnodes, so an NFS-mounted root partition is a necessary bootstrap for
+any filesystem mount operations on a diskless client. With the root
+filesystem NFS-mounted, there was no longer a need for a separate
+protocol to map root and swap filesystem logical disk blocks into
+server filesystem blocks, so the ND protocol was removed <a name="INDEX-1212" /></a> <a name="INDEX-1213" /></a>from SunOS.
+</p><p>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.6. NFS futures</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.2. Setting up a diskless client</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:43 GMT -->
+</html>

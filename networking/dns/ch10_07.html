@@ -1,0 +1,262 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+<head><title>Round Robin Load Distribution (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.7. Round Robin Load Distribution</h2>
+
+
+<a name="INDEX-1614" /> <a name="INDEX-1615" /> <a name="INDEX-1616" />Name <a name="INDEX-1617" />servers released
+since BIND 4.9 have formalized some load distribution functionality
+that has existed in patches to BIND for some time. Bryan
+<a name="INDEX-1618" />Beecher wrote
+patches to BIND 4.8.3 to implement what he called
+"<a name="INDEX-1619" />shuffle address records." These
+were address records of a special type that the name server rotated
+between responses. For example, if the domain name
+<em class="emphasis">foo.bar.baz</em> had three "shuffled" IP
+addresses, 192.168.1.1, 192.168.1.2, and 192.1.168.3, an
+appropriately patched name server would give them out first in the
+order:</p><p>
+
+
+<blockquote><pre class="code">192.168.1.1 192.168.1.2 192.168.1.3</pre></blockquote>
+
+
+then in the order:</p><p>
+
+
+<blockquote><pre class="code">192.168.1.2 192.168.1.3 192.168.1.1</pre></blockquote>
+
+
+and then in the order:</p><p>
+
+
+<blockquote><pre class="code">192.168.1.3 192.168.1.1 192.168.1.2</pre></blockquote>
+
+
+before starting all over with the first order and repeating the
+rotation ad infinitum.</p><p>
+
+
+The functionality is enormously useful if you have a number of
+equivalent network resources, such as mirrored FTP servers, web
+servers, or terminal servers, and you'd like to spread the load
+among them. You establish one domain name that refers to the group of
+resources and configure clients to access that domain name, and the
+name server distributes requests among the IP addresses you list.</p><p>
+
+
+BIND 4.9 and later versions do away with the shuffle address record
+as a separate record type, subject to special handling. Instead, a
+modern name server rotates addresses for any domain name that has
+more than one A record. (In fact, the name server will rotate any
+type of record as long as a given domain name has more than one of
+them.<a href="#FOOTNOTE-75">[75]</a> ) So the records:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-75" />[75]Actually, until BIND 9, PTR records
+weren't rotated. BIND 9 rotates all record types.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">foo.bar.baz.    60    IN    A    192.168.1.1
+foo.bar.baz.    60    IN    A    192.168.1.2
+foo.bar.baz.    60    IN    A    192.168.1.3</pre></blockquote>
+
+
+accomplish on a 4.9 or later name server just what the shuffle
+address records did on a patched 4.8.3 server. The BIND documentation
+calls this process <em class="emphasis">round robin</em>.</p><p>
+
+
+<a name="INDEX-1620" />It's a good
+idea to reduce the records' <a name="INDEX-1621" />time to live, too, as we did in this
+example. This ensures that if the addresses are cached on an
+intermediate name server that doesn't support round robin,
+they'll time out of the cache quickly. If the intermediate name
+server looks up the name again, your authoritative name server can
+round robin the addresses again.</p><p>
+
+
+Note that this is really load distribution, not load balancing, since
+the name server gives out the addresses in a completely deterministic
+way without regard to the actual load or capacity of the servers
+servicing the requests. In our example, the server at address
+192.168.1.3 could be a 486DX33 running Linux and the other two
+servers HP9000 Superdomes, and the Linux box would still get a third
+of the queries. Listing a higher-capacity server's address
+multiple times won't help because BIND eliminates duplicate
+records.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">10.7.1. Multiple CNAMEs</h3>
+
+
+Back in the heyday of BIND 4 name servers, some folks set up round
+robin using multiple <a name="INDEX-1622" />CNAME records instead of
+multiple address records:</p><p>
+
+
+<blockquote><pre class="code">foo1.bar.baz.   60   IN   A   192.168.1.1
+foo2.bar.baz.   60   IN   A   192.168.1.2
+foo3.bar.baz.   60   IN   A   192.168.1.3
+foo.bar.baz.    60   IN   CNAME   foo1.bar.baz.
+foo.bar.baz.    60   IN   CNAME   foo2.bar.baz.
+foo.bar.baz.    60   IN   CNAME   foo3.bar.baz.</pre></blockquote>
+
+
+This probably looks odd to those of you who are used to our harping
+on the evils of mixing anything with a CNAME record. But BIND 4 name
+servers didn't recognize this as the configuration error it is
+and simply returned the CNAME records for <em class="emphasis">foo.bar.baz
+</em>in round robin order.</p><p>
+
+
+BIND 8 name servers, on the other hand, are more vigilant and catch
+this error. You can, however, explicitly configure them to allow
+multiple CNAME records for a single domain name with:</p><p>
+
+
+<blockquote><pre class="code">options {
+	multiple-cnames yes;
+};</pre></blockquote>
+
+
+BIND 9 name servers don't notice the multiple CNAME problem
+until 9.1.0. BIND 9.1.0 detects the problem but doesn't support
+the
+<em class="emphasis">multiple-cnames</em><a name="INDEX-1623" /> statement.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-7.2" /><div class="sect2">
+<h3 class="sect2">10.7.2. The rrset-order Substatement</h3>
+
+
+<a name="INDEX-1624" />There are certain times when
+you'd rather the name server didn't use round robin. For
+example, maybe you'd like to designate one web server as a
+backup to another. To do this, the
+<a name="INDEX-1625" />name server should always return the
+backup's address after the primary web server's address.
+But you can't do that with round robin; it'll just rotate
+the order of the addresses in successive responses.</p><p>
+
+
+BIND 8.2 and later name servers -- but not BIND 9 name servers, as
+of 9.1.0 -- allow you to turn off round robin for certain domain
+names and types of records. For example, if we wanted to ensure that
+the address records for <em class="emphasis">www.movie.edu</em> were
+always returned in the same order, we could use this
+<em class="emphasis">rrset-order</em> substatement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	rrset-order {
+		class IN type A name "www.movie.edu" order fixed;
+	};
+};</pre></blockquote>
+
+
+We should probably lower the TTL on
+<em class="emphasis">www.movie.edu</em>'s address records, too, so a
+name server that cached the records wouldn't round robin them
+for long.</p><p>
+
+
+The <em class="emphasis">class</em>, <em class="emphasis">type</em>, and
+<em class="emphasis">name</em> settings determine which records the
+specified order applies to. The class defaults to IN, type to ANY,
+and name to *  -- in other words, any records. So the statement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	rrset-order {
+		order random;
+	};
+};</pre></blockquote>
+
+
+applies a random order to all records returned by the name server.
+The name setting may contain a wildcard as its leftmost label, as in:</p><p>
+
+
+<blockquote><pre class="code">options {
+	rrset-order {
+		type A name "*.movie.edu" order cyclic;
+	};
+};</pre></blockquote>
+
+
+Only one <em class="emphasis">rrset-order</em> substatement is permitted,
+but it can contain multiple order specifications. The first order
+specification to match a set of records in a response applies.</p><p>
+
+
+<em class="emphasis">rrset-order</em> supports three (count 'em,
+three!) different orders:</p><p>
+
+
+<dl>
+<dt><i>fixed</i></dt>
+<dd>Always return matching records in the same order</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>random</i></dt>
+<dd>Return matching records in random order</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>cyclic</i></dt>
+<dd>Return matching records in cyclic (round robin) order</p></dd>
+
+</dl>
+
+
+The default behavior is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	rrset-order {
+		class IN type ANY name "*" order cyclic;
+	};
+};</pre></blockquote>
+
+
+Configuring <em class="emphasis">rrset-order</em> is far from a complete
+solution, unfortunately, because resolver and name server caching can
+interfere with its operation. A better long-term solution is the SRV
+record, which we'll discuss<a name="INDEX-1626" /> in<a name="INDEX-1627" /> <a href="ch16_01.html">Chapter 16, "Miscellaneous"</a>.<a name="INDEX-1628" /> <a name="INDEX-1629" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.6. Views</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.8. Name Server Address Sorting</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+</html>

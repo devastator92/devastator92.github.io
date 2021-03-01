@@ -1,0 +1,1537 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:06 GMT -->
+<head><title>SSH Agents (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.3. SSH Agents</h2>
+
+
+
+<a name="INDEX-1081" /><a name="INDEX-1082" />An
+<a name="INDEX-1083" />SSH agent is a program
+that caches private keys and responds to authentication-related
+queries from SSH clients. [<a href="ch02_05.html#ch02-86139">Section 2.5, "The SSH Agent"</a>] They are
+terrific labor-saving devices, handling all key-related operations
+and eliminating the need to retype your passphrase.</p>
+
+
+
+The programs related to agents are
+<tt class="command">ssh-agent</tt><a name="INDEX-1084" />
+and
+<tt class="command">ssh-add</tt><a name="INDEX-1085" />.
+<tt class="command">ssh-agent</tt> runs an agent, and
+<tt class="command">ssh-add</tt> inserts and removes keys from the
+agent's key cache. A typical use might look like this:</p>
+
+
+
+<blockquote><pre class="code"># Start the agent
+$ ssh-agent $SHELL
+# Load your default identity
+$ ssh-add
+Need passphrase for /home/barrett/.ssh/identity (barrett@example.com).
+Enter passphrase: ********</pre></blockquote>
+
+
+
+By typing your passphrase a single time, you decrypt the private key
+which is then stored in memory by the agent. From now on, until you
+terminate the agent or log out, SSH clients automatically contact the
+agent for all key-related operations. You needn't type your
+passphrase again.</p>
+
+
+
+We now briefly discuss how agents work. After that we get practical
+and illustrate the two ways to start an agent, various configuration
+options, and several techniques for automatically loading your keys
+into the agent. Finally, we cover agent security, agent forwarding,
+and compatibility between SSH-1 and SSH-2 agents.</p>
+
+
+
+<a name="ch06-11-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.3.1. Agents Don't Expose Keys</h3>
+
+
+
+<a name="INDEX-1086" />Agents
+perform two tasks:</p>
+
+
+
+<ul><li>Store your private keys in memory</p></li><li>Answer questions (from SSH clients) about those keys</p></li></ul>
+Agents don't, however, send your private keys anywhere. This is
+important to understand. Once loaded, private keys remain within an
+agent, unseen by SSH clients. To access a key, a client says,
+"Hey agent! I need your help. Please perform a key-related
+operation for me." The agent obeys and sends the results to the
+client (see <a href="ch06_03.html#ch06-40177">Figure 6-4</a>).</p>
+
+
+
+<a name="ch06-40177" /><div class="figure"><img height="127" alt="Figure 6-4" src="figs/ssh_0604.gif" width="480" /></div><h4 class="objtitle">Figure 6-4. How an SSH agent works with its clients</h4>
+
+For example, if <tt class="command">ssh</tt> needs to sign an
+authenticator, it sends the agent a signing request containing the
+authenticator data and an indication of which key to use. The agent
+performs the cryptographic operation itself and returns the
+signature.</p>
+
+
+
+In this manner, SSH clients use the agent without ever seeing the
+agent's private keys. This technique is more secure than
+handing out keys to clients. The fewer places that private keys get
+stored or sent, the harder it is to steal them.<a href="#FOOTNOTE-80">[80]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-80" />[80]This
+design also fits well with <em class="emphasis">token-based key
+storage</em>, in which your keys are kept on a smart card
+carried with you. Examples are the U.S. government-standard Fortezza
+card or RSA Security's Keon system. Like agents, smart cards
+respond to key-related requests but don't give out keys, so
+integration with SSH would be straightforward. Though adoption of
+tokens has been slow, we believe it will be commonplace in the
+future.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-73241" /><div class="sect2">
+<h3 class="sect2">6.3.2. Starting an Agent</h3>
+
+
+
+<a name="INDEX-1087" /><a name="INDEX-1088" />There
+<a name="INDEX-1089" />
+are two ways to invoke an agent in your login account:</p>
+
+
+
+<ul><li>The <em class="emphasis">single-shell</em> method that uses your current
+login shell</p></li><li>The <em class="emphasis">subshell</em> method that forks a subshell to
+facilitate the inheritance of some environment variables</p></li></ul>
+<a name="ch06-12-fm2xml" /><blockquote><b>WARNING: </b>
+Don't invoke an
+agent with the "obvious"
+but wrong command:</p>
+<blockquote><pre class="code">$ ssh-agent</pre></blockquote>
+
+
+
+Although the agent runs without complaint, SSH clients can't
+contact it, and the termination command (<tt class="command">ssh-agent
+-k</tt>) doesn't kill it, because some environment
+variables aren't properly set.</p>
+
+
+</blockquote>
+
+<a name="ch06-68458" /><div class="sect3">
+<h3 class="sect3">6.3.2.1. Single-shell method</h3>
+
+
+
+The <a name="INDEX-1090" />single-shell method runs an agent in
+your current login shell. This is most convenient if you're
+running a login shell on a single terminal, as opposed to a Unix
+window system such as X. Type:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ eval `ssh-agent`</pre></blockquote>
+
+
+
+and an <tt class="command">ssh-agent</tt> process is forked in the
+background. The process detaches itself from your terminal, returning
+a prompt to you, so you needn't run it in the background
+manually (i.e., with an ampersand on the end). Note that the quotes
+around <tt class="command">ssh-agent</tt> are backquotes, not apostrophes.</p>
+
+
+
+What purpose does the
+<tt class="command">eval</tt><a name="INDEX-1091" /><a name="INDEX-1092" /> serve? Well, when
+<tt class="command">ssh-agent</tt> runs, it not only forks itself in the
+background, it also outputs some shell commands to set several
+environment variables necessary for using the agent. The
+<a name="INDEX-1093" />variables are SSH_AUTH_SOCK
+(for SSH1 and OpenSSH) or SSH2_AUTH_SOCK (SSH2), and SSH_AGENT_PID
+(SSH1, OpenSSH) or SSH2_AGENT_PID (SSH2).<a href="#FOOTNOTE-81">[81]</a>
+The <tt class="command">eval</tt> command causes the current shell to
+interpret the commands output by <tt class="command">ssh-agent</tt>,
+setting the environment variables. If you omit the
+<tt class="command">eval</tt>, these commands are printed on standard
+output as <tt class="command">ssh-agent</tt> is invoked. For example:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-81" />[81]Older
+versions of SSH1 use SSH_AUTHENTICATION_SOCKET instead of
+SSH_AUTH_SOCK. If this applies to you, we recommend setting
+SSH_AUTH_SOCK yourself, for example (in C shell):</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ ssh-agent
+SSH_AUTH_SOCK=/tmp/ssh-barrett/ssh-22841-agent; export SSH_AUTH_SOCK;
+SSH_AGENT_PID=22842; export SSH_AGENT_PID;
+echo Agent pid 22842;</pre></blockquote>
+
+
+
+Now you've got an agent running but inaccessible to the shell.
+You can either kill it using the pid printed in the previous output:</p>
+
+
+
+<blockquote><pre class="code">$ kill 22842</pre></blockquote>
+
+
+
+or connect your shell manually by setting the environment variables
+exactly as given:</p>
+
+
+
+<blockquote><pre class="code">$ SSH_AUTH_SOCK=/tmp/ssh-barrett/ssh-22841-agent; export SSH_AUTH_SOCK;
+$ SSH_AGENT_PID=22842; export SSH_AGENT_PID;</pre></blockquote>
+
+
+
+Nevertheless, it's easier to use the single-shell form of the
+command so everything is set up for you.<a href="#FOOTNOTE-82">[82]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-82" />[82]Why
+can't <tt class="command">ssh-agent</tt> set its environment
+variables without all this trickery? Because under Unix, a program
+can't set environment variables in its parent shell.</p>
+
+
+</blockquote>
+
+
+
+To <a name="INDEX-1094" /><a name="INDEX-1095" /><a name="INDEX-1096" />terminate
+the agent, kill its pid:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ kill 22842</pre></blockquote>
+
+
+
+and unset the environment variables:</p>
+
+
+
+<blockquote><pre class="code">$ unset SSH_AUTH_SOCK
+<i class="lineannotation"># SSH2 uses SSH2_AUTH_SOCK instead</i>
+$ unset SSH_AGENT_PID</pre></blockquote>
+
+
+
+Or for SSH1 and OpenSSH, use the more convenient
+<em class="emphasis">-k</em> command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ eval `ssh-agent -k`</pre></blockquote>
+
+
+
+This prints termination commands on standard output so the
+<tt class="command">eval</tt> can invoke them. If you eliminate the
+<tt class="command">eval</tt>, the agent is still killed, but your
+environment variables don't unset automatically:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh-agent1 -k
+unset SSH_AUTH_SOCK           <i class="lineannotation"># This won't get
+unset,</i>
+unset SSH_AGENT_PID           <i class="lineannotation"># and neither will
+this,</i>
+echo Agent pid 22848 killed   <i class="lineannotation"># but the agent gets killed.</i></pre></blockquote>
+
+
+
+Running an agent in a single shell, as opposed to the method we cover
+next (spawning a subshell), has one problem. When your login session
+ends, the <tt class="command">ssh-agent</tt> process doesn't die.
+After several logins, you see many agents running, serving no
+purpose.<a href="#FOOTNOTE-83">[83]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-83" />[83]Actually, you can reconnect to an agent
+launched in a previous login by modifying your SSH_AUTH_SOCK variable
+to point to the old socket, but this is gross.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">$ /usr/ucb/ps uax | grep ssh-agent
+barrett   7833  0.4  0.4  828  608 pts/1    S 21:06:10  0:00 grep agent
+barrett   4189  0.0  0.6 1460  844 ?        S   Feb 21  0:06 ssh-agent
+barrett   6134  0.0  0.6 1448  828 ?        S 23:11:41  0:00 ssh-agent
+barrett   6167  0.0  0.6 1448  828 ?        S 23:24:19  0:00 ssh-agent
+barrett   7719  0.0  0.6 1456  840 ?        S 20:42:25  0:02 ssh-agent</pre></blockquote>
+
+
+
+You can get around this problem by running <tt class="command">ssh-agent
+-k</tt> automatically when you log out. In Bourne style shells
+(<tt class="command">sh</tt>, <tt class="command">ksh</tt>,
+<tt class="command">bash</tt>), this may be done with a trap of Unix signal
+at the top of <em class="filename">~/.profile </em>:</p>
+
+
+
+<blockquote><pre class="code"># ~/.profile
+trap '
+  test -n "$SSH_AGENT_PID"  &amp;&amp; eval `ssh-agent1 -k` ;
+  test -n "$SSH2_AGENT_PID" &amp;&amp; kill $SSH2_AGENT_PID
+' 0</pre></blockquote>
+
+
+
+For C shell and <tt class="command">tcsh</tt>, terminate the agent in your
+<em class="filename">~/.logout</em> file:</p>
+
+
+
+<blockquote><pre class="code"># ~/.logout
+if ( "$SSH_AGENT_PID" != "" ) then
+  eval `ssh-agent -k`
+endif
+if ( "$SSH2_AGENT_PID" != "" ) then
+  kill $SSH2_AGENT_PID
+endif</pre></blockquote>
+
+
+
+Once this trap is set, your <tt class="command">ssh-agent</tt> process is
+killed automatically when you log out, printing a message like:</p>
+
+
+
+<blockquote><pre class="code">Agent pid 8090 killed <a name="INDEX-1097" /></pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch06-20004" /><div class="sect3">
+<h3 class="sect3">6.3.2.2. Subshell method</h3>
+
+
+
+<a name="INDEX-1098" />The second way to invoke an agent
+spawns a <em class="emphasis">subshell</em>. You provide an argument to
+<tt class="command">ssh-agent</tt>, which is a path to a shell or shell
+script. Examples are:</p>
+
+
+
+<blockquote><pre class="code">$ ssh-agent /bin/sh
+$ ssh-agent /bin/csh
+$ ssh-agent $SHELL
+$ ssh-agent my-shell-script     <i class="lineannotation"># Run a shell script instead of a shell</i></pre></blockquote>
+
+
+
+This time, instead of forking a background process,
+<tt class="command">ssh-agent</tt> runs in the foreground, spawning a
+subshell and setting the aforementioned environment variables
+automatically. The rest of your login session runs within this
+subshell, and when you terminate it, <tt class="command">ssh-agent</tt>
+terminates as well. This method, as you will see later, is most
+convenient if you run a window system such as X and invoke the agent
+in your initialization file (e.g.,
+<em class="filename">~/.xsession</em><a name="INDEX-1099" />).
+However, the method is also perfectly reasonable for single-terminal
+logins.</p>
+
+
+
+When using the subshell method, invoke it at an appropriate time. We
+recommend the last line of your login initialization file (e.g.,
+<em class="filename">~/.profile</em> or <em class="filename">~/.login</em>) or
+the first typed command after you log in. Otherwise, if you first run
+some background processes in your shell, and then invoke the agent,
+those initial background processes become inaccessible until you
+terminate the agent's subshell. For example, if you run the
+<em class="emphasis">vi</em> editor, suspend it, and then run the agent,
+you lose access to the editor session until you terminate the agent.</p>
+
+
+
+<blockquote><pre class="code">$ vi myfile                    <i class="lineannotation"># Run your editor</i>
+^Z                             <i class="lineannotation"># Suspend it</i>
+$ jobs                         <i class="lineannotation"># View your background
+processes</i>
+[1] + Stopped (SIGTSTP) vi
+$ ssh-agent $SHELL             <i class="lineannotation"># Run a
+subshell</i>
+$ jobs                         <i class="lineannotation"># No jobs here! They're
+in the parent shell</i>
+$ exit                         <i class="lineannotation"># Terminate the agent's
+subshell</i>
+$ jobs                         <i class="lineannotation"># Now we can see our
+processes again</i>
+[1] + Stopped (SIGTSTP) vi</pre></blockquote>
+
+
+
+The advantages and disadvantages of the two methods are shown in
+<a href="ch06_03.html#ch06-50031">Table 6-1</a>.<a name="INDEX-1100" /></p>
+
+
+
+<a name="ch06-50031" /><h4 class="objtitle">Table 6-1. Pros and Cons of Invoking an Agent</h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Method</p></th>
+<th>
+Pros</p></th>
+<th>
+Cons</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<tt class="command">eval `ssh-agent`</tt></p></td>
+<td>
+Simple, intuitive</p></td>
+<td>
+Must be terminated manually</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="command">ssh-agent $SHELL</tt></p></td>
+<td>
+Agent's environment variables are propagated automatically;
+terminates on logout</p></td>
+<td>
+Your login shell becomes dependent on the agent's health; if
+the agent dies, your login shell may die</p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+
+
+
+
+
+<a name="ch06-14-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.2.3. Format of environment variable commands</h3>
+
+
+
+<a name="INDEX-1101" />As we've said,
+<tt class="command">ssh-agent</tt> prints a sequence of shell commands to
+set several environment variables. The syntax of these commands
+differs depending on which shell is being used. You can force the
+commands to use Bourne-style or C shell-style syntax with the
+<em class="emphasis">-s</em> and <em class="emphasis">-c</em> options,
+respectively:</p>
+
+
+
+<blockquote><pre class="code"># Bourne-shell style commands
+$ ssh-agent -s
+SSH_AUTH_SOCK=/tmp/ssh-barrett/ssh-3654-agent; export SSH_AUTH_SOCK;
+SSH_AGENT_PID=3655; export SSH_AGENT_PID;
+echo Agent pid 3655;
+
+# C-shell style commands
+$ ssh-agent -c
+setenv SSH_AUTH_SOCK /tmp/ssh-barrett/ssh-3654-agent;
+setenv SSH_AGENT_PID 3655;
+echo Agent pid 3655;</pre></blockquote>
+
+
+
+Normally <tt class="command">ssh-agent</tt> detects your login shell and
+prints the appropriate lines, so you don't need
+<span class="option">-c</span> or <span class="option">-s</span>. One situation where you
+need these options is if you invoke <tt class="command">ssh-agent</tt>
+within a shell script, but the script's shell is not the same
+type as your login shell. For example, if your login shell is
+<em class="filename">/bin/csh</em>, and you invoke this script:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+`ssh-agent`</pre></blockquote>
+
+
+
+<tt class="command">ssh-agent</tt> outputs C shell-style commands, which
+will fail. So you should use:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/sh
+`ssh-agent -s`</pre></blockquote>
+
+
+
+This is particularly important if you run an agent under X, and your
+<em class="filename">~/.xsession</em> file (or other startup file) is
+executed by a shell different from your login shell.</p>
+</div>
+
+
+
+
+
+<a name="ch06-69275" /><div class="sect3">
+<h3 class="sect3">6.3.2.4. SSH-1 and SSH-2 agent compatibility</h3>
+
+
+
+<a name="INDEX-1102" /><a name="INDEX-1103" />An SSH-1 agent can't
+service requests from SSH-2 clients. The reverse, however, is
+supported by SSH2. If <tt class="command">ssh-agent2</tt> is invoked with
+the <span class="option">-1</span> option (that's a numeral one, not a
+lowercase L), the agent services requests from SSH-1 clients, even
+from <tt class="command">ssh-add1</tt>. This works only for SSH-2
+implementations that support RSA, because SSH-1 uses RSA keys. At
+press time, only <a name="INDEX-1104" />F-Secure SSH2
+Server is capable of SSH-1 agent compatibility.</p>
+
+
+
+<blockquote><pre class="code"># Invoke an SSH2 agent in SSH1 compatibility mode
+$ eval `ssh-agent2 -1`
+
+# Add an SSH1 key
+$ ssh-add1
+Need passphrase for /home/smith/.ssh/identity (smith SSH1 key).
+Enter passphrase: ****
+Identity added (smith SSH1 key).
+
+# Add an SSH2 key
+$ ssh-add2
+Adding identity: /home/smith/.ssh2/id_dsa_1024_a.pub
+Need passphrase for /home/smith/.ssh2/id_dsa_1024_a
+ (1024-bit dsa, smith SSH2 key, Thu Dec 02 1999 22:25:09-0500).
+Enter passphrase: ********
+
+# ssh-add1 lists only the SSH1 key
+$ ssh-add1 -l
+1024 37 1425047358166328978851045774063877571270<i class="lineannotation">... and so forth</i></pre></blockquote>
+
+
+
+<blockquote><pre class="code"># ssh-add2 lists both keys
+# F-Secure SSH Server only
+$ ssh-add2 -l
+Listing identities.
+The authorization agent has 2 keys:
+id_dsa_1024_a: 1024-bit dsa, smith SSH2 key, Thu Dec 02 1999 22:25:09-0500
+smith SSH1 key</pre></blockquote>
+
+
+
+Now an SSH-1 client contacts <tt class="command">ssh-agent2</tt>
+transparently, believing it to be an SSH-1 agent:</p>
+
+
+
+<blockquote><pre class="code">$ ssh1 server.example.com
+<i class="lineannotation">[no passphrase prompt appears]</i></pre></blockquote>
+
+
+
+<tt class="command">ssh-agent2</tt> achieves compatibility by setting the
+same environment variables normally set by
+<tt class="command">ssh-agent1</tt>: SSH_AUTH_SOCK and SSH_AGENT_PID.
+Therefore, any SSH-1 agent requests are directed to
+<tt class="command">ssh-agent2</tt>.</p>
+
+
+
+<a name="ch06-15-fm2xml" /><blockquote><b>WARNING: </b>
+If you have an <tt class="command">ssh-agent1</tt> process running, and you
+invoke <tt class="command">ssh-agent2 -1</tt>, your old
+<tt class="command">ssh-agent1</tt> process becomes inaccessible as
+<tt class="command">ssh-agent2</tt> overwrites its environment variables.</p>
+
+
+</blockquote>
+
+Agent compatibility works only if the SSH2 distribution is compiled
+with the flag
+<tt class="literal"> -- with-ssh-agent1-compat</tt>.
+[<a href="ch04_01.html#ch04-92825">Section 4.1.5.13, "SSH-1/SSH-2 agent compatibility"</a>] It also depends on the value of the
+client configuration keyword
+<tt class="literal">Ssh1AgentCompatibility</tt>. [<a href="ch07_04.html#ch07-74869">Section 7.4.14, "SSH1/SSH2 Compatibility"</a>]</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-16426" /><div class="sect2">
+<h3 class="sect2">6.3.3. Loading Keys with ssh-add</h3>
+
+
+
+The program <tt class="command">ssh-add</tt><a name="INDEX-1105" /><a name="INDEX-1106" />
+is your personal communication channel to an
+<tt class="command">ssh-agent</tt> process. (Again, this command may be
+<tt class="command">ssh-add1</tt> under SSH1 and
+<tt class="command">ssh-add2</tt> under SSH2, with
+<tt class="command">ssh-add</tt> a link to one program or the other.)</p>
+
+
+
+When you first invoke an SSH agent, it contains no keys.
+<tt class="command">ssh-add</tt>, as you might guess from its name, can add
+private keys to an SSH agent. But the name is misleading, because it
+also controls the agent in other ways, such as listing keys, deleting
+keys, and locking the agent from accepting further keys.</p>
+
+
+
+If you invoke <tt class="command">ssh-add</tt> with no arguments, your
+default SSH key is loaded into the agent, once you have typed its
+passphrase. For example:</p>
+
+
+
+<blockquote><pre class="code">$ ssh-add1
+Need passphrase for /home/smith/.ssh/identity (smith@client).
+Enter passphrase: ********
+Identity added: /home/smith/.ssh/identity (smith@client).
+
+$ ssh-add2
+Adding identity: /home/smith/.ssh2/id_dsa_1024_a.pub
+Need passphrase for /home/smith/.ssh2/id_dsa_1024_a
+ (1024-bit dsa, smith@client, Thu Dec 02 1999 22:25:09-0500).
+Enter passphrase: ********</pre></blockquote>
+
+
+
+Normally, <tt class="command">ssh-add</tt> reads the passphrase from the
+user's terminal. If the standard input isn't a terminal,
+however, and the
+<a name="INDEX-1107" />DISPLAY environment variable is set,
+<tt class="command">ssh-add</tt> instead invokes an X window graphical
+program called
+<tt class="command">ssh-askpass</tt><a name="INDEX-1108" />
+that pops up a window to read your passphrase. This is especially
+convenient in <tt class="command">xdm</tt> start-up scripts.<a href="#FOOTNOTE-84">[84]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-84" />[84]X has its own security problems, of course. If someone can
+connect to your X server, they can monitor all your keystrokes,
+including your passphrase. Whether this is an issue in using
+<tt class="command">ssh-askpass </tt>depends on your system and security
+needs.</p>
+
+
+</blockquote>
+
+
+
+Both <tt class="command">ssh-add1</tt> and <tt class="command">ssh-add2</tt>
+support the following command-line options for listing and deleting
+keys, and for reading the passphrase:</p>
+
+
+
+<ul><li>List all <a name="INDEX-1109" />identities
+loaded in the agent, with <span class="option">-l</span>:</p>
+
+<blockquote><pre class="code">$ ssh-add1 -l
+1024 35
+1604921766775161379181745950571099412502846<i class="lineannotation">... and so
+forth</i>
+1024 37
+1236194621955474376584658921922152150472844<i class="lineannotation">... and so
+forth</i>
+
+$ ssh-add2 -l
+Listing identities.
+The authorization agent has one key:
+id_dsa_1024_a: 1024-bit dsa, smith@client, Thu Dec 02 1999 22:25:09-0500</pre></blockquote>
+
+
+For OpenSSH, the <span class="option">-l</span> option operates differently,
+printing the key's fingerprint rather than the public key (see
+<a href="ch06_02.html#ch06-20691">the sidebar "Key Fingerprints"</a> earlier for more
+detail):</p>
+
+<blockquote><pre class="code"># OpenSSH only
+$ ssh-add -l
+1024 1c:3d:cc:1a:db:74:f8:e6:46:6f:55:57:9e:ec:d5:fc smith@client</pre></blockquote>
+
+
+To print the public key with OpenSSH, use <span class="option">-L</span>
+instead:</p>
+
+<blockquote><pre class="code"># OpenSSH only
+$ ssh-add -L
+1024 35
+1604921766775161379181745950571099412502846<i class="lineannotation">... and so
+forth</i>
+1024 37 1236194621955474376584658921922152150472844<i class="lineannotation">... and so forth</i></pre></blockquote>
+
+</li>
+
+<li><a name="INDEX-1110" /><a name="INDEX-1111" />Delete
+an identity from the agent, with <span class="option">-d</span>:</p>
+
+<blockquote><pre class="code">$ ssh-add -d ~/.ssh/second_id
+Identity removed: /home/smith/.ssh/second_id (my alternative key)
+
+$ ssh-add2 -d ~/.ssh2/id_dsa_1024_a
+Deleting identity: id_dsa_1024_a.pub</pre></blockquote>
+
+
+If you don't specify a key file, <tt class="command">ssh-add1</tt>
+deletes your default identity from the agent:</p>
+
+<blockquote><pre class="code">$ ssh-add -d
+Identity removed: /home/smith/.ssh/identity (smith@client)</pre></blockquote>
+
+
+<tt class="command">ssh-add2</tt>, on the other hand, requires you to
+specify a key file:</p>
+
+<blockquote><pre class="code">$ ssh-add2 -d
+<i class="lineannotation">(nothing happens)</i></pre></blockquote>
+
+</li>
+
+<li>Delete all identities from the agent, with <span class="option">-D</span>. This
+unloads every currently loaded key but leaves the agent
+running:</p>
+
+<blockquote><pre class="code">$ ssh-add -D
+All identities removed.
+
+$ ssh-add2 -D
+Deleting all identities.</pre></blockquote>
+</li>
+
+
+<li>Read the passphrase from standard input, with <span class="option">-p</span>, as
+opposed to reading directly from your tty. This is useful if you want
+to send your passphrase to <tt class="command">ssh-add</tt> in a program,
+as in this Perl fragment:</p>
+
+<blockquote><pre class="code">open(SSHADD,"|ssh-add -p") || die "can't start ssh-add";
+print SSHADD $passphrase;
+close(SSHADD);</pre></blockquote>
+
+
+</li></ul>
+
+In addition, <tt class="command">ssh-add2</tt> has further features
+controlled by command-line options:</p>
+
+
+
+<ul><li><a name="INDEX-1112" />Lock and unlock the agent with a
+password using <span class="option">-L</span> and <span class="option">-U</span>. A locked
+agent refuses all <tt class="command">ssh-add2</tt> operations except an
+unlock request. Specifically:</p>
+
+<ul>
+<li>If you try to modify the state of the agent (adding or deleting keys,
+etc.), you are told:</p>
+
+
+<blockquote><pre class="code">The requested operation was denied.</pre></blockquote></li>
+<li>If you try to list the keys in the agent, you are told:</p>
+
+
+<blockquote><pre class="code">The authorization agent has no
+keys.</pre></blockquote></li></ul>
+
+To lock:</p>
+
+
+<blockquote><pre class="code">$ ssh-add2 -L
+Enter lock password: ****
+Again: ****</pre></blockquote>
+
+and to unlock:</p>
+
+
+<blockquote><pre class="code">$ ssh-add2 -U
+Enter lock password: ****</pre></blockquote>
+
+Locking is a convenient way to protect the agent if you step away
+from your computer but leave yourself logged in. You can unload all
+your keys with <tt class="command">ssh-add -D</tt>, but then you'd
+have to reload them again when you return. If you have only one key,
+there's no difference, but if you use several, it's a
+pain. Unfortunately, the locking mechanism isn't tremendously
+secure. <tt class="command">ssh-agent2</tt> simply stores the lock password
+in memory, refusing to honor any more requests until it receives an
+unlock message containing the same password. The locked agent is
+still vulnerable to attack: if an intruder gains access to your
+account (or the root account), he can dump the agent's process
+address space and extract your keys. The lock feature certainly
+deters casual misuse, but the potential for an attack is real. If
+you're seriously concerned about key disclosure, think twice
+before relying on locking. We prefer to see this feature implemented
+by encrypting all the agent's loaded keys with the lock
+password. This gives the same user convenience and provides better
+protection.</p></li>
+
+
+<li>Set a <a name="INDEX-1113" />timeout
+on a key, with <span class="option">-t</span>. Normally when you add a key, it
+remains loaded in the agent indefinitely, until the agent terminates
+or you unload the key manually. The <span class="option">-t</span> option
+indicates the lifetime of a key, measured in minutes. After this time
+has passed, the agent automatically unloads the key.</p>
+
+
+<blockquote><pre class="code"># Unload this key after 30 minutes
+$ ssh-add2 -t 30 mykey</pre></blockquote></li>
+
+<li>
+Place limits on <a name="INDEX-1114" />agent
+forwarding with <span class="option">-f</span> and <span class="option">-F</span>. (Agent
+forwarding, which we'll cover soon, transmits agent requests
+between hosts.) The <span class="option">-f</span> option lets you limit, for a
+given key, the distance that requests for this key may traverse. If a
+request is made from too far away, measured in hops from machine to
+machine, the request fails. A hop count of zero disables forwarding
+for this key alone:</p>
+
+
+<blockquote><pre class="code"># Load a key that may be used only  locally
+$ ssh-agent2 -f 0 mykey
+
+# Load a key and accept requests from up to 3 hops away
+$ ssh-agent2 -f 3 mykey</pre></blockquote>
+
+The <span class="option">-F</span> option lets you limit the set of hosts that
+may make requests relating to this key. It takes as an argument a set
+of hostnames, domains, and IP addresses that may make or forward
+requests. The argument is a comma-separated list of wildcard
+patterns, as for the serverwide configuration keywords
+<tt class="literal">AllowHosts</tt> and <tt class="literal">DenyHosts</tt>. [<a href="ch05_05.html#ch05-11656">Section 5.5.2.3, "Hostname access control"</a>]</p>
+
+<blockquote><pre class="code"># Permit request forwarding for a key only in the example.com domain
+$ ssh-agent2 -F '*.example.com' mykey
+
+# Permit forwarding from server.example.com and the harvard.edu domain
+$ ssh-agent2 -F 'server.example.com,*.harvard.edu' mykey
+
+# Same as the preceding command, but limit forwarding to 2 hops
+$ ssh-agent2 -F 'server.example.com,*.harvard.edu' -f 2 mykey</pre></blockquote>
+
+
+
+<a name="ch06-16-fm2xml" /><blockquote><b>WARNING: </b>
+SSH1 agents don't support this feature. If you use an SSH2
+agent in SSH1 compatibility mode, these forwarding features
+won't necessarily work.</p>
+
+
+</blockquote>
+</li>
+
+<li>Make the given key invisible to SSH-1 client requests if
+<tt class="command">ssh-agent2</tt> is running in SSH1
+<a name="INDEX-1115" />compatibility mode, with
+<span class="option">-1</span> (that's a one, not a lowercase L). It must
+be an RSA key, since all SSH1 public keys are RSA, and the only SSH-2
+implementation that supports RSA keys (at press time) is F-Secure
+SSH2 Server. We demonstrate this feature by example:</p>
+
+
+<ol><li>Generate an SSH2 RSA key,
+<tt class="literal">my-rsa-key</tt>:</p>
+
+
+<blockquote><pre class="code">$ ssh-keygen2 -t rsa my-rsa-key</pre></blockquote>
+
+</li>
+
+<li>Run an agent in SSH1 compatibility mode:</p>
+
+<blockquote><pre class="code">$ eval `ssh-agent2 -1`</pre></blockquote>
+</li>
+
+
+<li>Load the key into the agent normally:</p>
+
+<blockquote><pre class="code">$ ssh-add2 my-rsa-key
+Enter passphrase: ********</pre></blockquote>
+</li></ol>
+
+As the agent is running in SSH1 compatibility mode, notice that the
+key is visible to both SSH1 clients:</p>
+
+<blockquote><pre class="code">$ ssh-add1 -l
+1023 33 753030143250178784431763590... my-rsa-key ...</pre></blockquote>
+
+
+and SSH2 clients:</p>
+
+<blockquote><pre class="code">$ ssh-add2 -l
+Listing identities.
+The authorization agent has one key:
+my-rsa-key: 1024-bit rsa, smith@client, Mon Jun 05 2000 23:37:19 -040</pre></blockquote>
+
+
+Now let's unload the key and repeat the experiment:</p>
+
+<blockquote><pre class="code">$ ssh-add2 -D
+Deleting all identities.</pre></blockquote>
+
+
+This time, load the key using the <span class="option">-1</span> option, so SSH1
+clients don't see it:</p>
+
+<blockquote><pre class="code">$ ssh-add2 -1 my-rsa-key
+Enter passphrase: ********</pre></blockquote>
+
+
+Notice that the key is still visible to SSH2 clients:</p>
+
+<blockquote><pre class="code">$ ssh-add2 -l
+Listing identities.
+The authorization agent has one key:
+my-rsa-key: 1024-bit rsa, smith@client, Mon Jun 05 2000 23:37:19 -040</pre></blockquote>
+
+
+But SSH1 clients can't see it:</p>
+
+<blockquote><pre class="code">$ ssh-add1 -l
+The agent has no identities.</pre></blockquote>
+
+</li>
+
+<li>Perform PGP key operations. The <tt class="command">ssh-add2</tt> manpage
+documents the options <span class="option">-R</span>, <span class="option">-N</span>,
+<span class="option">-P</span>, and <span class="option">-F</span> for OpenPGP keyring
+operations, but at press time they aren't implemented.</p></li></ul>
+
+
+<a name="ch06-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.3.1. Automatic agent loading (single-shell method)</h3>
+
+
+
+<a name="INDEX-1116" />It's a pain to invoke
+<tt class="command">ssh-agent</tt> and/or <tt class="command">ssh-add</tt>
+manually each time you log in. With some clever lines in your login
+initialization file, you can automatically invoke an agent and load
+your default identity. We demonstrate this with both methods of agent
+invocation, single-shell and subshell.</p>
+
+
+
+With the single-shell method, here are the major steps:</p>
+
+
+
+<ol><li>Make sure you're not already running an agent, by testing
+environment variable SSH_AUTH_SOCK or SSH2_AUTH_SOCK.</p></li><li>Run the agent, <tt class="command">ssh-agent1</tt> or
+<tt class="command">ssh-agent2</tt>, using <tt class="command">eval</tt>.</p></li><li>If your shell is attached to a tty, load your default identity with
+<tt class="command">ssh-add1</tt> or <tt class="command">ssh-add2</tt>.</p></li></ol>
+For the Bourne shell and its derivatives (<tt class="command">ksh</tt>,
+<tt class="command">bash</tt>), the following lines can be placed into
+<em class="filename">~/.profile</em> :</p>
+
+
+
+<blockquote><pre class="code"># Make sure ssh-agent1 and ssh-agent2 die on logout
+trap '
+  test -n "$SSH_AGENT_PID"  &amp;&amp; eval `ssh-agent1 -k` ;
+  test -n "$SSH2_AGENT_PID" &amp;&amp; kill $SSH2_AGENT_PID
+' 0
+
+# If no agent is running and we have a terminal, run ssh-agent and ssh-add.
+# (For SSH2, change this to use SSH2_AUTH_SOCK, ssh-agent2 and ssh-add2.)
+if [ "$SSH_AUTH_SOCK" = "" ]
+then
+  eval `ssh-agent`
+  /usr/bin/tty &gt; /dev/null &amp;&amp; ssh-add
+fi</pre></blockquote>
+
+
+
+For the C shell and <tt class="command">tcsh</tt>, the following lines can
+be placed into <em class="filename">~/.login</em>:</p>
+
+
+
+<blockquote><pre class="code"># Use SSH2_AUTH_SOCK instead for SSH2
+if ( ! $?SSH_AUTH_SOCK  ) then
+  eval `ssh-agent`
+  /usr/bin/tty &gt; /dev/null &amp;&amp; ssh-add
+endif</pre></blockquote>
+
+
+
+and termination code in <em class="filename">~/.logout </em>:</p>
+
+
+
+<blockquote><pre class="code"># ~/.logout
+if ( "$SSH_AGENT_PID" != "" ) eval `ssh-agent -k`
+if ( "$SSH2_AGENT_PID" != "" ) kill $SSH2_AGENT_PID</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch06-18-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.3.2. Automatic agent loading (subshell method)</h3>
+
+
+
+The second way to load an agent on login uses the subshell method to
+invoke the agent. This time, you need to add lines to both your login
+initialization file (<em class="filename">~/.profile</em> or
+<em class="filename">~/.login</em>), an optional second file of your
+choice, and your shell initialization file
+(<em class="filename">~/.cshrc</em>, <em class="filename">~/.bashrc</em>,
+etc.). This method doesn't work for the Bourne shell, which has
+no shell initialization file.</p>
+
+
+
+<ol><li>In your <em class="emphasis">login</em> initialization file, make sure
+you're not already running an agent, by testing environment
+variable SSH_AUTH_SOCK or SSH2_AUTH_SOCK.</p></li><li>As the last line of your login initialization file, exec
+<tt class="command">ssh-agent</tt>, which spawns a subshell. Optionally run
+a <em class="emphasis">second</em> initialization file to configure
+aspects of the subshell.</p></li><li>In your <em class="emphasis">shell</em> initialization file, check whether
+the shell is attached to a tty and that the agent has no identities
+loaded yet. If so, load your default identity with
+<tt class="command">ssh-add1</tt> or <tt class="command">ssh-add2</tt>.</p></li></ol>
+Now let's see how to do this with Bourne shell and C shell
+families. For derivatives of Bourne shell (<tt class="command">ksh</tt>,
+<tt class="command">bash</tt>), put the following lines at the end of
+<em class="filename">~/.profile </em>:</p>
+
+
+
+<blockquote><pre class="code">test -n "$SSH_AUTH_SOCK" &amp;&amp; exec ssh-agent $SHELL</pre></blockquote>
+
+
+
+This runs the agent, spawning a subshell. If you want to tailor the
+environment of the subshell, create a script (say,
+<em class="filename">~/.profile2</em>) to do so, and use this instead:</p>
+
+
+
+<blockquote><pre class="code">test -n "$SSH_AUTH_SOCK" &amp;&amp; exec ssh-agent $SHELL $HOME/.profile2</pre></blockquote>
+
+
+
+Next, in your shell initialization file ($ENV for
+<tt class="command">ksh</tt>, or <em class="filename">~/.bashrc</em> for
+<tt class="command">bash</tt>), place the following lines to load your
+default identity only if it's not loaded already:</p>
+
+
+
+<blockquote><pre class="code"># Make sure we are attached to a tty
+if /usr/bin/tty &gt; /dev/null
+then
+  # Check the output of "ssh-add -l" for identities.
+  # For SSH2, use the line:
+  #  ssh-add2 -l | grep 'no keys' &gt; /dev/null
+  #
+  ssh-add1 -l | grep 'no identities' &gt; /dev/null
+  if [ $? -eq 0 ]
+  then
+    # Load your default identity.  Use ssh-add2 for SSH2.
+    ssh-add1
+  fi
+fi</pre></blockquote>
+</div>
+
+
+
+
+
+<a name="ch06-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.3.3. Automatic agent loading (X Window System)</h3>
+
+
+
+If you're using X and want to run an agent and load your
+default identity automatically, it's simple. Just use the
+single-shell method. For example, in your X startup file, usually
+<em class="filename">~/.xsession</em>, you can use these two lines:</p>
+
+
+
+<blockquote><pre class="code">eval `ssh-agent`
+ssh-add</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-20-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.3.4. Agents and Security</h3>
+
+
+
+As we mentioned earlier, agents don't expose private keys to
+SSH clients. Instead, they answer requests from clients about the
+keys. This approach is more secure than passing keys around, but it
+still has some security concerns. It is important to understand these
+concerns before completely trusting the agent model:</p>
+
+
+
+<ul><li>Agents rely on external access control mechanisms.</p></li><li>Agents can be cracked.</p></li></ul>
+<a name="ch06-21-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.4.1. Access control</h3>
+
+
+
+When your agent is loaded with private keys, a potential security
+issue arises. How does your agent distinguish between legitimate
+requests from your SSH clients and illegitimate requests from
+unauthorized sources? Surprisingly, the agent does not distinguish at
+all. Agents don't authenticate their clients. They will respond
+to any well-formed request received over their IPC channel, which is
+a Unix domain
+<a name="INDEX-1117" />socket.</p>
+
+
+
+How is agent security maintained then? The host operating system is
+responsible for protecting the IPC channel from unauthorized access.
+For Unix, this protection is accomplished by the file permissions on
+the socket. SSH1 and SSH2 keep your agent sockets in a protected
+directory,
+<em class="filename">/tmp/ssh-</em><em class="emphasis">USERNAME</em>, where
+<em class="emphasis">USENRAME</em> is your login name, while OpenSSH names
+the directory <em class="filename">/tmp/ssh-STRING</em>, where
+<em class="replaceable">STRING</em> is random text based on the
+agent's pid. In either case, the directory is protected from
+all other users (mode 700) and owned by you:</p>
+
+
+
+<blockquote><pre class="code">$ ls -la /tmp/ssh-smith/
+drwx------   2 smith    smith        1024 Feb 17 18:18 .
+drwxrwxrwt   9 root     root         1024 Feb 17 18:01 ..
+srwx------   1 smith    smith           0 May 14  1999 agent-socket-328
+s-w--w--w-   1 root     root            0 Feb 14 14:30 ssh-24649-agent
+srw-------   1 smith    smith           0 Dec  3 00:34 ssh2-29614-agent</pre></blockquote>
+
+
+
+In this case, user smith has several agent-related sockets in this
+directory. The two sockets owned by smith were created by agents run
+and owned by smith. The third, which is world-writable and owned by
+root, was created by the SSH server to effect an agent
+forwarding.<a href="#FOOTNOTE-85">[85]</a> [<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>]</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-85" />[85]Even though this socket is
+world-writable, only user smith can access it due to the permissions
+on the parent directory, <em class="filename">/tmp/ssh-smith</em>.</p>
+
+
+</blockquote>
+
+
+
+This organization of a user's sockets into a single directory
+is not only for neatness but also for security and portability,
+because different operating systems treat socket permissions in
+different ways. For example, Solaris appears to ignore them
+completely; even a socket with permission 000 (no access for anyone)
+accepts all connections. Linux respects socket permissions, but a
+write-only socket permits both reading and writing. To deal with such
+diverse implementations, SSH keeps your sockets in a directory owned
+by you, with directory permissions that forbid anyone else to access
+the sockets inside.</p>
+
+
+
+Using a subdirectory of <em class="filename">/tmp</em>, rather than
+<em class="filename">/tmp</em> itself, also prevents a class of attacks
+called <em class="emphasis">temp
+races</em><a name="INDEX-1118" />.
+A temp-race attack takes advantage of race conditions inherent in the
+common setting of the "sticky" mode bit on the Unix
+<em class="filename">/tmp</em> directory, allowing anyone to create a file
+there, but only allowing deletion of files owned by the same uid as
+the deleting process.</p>
+</div>
+
+
+
+
+
+<a name="ch06-22-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.4.2. Cracking an agent</h3>
+
+
+
+If the machine running your agent is compromised, an attacker can
+easily gain access to the IPC channel and thus to your agent. This
+permits the interloper to make requests of the agent, at least for a
+time. Once you log out or unload your keys from the agent, the
+security hole is closed. Therefore, you should run agents only on
+trusted machines, perhaps unloading your keys (<tt class="command">ssh-agent
+-D</tt>) if you're away from the computer for an extended
+time, such as overnight.</p>
+
+
+
+Since agents don't give out keys, your keys would seem safe
+from theft if the machine is compromised. Alas, that's not the
+case. An enterprising cracker, once logged into the machine, has
+other means for getting your keys, such as:</p>
+
+
+
+<ul><li>Stealing your private key file and attempting to guess your passphrase</p></li><li>Tracing processes that you're running, and catching your
+passphrase while you type it</p></li><li>Trojan horse attacks: installing modified versions of system
+programs, such as the login program, shells, or the SSH
+implementation itself, that steal your passphrase</p></li><li>Obtaining a copy of the memory space of your running agent and
+picking the keys out of it directly (this is a bit harder than the
+others)</p></li></ul>
+The bottom line is this: run agents only on trusted machines. SSH
+does not excuse you from securing other aspects of your system.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-27937" /><div class="sect2">
+<h3 class="sect2">6.3.5. Agent Forwarding</h3>
+
+
+
+So far, our SSH clients have conversed with an SSH agent on the same
+machine. Using a feature called <em class="emphasis">agent
+forwarding</em>, clients can also communicate with agents on
+remote machines. This is both a convenience feature -- permitting
+your clients on multiple machines to work with a single
+agent -- and a means for avoiding some firewall-related problems.</p>
+
+
+
+<a name="ch06-23-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.5.1. A firewall example</h3>
+
+
+
+Suppose you want to connect from your home computer, H, to a computer
+at work, W. Like many corporate computers, W is behind a network
+firewall and not directly accessible from the Internet, so you
+can't create an SSH connection from H to W. Hmm... what can you
+do? You call technical support and for once, they have good news.
+They say that your company maintains a gateway or
+"<a name="INDEX-1119" /><a name="INDEX-1120" />bastion" host, B, that is accessible
+from the Internet and runs an SSH server. This means you should be
+able to reach W by opening an SSH connection from H to B, and then
+from B to W, since the firewall permits SSH traffic. Tech support
+gives you an account on the bastion host B, and the problem seems to
+be solved... or is it?</p>
+
+
+
+For security reasons, the company permits access to its computers
+only by public-key authentication. So, using your private key on home
+machine H, you successfully connect to bastion host B. And now you
+run into a roadblock: also for security reasons, the company
+prohibits users from storing SSH keys on the exposed bastion host B,
+since they can be stolen if B were hacked. That's bad news,
+since the SSH client on B needs a key to connect to your work account
+on W. Your key is at home on H. (<a href="ch06_03.html#ch06-13980">Figure 6-5</a>
+illustrates the problem.) What now?</p>
+
+
+
+<a name="ch06-13980" /><div class="figure"><img height="196" alt="Figure 6-5" src="figs/ssh_0605.gif" width="391" /></div><h4 class="objtitle">Figure 6-5. Bastion host scenario</h4>
+
+Notice that this problem doesn't arise with
+<tt class="command">telnet</tt> or <tt class="command">rsh</tt>. You'd
+simply type your password to reach W (insecurely, of
+course).<a href="#FOOTNOTE-86">[86]</a> For a solution,
+we turn to SSH agents and agent forwarding.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-86" />[86]This key-distribution problem can also be
+solved with network file-sharing protocols, such as NFS, SMB, or AFP,
+but these aren't usually available in the remote-access
+situation we're discussing.</p>
+
+
+</blockquote>
+
+
+
+SSH agent forwarding allows a program running on a remote host, such
+as B, to access your <em class="emphasis">ssh-agent</em> on H
+transparently, as if the agent were running on B. Thus, a remote SSH
+client running on B can now sign and decrypt data using your key on H
+as shown in <a href="ch06_03.html#ch06-51798">Figure 6-6</a>. As a result, you can invoke
+an SSH session from B to your work machine W, solving the problem.</p>
+
+
+
+<a name="ch06-51798" /><div class="figure"><img height="230" alt="Figure 6-6" src="figs/ssh_0606.gif" width="400" /></div><h4 class="objtitle">Figure 6-6. Solution with SSH agent forwarding</h4>
+</div>
+
+
+
+
+
+<a name="ch06-24-fm2xml" /><div class="sect3">
+<h3 class="sect3">6.3.5.2. How agent forwarding works</h3>
+
+
+
+Agent forwarding, like all SSH forwarding (<a href="ch09_01.html">Chapter 9, "Port Forwarding and X Forwarding"</a>), works "behind the scenes." In
+this case, an SSH client has its agent requests forwarded across a
+separate, previously established SSH session, to an agent holding the
+needed keys, shown in <a href="ch06_03.html#ch06-25224">Figure 6-7</a>. The transmission
+takes place over a secure SSH connection, of course. Let's
+examine, in detail, the steps that occur.</p>
+
+
+
+<a name="ch06-25224" /><div class="figure"><img height="257" alt="Figure 6-7" src="figs/ssh_0607.gif" width="289" /></div><h4 class="objtitle">Figure 6-7. How agent forwarding works</h4>
+
+<ol><li>Suppose you're logged onto machine X, and you invoke
+<em class="emphasis">ssh</em> to establish a remote terminal session on
+machine Y:</p>
+<blockquote><pre class="code"># On machine X:
+$ ssh Y</pre></blockquote>
+</li>
+
+
+<li>Assuming that agent forwarding is turned on, the client says to the
+SSH server, "I would like to request agent forwarding,
+please," when establishing the connection.</p></li><li><tt class="command">sshd</tt> on machine <em class="replaceable">Y</em>
+checks its configuration to see if it permits agent forwarding.
+Let's assume that it's enabled.</p></li><li><tt class="command">sshd</tt> on machine <em class="replaceable">Y</em> sets
+up an interprocess communication (IPC) channel local to Y by creating
+some Unix domain sockets and setting some environment variables.
+[<a href="ch06_03.html#ch06-68458">Section 6.3.2.1, "Single-shell method"</a>] The resulting IPC mechanism is just like
+the one <tt class="command">ssh-agent</tt> sets up. As a result,
+<tt class="command">sshd</tt> is now prepared to pose as an SSH agent.</p></li><li>Your SSH session is now established between X and Y.</p></li><li>Next, from machine Y, you run another <tt class="command">ssh</tt> command
+to establish an SSH session with a third machine, Z:</p>
+<blockquote><pre class="code"># On machine Y:
+$ ssh Z</pre></blockquote></li>
+
+
+<li>This new <tt class="command">ssh</tt> client now needs a key to make the
+connection to Z. It believes there's an agent running on
+machine Y, because <tt class="command">sshd</tt> on Y is posing as one. So,
+the client makes an authentication request over the agent IPC
+channel.</p></li><li><tt class="command">sshd</tt> intercepts the request, masquerading as an
+agent, and says, "Hello, I'm the agent. What would you
+like to do?" The process is transparent: the client believes
+it's talking to an agent.</p></li><li><tt class="command">sshd</tt> then forwards the agent-related request back
+to the original machine, X, over the secure connection between X and
+Y. The agent on machine X receives the request and accesses your
+local key, and its response is forwarded back to
+<tt class="command">sshd</tt> on machine Y.</p></li><li><tt class="command">sshd</tt> on Y passes the response on to the client,
+and the connection to machine Z proceeds.</p></li></ol>
+Thanks to agent forwarding, you have transparent access from machine
+Y to any SSH keys on machine X. Thus, any SSH clients on Y can access
+any hosts permitted by your keys on X. To test this, run this command
+on machine Y to list your keys:</p>
+
+
+
+<blockquote><pre class="code"># On machine Y:
+$ ssh-agent -l</pre></blockquote>
+
+
+
+You will see all keys that are loaded in your agent on machine X.</p>
+
+
+
+It's worth noting that the agent-forwarding relationship is
+transitive: if you repeat this process, making a chain of SSH
+connections from machine to machine, then clients on the final host
+will still have access to your keys on the first host (X). (This
+assumes, of course, that agent forwarding is permitted by
+<tt class="command">sshd</tt> on each intermediate host.)</p>
+</div>
+
+
+
+
+
+<a name="ch06-29354" /><div class="sect3">
+<h3 class="sect3">6.3.5.3. Enabling agent forwarding</h3>
+
+
+
+Before an SSH client can take advantage of agent forwarding, the
+feature must be turned on. SSH implementations vary in their default
+settings of this feature, and of course the system administrator can
+change it. If necessary, you can turn it on manually with the
+configuration keyword
+<a name="INDEX-1121" /><tt class="literal">ForwardAgent</tt><a href="#FOOTNOTE-87">[87]</a> in the client
+configuration file <em class="filename">~/.ssh/config</em>, giving a value
+of <tt class="literal">yes</tt> (the default) or <tt class="literal">no</tt>:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-87" />[87]SSH2 supports the keyword
+<tt class="literal">AllowAgentForwarding</tt> as a synonym for
+<tt class="literal">ForwardAgent</tt>.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+ForwardAgent yes</pre></blockquote>
+
+
+
+Likewise, you can use command-line options. In addition to the
+<span class="option">-o</span> command-line option, which accepts any
+configuration keyword and its value:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ ssh -o "ForwardAgent yes" ...</pre></blockquote>
+
+
+
+The <span class="option">ssh</span> option <span class="option">-a</span> turns off agent
+forwarding:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ ssh -a ...</pre></blockquote>
+
+
+
+In addition, <em class="emphasis">ssh2</em> and OpenSSH's
+<em class="emphasis">ssh</em> accept options to turn on agent forwarding,
+even though it's on by default:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh2 +a ...
+
+# OpenSSH only
+$ ssh -A ...</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-25-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.3.6. Agent CPU Usage</h3>
+
+
+
+Before we leave our discussion of agents, we'll make one final
+note about performance. Agents carry out all cryptographic work that
+would otherwise be done by SSH clients. This means an agent can
+accumulate substantial CPU time. In one case we saw, some friends of
+ours were using SSH1 for a great deal of automation, running hundreds
+of short-lived SSH sessions in a row. Our friends were quite puzzled
+to find that the single <tt class="command">ssh-agent</tt> used by all
+these processes was eating the lion's share of CPU on that
+<a name="INDEX-1122" />machine.
+<a name="INDEX-1123" /><a name="INDEX-1124" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.2. Creating an Identity</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.4. Multiple Identities</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+</html>

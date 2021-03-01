@@ -1,0 +1,1386 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+<head><title>Routing Protocols (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch22_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">22.2. Routing Protocols</h2>
+
+
+
+
+
+<a name="INDEX-2045" /> <a name="INDEX-2046" />
+<a name="INDEX-2047" />Routing
+protocols are used to distribute information about where packets
+should be directed. Any given device can pass a packet only to
+another device on the same local area network. If the packet's
+destination is on a different local area network, the device must
+know what machine can move it to the next network, on the way to its
+destination. Most desktop machines have very little use for routing
+protocols -- usually, a desktop machine has a single network
+interface and attaches to a network with only one cross-connection to
+other networks. Thus, a desktop machine needs to know only "If
+the packet isn't bound for a machine on this network, hand it
+to that address over there". However, bastion hosts and
+Internet-connected gateways may be keeping track of much more complex
+situations, involving multiple network interfaces, and multiple
+connections from those networks to others.</p><p>
+
+
+
+
+
+<a name="INDEX-2048" />Routing protocols in general
+are dangerous. Attackers who can send you bad routing information not
+only have an easy way of performing a denial of service attack (if
+you route your packets the wrong places, you can't talk to
+anybody), but also have a much easier time of intercepting data (they
+can get you to send data to them so they can read it on the way
+past). Furthermore, routing protocols tend to be old. Many of the
+routing protocols in use today were designed when the Internet was a
+kinder, gentler, and smaller place, and the idea that people might
+intentionally lie to you about routes had never occurred to anybody,
+so there is no provision for preventing it.</p><p>
+
+
+
+
+
+It's actually quite difficult to design a routing protocol
+that's secure and is still usable for routing on the Internet
+backbone, since the protocol needs to move quite large amounts of
+data, including frequent changes, between hosts that are already
+busy. Because the backbone routers are specialized devices, not
+general-purpose computers, and because routing problems on the
+backbone can cause widespread disruption, changes to backbone routing
+protocols have to be made very slowly and carefully.</p><p>
+
+
+
+
+
+Fortunately, the routing protocols currently used on the backbone are
+different from the protocols used within individual sites. We do not
+discuss protocols that are used between distinct entities across the
+backbone because these protocols do not usually cross firewalls.
+Instead, we discuss the protocols most commonly used for routing
+within networks (often called <em class="emphasis">interior gateway
+protocols</em>), which you may need to use across internal
+firewalls.</p><p>
+
+
+
+
+
+<a name="ch22-15098" /><div class="sect2">
+<h3 class="sect2">22.2.1. Routing Information Protocol (RIP)</h3>
+
+
+
+
+
+<a name="INDEX-2049" />RIP is the oldest
+routing protocol on the Internet. In fact, it predates IP; it was
+taken almost verbatim from the older Xerox Network Services (XNS)
+system. It is also still a very commonly used routing protocol on
+local area IP networks. Routers (including general-purpose machines
+with multiple interfaces that can act as routers) use RIP to
+periodically broadcast which networks they know how to reach and how
+far away those networks are. By listening to these broadcasts, a
+router or host can determine what networks are reachable and choose
+the best (shortest) path to each. RIP servers generally just
+broadcast this information every 30 seconds or so for anyone
+interested to hear, but a RIP client can request a special update
+from a RIP server, which will cause the server to reply directly to
+the client with the information requested.</p><p>
+
+
+
+
+
+By default, RIP is completely insecure; clients simply accept any
+data they are sent. RIP does not provide any place in the protocol
+for authentication. There have been security problems with RIP
+clients because it is possible for RIP packets to contain not only
+routing information, but also the request to turn on logging to a
+specified file. Some Unix RIP clients were willing to accept such
+requests; since routing daemons have to run as root, they were then
+willing and able to overwrite any file on the system with a log of
+routing updates, which is not a useful substitute for most system
+files. RIP clients are no longer routinely configured to accept such
+requests.</p><p>
+
+
+
+
+
+any RIP implementations will allow you to configure a RIP client
+with slight security improvements; for instance, they will allow you
+to specify that you are willing to accept RIP updates only from
+certain IP source addresses, and/or they will allow you to declare
+that certain routing information cannot be modified by RIP updates.
+This is usually sufficient to protect clients from local
+misconfigurations but not sufficient to protect against active
+hostile acts.</p><p>
+
+
+
+
+
+A modified version of RIP, called RIP-2, provides several
+improvements to the routing information that's distributed and
+also allows for the use of passwords. Unfortunately, the normal
+method of using passwords is to put the same 16-character password in
+every packet. Again, this is sufficient to protect clients from local
+misconfigurations (you're unlikely to get the right password by
+accident) but not against hostile acts (any attacker can read the
+password out of any valid RIP broadcast and use it). It is easier to
+maintain than a list of valid IP source addresses. RIP-2
+implementations that support MD5 authentication are becoming more
+widely available, and this authentication actually provides a
+reasonable amount of protection.</p><p>
+
+
+
+
+
+RIP-2 and RIP implementations can interoperate, but RIP
+implementations won't verify or attach the password. As a
+result, if you're using RIP-2 with passwords, routers that
+implement RIP can receive routing updates but cannot successfully
+send them.</p><p>
+
+
+
+
+
+<a name="ch22-15124" /><div class="sect3">
+<h3 class="sect3">22.2.1.1. Packet filtering characteristics of RIP</h3>
+
+
+
+
+
+RIP is a UDP-based service. RIP servers listen on port 520 for
+broadcasts from other servers and requests from clients. RIP servers
+generally send their broadcasts from port 520. RIP clients generally
+use ports above 1023.</p><p>
+
+
+
+
+
+<a name="ch22-11-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+520</p><p></td>
+<td>
+<a href="#FOOTNOTE-149">[149]</a></p><p>
+</td>
+<td>
+Request, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+520</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-149">[149]</a></td>
+<td>
+Response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+520</p><p></td>
+<td><a href="#FOOTNOTE-149">[149]</a></td>
+<td>
+Request, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+520</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-149">[149]</a></td>
+<td>
+Response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Broadcast</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+520</p><p></td>
+<td>
+520</p><p></td>
+<td><a href="#FOOTNOTE-149">[149]</a></td>
+<td>
+Update, external server to internal servers</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Broadcast</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+520</p><p></td>
+<td>
+520</p><p></td>
+<td><a href="#FOOTNOTE-149">[149]</a></td>
+<td>
+Update, internal server to external servers</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-149" />[149]UDP has no ACK equivalent.<a name="INDEX-2050" /></p><p>
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-12-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.2.2. Open Shortest Path First (OSPF)</h3>
+
+
+
+
+
+<a name="INDEX-2051" /> <a name="INDEX-2052" />OSPF is a more recent protocol
+than RIP that uses a completely different approach to distributing
+routing information. The main difference between the two protocols
+involves the kinds of routing information they distribute, but there
+are also significant differences in the ways they use the network.
+RIP is based on UDP, while OSPF is based directly on IP; RIP uses
+unicast and broadcast, while OSPF uses unicast and multicast.</p><p>
+
+
+
+
+
+OSPF supports authentication, which could theoretically be quite
+secure -- the protocol allows for cryptographic message digests.
+However, the cryptographic message digest algorithm is not specified
+by the standard, so in practice OSPF authentication is restricted to
+eight-character cleartext passwords or the same degree of
+authentication as RIP-2. This will protect from accidental
+misconfigurations but not from hostile attacks.</p><p>
+
+
+
+
+
+<a name="ch22-13-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.2.2.1. Packet filtering characteristics of OSPF</h3>
+
+
+
+
+
+OSPF is layered directly on IP, not on TCP or UDP, and is IP protocol
+89. OSPF uses both multicast and unicast packets. OSPF uses two
+special multicast groups, AllSPFRouters (224.0.0.5) and AllDRouters
+(224.0.0.6). OSPF does not have port numbers but does distinguish
+between different messages with a packet type identifier.</p><p>
+
+
+
+
+
+<a name="ch22-14-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol<a href="#FOOTNOTE-150">[150]</a></p><p>
+
+
+
+
+
+
+
+
+</blockquote></th>
+<th>
+PacketType<a href="#FOOTNOTE-151">[151]</a></p><p>
+
+
+
+
+
+
+
+
+</blockquote></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+1</p><p></td>
+<td>
+Router hello, announcing its existence and neighbors</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+1</p><p></td>
+<td>
+Internal router hello, announcing its existence and neighbors</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int Router</p><p></td>
+<td>
+89</p><p></td>
+<td>
+2</p><p></td>
+<td>
+External router database description, giving an external
+router's link state database</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+89</p><p></td>
+<td>
+2</p><p></td>
+<td>
+Internal router database description</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int Router</p><p></td>
+<td>
+89</p><p></td>
+<td>
+3</p><p></td>
+<td>
+External router link state request, asking for information about a
+particular link</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+Internal router link state update for a particular link in response
+to a request.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+89</p><p></td>
+<td>
+3</p><p></td>
+<td>
+Internal router link state request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int Router</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+External  router link state update</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+External router link state update, flooding all link states, from a
+designated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+224.0.0.6</p><p></td>
+<td>
+89</p><p></td>
+<td>
+5</p><p></td>
+<td>
+Internal router link state acknowledgment response from a
+nondesignated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+224.0.0.6</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+External router link state update, from a nondesignated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+5</p><p></td>
+<td>
+Internal router link state acknowledgment from a designated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+Internal router link state update from a designated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+224.0.0.6</p><p></td>
+<td>
+89</p><p></td>
+<td>
+5</p><p></td>
+<td>
+External router link state acknowledgment from a nondesignated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int. Router</p><p></td>
+<td>
+224.0.0.6</p><p></td>
+<td>
+89</p><p></td>
+<td>
+4</p><p></td>
+<td>
+Internal router link state update, from a nondesignated router</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+224.0.0.5</p><p></td>
+<td>
+89</p><p></td>
+<td>
+5</p><p></td>
+<td>
+External router link state acknowledgment from a designated router</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-150" />[150]OSPF is layered directly on IP, not on TCP
+or UDP.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-151" />[151]OSPF does not have source and destination
+ports, but messages are distinguished by type.</p><p>
+
+
+
+
+</blockquote>
+
+OSPF multicast packets are not intended to be forwarded and will be
+sent with a TTL of 1, which means that the packets will not go
+through a router. If you are doing packet filtering that is not
+completely transparent, and for some reason you still want to do OSPF
+through the packet filter, you have two choices. The preferred option
+is to preconfigure the routers that need to pass routing updates
+through the packet filter so that they know about their neighbors.
+This will usually remove the need to pass multicast packets. If that
+is unacceptable, and the packet filter is sufficiently flexible, you
+may be able to configure the packet filter so that it does not
+decrease the TTL on OSPF packets and will pass them on. This is an
+extremely eccentric network configuration and is rarely advisable;
+any packet filter capable of this sort of trickery is probably on a
+machine capable of simply speaking OSPF directly, which would be
+preferable.<a name="INDEX-2053" /> <a name="INDEX-2054" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.2.3. Internet Group Management Protocol (IGMP)</h3>
+
+
+
+
+
+<a name="INDEX-2055" /> <a name="INDEX-2056" />IGMP is used to
+manage multicast groups. See <a href="ch19_01.html">Chapter 19, "Real-Time Conferencing Services"</a>, for more
+information about multicast. Multicasting is also increasingly being
+used by administrative protocols; for example, it's used for
+WINS server replication.</p><p>
+
+
+
+
+
+ulticast routers do not forward all multicast packets to all
+networks; they forward multicast packets only to places where hosts
+are listening for them. In order to make this decision, a multicast
+router has to keep track of the multicast groups in use. Since
+multicast packets go to all the hosts on a network segment that want
+them, the router doesn't need to identify all the hosts that
+are in a group, but it does need to know, for each network segment,
+what groups are of interest. IGMP is the protocol that hosts and
+routers use to communicate this information.</p><p>
+
+
+
+
+
+ulticast routers receive all multicast packets, regardless of the
+multicast address they are sent to. Hosts that use multicast receive
+packets only for groups they subscribe to, but all of them subscribe
+to a group called AllSystems (224.0.0.1). All IGMP packets are sent
+out with a TTL of 1, which means that they will not be forwarded
+through a router. This makes sense because the purpose of IGMP is to
+configure a router's information about a particular, directly
+attached network segment.</p><p>
+
+
+
+
+
+There are two parts to the IGMP process: first, hosts send out
+notifications, called <em class="emphasis">membership reports</em>, when
+they join any group other than AllSystems (and in some versions, when
+they leave those groups as well). Second, routers can send out
+periodic queries asking about group membership. A router can ask for
+information either about all groups, or about a particular group. In
+either case, hosts respond with membership reports, just like the
+ones they send when they initially join groups. The protocol is
+designed so that only one host per group will respond. All the router
+needs to know is whether or not there is interest in the group; it
+doesn't need to know how many hosts are interested.</p><p>
+
+
+
+
+
+<a name="ch22-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.2.3.1. Packet filtering characteristics of IGMP</h3>
+
+
+
+
+
+IGMP is based directly on IP and is protocol 2. IGMP does not have
+port numbers; IGMP packets are distinguished by packet types. IGMP is
+a datagram protocol that does not have an ACK bit or its equivalent.
+All IGMP packets are sent with a TTL of 1 and will not pass through a
+packet filter unless it is completely transparent or is specially
+configured to pass IGMP without decreasing the TTL. You would pass
+IGMP through a packet filter only if the packet filter was between a
+multicast router and the hosts it serves, and the packet filter was
+also going to pass all other multicast. In this situation, it would
+probably be better to either tunnel multicast or configure the packet
+filter to be a multicast router.</p><p>
+
+
+
+
+
+<a name="ch22-17-fm2xml" /><table border="1">
+
+
+
+
+
+
+<tr>
+<th>
+Source Addr.</p><p></th>
+<th>
+Dest. Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Packet Type</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+Router</p><p></td>
+<td>
+224.0.0.1</p><p></td>
+<td>
+2 (IGMP)</p><p></td>
+<td>
+0x11</p><p></td>
+<td>
+Host membership query</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Host</p><p></td>
+<td>
+ulticast<a href="#FOOTNOTE-152">[152]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+2 (IGMP)</p><p></td>
+<td>
+0x12</p><p></td>
+<td>
+Version 1 host membership report</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Host</p><p></td>
+<td>
+ulticast<a href="#FOOTNOTE-152">[152]</a></p><p></td>
+<td>
+2 (IGMP)</p><p></td>
+<td>
+0x16</p><p></td>
+<td>
+Version 2 host membership report</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Host</p><p></td>
+<td>
+224.0.0.1</p><p></td>
+<td>
+2 (IGMP)</p><p></td>
+<td>
+0x17</p><p></td>
+<td>
+Leave group</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<a name="FOOTNOTE-152" />[152]This will be addressed to the multicast
+group that it is reporting about.</p><p>
+
+
+
+
+</blockquote>
+<a name="INDEX-2057" /> 
+<a name="INDEX-2058" />
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-18-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.2.4. Router Discovery/ICMP Router Discovery Protocol (IRDP)</h3>
+
+
+
+
+
+<a name="INDEX-2059" /> <a name="INDEX-2060" /> <a name="INDEX-2061" />Router discovery, also known as ICMP
+Router Discovery Protocol (IRDP), is not actually a routing protocol.
+It is a mechanism that hosts can use to find routers, independent of
+any routing protocol. Router discovery allows a host to ask what
+routers are on its network, using something called a <em class="emphasis">router
+solicitation</em>, and get back an answer from each router. The
+routers can also provide information about relative desirability.
+That is, each router sends a number indicating how good it thinks it
+is, configured by the administrator who set up the router. The host
+can then use this information to pick a router. That's all the
+information the host gets from the router; there's no
+information about what networks the router is connected to, for
+instance.</p><p>
+
+
+
+
+
+In addition to responding to requests from hosts, routers send out
+the same information periodically. Whether or not it's been
+requested, it is called a <em class="emphasis">router announcement</em>,
+and hosts are supposed to treat unsolicited announcements the same
+way they treat announcements they've asked for.</p><p>
+
+
+
+
+
+Router discovery is a useful way for hosts to find default routers
+without needing to implement complicated routing protocols. However,
+it contains no authentication information at all, allowing attackers
+to send out router announcements that will divert traffic. If the
+attacker is on the network being attacked, those announcements could
+divert traffic to where the attacker could read or modify it. If the
+attacker doesn't have a point of presence on the network,
+there's less benefit to the attacker. Denial of service attacks
+are certainly possible, and in a few cases, an attacker might be able
+to divert traffic to another network that the attacker was present
+on.</p><p>
+
+
+
+
+
+Router discovery is not widely implemented, and most hosts that use
+it do so as a supplement to other ways of configuring routing. You
+may therefore have hosts that are using router discovery without
+knowing it. These hosts will already have routes configured by some
+other means (using RIP announcements, DHCP, or simply having some
+human type them in somewhere). How these hosts treat router
+announcements is entirely implementation dependent. Many of them will
+use announced routers instead of routers they knew about from other
+sources; others will apply a ranking based on the information in the
+announcement; and some of them will prefer preconfigured routers to
+announced routers.</p><p>
+
+
+
+
+
+There is absolutely no reason for router discovery to ever go through
+a router. Router discovery is intended only to convey information
+about the local network. It is therefore safe and advisable to filter
+it out in all packet filtering routers. You will also want to turn
+off router discovery on bastion hosts, in order to be sure that they
+are not going to pay attention to invalid announcements if other
+bastion hosts are compromised.</p><p>
+
+
+
+
+
+<a name="ch22-19-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.2.4.1. Packet filtering characteristics of router discovery</h3>
+
+
+
+
+
+Router discovery is based on ICMP. Router discovery is supposed to be
+multicast-based, but it is allowable (although strongly discouraged)
+for hosts to use broadcast instead of multicast.<a name="INDEX-2062" /> <a name="INDEX-2063" /> <a name="INDEX-2064" /></p><p>
+
+
+
+
+
+<a name="ch22-20-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+essageType<a href="#FOOTNOTE-153">[153]</a></p><p>
+
+
+
+
+
+
+
+
+</blockquote></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Broadcast,</p><p>
+
+
+
+
+
+224.0.0.2</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+10</p><p></td>
+<td>
+Incoming router solicitation</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext,</p><p>
+
+
+
+
+
+Broadcast, 224.0.0.1</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+9</p><p></td>
+<td>
+Outgoing router announcement</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Broadcast, 224.0.0.2</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+10</p><p></td>
+<td>
+Outgoing router solicitation</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int,</p><p>
+
+
+
+
+
+Broadcast,</p><p>
+
+
+
+
+
+224.0.0.1</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+9</p><p></td>
+<td>
+Incoming router advertisement</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+<blockquote>
+<a name="FOOTNOTE-153" />[153]ICMP messages do not have source or
+destination port numbers; they have a single ICMP message type field
+instead. ICMP has no ACK equivalent.</p><p>
+
+
+
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-15284" /><div class="sect2">
+<h3 class="sect2">22.2.5. Proxying Characteristics of Routing Protocols</h3>
+
+
+
+
+
+Because routing protocols are used by a host to develop routing
+tables that are specific to where that host is in the network, it
+doesn't make any sense to proxy routing protocols to hosts
+elsewhere in the network.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-21-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.2.6. Network Address Translation Characteristics of Routing Protocols</h3>
+
+
+
+
+
+Routing protocols transfer information that's highly dependent
+on network addresses and is certain to be pointless if it passes
+through a network address translator. It doesn't make any sense
+to run network address translation on routing protocols.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.2.7. Summary of Recommendations for Routing Protocols</h3>
+
+
+
+
+
+<ul><li>Do not allow routing protocols (RIP or otherwise) across your
+firewall to or from the Internet. Routing on the firewall is
+generally very simple and is accomplished best with static routes.
+Simply configure the firewall to direct packets bound for internal
+source addresses to an internal router and to direct all other
+packets to your Internet connection.</p><p></li><li>Configure routing on bastion hosts carefully, in order to provide
+depth of defense against problems with the firewall or other bastion
+hosts and some level of protection against local
+misconfiguration.<a name="INDEX-2065" /> <a name="INDEX-2066" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch22_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">22. Administrative Services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">22.3. Protocols for Booting and Boot-Time Configuration</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+</html>

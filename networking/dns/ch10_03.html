@@ -1,0 +1,299 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>DNS NOTIFY (Zone Change Notification) (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.3. DNS NOTIFY (Zone Change Notification)</h2>
+
+
+<a name="INDEX-1560" />
+<a name="INDEX-1561" /> <a name="INDEX-1562" />Traditionally, BIND slaves have used a
+polling scheme to determine when they need a zone transfer. The
+polling interval is called the <a name="INDEX-1563" /><em class="emphasis">refresh interval</em>.
+Other parameters in the zone's SOA record govern other aspects
+of the polling mechanism.</p><p>
+
+
+But with this polling scheme, it can take up to the refresh interval
+before a slave detects and transfers new zone data from its master
+name server. That kind of latency could wreak havoc in a dynamically
+updated environment. Wouldn't it be nice if the primary master
+name server could <em class="emphasis">tell</em> its slave servers when
+the information in the zone changed? After all, the primary master
+name server <em class="emphasis">knows</em> the data has changed; someone
+reloaded the data, and the server checked the
+<em class="emphasis">mtime</em><a name="INDEX-1564" /> <a name="INDEX-1565" /> (the Unix file
+modification time) of all its zone data files to determine which had
+been changed,<a href="#FOOTNOTE-73">[73]</a> or
+it received and processed a dynamic update. The primary master could
+send notification right after processing the reload or update instead
+of waiting for the refresh interval to pass.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-73" />[73]Except in the case of a single-zone
+reload, when the name server checks the <em class="emphasis">mtime</em> of
+the data file only of the zone being reloaded.</p><p>
+
+</blockquote>
+
+
+RFC 1996 proposed a mechanism that would allow primary master name
+servers to notify their slaves of changes to a zone's data.
+BIND 8 and 9 implement this scheme, which is called DNS NOTIFY.</p><p>
+
+
+DNS NOTIFY works like this: when a primary master name server notices
+that the serial number of a zone has changed, it sends a special
+announcement to all of the slave name servers for that zone. The
+primary master name server determines which servers are the slaves
+for the zone by looking at the list of NS records in the zone and
+taking out the record that points to the name server listed in the
+MNAME field of the zone's SOA record as well as the domain name
+of the local host.</p><p>
+
+
+When does the name server notice a change? Restarting a primary
+master name server causes it to notify all of its slaves of the
+current serial number of all of its zones because the primary master
+has no way of knowing whether its zone data files were edited before
+it started. Reloading one or more zones with new serial numbers
+causes a name server to notify the slaves of those zones. And a
+dynamic update that causes a zone's serial number to increment
+also causes notification.</p><p>
+
+
+<a name="INDEX-1566" />The special NOTIFY announcement is
+identified by its opcode in the DNS header. The opcode for most
+queries is QUERY. NOTIFY messages, including announcements and
+responses, have a special opcode, NOTIFY (duh). Other than that,
+NOTIFY messages look very much like queries for the SOA record for a
+zone: they specify the domain name of the zone whose serial number
+has changed, its class, and a type of SOA. The authoritative answer
+bit is also set.</p><p>
+
+
+When a slave receives a NOTIFY announcement for a zone from one of
+its configured master name servers, it responds with a NOTIFY
+response. The response tells the master that the slave received the
+NOTIFY announcement so that the master can stop sending it NOTIFY
+announcements for the zone. Then the slave proceeds just as if the
+refresh timer for that zone had expired: it queries the master name
+server for the SOA record for the zone that the master claims has
+changed. If the serial number is higher, the slave transfers the
+zone.</p><p>
+
+
+Why doesn't the slave simply take the master's word that
+the zone has changed? It's possible that a miscreant could
+forge NOTIFY announcements to slaves, causing lots of unnecessary
+zone transfers and amounting to a denial-of-service attack against a
+master name server.</p><p>
+
+
+If the slave actually transfers the zone, RFC 1996 says that it
+should issue its own NOTIFY announcements to the other authoritative
+name servers for the zone. The idea is that the primary master may
+not be able to notify all of the slave name servers for the zone
+itself, since it's possible some slaves can't communicate
+directly with the primary master (they use another slave as their
+master). However, while BIND 8.2.3 and BIND 9 implement this, earlier
+versions of BIND 8 don't. Older BIND 8 slaves don't send
+NOTIFY messages unless explicitly configured to do so.</p><p>
+
+
+Here's how that works in practice. On our network,
+<em class="emphasis">terminator.movie.edu</em> is the primary master name
+server for <em class="emphasis">movie.edu</em>, and
+<em class="emphasis">wormhole.movie.edu</em> and
+<em class="emphasis">zardoz.movie.edu</em> are slaves, as shown in <a href="ch10_03.html#dns4-CHP-10-FIG-1">Figure 10-1</a>.</p><p>
+
+
+<a name="dns4-CHP-10-FIG-1" /><div class="figure"><img height="221" alt="Figure 10-1" src="figs/dns4_1001.gif" width="260" /></div><h4 class="objtitle">Figure 10-1. movie.edu zone transfers</h4>
+
+When we edit and reload or dynamically update <em class="emphasis">movie.edu
+</em>on <em class="emphasis">terminator.movie.edu</em>,
+<em class="emphasis">terminator.movie.edu</em> sends NOTIFY announcements
+to <em class="emphasis">wormhole.movie.edu</em> and
+<em class="emphasis">zardoz.movie.edu</em>. Both slaves respond to
+<em class="emphasis">terminator.movie.edu</em>, telling it that
+they've received the notification. They then check to see
+whether <em class="emphasis">movie.edu</em>'s serial number has
+incremented and, when they find it has, perform a zone transfer.
+If <em class="emphasis">wormhole.movie.edu</em> and
+<em class="emphasis">zardoz.movie.edu</em> are running BIND 8.2.3 or BIND
+9, after they transfer the new version of the zone, they
+alsosend NOTIFY announcements to tell each
+other about the change. But since
+<em class="emphasis">wormhole.movie.edu</em> isn't
+<em class="emphasis">zardoz.movie.edu</em>'s master name server for
+<em class="emphasis">movie.edu</em>, and the converse isn't true
+either, both slaves just ignore each other's NOTIFY
+announcements.</p><p>
+
+
+BIND 8 name servers log information about NOTIFY messages to
+<em class="emphasis">syslog</em>. Here's what <em class="emphasis">terminator.movie.edu</em>logged after we reloaded <em class="emphasis">movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">Oct 14 22:56:34 terminator named[18764]: Sent NOTIFY for "movie.edu IN SOA 2000010958" (movie.edu); 2 NS, 2 A
+Oct 14 22:56:34 terminator named[18764]: Received NOTIFY answer (AA) from 192.249.249.1 for "movie.edu IN SOA"
+Oct 14 22:56:34 terminator named[18764]: Received NOTIFY answer (AA) from 192.249.249.9 for "movie.edu IN SOA"</pre></blockquote>
+
+
+The first message shows us the NOTIFY announcement that
+<em class="emphasis">terminator.movie.edu</em> sent, informing the two
+slaves (2 NS ) that the serial number of
+<em class="emphasis">movie.edu</em> is now 2000010958. The next two lines
+show the slave name servers confirming their receipt of the
+notification. (BIND 9 name servers don't usually log NOTIFY
+activity.)</p><p>
+
+
+Let's also look at a more complicated zone transfer scheme.
+Here, <em class="emphasis">a</em> is the primary master name server for
+the zone and <em class="emphasis">b</em> 's master server, but
+<em class="emphasis">b</em> is <em class="emphasis">c</em> 's master
+server. Moreover, <em class="emphasis">b</em> has two network interfaces.
+This setup is shown in <a href="ch10_03.html#dns4-CHP-10-FIG-2">Figure 10-2</a>.</p><p>
+
+
+<a name="dns4-CHP-10-FIG-2" /><div class="figure"><img height="246" alt="Figure 10-2" src="figs/dns4_1002.gif" width="298" /></div><h4 class="objtitle">Figure 10-2. Complex zone transfer example</h4>
+
+In this scenario, <em class="emphasis">a</em> notifies both <em class="emphasis">b
+</em>and <em class="emphasis">c</em> after the zone is updated.
+Then, <em class="emphasis">b</em> checks to see whether the zone's
+serial number has incremented and initiates a zone transfer. However,
+<em class="emphasis">c</em> ignores <em class="emphasis">a</em> 's NOTIFY
+announcement because <em class="emphasis">a</em> is not <em class="emphasis">c
+</em>'s configured master name server
+(<em class="emphasis">b</em> is). If <em class="emphasis">b</em> is running
+BIND 8.2.3 or BIND 9 or is explicitly configured to notify
+<em class="emphasis">c</em>, then after <em class="emphasis">b</em> 's
+zone transfer completes, it sendsa NOTIFY
+announcement to <em class="emphasis">c</em>, which prompts
+<em class="emphasis">c</em> to check the serial number <em class="emphasis">b
+</em>holds for the zone. If <em class="emphasis">c</em> is also
+running BIND 8.2.3 or BIND 9, it sends <em class="emphasis">b</em> a
+NOTIFY announcement after its zone transfer finishes, which
+<em class="emphasis">b</em>, naturally, ignores.</p><p>
+
+
+Note also that if there's any possibility that
+<em class="emphasis">c</em> will receive a NOTIFY announcement from
+<em class="emphasis">b</em> 's other network interface, <em class="emphasis">c
+</em>must be configured with both network interfaces'
+addresses in the zone's <em class="emphasis">masters
+</em>substatement, or else <em class="emphasis">c</em> will ignore
+NOTIFY announcements from the unknown interface.</p><p>
+
+
+BIND 4 slave name servers and other name servers that don't
+support NOTIFY will respond with a Not Implemented (NOTIMP) error.
+Note that the Microsoft DNS Server <em class="emphasis">does</em> support
+DNS NOTIFY.</p><p>
+
+
+In both BIND 8 and 9, DNS NOTIFY is on by default, but you can turn
+NOTIFY off globally with the substatement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	 notify no;
+};</pre></blockquote>
+
+
+You can also turn NOTIFY on or off for a particular zone. For
+example, say we know that all the slave name servers for our
+<em class="emphasis">fx.movie.edu</em> zone are running BIND 4 and
+therefore don't understand NOTIFY announcements. The
+<em class="emphasis">zone</em> statement:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type master;
+	file "db.fx.movie.edu";
+	notify no;
+};</pre></blockquote>
+
+
+avoids sending useless NOTIFY announcements to the slaves for
+<em class="emphasis">fx.movie.edu</em>. A zone-specific NOTIFY setting
+overrides any global setting for that zone. Unfortunately, neither
+BIND 8 nor BIND 9 allows you to turn off NOTIFY announcements on a
+server-by-server basis.</p><p>
+
+
+BIND 8 and 9 even have a provision for adding servers besides those
+in your zone's NS records to your
+"<a name="INDEX-1567" />NOTIFY
+list." For example, you may have one or more unregistered slave
+name servers (described in <a href="ch08_01.html">Chapter 8, "Growing Your Domain"</a>) and
+you'd like them to pick up changes to the zone quickly. Or you
+may have an older BIND 8 slave for the zone that is the master server
+for another slave and needs to send NOTIFY messages to the slave.</p><p>
+
+
+To add a server to your NOTIFY list, use the <em class="emphasis">also-notify
+</em>substatement of the <em class="emphasis">zone</em> statement:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+	type slave;
+	file "bak.fx.movie.edu";
+	notify yes;
+	also-notify { 15.255.152.4; }; // This is a BIND 8 slave, which
+                                    // must be explicitly configured
+                                    // to notify its slave
+};</pre></blockquote>
+
+
+In BIND 8.2.2 and later name servers, you can specify
+<em class="emphasis">also-notify</em> as an <em class="emphasis">options
+</em>substatement as well. This will apply to all zones for
+which NOTIFY is on (and that don't have their own
+<em class="emphasis">also-notify</em> substatements).</p><p>
+
+
+Beginning in BIND 9.1.0, you can specify
+<em class="emphasis">explicit</em> as an argument to the <em class="emphasis">notify
+</em>substatement; this suppresses NOTIFY messages to all name
+servers <em class="emphasis">except</em> those in the
+<em class="emphasis">also-notify</em> list. You can also use the
+<em class="emphasis">allow-notify</em> substatement to tell your name
+server to accept NOTIFY messages from name servers other than just
+the configured master name servers for a zone:</p><p>
+
+
+<blockquote><pre class="code">options {
+	allow-notify { 192.249.249.17; }; // let 192.249.249.17 send NOTIFY msgs
+};</pre></blockquote>
+
+
+As an <em class="emphasis">options</em> substatement,
+<em class="emphasis">allow-notify</em> affects all slave zones. When
+specified as a <em class="emphasis">zone</em> substatement,
+<em class="emphasis">allow-notify</em> overrides any global
+<em class="emphasis">allow-notify</em> for just<a name="INDEX-1568" /> that
+zone.<a name="INDEX-1569" /></p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.2. DNS Dynamic Update</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.4. Incremental Zone Transfer </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+</html>

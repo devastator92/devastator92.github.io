@@ -1,0 +1,338 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+<head><title>Organizing Your Files (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch07_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.3. Organizing Your Files</h2>
+
+
+<a name="INDEX-1063" />Back when
+you first set up your zones, organizing your files was
+simple -- you put them all in a single directory. There was one
+configuration file and a handful of zone data files. Over time,
+though, your responsibilities grew. More networks were added and
+hence more <em class="emphasis">in-addr.arpa</em>zones. Maybe you delegated a few subdomains. You started
+backing up zones for other sites. After a while, an <em class="filename">ls
+</em>of your name server directory no longer fit on a single
+screen. It's time to reorganize. BIND has a few features that
+will help with this reorganization.</p><p>
+
+
+BIND 4.9 and later name servers support a configuration file
+statement, called
+<em class="emphasis">include</em><a name="INDEX-1064" />, which allows you to insert the
+contents of a file into the current configuration file. This lets you
+take a very large configuration file and break it into smaller
+pieces.</p><p>
+
+
+Zone data files (for all BIND versions) support two<a href="#FOOTNOTE-52">[52]</a> control statements: $ORIGIN and $INCLUDE.
+The<a name="INDEX-1065" />$ORIGINstatement
+changes a zone data file's origin, and
+<a name="INDEX-1066" />$INCLUDE inserts a new file into the
+current zone data file. These control statements are not resource
+records; they facilitate the maintenance of DNS data. In particular,
+they make it easier for you to divide your zone into
+<a name="INDEX-1067" />
+<a name="INDEX-1068" />subdomains by allowing you to store the
+data for each subdomain in a separate file.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-52" />[52]Three if you count $TTL, which BIND 8.2 and later name servers
+support.</p><p>
+
+</blockquote>
+
+
+<a name="dns4-CHP-7-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">7.3.1. Using Several Directories</h3>
+
+
+<a name="INDEX-1069" />One way to organize your zone data
+files is to store them in separate directories. If your name server
+is a primary master for several sites' zones (both forward- and
+reverse-mapping), you could store each site's zone data files
+in its own directory. Another arrangement might be to store all the
+primary master zones' data files in one directory and all the
+backup zone data files in another. Let's look at what the BIND
+4 configuration file might look like if you chose to split up your
+primary master and slave zones:</p><p>
+
+
+<blockquote><pre class="code">directory /var/named
+;
+; These files are not specific to any zone
+;
+cache    .                         db.cache
+primary  0.0.127.in-addr.arpa      db.127.0.0
+;
+; These are our primary zone files
+;
+primary  movie.edu                 primary/db.movie.edu
+primary  249.249.192.in-addr.arpa  primary/db.192.249.249
+primary  253.253.192.in-addr.arpa  primary/db.192.253.253
+;
+; These are our slave zone files
+;
+secondary ora.com                  198.112.208.25 slave/bak.ora.com
+secondary 208.112.198.in-addr.arpa 198.112.208.25 slave/bak.198.112.208</pre></blockquote>
+
+
+Here's the same configuration file in BIND 8 format:</p><p>
+
+
+<blockquote><pre class="code">options { directory "/var/named"; };
+//
+// These files are not specific to any zone
+//
+zone "." {
+        type hint;
+        file "db.cache";
+};
+zone "0.0.127.in-addr.arpa" {
+        type master;
+        file "db.127.0.0";
+};
+//
+// These are our primary zone files
+//
+zone "movie.edu" {
+        type master;
+        file "primary/db.movie.edu";
+};
+zone "249.249.192.in-addr.arpa" {
+        type master;
+        file "primary/db.192.249.249";
+};
+zone "253.253.192.in-addr.arpa" {
+        type master;
+        file "primary/db.192.253.253";
+};
+//
+// These are our slave zone files
+//
+zone "ora.com" {
+        type slave;
+        file "slave/bak.ora.com";
+        masters { 198.112.208.25; };
+};
+zone "208.112.192.in-addr.arpa" {
+        type slave;
+        file "slave/bak.198.112.208";
+        masters { 198.112.208.25; };
+};</pre></blockquote>
+
+
+Another variation on this division is to break the configuration file
+into three files: the main file, a file that contains all the
+<em class="emphasis">primary</em> entries, and a file that contains all
+the <em class="emphasis">secondary</em> entries. Here's what the
+main BIND 4 configuration file might look like:</p><p>
+
+
+<blockquote><pre class="code">directory /var/named
+;
+; These files are not specific to any zone
+;
+cache    .                         db.cache
+primary  0.0.127.in-addr.arpa      db.127.0.0
+;
+include  named.boot.primary
+include  named.boot.slave</pre></blockquote>
+
+
+Here is <em class="filename">named.boot.primary </em>(BIND 4):</p><p>
+
+
+<blockquote><pre class="code">;
+; These are our primary zone files
+;
+primary  movie.edu                 primary/db.movie.edu
+primary  249.249.192.in-addr.arpa  primary/db.192.249.249
+primary  253.253.192.in-addr.arpa  primary/db.192.253.253</pre></blockquote>
+
+
+Here is <em class="filename">named.boot.slave </em>(BIND 4):</p><p>
+
+
+<blockquote><pre class="code">;
+; These are our slave zone files
+;
+secondary ora.com                  198.112.208.25 slave/bak.ora.com
+secondary 208.112.198.in-addr.arpa 198.112.208.25 slave/bak.198.112.208</pre></blockquote>
+
+
+Here are the same files in BIND 8 or 9 format:</p><p>
+
+
+<blockquote><pre class="code">options { directory "/var/named"; };
+//
+// These files are not specific to any zone
+//
+zone "." {
+        type hint;
+        file "db.cache";
+};
+zone "0.0.127.in-addr.arpa" {
+        type master;
+        file "db.127.0.0";
+};
+
+include "named.conf.primary";
+include "named.conf.slave";</pre></blockquote>
+
+
+Here is <em class="filename">named.conf.primary </em>(BIND 8 or 9):</p><p>
+
+
+<blockquote><pre class="code">//
+// These are our primary zone files
+//
+zone "movie.edu" {
+        type master;
+        file "primary/db.movie.edu";
+};
+zone "249.249.192.in-addr.arpa" {
+        type master;
+        file "primary/db.192.249.249";
+};
+zone "253.253.192.in-addr.arpa" {
+        type master;
+        file "primary/db.192.253.253";
+};</pre></blockquote>
+
+
+Here is <em class="filename">named.conf.slave </em>(BIND 8 or 9):</p><p>
+
+
+<blockquote><pre class="code">//
+// These are our slave zone files
+//
+zone "ora.com" {
+        type slave;
+        file "slave/bak.ora.com";
+        masters { 198.112.208.25; };
+};
+zone "208.112.192.in-addr.arpa" {
+        type slave;
+        file "slave/bak.198.112.208";
+        masters { 198.112.208.25; };
+};</pre></blockquote>
+
+
+You might think the organization would be better if you put the
+configuration file with the <em class="emphasis">primary</em> directives
+into the <em class="emphasis">primary</em> subdirectory by adding a new
+<em class="emphasis">directory</em> directive to change to this directory,
+and remove the <em class="filename">primary/ </em>from each of the
+filenames since the name server is now running in that directory.
+Then you could make comparable changes in the configuration file with
+the <em class="emphasis">secondary</em> lines. Unfortunately, that
+doesn't work. BIND 8 and 9 name servers allow you to define
+only a single working directory. BIND 4 name servers let you redefine
+the working directory with multiple <em class="emphasis">directory</em>
+directives, but that's more of an oversight than a feature.
+Things get rather confused when the name server keeps switching
+around to different directories -- backup zone data files end up
+in the last directory the name server changed to, and when the name
+server is reloaded, it may not be able to find the main configuration
+file if it isn't left in the directory where it started (if the
+configuration file is specified with a relative pathname).<a name="INDEX-1070" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">7.3.2. Changing the Origin in a Zone Data File</h3>
+
+
+With BIND, the default origin for the <a name="INDEX-1071" />
+<a name="INDEX-1072" />zone data files is the second
+field of the <em class="emphasis">primary</em> or
+<em class="emphasis">secondary</em> directive in a BIND 4
+<em class="filename">named.boot </em>file, or the second field of the
+<em class="emphasis">zone</em> statement in a BIND 8 or 9
+<em class="filename">named.conf</em> file. The origin is a domain name
+that is automatically appended to all names in the file that
+don't end in a dot. This origin can be changed in the zone data
+file with the <a name="INDEX-1073" />$ORIGIN control statement. In the zone
+data file, $ORIGIN is followed by a domain name. (Don't forget
+the trailing dot if you use the full domain name!) From this point
+on, all names that don't end in a dot have the new origin
+appended. If your zone (e.g., <em class="emphasis">movie.edu</em>) has a number of subdomains,
+you can use the $ORIGIN statement to reset the origin and simplify
+the zone data file. For example:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN classics.movie.edu.
+maltese       IN  A  192.253.253.100
+casablanca    IN  A  192.253.253.101
+
+$ORIGIN comedy.movie.edu.
+mash          IN  A  192.253.253.200
+twins         IN  A  192.253.253.201</pre></blockquote>
+
+
+We'll cover creating subdomains in more depth in <a href="ch09_01.html">Chapter 9, "Parenting"</a>.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">7.3.3. Including Other Zone Data Files</h3>
+
+
+Once you've subdivided your zone like this, you might find it
+more convenient to keep each subdomain's records in separate
+files. The <a name="INDEX-1074" />$INCLUDE control statement lets you do
+this:</p><p>
+
+
+<blockquote><pre class="code">$ORIGIN classics.movie.edu.
+$INCLUDE db.classics.movie.edu
+
+$ORIGIN comedy.movie.edu.
+$INCLUDE db.comedy.movie.edu</pre></blockquote>
+
+
+To simplify the file even further, you can specify the included file
+and the new origin on a single line:</p><p>
+
+
+<blockquote><pre class="code">$INCLUDE db.classics.movie.edu classics.movie.edu.
+$INCLUDE db.comedy.movie.edu   comedy.movie.edu.</pre></blockquote>
+
+
+When you specify the origin and the included file on a single line,
+the origin change applies only to the particular file that
+you're including. For example, the <em class="emphasis">comedy.movie.edu</em> origin applies only to
+the names in <em class="filename">db.comedy.movie.edu</em>. After
+<em class="filename">db.comedy.movie.edu </em>has been included, the
+origin returns to what it was before $INCLUDE, even if there was an
+$ORIGIN statement within
+<em class="filename">db.comedy.movie.edu</em>.<a name="INDEX-1075" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.2. Updating Zone Data Files</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.4. Changing System File Locations in BIND 8 and 9</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+</html>

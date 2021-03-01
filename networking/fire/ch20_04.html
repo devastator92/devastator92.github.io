@@ -1,0 +1,663 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+<head><title>The Windows Browser (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch20_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">20.4. The Windows Browser</h2>
+
+
+
+
+
+<a name="INDEX-1900" /> <a name="INDEX-1901" /> <a name="INDEX-1902" />The information that Windows machines
+display in the Network Neighborhood and in other places where you can
+pick a computer from a list comes from a server known as the Windows
+Browser. This is a separate service from name resolution and is not
+just dependent on name resolution, but also intertwined with it. In
+particular, machines use special names to locate Browser servers, and
+those names are sometimes registered and resolved exceptionally. The
+Browser service is responsible for most of the mysterious broadcast
+packets to port 138 that you will see on Windows networks, and a
+significant number of the mysterious headaches suffered by Windows
+administrators. The headaches are greatly magnified by the fact that
+very few people understand exactly what Browser service is supposed
+to do, let alone how it does it.</p><p>
+
+
+
+
+
+The Browser service is responsible only for maintaining lists of
+computers so that human beings can pick them from the list instead of
+having to be able to type the computer's name. The Browser does
+not list the resources actually available on the computer; it
+isn't part of WINS, much less the same thing as WINS; and it
+isn't involved in any direct interactions between servers and
+clients. It's not at all unusual for a machine to be visible
+via the Browser but not actually accessible, and this is not a
+problem with the Browser. If it is accessible but unintentionally
+invisible, that's a Browser problem but not a surprise.</p><p>
+
+
+
+
+
+Originally, Windows Browser service was entirely broadcast-based. A
+number of complicated changes have been made to allow it to work
+across routers, so that in theory if a network stays the same for
+long enough, and contains enough Windows NT machines, browsing
+information will stabilize and propagate across the entire network.
+For a complex network, this process may take a considerable amount of
+time and in fact will often take longer than the average delay
+between network changes.</p><p>
+
+
+
+
+
+<a name="ch20-32-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.1. Domains and Workgroups</h3>
+
+
+
+
+
+<a name="INDEX-1903" /> <a name="INDEX-1904" />
+<a name="INDEX-1905" /> <a name="INDEX-1906" />Every
+machine on a Windows network must be part of some domain or
+workgroup. A <em class="emphasis">workgroup</em> is simply a collection of
+machines that share the same workgroup registration; there are no
+controls over what machines can be in a workgroup. Being a member of
+a workgroup is like being a sports fan; if you say you're part
+of the group, then you are.</p><p>
+
+
+
+
+
+A <em class="emphasis">domain</em> is an administrative entity where there
+is a centralized source of information (a domain controller). Joining
+a domain is like joining an exclusive club; you have to be admitted
+by the administration. Unfortunately, it is possible to create a
+workgroup with the same name as a domain.</p><p>
+
+
+
+
+
+The Browser service was created before domains, and as a result, it
+is not fully aware of the distinction between workgroups and domains.
+It treats them identically and pretends that they are domains (both
+by calling them domains and by assuming that every group of
+workstations that it knows about has a contactable domain
+controller).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-33-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.2. Windows Browser Roles</h3>
+
+
+
+
+
+A Browser server contains information about a single domain, which it
+gathers by listening to the registrations broadcast by machines at
+boot time. Since the Browser is primarily broadcast-based, many
+things about the Browser apply to the set of machines that are
+reachable by broadcast. For convenience, we'll call this set of
+machines a <em class="emphasis">subnet</em>, although depending on how you
+configure your network it may not technically be a subnet.</p><p>
+
+
+
+
+
+ost machines that know about Browser service are capable of being
+Browser servers, and it is perfectly legitimate for multiple machines
+on the same subnet to be Browser servers for the same domain or
+workgroup. These machines will use broadcast to elect a master
+browser. There will always be exactly one master browser per subnet
+per domain or workgroup. A single subnet may have multiple master
+browsers for different domains or workgroups, and a single domain or
+workgroup may have multiple master browsers on different subnets.
+<a href="ch20_04.html#ch20-34836">Figure 20-7</a> shows a network with multiple subnets
+and multiple domains and the resulting browser configuration.</p><p>
+
+
+
+
+
+<a name="ch20-34836" /><div class="figure"><img height="217" alt="Figure 20-7" src="figs/fire2.2007.gif" width="471" /></div><h4 class="objtitle">Figure 20-7. Master browsers in a network with multiple domains and multiple subnets</h4>
+
+In general, users don't care about subnet boundaries; they want
+to know about all the machines in a domain or workgroup, regardless
+of what subnet they're on. Since Browser servers collect data
+via broadcast, it requires some mechanism for master browsers on
+different networks to synchronize information. In a workgroup
+configuration, there is simply no way for this to occur. Workgroups
+have no centralized structure. In a domain configuration, however,
+there is a central source of information (the domain controller), and
+the master browsers for a domain will all synchronize to it. The
+domain controller's centralized Browser server is called a
+<em class="emphasis">domain master browser</em>.</p><p>
+
+
+
+
+
+Browser servers do not initiate transactions to individual hosts by
+their normal names. Instead, the Browser sends out broadcast packets
+or unicast packets to special hostnames. The Browser does not need to
+know how to find other servers; it simply tries to send packets to
+the name that the server would be using if it existed. If no server
+is there, name resolution will fail (for unicast packets), or the
+broadcast will be ignored (for broadcast packets). The Browser
+simplifies things still further by not even attempting name
+resolution for most group names and simply sending out broadcasts
+with a destination NetBIOS name set. Hosts that are not part of the
+group will ignore the broadcasts.</p><p>
+
+
+
+
+
+The following sections describe the browser roles and the names
+associated with them.</p><p>
+
+
+
+
+
+<a name="ch20-34-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.1. Domain master browser</h3>
+
+
+
+
+
+<a name="INDEX-1907" /><a name="INDEX-1908" />The domain master
+browser registers a unique name with the name of the domain and the
+type 1B. It is always the primary domain controller. Because it is a
+domain controller, it also registers a group name with the name of
+the domain and the type 1C. Aside from registering the name, the
+domain master browser takes no special actions. Other master browsers
+will initiate connections to it for synchronization. (This will be
+true whether or not there is an actual domain master browser, since
+the Browser assumes that everything is a domain. If there is no
+domain master browser, or it is unreachable, the amount of name
+resolution traffic will be significant as master browsers try to
+resolve the 1B and 1C names.)</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-35-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.2. Master browser</h3>
+
+
+
+
+
+<a name="INDEX-1909" />A master browser registers a unique
+name with the name of the domain and the type 1D. This represents a
+problem for WINS because WINS spans multiple subnets. It's
+legal for more than one master browser to exist, as long as
+they're on different subnets, but if they're all talking
+to the same WINS server, they shouldn't be able to register the
+name as a unique name. This is dealt with by having WINS treat the
+type 1D as special. WINS servers will return success for any attempt
+to register a unique name with type 1D, and failure for any attempt
+to resolve such a name. This allows the broadcast-based NetBT name
+service to handle uniqueness and resolution for master browsers.</p><p>
+
+
+
+
+
+A master browser also registers the group name _MSBROWSE_, which is
+used to distribute information among master browsers so that each one
+has the full list of available domains and workgroups.</p><p>
+
+
+
+
+
+aster browsers collect information from broadcasts to build up a
+list of all hosts in the domain or workgroup that they are
+responsible for, and to build up a list of other domains and
+workgroups and their master browsers.</p><p>
+
+
+
+
+
+aster browsers initiate four types of communication:</p><p>
+
+
+
+
+
+<ul><li>They broadcast their lists of hosts and domains to the backup
+browsers (using the group with the name of the domain and the type
+1E).</p><p></li><li>They broadcast their domain and name to the other master browsers
+(using the group _MSBROWSE_).</p><p></li><li>They synchronize their lists of hosts and domains with their domain
+master browser (using the unique name with the name of the domain and
+the type 1B or, if that fails, the group name with the name of the
+domain and the type 1C).</p><p></li><li>They tell machines that are potential browsers to become backup
+browsers (using a packet that is an IP unicast but has a NetBT
+destination of the group name with the name of the domain and the
+type 1E).</p><p></li></ul>
+In addition, master browsers get requests from clients and return
+lists of backup browsers.<a name="INDEX-1910" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-36-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.3. Backup browsers</h3>
+
+
+
+
+
+<a name="INDEX-1911" />Backup browsers have two functions:
+they take requests from clients and return actual data, and they
+participate in elections to select a master browser. Backup browsers
+register a group name with the name of the domain and the type 1E.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-37-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.4. Potential browsers</h3>
+
+
+
+
+
+Potential browsers register a group name with the name of the domain
+and the type 1E. They participate in elections, but otherwise do
+nothing unless they are promoted to backup browsers.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-38-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.5. Browseable server</h3>
+
+
+
+
+
+Any machine that has a service that should show up in the browser
+sends an announcement every 12 minutes to a group with the name of
+the domain and the type 1D.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch20-39-fm2xml" /><div class="sect3">
+<h3 class="sect3">20.4.2.6. Browser client</h3>
+
+
+
+
+
+<a name="INDEX-1912" />A client that's in the domain
+"netherworld" and wants to look up a browse list for the
+domain "limbo" goes through the following steps:</p><p>
+
+
+
+
+
+<ol><li>Sends a GetBackupListRequest via a NetBT message at UDP port 138 to
+the special unique name "netherworld&lt;1d&gt;" (this is
+sent as an IP broadcast and is processed only by the local master
+browser).</p><p></li><li>Sends a GetBackupListRequest to the unique name
+"netherworld&lt;1b&gt;" (this is sent as an IP unicast
+because it's a unique name, and it goes to the domain master
+browser, which is also the primary domain controller).</p><p></li><li>Gets back two lists of servers, which contain computer names.</p></li><li>Selects three of the servers listed in the browser lists provided to
+it and saves them for future browsing.</p><p></li><li>Asks one of those three servers for a list of domains and workgroups;
+this comes back with the names of the domains or workgroups and the
+computer name of the local master browser for each one. This is a
+NetBT session conversation at TCP port 139.</p><p></li><li>Sends a name resolution query for the name
+"limbo&lt;1d&gt;" via broadcast to UDP port 137 (NetBT
+name service). This is a special query that is done over broadcast
+even on a machine that would otherwise try WINS before broadcast.</p><p></li><li>If step 6 succeeded, sends a request for a
+list of members to the machine "limbo&lt;1d&gt;". This is
+once again a NetBT session conversation at TCP port 139.</p><p></li><li>If there was no response to the previous request, resolves the
+computer name listed as the master browser for domain
+"limbo" by the machine's standard name resolution
+procedure and connects to it over NetBT session for a list of
+members.</p><p></li></ol>
+If the client wanted a member list for its own domain, it would send
+that request at step 5. If there is no
+response to the initial GetBackupList requests, both requests are
+retried up to three times, and if there is still no response, the
+client starts an election. The client starts an election only if both
+GetBackupList requests fail.<a name="INDEX-1913" /><a name="INDEX-1914" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-40-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.3. Browser Elections</h3>
+
+
+
+
+
+<a name="INDEX-1915" />Elections
+are one of the best-documented parts of the Browser protocol; for the
+details on how they work, consult almost any book on Microsoft
+networking (for instance, Microsoft's <em class="emphasis">Windows NT
+Server Networking Guide,</em> mentioned earlier). In outline,
+the procedure is that a machine that wants an election to occur sends
+a packet to the IP broadcast address with the NetBT destination of
+the group with the name of the domain and the type 1E. This packet
+includes several parameters that indicate the machine's
+qualifications to be master browser. Each browser that gets the
+packet compares those qualifications to its own and sends another
+election packet if it is more qualified. A machine that sends out an
+election packet without getting a response from a more qualified
+machine will send out three more; once a machine has sent out four
+election packets without seeing a response from a more qualified
+machine, it will consider itself elected and send out a master
+browser announcement.</p><p>
+
+
+
+
+
+Because master browsers are important for the speed with which
+browsing works, elections are designed to prefer more stable
+machines. Election qualifications include a parameter that depends on
+the machine's operating system version (Windows NT Server is
+better than Windows NT Workstation is better than Windows 95), plus a
+parameter specific to the browser, which you can think of as an
+indication of how much the machine wants to win, and a parameter that
+depends on the machine's uptime (longer uptime wins). Master
+browser announcements include information about some of these
+parameters (in particular, the operating system type and part of the
+browser-specific information).</p><p>
+
+
+
+
+
+There are two situations in which machines will decide to call
+elections:</p><p>
+
+
+
+
+
+<ul><li>A client will call an election if it tries to find a master browser
+and cannot. In this case, it will send out an election packet that is
+guaranteed to lose (all the parameters are set to zero). This is
+called an <em class="emphasis">election force.</em> If the client is also
+a potential browser server, it will not send out its real election
+packet unless it gets one from a less-qualified candidate, or it gets
+no response to repeated election force attempts.</p><p></li><li>A browser server will call an election if it receives a master
+browser announcement from a less qualified machine. This should
+normally happen only when a more qualified machine boots onto a
+network (for instance, when a machine running Windows NT Server comes
+onto a network of machines running Windows 98). However, you may see
+less qualified machines boot and immediately claim to be master
+servers, thereby forcing elections on otherwise stable networks.
+<a name="INDEX-1916" /></p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-41-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.4. Security Implications of the Windows Browser</h3>
+
+
+
+
+
+<a name="INDEX-1917" />
+<a name="INDEX-1918" />Obviously,
+the Windows Browser gives out security-critical information (valid
+hostnames). Less obviously, it has many fewer security implications
+than WINS does. The Browser provides information in bulk, unlike
+WINS, but it provides only hostname information, while WINS
+coincidentally provides much more sensitive information about valid
+usernames and current logins. Various sorts of denial of service and
+network flooding attacks can be carried out via the Browser, but the
+Browser has no equivalent of a WINS server that can be used as a
+magnifier and distributor to carry attacks to networks that the
+attacker is not connected to. You can spread misinformation via the
+Browser, but doing so is merely confusing; unless the misinformation
+is actually in NetBT name service as well, connections will simply
+fail.</p><p>
+
+
+
+
+
+This is all highly theoretical, however, since making the Windows
+Browser work requires making all of NetBT work. You can't allow
+the relatively safe Windows Browser without also allowing the highly
+unsafe NetBT name service. If you do allow all of NetBT, adding the
+Windows Browser is a relatively small decrease in security. (From a
+purely practical standpoint, as opposed to a security standpoint, we
+advise against it; while the security problem is small, the
+administrative problem is extremely large, and the Browser almost
+never works well, or even predictably, in complex
+networks.)<a name="INDEX-1919" /> <a name="INDEX-1920" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-42-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.5. Packet Filtering Characteristics of the Windows Browser</h3>
+
+
+
+
+
+The Windows Browser depends on NetBT name service at port 137 (UDP
+and TCP, broadcast and unicast), NetBT datagram service at port 138
+(UDP, broadcast, and unicast), and NetBT session service at port 139
+(TCP, unicast only). Packet filtering characteristics of NetBT
+session and datagram service are discussed in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>; NetBT name service is discussed earlier in
+this chapter.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-43-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.6. Proxying Characteristics of the Windows Browser</h3>
+
+
+
+
+
+Because the Browser is strongly based on broadcasts, standard
+proxying systems will not work with it. It is possible to use router
+configurations to forward broadcasts, but this is not terribly
+effective with the Browser because of the large amount of traffic
+involved and the multiple port numbers used.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-44-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.7. Network Address Translation Characteristics of the Windows Browser</h3>
+
+
+
+
+
+Not only does the Browser use NetBT (which has embedded IP
+addresses), it also relies on many-to-many communication via
+broadcasts. This is not a promising situation for network address
+translation. In particular, it is not possible to conserve address
+space using network address translation and the Browser, since all
+hosts must be able to speak to all other hosts. Furthermore, unlike
+many NetBT-based protocols, the Browser actually uses the embedded IP
+addresses in some situations and will need them to be correct.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch20-45-fm2xml" /><div class="sect2">
+<h3 class="sect2">20.4.8. Summary of Recommendations for the Windows Browser</h3>
+
+
+
+
+
+<ul><li>Do not allow access to the Windows Browser across your
+firewall.<a name="INDEX-1921" /> <a name="INDEX-1922" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch20_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">20.3. NetBIOS for TCP/IP Name Service and Windows Internet Name Service</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">20.5. Lightweight Directory Access Protocol </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch20_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:38 GMT -->
+</html>

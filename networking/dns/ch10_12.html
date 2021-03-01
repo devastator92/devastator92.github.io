@@ -1,0 +1,778 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_12.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>System Tuning (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_11.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_13.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.12. System Tuning</h2>
+
+
+<a name="INDEX-1661" /> <a name="INDEX-1662" />While for many name servers
+BIND's default configuration values work just fine, yours may
+be one of those that need some further tuning. In this section, we
+discuss all the various dials and switches available to you to tune
+your name server.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-12.1" /><div class="sect2">
+<h3 class="sect2">10.12.1. Zone Transfers</h3>
+
+
+<a name="INDEX-1663" />Zone
+transfers can place a heavy load on a name server. On BIND 4 name
+servers, outbound zone transfers (transfers of a zone the server is
+master for) require <em class="emphasis">fork( )</em> ing the
+<em class="emphasis">named</em> process, thereby using a significant
+amount of extra memory. BIND 4.9 introduced mechanisms for limiting
+the zone transfer load that your name server places on its master
+servers. BIND 8 and 9 have these mechanisms and more.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-12.1.1" /><div class="sect3">
+<h3 class="sect3">10.12.1.1. Limiting transfers requested per name server</h3>
+
+
+With BIND 4.9 and later, you can limit the number of zones your
+<a name="INDEX-1664" />name server
+<a name="INDEX-1665" />requests from a single remote name
+server. This will make the administrator of the remote name server
+happy because his host won't be pounded for zone transfers if
+all of the zones change -- important if hundreds of zones are
+involved.</p><p>
+
+
+In BIND 8 and 9, the config file statement is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	transfers-per-ns 2;
+};</pre></blockquote>
+
+
+The equivalent BIND 4 boot file directive is:</p><p>
+
+
+<a name="INDEX-1666" /><a name="INDEX-1667" /><blockquote><pre class="code">limit transfers-per-ns 2</pre></blockquote>
+
+
+In BIND 9, you can also set the limit on a server-by-server basis
+instead of globally. To do this, use the
+<em class="emphasis">transfers</em> substatement inside a <em class="emphasis">server
+</em>statement, where the server is the name server you'd
+like to specify the limit for:</p><p>
+
+
+<blockquote><pre class="code">server 192.168.1.2 {
+	transfers 2;
+};</pre></blockquote>
+
+
+This overrides any global limit set in the <em class="emphasis">options
+</em>statement. The default limit is two active zone transfers
+per name server. That limit may seem small, but it works.
+Here's what happens: suppose your name server needs to load
+four zones from a remote name server. Your name server starts
+transferring the first two zones and wait to transfer the third and
+fourth zones. After one of the first two zone transfers completes,
+the name server begins transferring the third zone. After another
+transfer completes, the name server starts transferring the fourth
+zone. The net result is the same as before there were
+limits -- all the zones are transferred -- but the work is
+spread out.</p><p>
+
+
+When might you need to increase this limit? You might notice that it
+is taking too long to synch up with the remote name server, and you
+know that the reason is the serializing of transfers -- not just
+that the network between the hosts is slow. This probably matters
+only if you're maintaining hundreds or thousands of zones. You
+also need to make sure that the remote name server and the networks
+in between can handle the additional workload of more simultaneous
+zone transfers.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.1.2" /><div class="sect3">
+<h3 class="sect3">10.12.1.2. Limiting the total number of zone transfers requested</h3>
+
+
+The last limit dealt with the zone transfers requested from a single
+remote name server. This limit deals with multiple remote name
+servers. BIND Versions 4.9 and later let you limit the total number
+of zones your name server can request at any one time. The default
+limit is 10. As we explained previously, your name server will pull
+only two zones from any single remote server by default. If your name
+server is transferring two zones from each of five remote servers,
+your server has hit the limit and will postpone any further transfers
+until one of the current transfers finishes.</p><p>
+
+
+The BIND 8 and 9 <em class="emphasis">named.conf</em> file statement is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	transfers-in 10;
+};</pre></blockquote>
+
+
+The equivalent BIND 4 boot file directive is:</p><p>
+
+
+<a name="INDEX-1668" /><a name="INDEX-1669" /><blockquote><pre class="code">limit transfers-in 10</pre></blockquote>
+
+
+If your host or network cannot handle 10 active zone transfers, you
+should decrease this number. If you run a server that supports
+hundreds or thousands of zones and your host and network can support
+the load, you might want to raise this limit. If you raise this
+limit, you may also need to raise the limit for the number of
+transfers per name server. (For example, if your name server loads
+from only four remote name servers and your name server will start
+only two transfers per remote name server, then your server will have
+at most eight active zone transfers. Increasing the limit for the
+total number of zone transfers won't have any effect unless you
+also increase the per-name server limit.)</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.1.3" /><div class="sect3">
+<h3 class="sect3">10.12.1.3. Limiting the total number of zone transfers served</h3>
+
+
+BIND 9 name servers can also limit the number of zone transfers
+they'll <em class="emphasis">serve</em> simultaneously. This is
+arguably more useful than limiting the number you'll request,
+since without it you'd have to rely on the kindness of the
+administrators who run your slave name servers not to overload your
+master server. The BIND 9 statement is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	transfers-out 10;
+};</pre></blockquote>
+
+
+The default limit is 10.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.1.4" /><div class="sect3">
+<h3 class="sect3">10.12.1.4. Limiting the duration of a zone transfer</h3>
+
+
+BIND 8 and 9 also let you limit the duration of an inbound zone
+transfer. By default, zone transfers are limited to 120 minutes, or
+two hours. The idea is that a zone transfer taking longer than 120
+minutes is probably hung and won't complete, and the process is
+taking up resources unnecessarily. If you'd like a smaller or
+larger limit, perhaps because you know that your name server is a
+slave for a zone that normally takes more than 120 minutes to
+transfer, you can use this statement:</p><p>
+
+
+<blockquote><pre class="code">options {
+	max-transfer-time-in 180;
+};</pre></blockquote>
+
+
+You can even place a limit on transfers of a particular zone by using
+the <em class="emphasis">max-transfer-time-in
+</em><a name="INDEX-1670" />substatement inside a
+<em class="emphasis">zone</em> statement. For example, if you know that
+the <em class="emphasis">rinkydink.com</em> zone always takes a long time
+(say three hours) to transfer, either because of its size or because
+the links to the master name server are so slow, but you'd
+still like a shorter time limit (maybe an hour) on other zone
+transfers, you could use:</p><p>
+
+
+<blockquote><pre class="code">options {
+	max-transfer-time-in 60;
+};
+
+zone "rinkydink.com" {
+	type slave;
+	file "bak.rinkydink.com";
+	masters { 192.168.1.2; };
+	max-transfer-time-in 180;
+};</pre></blockquote>
+
+
+In BIND 9, there's also a
+<em class="emphasis">max-transfer-time-out</em><a name="INDEX-1671" /> substatement that can be used the
+same way (either within an <em class="emphasis">options</em> statement or
+a <em class="emphasis">zone</em> statement). It controls how long an
+outbound zone transfer (i.e., a transfer to a slave) can run and has
+the same default value (120 minutes) as
+<em class="emphasis">max-transfer-time-in</em>.</p><p>
+
+
+BIND 9 name servers even let you limit zone transfer idle time, the
+length of time since the zone transfer made any progress. The two
+configuration substatements, <em class="emphasis">max-transfer-idle-in
+</em><a name="INDEX-1672" />and
+<em class="emphasis">max-transfer-idle-out</em><a name="INDEX-1673" />, control how long an inbound and
+an outbound zone transfer can be idle, respectively. Like the
+transfer time limits, both can be used as either an
+<em class="emphasis">options</em> substatement or a <em class="emphasis">zone
+</em>substatement. The default limit on idle time is 60
+minutes.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.1.5" /><div class="sect3">
+<h3 class="sect3">10.12.1.5. Limiting the frequency of zone transfers</h3>
+
+
+It's possible to set a zone's refresh interval so low as
+to cause slave name servers for that zone undue work. For example, if
+your name server is a slave for thousands of zones and the
+administrators of some of those zones set their refresh intervals to
+very small values, your name server may not be able to keep up with
+all the refreshing it needs to do. (If you run a name server
+that's a slave for that many zones, be sure to read the later
+section "Limiting the number of SOA queries"; you may
+also need to tune the number of SOA queries allowed.) On the other
+hand, it's possible for an inexperienced administrator to set
+her zone's refresh interval so high as to cause prolonged
+inconsistencies between the zone's primary master and slave
+name servers.</p><p>
+
+
+BIND Versions 9.1.0 and later let you limit the refresh interval with
+<em class="emphasis">max-refresh-time</em><a name="INDEX-1674" /> and
+<em class="emphasis">min-refresh-time</em><a name="INDEX-1675" />. These substatements bracket the
+refresh value for all master, slave, and stub zones if used as an
+<em class="emphasis">options</em> substatement, or just for a particular
+zone if used as a <em class="emphasis">zone</em> substatement. Both take a
+number of seconds as an argument:</p><p>
+
+
+<blockquote><pre class="code">options {
+	max-refresh-time 86400;    // refresh should never be more than a day
+	min-refresh-time 1800;     // or less than 30 minutes
+};</pre></blockquote>
+
+
+BIND 9.1.0 and later name servers also let you limit the retry
+interval with the <em class="emphasis">max-retry-time
+</em><a name="INDEX-1676" />and
+<em class="emphasis">min-retry-time</em><a name="INDEX-1677" /> substatements, which use the same
+syntax.<a name="INDEX-1678" /></p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.1.6" /><div class="sect3">
+<h3 class="sect3">10.12.1.6. More efficient zone transfers</h3>
+
+
+A <a name="INDEX-1679" />zone
+<a name="INDEX-1680" />transfer, as we said
+earlier, is composed of many DNS messages sent end-to-end over a TCP
+connection. Traditional zone transfers put only a single resource
+record in each DNS message. That's a waste of space: you need a
+full header on each DNS message, even though you're carrying
+only a single record. It's like being the only person in a
+Chevy Suburban. A TCP-based DNS message couldcarry many more records: its maximum size is a whopping 64
+KB!</p><p>
+
+
+BIND 8 and 9 name servers understand a new zone transfer format,
+called <em class="emphasis">many-answers</em>. The <em class="emphasis">many-answers
+</em><a name="INDEX-1681" />format puts as many records as possible
+into a single DNS message. The result is that a
+<em class="emphasis">many-answers</em> zone transfer takes less bandwidth
+because there's less overhead, and less CPU time because less
+time is spent unmarshaling DNS messages.</p><p>
+
+
+The <a name="INDEX-1682" /><em class="emphasis">transfer-format
+</em>substatement controls which zone transfer format the name
+server uses for zones for which it is a master. That is, it
+determines the format of the zones that your name server transfers to
+its slaves. <em class="emphasis">transfer-format</em> is both an
+<em class="emphasis">options</em> substatement and a <em class="emphasis">server
+</em>substatement; as an <em class="emphasis">options
+</em>substatement, <em class="emphasis">transfer-format
+</em>controls the name server's global zone transfer
+format. BIND 8's default is to use the old <em class="emphasis">one-answer
+</em><a name="INDEX-1683" />zone
+transfer format for interoperability with BIND 4 name servers. BIND
+9's default is to use the <em class="emphasis">many-answers
+</em>format. The statement:</p><p>
+
+
+<a name="INDEX-1684" /><blockquote><pre class="code">options {
+	transfer-format many-answers;
+};</pre></blockquote>
+
+
+changes the name server's settings to use the
+<em class="emphasis">many-answers</em> format for zone transfers to all
+slave servers, unless a <em class="emphasis">server</em> statement like
+the following explicitly says otherwise:</p><p>
+
+
+<blockquote><pre class="code">server 192.168.1.2 {
+	transfer-format one-answer;
+};</pre></blockquote>
+
+
+The one downside to using the <em class="emphasis">many-answers
+</em>format is that zone transfers can actually take longer to
+complete using the new format, despite being more efficient from a
+bandwidth and CPU utilization point of view.</p><p>
+
+
+If you'd like to take advantage of the new, more efficient zone
+transfers, do one of the following:</p><p>
+
+
+<ul><li>Set your name server's global zone transfer format to
+<em class="emphasis">many-answers</em> (or don't add one at all if
+you're running BIND 9) if most of your slaves run BIND 8, BIND
+9, or Microsoft's DNS Server, which also understands the
+format.</p></li><li>Set your name server's global zone transfer format to
+<em class="emphasis">one-answer</em>, if most of your slaves run BIND 4.
+Then use the <em class="emphasis">transfer-format server</em> substatement
+to adjust the global setting for exceptional servers.</p></li></ul>
+Remember that if you run BIND 9, you'll need to add an explicit
+<em class="emphasis">server</em> statement for all BIND 4 slaves to change
+their transfer formats to <em class="emphasis">one-answer</em>.</p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-12.2" /><div class="sect2">
+<h3 class="sect2">10.12.2. Resource Limits</h3>
+
+
+<a name="INDEX-1685" />
+<a name="INDEX-1686" />Sometimes you just want to tell the
+name server to stop being so greedy: don't use more than this
+much memory, don't open more than this many files. BIND 4.9
+introduced these limits, and, as with so many features, BIND 8 and 9
+give you several new variations.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-12.2.1" /><div class="sect3">
+<h3 class="sect3">10.12.2.1. Changing the data segment size limit</h3>
+
+
+<a name="INDEX-1687" />
+<a name="INDEX-1688" />Some operating systems place a
+default limit on the amount of memory a process can use. If your OS
+ever prevents your name server from allocating additional memory, the
+server will panic or exit. Unless your name server handles an
+extremely large amount of data or the limit is very small, you
+won't run into this limit. But if you do, BIND 4.9 and 8 as
+well as BIND 9.1.0 and later name servers have configuration options
+to change the system's default limit on data segment size. You
+might use these options to set a higher limit for
+<em class="emphasis">named</em> than the default system limit.</p><p>
+
+
+For BIND 8 and 9, the statement is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	datasize size          
+};</pre></blockquote>
+
+
+For BIND 4, the directive is:</p><p>
+
+
+<a name="INDEX-1689" /><a name="INDEX-1690" /><blockquote><pre class="code">limit datasize size</pre></blockquote>
+
+
+<em class="emphasis">size</em> is an integer value, specified in bytes by
+default. You can specify a unit other than bytes by appending a
+character: k (kilobyte), m (megabyte), or g (gigabyte). For example,
+"64m" is 64 megabytes.</p><p>
+
+
+<a name="ch10-36-fm2xml" /><blockquote><b>TIP: </b>
+Not all systems support increasing the data segment size for
+individual processes. If your system doesn't, the name server
+will issue a <em class="emphasis">syslog</em> message at level LOG_WARNING
+to tell you that this feature is not implemented.</p><p>
+
+</blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.2.2" /><div class="sect3">
+<h3 class="sect3">10.12.2.2. Changing the stack size limit</h3>
+
+
+<a name="INDEX-1691" />In addition to allowing you to change
+the limit on the size of the name server's data segment, BIND 8
+and BIND 9.1.0 and later name servers let you adjust the limit the
+system places on the amount of memory the <em class="emphasis">named</em>
+process's stack can use. The syntax
+is:<a name="INDEX-1692" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	stacksize size;
+};</pre></blockquote>
+
+
+where <em class="emphasis">size</em> is specified as in
+<em class="emphasis">datasize</em>. Like <em class="emphasis">datasize</em>,
+this feature works only on systems that permit a process to modify
+the stack size limit.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.2.3" /><div class="sect3">
+<h3 class="sect3">10.12.2.3. Changing the core size limit</h3>
+
+
+<a name="INDEX-1693" />If
+you don't appreciate <em class="emphasis">named</em> 's
+leaving huge core files lying around on your filesystem, you can at
+least make them smaller by using <em class="emphasis">coresize</em>.
+Conversely, if <em class="emphasis">named</em> hasn't been able to
+dump an entire core file because of a tight operating system limit,
+you may be able to raise that limit with
+<em class="emphasis">coresize</em>.</p><p>
+
+
+<a name="INDEX-1694" /><em class="emphasis">coresize</em>'s
+syntax is:</p><p>
+
+
+<blockquote><pre class="code">options {
+	coresize size;
+};</pre></blockquote>
+
+
+Again, as with <em class="emphasis">datasize</em>, this feature works only
+on operating systems that let processes modify the limit on core file
+size, and doesn't work on versions of BIND 9 before 9.1.0.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.2.4" /><div class="sect3">
+<h3 class="sect3">10.12.2.4. Changing the open files limit</h3>
+
+
+If your name server is authoritative for a lot of zones, the
+<em class="emphasis">named</em> process opens lots of
+<a name="INDEX-1695" />files when
+it starts up -- one per authoritative zone, assuming you use
+backup zone data files on the zones you're a slave for.
+Likewise, if the host running your name server has lots of virtual
+network interfaces,<a href="#FOOTNOTE-79">[79]</a>
+<em class="emphasis">named</em> requires one file descriptor per
+interface. Most Unix operating systems place a limit on the number of
+files any process can open concurrently. If your name server tries to
+open more files than this limit permits, you'll see this
+message in your <em class="emphasis">syslog</em> output:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-79" />[79]<a href="ch14_01.html">Chapter 14, "Troubleshooting DNS and BIND"</a>,
+describes better solutions to the "Too many open files"
+problem than bumping up the limit on files.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">named[pid]: socket(SOCK_RAW): Too many open files</pre></blockquote>
+
+
+If your operating system also permits changing that limit on a
+per-process basis, you can increase it using BIND's
+<em class="emphasis">files</em> substatement:<a name="INDEX-1696" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	files number;
+};</pre></blockquote>
+
+
+The default is <em class="emphasis">unlimited</em> (which is also a valid
+value), although this just means that the name server doesn't
+place a limit on the number of concurrently open files; the operating
+system may, however. And though we know you're sick of our
+saying it, BIND 9 doesn't support this until 9.1.0.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.2.5" /><div class="sect3">
+<h3 class="sect3">10.12.2.5. Limiting the number of clients</h3>
+
+
+BIND 9 gives you the ability to restrict the number of
+<a name="INDEX-1697" />clients your name server will serve
+concurrently. You can apply a limit to the number of recursive
+clients (resolvers plus name servers using your name server as a
+forwarder) with the
+<em class="emphasis">recursive-clients</em><a name="INDEX-1698" /> substatement:</p><p>
+
+
+<a name="INDEX-1699" /><blockquote><pre class="code">options {
+	recursive-clients 10;
+};</pre></blockquote>
+
+
+The default limit is 1000. If you find your name server refusing
+recursive queries and logging, as shown by an error message like this
+one:</p><p>
+
+
+<blockquote><pre class="code">Sep 22 02:26:11 terminator named[13979]: client 192.249.249.151#1677: no more 
+recursive clients: quota reached</pre></blockquote>
+
+
+you may want to increase the limit. Conversely, if you find your name
+server struggling to keep up with the deluge of recursive queries it
+receives, you could lower the limit.</p><p>
+
+
+You can also apply a limit to the number of concurrent TCP
+connections your name server will process (for zone transfers and
+TCP-based queries) with the <em class="emphasis">tcp-clients
+</em>substatement. TCP connections consume considerably more
+resources than UDP because the host needs to track the state of the
+TCP connection. The default limit is 100.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.2.6" /><div class="sect3">
+<h3 class="sect3">10.12.2.6. Limiting the number of SOA queries</h3>
+
+
+BIND 8.2.2 and later name servers let you limit the number of
+outstanding SOA queries your name server allows. If your name server
+is a slave for thousands of zones, it may have many queries for the
+<a name="INDEX-1700" />SOA records of those zones pending
+at any one time. Tracking each of those queries requires a small but
+finite amount of memory, so by default BIND 8 name servers limit
+outstanding SOA queries to four. If you find that your name server
+can't keep up with its duties as a slave, you may need to raise
+the limit with the
+<em class="emphasis">serial-queries</em><a name="INDEX-1701" /> substatement:</p><p>
+
+
+<a name="INDEX-1702" /><blockquote><pre class="code">options { 
+	serial-queries 1000;
+};</pre></blockquote>
+
+
+<em class="emphasis">serial-queries</em> is obsolete in BIND 9. BIND 9
+limits the rate at which serial queries are sent (to 20 per second),
+not the number of outstanding queries.<a name="INDEX-1703" /> <a name="INDEX-1704" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-12.3" /><div class="sect2">
+<h3 class="sect2">10.12.3. Maintenance Intervals</h3>
+
+
+<a name="INDEX-1705" />
+<a name="INDEX-1706" /> <a name="INDEX-1707" />BIND name servers have always done
+periodic housekeeping, such as refreshing zones for which the server
+is a slave. With BIND 8 and 9, you can now control how often these
+chores happen or whether they happen at all.</p><p>
+
+
+<a name="dns4-CHP-10-SECT-12.3.1" /><div class="sect3">
+<h3 class="sect3">10.12.3.1. Cleaning interval</h3>
+
+
+<a name="INDEX-1708" /><a name="INDEX-1709" />Name servers older than BIND 4.9
+only passively remove stale entries from the cache. Before such a
+name server returns a record to a querier, it checks to see whether
+the TTL on that record has expired. If it has, the name server starts
+the resolution process to find more current data. This means that a
+BIND 4 server may cache a lot of records in a flurry of name
+resolution and then just let those records spoil in the cache, taking
+up valuable memory even though the records are stale.</p><p>
+
+
+BIND 8 and 9 actively walk through the cache and remove stale records
+once per cleaning interval. This means that BIND 8 and 9 name servers
+tend to use less memory for caching than a BIND 4 server in the same
+role. On the other hand, the cleaning process takes CPU time, and on
+very slow or very busy name servers, you may not want it running
+every hour.</p><p>
+
+
+<a name="INDEX-1710" />By default, the cleaning
+interval is 60 minutes. You can tune the interval with the
+<em class="emphasis">cleaning-interval</em> substatement to the
+<em class="emphasis">options</em> statement. For example:</p><p>
+
+
+<blockquote><pre class="code">options {
+	cleaning-interval 120;
+};</pre></blockquote>
+
+
+sets the cleaning interval to 120 minutes. To turn off cache cleaning
+entirely, set the cleaning interval to zero.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.3.2" /><div class="sect3">
+<h3 class="sect3">10.12.3.2. Interface interval</h3>
+
+
+<a name="INDEX-1711" /><a name="INDEX-1712" /><a name="INDEX-1713" />We've said
+already that BIND, by default, listens on all of a host's
+network interfaces. BIND 8 and 9 name servers are actually smart
+enough to notice when a network interface on the host they're
+running on comes up or goes down. To do this, they periodically scan
+the host's network interfaces. This happens once each interface
+interval, which is 60 minutes by default. If you know that the host
+your name server runs on has no dynamic network interfaces, you can
+disable scanning for new interfaces to avoid the unnecessary hourly
+overhead by setting the interface interval to
+zero:<a name="INDEX-1714" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	interface-interval 0;
+};</pre></blockquote>
+
+
+On the other hand, if your host brings up or tears down network
+interfaces more often than every hour, you may want to reduce the
+interval.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-10-SECT-12.3.3" /><div class="sect3">
+<h3 class="sect3">10.12.3.3. Statistics interval</h3>
+
+
+<a name="INDEX-1715" />Okay,
+adjusting the statistics interval -- the frequency with which the
+BIND 8 name server dumps statistics to the statistics
+file -- won't have much effect on performance. But it fits
+better here, with the other maintenance intervals, than anywhere else
+in the book.</p><p>
+
+
+The syntax of the <em class="emphasis">statistics-interval</em>
+substatement is exactly analogous to the other maintenance
+intervals:<a name="INDEX-1716" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	statistics-interval 60;
+};</pre></blockquote>
+
+
+And as with the other maintenance intervals, the default is 60
+minutes and a setting of zero disables the periodic dumping of
+statistics. Because BIND 9 doesn't write statistics to
+<em class="emphasis">syslog</em>, it doesn't have a configurable
+statistics interval either.<a name="INDEX-1717" /> <a name="INDEX-1718" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-12.4" /><div class="sect2">
+<h3 class="sect2">10.12.4. TTLs</h3>
+
+
+<a name="INDEX-1719" />
+<a name="INDEX-1720" />Internally, BIND has trimmed TTL values
+on <a name="INDEX-1721" />cached records to reasonable values
+for some time. BIND 8 and 9 name servers make the limits
+configurable.</p><p>
+
+
+In BIND 8.2 or later name servers, you can limit the TTL on cached
+negative information with the
+<em class="emphasis">max-ncache-ttl</em><a name="INDEX-1722" /> <em class="emphasis">options
+</em>substatement. This was designed as a safety net for people
+who upgraded to 8.2 and its new negative caching scheme (RFC 2308 and
+all that, described in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>). This new name
+server caches negative information according to the last field of the
+zone's SOA record, and many zone admins still use that field
+for the default TTL for the zone -- probably much too long for
+negative information. So a prudent name server administrator can use
+a substatement like:</p><p>
+
+
+<blockquote><pre class="code">options {
+	max-ncache-ttl 3600;  // 3600 seconds is one hour
+};</pre></blockquote>
+
+
+to trim larger negative caching TTLs to one hour. The default is
+10800 seconds (three hours). Without this precaution, it's
+possible that someone looking up a brand-new record could get a
+negative answer (maybe because the new record hadn't yet
+reached the zone's slaves), and her name server would cache
+that answer for an inordinately long time, rendering the record
+unresolvable.</p><p>
+
+
+BIND 9 name servers also let you configure the upper limit of the TTL
+on cached records with the <em class="emphasis">max-cache-ttl
+</em>substatement. The default is one week. BIND 8 name servers
+trim TTLs to one week, too, but they don't let you configure
+the limit.</p><p>
+
+
+Finally, there's what's referred to as the <em class="emphasis">lame
+TTL</em><a name="INDEX-1723" />
+<a name="INDEX-1724" />, which
+isn't really a TTL at all. Instead, it's the amount of
+time your name server remembers that a given remote name server
+isn't authoritative for a zone that's delegated to it.
+This prevents your name server from wasting valuable time and
+resources asking that name server for information about a domain name
+it knows nothing about. BIND 8 name servers after 8.2 and BIND 9 name
+servers newer than 9.1.0 let you tune the lame TTL with the
+<em class="emphasis">lame-ttl options</em> substatement. The default lame
+TTL is 600 seconds (10 minutes), with a maximum of 30 minutes. You
+can even turn off the caching of lame name servers with a value of
+zero, though that strikes us as a Very Bad Thing.<a name="INDEX-1725" /> <a name="INDEX-1726" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_11.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_13.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.11. Avoiding a Bogus Name Server</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.13. Compatibility</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_12.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

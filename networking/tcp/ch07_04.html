@@ -1,0 +1,749 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch07_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:27 GMT -->
+<head><title>Interior Routing Protocols  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch07_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">7.4. Interior Routing Protocols </h2>
+
+<p>Routing protocols
+<a name="INDEX-1417" />
+<a name="INDEX-1418" />
+<a name="INDEX-1419" />are
+divided into two general groups: <em class="emphasis">interior</em> and
+<em class="emphasis">exterior</em> protocols. An interior protocol is a
+routing protocol used inside -- interior to -- an independent
+network system. In TCP/IP terminology, these independent network
+systems are called autonomous systems.<a href="#FOOTNOTE-74">[74]</a> Within an autonomous system (AS), routing information is
+exchanged using an interior protocol chosen by the autonomous
+system's administration.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-74" /><p>[74]Autonomous
+systems are described in <a href="ch02_01.html">Chapter 2, "Delivering the Data"</a>.</p>
+</blockquote>
+
+<p>All interior routing protocols perform the same basic functions. They
+determine the "best" route to each destination and
+distribute routing information among the systems on a network. How
+they perform these functions (in particular, how they decide which
+routes are best) is what makes routing protocols different from each
+other. There are several interior protocols:
+</p>
+
+<ul><li>
+<p>The <em class="emphasis">Routing Information
+Protocol</em><a name="INDEX-1420" /> (RIP)
+is the interior protocol most commonly used on Unix systems. RIP is
+included as part of the Unix software delivered with most systems. It
+is adequate for local area networks and is simple to configure. RIP
+selects the route with the lowest "hop count"
+(<em class="emphasis">metric</em>) as the best route. The RIP hop count
+represents the number of gateways through which data must pass to
+reach its destination. RIP assumes the best route is the one that
+uses the fewest gateways. This approach to route choice is called a
+<em class="emphasis">distance-vector
+algorithm</em><a name="INDEX-1421" /><a name="INDEX-1422" />.
+</p>
+</li><li>
+<p><em class="emphasis">Hello</em><a name="INDEX-1423" /> is a protocol that uses delay as the
+deciding factor when choosing the best route.
+<em class="emphasis">Delay</em> is the length of time it takes a datagram
+to make the round trip between its source and destination. A Hello
+packet contains a timestamp indicating when it was sent. When the
+packet arrives at its destination, the receiving system subtracts the
+timestamp from the current time to estimate how long it took the
+packet to arrive. Hello is not widely used. It was the interior
+protocol of the original 56 Kbps NSFNET backbone and has had very
+little use otherwise.
+</p>
+</li><li>
+<p><em class="emphasis">Intermediate System to Intermediate
+System</em><a name="INDEX-1424" /><a name="INDEX-1425" /> (IS-IS) is an interior routing
+protocol from the OSI protocol suite. It is a <em class="emphasis">Shortest Path
+First</em> (SPF) <em class="emphasis">link-state</em> protocol. It
+was the interior routing protocol used on the T1 NSFNET backbone, and
+it is still used by some large service providers.
+</p>
+</li><li>
+<p><em class="emphasis">Open Shortest Path First</em><a name="INDEX-1426" /> (OSPF) is
+another link-state protocol developed for TCP/IP. It is suitable for
+very large networks and provides several advantages over RIP.
+</p>
+</li></ul>
+<p>Of these protocols, we will discuss RIP and OSPF in detail. OSPF is
+widely used on routers. RIP is widely used on Unix systems. We will
+start the discussion with RIP.
+</p>
+
+<a name="tcp3-CHP-7-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">7.4.1. Routing Information Protocol </h3>
+
+<p>As delivered
+<a name="INDEX-1427" />
+<a name="INDEX-1428" />
+<a name="INDEX-1429" />
+<a name="INDEX-1430" />with many Unix systems, Routing
+Information Protocol (RIP) is run by the routing daemon
+<tt class="literal">routed</tt> (pronounced "route"
+"d"). When
+<tt class="literal">routed</tt><a name="INDEX-1431" /> starts, it issues a request for routing
+updates and then listens for responses to its request. When a system
+configured to supply RIP information hears the request, it responds
+with an update packet based on the information in its routing table.
+The update packet contains the destination addresses from the routing
+table and the routing metric associated with each destination. Update
+packets are issued in response to requests as well as periodically to
+keep routing information accurate.
+</p>
+
+<p>To build the routing <a name="INDEX-1432" />table, <tt class="literal">routed</tt> uses
+the information in the update packets. If the routing update contains
+a route to a destination that does not exist in the local routing
+table, the new route is added. If the update describes a route whose
+destination is already in the local table, the new route is used only
+if it is a better route. As noted previously, RIP considers a route
+with a lower "<a name="INDEX-1433" />
+<a name="INDEX-1434" />hop
+count" to be a better route. In RIP terminology, the hop count
+is called the <em class="emphasis">cost</em> of the route or the routing
+<em class="emphasis">metric</em>. We saw earlier that the routing metric
+in the local routing table can be manually controlled using the
+metric argument of the <tt class="literal">route</tt> command. To select
+the best route, RIP must first determine the cost of the route. The
+cost of a route is determined by adding the cost of reaching the
+gateway that sent the update to the metric contained in the RIP
+update packet. If the total cost is less than the cost of the current
+route, the new route is used.
+</p>
+
+<p>RIP also deletes <a name="INDEX-1435" />routes from the routing table. It
+accomplishes this in two ways. First, if the gateway to a destination
+says the cost of the route is greater than 15, the route is deleted.
+Second, RIP assumes that a gateway that doesn't send updates is
+dead. All routes through a gateway are deleted if no updates are
+received from that gateway for a specified time period. In general,
+RIP issues <a name="INDEX-1436" />routing updates every 30 seconds. In many
+implementations, if a gateway does not issue routing updates for 180
+seconds, all routes through that gateway are deleted from the routing
+table.
+</p>
+
+<a name="tcp3-CHP-7-SECT-4.1.1" /><div class="sect3">
+<h3 class="sect3">7.4.1.1. Running RIP with routed </h3>
+
+<p>To run RIP using <a name="INDEX-1437" /> <a name="INDEX-1438" /> <a name="INDEX-1439" />
+<a name="INDEX-1440" />the <a name="INDEX-1441" />routing
+daemon (<tt class="literal">routed</tt>),<a href="#FOOTNOTE-75">[75]</a> enter the following command:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-75" /><p>[75]On some systems
+the routing daemon is <tt class="literal">in.routed</tt>.</p>
+</blockquote>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">routed</b></pre></blockquote>
+
+<p>The <tt class="literal">routed</tt> statement is often used without any
+command-line arguments, but you may want to use the
+<tt class="literal">-q</tt> option. The
+<tt class="literal">-q</tt><a name="INDEX-1442" /> option prevents
+<tt class="literal">routed</tt> from advertising routes. It just listens to
+the routes advertised by other systems. If your computer is not a
+gateway, you should probably use the <tt class="literal">-q</tt> option.
+</p>
+
+<p>In the section on static routing, we did not need to comment out the
+<tt class="literal">routed</tt> statement found in the
+<em class="emphasis">inetinit</em> startup file because Solaris runs
+<tt class="literal">routed</tt> only if the system has two network
+interfaces or if the <em class="emphasis">/etc/gateways</em> file is
+found. If your Unix system starts <tt class="literal">routed</tt>
+unconditionally, no action is required to run RIP; just boot your
+system and RIP will run. Otherwise, you need to make sure the
+<tt class="literal">routed</tt> command is in your startup and the
+conditions required by your system are met. The easiest way to get
+<a name="INDEX-1443" />Solaris to run
+<tt class="literal">routed</tt> is to create a
+<em class="emphasis">gateways</em><a name="INDEX-1444" />
+<a name="INDEX-1445" />file -- even an empty one will do.
+</p>
+
+<p><tt class="literal">routed</tt> reads <em class="emphasis">/etc/gateways</em> at
+startup and adds its information to the routing table.
+<tt class="literal">routed</tt> can build a functioning routing table
+simply by using the RIP updates received from the RIP suppliers.
+However, it is sometimes useful to supplement this information with,
+for example, an initial default route or information about a gateway
+that does not announce its routes. The
+<em class="emphasis">/etc/gateways</em> file stores this additional
+routing information.
+</p>
+
+<p>The most common use of the <em class="emphasis">/etc/gateways</em> file is
+to define an active default route, so we'll use that as an
+example. This one example is sufficient because all entries in the
+<em class="emphasis">/etc/gateways</em> file have the same basic format.
+The following entry specifies <em class="emphasis">crab</em> as the
+default gateway:
+</p>
+
+<blockquote><pre class="code">net 0.0.0.0 gateway 172.16.12.1 metric 1 active</pre></blockquote>
+
+<p>The entry starts with the keyword <a name="INDEX-1446" /><tt class="literal">net</tt>. All
+entries start with either the keyword <tt class="literal">net</tt> or the
+keyword <tt class="literal">host</tt> to indicate whether the address that
+follows is a network address or a host address. The destination
+address 0.0.0.0 is the address used for the default route. In the
+<tt class="literal">route</tt> command we used the keyword
+<tt class="literal">default</tt> to indicate this route, but in
+<em class="emphasis">/etc/gateways</em> the default route is indicated by
+network address 0.0.0.0.
+</p>
+
+<p>Next is the keyword <tt class="literal">gateway</tt> followed by the
+gateway's IP address. In this case it is the address of
+<em class="emphasis">crab</em> (172.16.12.1).
+</p>
+
+<p>Then comes the keyword <a name="INDEX-1447" /><tt class="literal">metric</tt> followed by a
+numeric metric value. The metric is the cost of the route. The metric
+was almost meaningless when used with static routing, but now that we
+are running RIP, the metric is used to make routing decisions. The
+RIP metric represents the number of gateways through which data must
+pass to reach its final destination. But as we saw with
+<tt class="literal">ifconfig</tt>, the metric is really an arbitrary value
+used by the administrator to prefer one route over another. (The
+system administrator is free to assign any metric value.) However, it
+is useful to vary the metric only if you have more than one route to
+the same destination. With only one gateway to the Internet, the
+correct metric to use for <em class="emphasis">crab</em> is 1.
+</p>
+
+<p>All <em class="emphasis">/etc/gateways</em> entries end with either the
+keyword <tt class="literal">passive</tt><a name="INDEX-1448" /> or the keyword
+<tt class="literal">active</tt><a name="INDEX-1449" />. "Passive" means the
+gateway listed in the entry is not required to provide RIP updates.
+Use <tt class="literal">passive</tt> to prevent RIP from deleting the route
+if no updates are expected from the gateway. A passive route is
+placed in the routing table and kept there as long as the system is
+up. In effect, it becomes a permanent static route.
+</p>
+
+<p>The keyword <tt class="literal">active</tt>, on the other hand, creates a
+route that can be updated by RIP. An active gateway is expected to
+supply routing information and will be removed from the routing table
+if, over a period of time, it does not provide routing updates.
+Active routes are used to "prime the pump" during the RIP
+startup phase, with the expectation that the routes will be updated
+by RIP when the protocol is up and running.
+</p>
+
+<p>Our sample entry ends with the keyword <tt class="literal">active</tt>,
+which means that this default route will be deleted if no routing
+updates are received from <em class="emphasis">crab</em>. Default routes
+are convenient; this is especially true when you use static routing.
+But when you use dynamic routing, default routes should be used with
+caution, especially if you have multiple gateways that can reach the
+same destination. A passive default route prevents the routing
+protocol from dynamically updating the route to reflect changing
+network conditions. Use an active default route that can be updated
+by the routing protocol.
+</p>
+
+<p>RIP is easy to implement and simple to configure. Perfect! Well, not
+quite. <a name="INDEX-1450" />RIP
+has three serious shortcomings:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Limited network diameter</em></i></dt>
+<dd>
+<p>The longest RIP route is 15 hops. A RIP router cannot maintain a
+complete routing table for a network that has destinations more than
+15 hops away. The hop count cannot be increased because of the second
+shortcoming.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Slow convergence</em></i></dt>
+<dd>
+<p>Deleting a bad <a name="INDEX-1451" />route sometimes requires
+the exchange of multiple routing update packets until the
+route's cost reaches 16. This is <a name="INDEX-1452" />called
+"counting to infinity" because RIP keeps incrementing the
+route's cost until it becomes greater than the largest valid
+RIP metric. (In this case, 16 is infinity.) Additionally, RIP may
+wait 180 seconds before deleting the invalid routes. In
+network-speak, we say that these conditions delay the
+"convergence of routing," i.e., it takes a long time for
+the routing table to reflect the current state of the network.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Classful routing</em></i></dt>
+<dd>
+<p>RIP interprets <a name="INDEX-1453" />
+<a name="INDEX-1454" />all
+addresses using the class rules described in <a href="ch02_01.html">Chapter 2, "Delivering the Data"</a>. For RIP, all addresses are class A, B, or C,
+which makes RIP incompatible with the current practice of
+interpreting an address based on the address bit mask.
+</p>
+</dd>
+
+</dl>
+
+<p>Nothing can be done to change the limited network diameter. A small
+metric is essential to reduce the impact of counting to infinity.
+However, limited network size is the least important of RIP's
+shortcomings. The real work of improving RIP concentrates on the
+other two problems, slow convergence and classful routing.
+</p>
+
+<p>Features have been added to RIP to address slow convergence. Before
+discussing them we must understand how the
+"counting-to-infinity" problem occurs. <a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a> illustrates a network where a
+counting-to-infinity problem might happen.
+</p>
+
+<a name="tcp3-CHP-7-FIG-2" /><div class="figure"><img height="250" alt="Figure 7-2" src="figs/tcp3_0702.gif" width="384" /></div><h4 class="objtitle">Figure 7-2. Sample network</h4>
+
+<p><a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a> shows that <em class="emphasis">crab</em>
+reaches subnet 3 through <em class="emphasis">horseshoe</em> and then
+through <em class="emphasis">ora</em>. Subnet 3 is two hops away from
+<em class="emphasis">crab</em> and one hop away from
+<em class="emphasis">horseshoe</em>. Therefore
+<em class="emphasis">horseshoe</em> advertises a cost of 1 for subnet 3
+and <em class="emphasis">crab</em> advertises a cost of 2, and traffic
+continues to be routed through <em class="emphasis">horseshoe</em>. That
+is, until something goes wrong. If <em class="emphasis">ora</em> crashes,
+<em class="emphasis">horseshoe</em> waits for an update from
+<em class="emphasis">ora</em> for 180 seconds. While waiting,
+<em class="emphasis">horseshoe</em> continues to send updates to
+<em class="emphasis">crab</em> that keep the route to subnet 3 in
+<em class="emphasis">crab</em>'s routing table. When
+<em class="emphasis">horseshoe</em>'s timer finally expires, it
+removes all routes through <em class="emphasis">ora</em> from its routing
+table, including the route to subnet 3. It then receives an update
+from <em class="emphasis">crab</em> advertising that
+<em class="emphasis">crab</em> is two hops away from subnet 3.
+<em class="emphasis">horseshoe</em> installs this route and announces that
+it is three hops away from subnet 3. <em class="emphasis">crab</em>
+receives this update, installs the route, and announces that it is
+four hops away from subnet 3. Things continue on in this manner until
+the cost of the route to subnet 3 reaches 16 in both routing tables.
+If the update interval is 30 seconds, this could take a long time!
+</p>
+
+<p><em class="emphasis">Split horizon</em> and <em class="emphasis">poison
+reverse</em> are two features that attempt to avoid counting to
+infinity. Here's how:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Split horizon</em></i></dt>
+<dd>
+<p>With this feature, a
+<a name="INDEX-1455" /> <a name="INDEX-1456" />router
+does not advertise routes on the link from which those routes were
+obtained. This would solve the count-to-infinity problem described
+above. Using the split horizon rule, <em class="emphasis">crab</em> would
+not announce the route to subnet 3 on subnet 12 because it learned
+that route from the updates it received from
+<em class="emphasis">horseshoe</em> on subnet 12. While this feature works
+for the previous example described, it does not work for all
+count-to-infinity configurations. (More on this later.)
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Poison reverse</em></i></dt>
+<dd>
+<p>This feature <a name="INDEX-1457" /> <a name="INDEX-1458" />is an enhancement of split horizon. It
+uses the same idea: "Don't advertise routes on the link
+from which those routes were obtained." But it adds a positive
+action to that essentially negative rule. Poison reverse says that a
+router should advertise an infinite distance for routes on this link.
+With poison reverse, <em class="emphasis">crab</em> would advertise subnet
+3 with a cost of 16 to all systems on subnet 12. The cost of 16 means
+that subnet 3 cannot be reached through <em class="emphasis">crab</em>.
+</p>
+</dd>
+
+</dl>
+
+<p>Split horizon and poison reverse solve the problem described above.
+But what happens if <em class="emphasis">crab</em> crashes? Refer to <a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a>. With split horizon,
+<em class="emphasis">aulds</em> and <em class="emphasis">smith</em> do not
+advertise to <em class="emphasis">crab</em> the route to subnet 12 because
+they learned the route from <em class="emphasis">crab</em>. They do,
+however, advertise the route to subnet 12 to each other. When
+<em class="emphasis">crab</em> goes down, <em class="emphasis">aulds</em> and
+<em class="emphasis">smith</em> perform their own count to infinity before
+they remove the route to subnet 12. Triggered updates address this
+problem.
+</p>
+
+<p><em class="emphasis">Triggered</em>
+<a name="INDEX-1459" /> <a name="INDEX-1460" /><em class="emphasis">updates</em> are a big
+improvement. Instead of waiting the normal 30-second update interval,
+a triggered update is sent immediately. Therefore, when an upstream
+router crashes or a local link goes down, the router sends the
+changes to its neighbors immediately after it updates its local
+routing table. Without triggered updates, counting to infinity can
+take almost eight minutes! With triggered updates, neighbors are
+informed in a few seconds. Triggered updates also use network
+bandwidth efficiently. They don't include the full routing
+table; they include only the routes that have changed.
+</p>
+
+<p>Triggered updates take positive action to eliminate bad routes. Using
+triggered updates, a router advertises the routes deleted from its
+routing table with an infinite cost to force downstream routers to
+also remove them. Again, look at <a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a>. If
+<em class="emphasis">crab</em> crashes, <em class="emphasis">smith</em> and
+<em class="emphasis">aulds</em> wait 180 seconds and remove the routes to
+subnets 1, 3, and 12 from their routing tables. They then send each
+other triggered updates with a metric of 16 for subnets 1, 3, and 12.
+Thus they tell each other that they cannot reach these networks and
+no count to infinity occurs. Split horizon, poison reverse, and
+triggered updates go a long way toward eliminating counting to
+infinity.
+</p>
+
+<p>It is the final shortcoming -- the fact that RIP is incompatible
+with CIDR supernets and variable-length subnets -- that caused the
+RIP protocol to be moved to "historical" status in 1996.
+RIP is not compatible with current and future plans for the TCP/IP
+protocol stack. A new version of RIP had to be created to address
+this final <a name="INDEX-1461" /> <a name="INDEX-1462" /> <a name="INDEX-1463" /> <a name="INDEX-1464" />problem. 
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-7-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">7.4.2. RIP Version 2 </h3>
+
+<p>RIP version 2 (RIP-2),
+<a name="INDEX-1465" />
+<a name="INDEX-1466" />
+<a name="INDEX-1467" />defined
+in RFC 2453, is a new version of RIP. It is not a completely new
+protocol; it simply defines extensions to the RIP packet format.
+RIP-2 adds a network mask and a next-hop address to the destination
+address and metric found in the original RIP packet.
+</p>
+
+<p>The network mask frees the RIP-2 router from the limitation of
+interpreting addresses based on outdated address class rules. The
+mask is applied to the destination address to determine how the
+address should be interpreted. Using the mask, RIP-2 routers support
+variable-length subnets and CIDR supernets.
+</p>
+
+<p>The next-hop address is the IP address of the gateway that handles
+the route. If the address is 0.0.0.0, the source of the update packet
+is the gateway for the route. The next-hop route permits a RIP-2
+supplier to provide routing information about gateways that do not
+speak RIP-2. Its function is similar to an ICMP Redirect, pointing to
+the best gateway for a route and eliminating extra routing hops.
+</p>
+
+<p>RIP-2 adds other new features to RIP. It transmits updates via the
+multicast address 224.0.0.9 to reduce the load on systems that are
+not capable of processing a RIP-2 packet. RIP-2 also introduces a
+packet authentication scheme to reduce the possibility of accepting
+erroneous updates from misconfigured systems.
+</p>
+
+<p>Despite these changes, RIP-2 is compatible with RIP. The original RIP
+specification allowed for future versions of RIP. RIP has a version
+number in the packet header, and several empty fields for extending
+the packet. The new values used by RIP-2 did not require any changes
+to the structure of the packet. The new values are simply placed in
+the empty fields that the original protocol reserved for future use.
+Properly implemented RIP routers can receive RIP-2 packets and
+extract the data that they need from the packet without becoming
+confused by the new data.
+</p>
+
+<p>Split horizon, poison reverse, triggered updates, and RIP-2 eliminate
+most of the problems with the original RIP protocol. But RIP-2 is
+still a distance-vector protocol. There are other, newer routing
+technologies that are considered superior for large networks. In
+particular, <em class="emphasis">link-state</em> routing protocols are
+favored because they provide rapid routing convergence and reduce the
+possibility of routing loops.
+</p>
+
+</div>
+<a name="tcp3-CHP-7-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">7.4.3. Open Shortest Path First </h3>
+
+<p><em class="emphasis">Open Shortest Path First</em> (OSPF), defined
+<a name="INDEX-1468" />
+<a name="INDEX-1469" />
+<a name="INDEX-1470" />
+<a name="INDEX-1471" />by RFC
+2328, is a
+<em class="emphasis">link-state</em><a name="INDEX-1472" /> protocol. As such, it is very
+different from RIP. A router running RIP shares information about the
+entire network with its neighbors. Conversely, a router running OSPF
+shares information about its neighbors with the entire network. The
+"entire network" means, at most, a single autonomous
+system. RIP doesn't try to learn about the entire Internet, and
+OSPF doesn't try to advertise to the entire Internet.
+That's not their job. These are interior routing protocols, so
+their job is to construct the routing inside an autonomous system.
+OSPF further refines this task by defining a hierarchy of routing
+areas within an autonomous system:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Areas</em></i></dt>
+<dd>
+<p>An <em class="emphasis">area</em><a name="INDEX-1473" /> is an arbitrary collection of
+interconnected networks, hosts, and routers. Areas exchange routing
+information with other areas within the autonomous system through
+<em class="emphasis">area border routers</em>.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Backbone</em></i></dt>
+<dd>
+<p>A <em class="emphasis">backbone</em><a name="INDEX-1474" /> is a special area that interconnects
+all of the other areas within an autonomous system. Every area must
+connect to the backbone because the backbone is responsible for
+distributing routing information between the areas.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Stub area</em></i></dt>
+<dd>
+<p>A <em class="emphasis">stub area</em><a name="INDEX-1475" /> has only one area border router,
+which means that there is only one route out of the area. In this
+case, the area border router does not need to advertise external
+routes to the other routers within the stub area. It can simply
+advertise itself as the default route.
+</p>
+</dd>
+
+</dl>
+
+<p>Only a large autonomous system needs to be subdivided into areas. The
+sample network shown in <a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a> is small and
+would not need to be divided. We can, however, use it to illustrate
+the different areas. We could divide this autonomous system into any
+areas we wish. Assume we divide it into three areas: area 1 contains
+subnet 3; area 2 contains subnet 1 and subnet 12; and area 3 contains
+subnet 25, subnet 36, and the PPP links. Furthermore, we could define
+area 1 as a stub area because <em class="emphasis">ora</em> is that
+area's only area border router. We also could define area 2 as
+the backbone area because it interconnects the other two areas and
+all routing information between areas 1 and 3 must be distributed by
+area 2. Area 2 contains two area border routers,
+<em class="emphasis">crab</em> and <em class="emphasis">ora</em>, and one
+interior router, <em class="emphasis">horseshoe</em>. Area 3 contains
+three routers: <em class="emphasis">crab</em>, <em class="emphasis">smith</em>,
+and <em class="emphasis">aulds</em>.
+</p>
+
+<p>Clearly OSPF provides lots of flexibility for subdividing an
+autonomous system. But why is it necessary? One problem for a
+link-state protocol is the large quantity of data that can be
+collected in the <em class="emphasis">link-state database</em> and the
+amount of time it can take to calculate the routes from that data. A
+look at the protocol shows why this is true.
+</p>
+
+<p>Every OSPF router builds a <a name="INDEX-1476" /><em class="emphasis">directed
+graph</em><a name="INDEX-1477" /> of the entire network using the
+<a name="INDEX-1478" /> <a name="INDEX-1479" />Dijkstra Shortest
+Path First (SPF) algorithm. A directed graph is a map of the network
+from the perspective of the router; that is, the root of the graph is
+the router. The graph is built from the link-state database, which
+includes information about every router on the network and all the
+neighbors of every router. The link-state database for the autonomous
+system in <a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a> contains 5 routers and 10
+neighbors: <em class="emphasis">ora</em> has 1 neighbor,
+<em class="emphasis">horseshoe</em>; <em class="emphasis">horseshoe</em> has 2
+neighbors, <em class="emphasis">ora</em> and <em class="emphasis">crab</em>;
+<em class="emphasis">crab</em> has 3 neighbors,
+<em class="emphasis">horseshoe</em>, <em class="emphasis">aulds</em>, and
+<em class="emphasis">smith</em>; <em class="emphasis">aulds</em> has 2
+neighbors, <em class="emphasis">crab</em> and <em class="emphasis">smith</em>;
+and <em class="emphasis">smith</em> has 2 neighbors,
+<em class="emphasis">aulds</em> and <em class="emphasis">crab</em>. <a href="ch07_04.html#tcp3-CHP-7-FIG-3">Figure 7-3</a> shows the graph of this autonomous system from
+the perspective of <em class="emphasis">ora</em>.
+</p>
+
+<a name="tcp3-CHP-7-FIG-3" /><div class="figure"><img height="339" alt="Figure 7-3" src="figs/tcp3_0703.gif" width="223" /></div><h4 class="objtitle">Figure 7-3. A network graph</h4>
+
+<p>The Dijkstra algorithm builds the map in this manner:</p>
+
+<ol><li>
+<p>Install the local system as the root of the map with a cost of 0.</p>
+</li><li>
+<p>Locate the neighbors of the system just installed and add them to the
+map. The cost of reaching the neighbors is calculated as the sum of
+the cost of reaching the system just installed plus the cost it
+advertises for reaching each neighbor. For example, assume that
+<em class="emphasis">crab</em> advertises a cost of 20 for
+<em class="emphasis">aulds</em> and that the cost of reaching
+<em class="emphasis">crab</em> is 15. Then the cost for
+<em class="emphasis">aulds</em> in <em class="emphasis">ora</em>'s map is
+35.
+</p>
+</li><li>
+<p>Walk through the map and select the lowest-cost path for each
+destination. For example, when <em class="emphasis">aulds</em> is added to
+the map, its neighbors include <em class="emphasis">smith</em>. The path
+to <em class="emphasis">smith</em> through <em class="emphasis">aulds</em> is
+temporarily added to the map. In this third phase of the algorithm,
+the cost of reaching <em class="emphasis">smith</em> through
+<em class="emphasis">crab</em> is compared to the cost of reaching it
+through <em class="emphasis">aulds</em>. The lowest-cost path is selected.
+<a href="ch07_04.html#tcp3-CHP-7-FIG-3">Figure 7-3</a> shows the deleted paths in dotted lines.
+Steps 2 and 3 of the algorithm are repeated for every system in the
+link-state database.
+</p>
+</li></ol>
+<p>The information in the <a name="INDEX-1480" />link-state <a name="INDEX-1481" />database is gathered and distributed
+in a simple and efficient manner. An OSPF router discovers its
+neighbors through the use of Hello packets.<a href="#FOOTNOTE-76">[76]</a> It sends
+<a name="INDEX-1482" />
+<a name="INDEX-1483" />Hello <a name="INDEX-1484" />packets and listens for Hello packets
+from adjacent routers. The Hello packet identifies the local router
+and lists the adjacent routers from which it has received packets.
+When a router receives a Hello packet that lists it as an adjacent
+router, it knows it has found a neighbor. It knows this because it
+can hear packets from that neighbor and, because the neighbor lists
+it as an adjacent router, the neighbor must be able to hear packets
+from it. The newly discovered neighbor is added to the local
+system's neighbor list.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-76" /><p>[76]Don't confuse Hello packets with the Hello protocol.
+These are OSPF Hello packets.</p> </blockquote>
+
+<p>The OSPF router then advertises all of its neighbors. It does this by
+<em class="emphasis">flooding</em> a <a name="INDEX-1485" /> <a name="INDEX-1486" />Link-State
+Advertisement (LSA) to <a name="INDEX-1487" />the entire network. The LSA
+contains the address of every neighbor and the cost of reaching that
+neighbor from the local system. Flooding means that the router sends
+the LSA out of every interface and that every router that receives
+the LSA sends it out of every interface except the one from which it
+was received. To avoid flooding duplicate LSAs, the routers store a
+copy of the LSAs they receive and discard duplicates.
+</p>
+
+<p><a href="ch07_04.html#tcp3-CHP-7-FIG-2">Figure 7-2</a> provides an example. When OSPF starts on
+<em class="emphasis">horseshoe</em> it sends a Hello packet on subnet 1
+and one on subnet 12. <em class="emphasis">ora</em> and
+<em class="emphasis">crab</em> hear the Hello and respond with Hello
+packets that list <em class="emphasis">horseshoe</em> as an adjacent
+router. <em class="emphasis">horseshoe</em> hears their Hello packets and
+adds them to its neighbor list. <em class="emphasis">horseshoe</em> then
+creates an LSA that lists <em class="emphasis">ora</em> and
+<em class="emphasis">crab</em> as neighbors with appropriate costs
+assigned to each. For instance, <em class="emphasis">horseshoe</em> might
+assign a cost of 5 to <em class="emphasis">ora</em> and a cost of 10 to
+<em class="emphasis">crab</em>. <em class="emphasis">horseshoe</em> then floods
+the LSA on subnet 1 and subnet 12. <em class="emphasis">ora</em> hears the
+LSA and floods it on subnet 3. <em class="emphasis">crab</em> receives the
+LSA and floods it on both of its PPP links.
+<em class="emphasis">aulds</em> floods the LSA on the link toward
+<em class="emphasis">smith</em>, and <em class="emphasis">smith</em> floods it
+on the same link to <em class="emphasis">aulds</em>. When
+<em class="emphasis">aulds</em> and <em class="emphasis">smith</em> received
+the second copy of the LSA, they discarded it because it duplicated
+one that they had already received from <em class="emphasis">crab</em>. In
+this manner, every router in the entire network receives every other
+router's link-state advertisement.
+</p>
+
+<p>OSPF routers track the state of their neighbors by listening for
+Hello packets. Hello packets are issued by all routers on a periodic
+basis. When a router stops issuing packets, it or the link it is
+attached to is assumed to be down. Its neighbors update their LSA and
+flood them through the network. The new LSAs are included into the
+link-state database on every router on the network, and every router
+recalculates its network map based on this new information. Clearly,
+limiting the number of routers by limiting the size of the network
+reduces the burden of recalculating the map. For many networks, the
+entire autonomous system is small enough. For others, dividing the
+autonomous system into areas improves efficiency.
+</p>
+
+<p>Another feature of OSPF that improves efficiency is
+<a name="INDEX-1488" />the <em class="emphasis">designated
+router</em><a name="INDEX-1489" />. The designated router is one router on
+the network that treats all other routers on the network as its
+neighbors, while all other routers treat only the designated router
+as their neighbor. This helps reduce the size of the link-state
+database and thus improves the speed of the Shortest-Path-First
+calculation. Imagine a broadcast network with 5 routers. Five routers
+each with 4 neighbors produce a link-state database with 20 entries.
+But if one of those routers is the designated router, then that
+router has 4 neighbors and all other routers have only 1 neighbor,
+for a total of 10 link-state database entries. While there is no need
+for a designated router on such a small network, the larger the
+network, the more dramatic the gains. For example, a broadcast
+network with 25 routers has a link-state database of 50 entries when
+a designated router is used, versus a database of 600 entries without
+one.
+</p>
+
+<p>OSPF provides the router with an end-to-end view of the route between
+two systems instead of the limited next-hop view provided by RIP.
+Flooding quickly disseminates routing information throughout the
+network. Limiting the size of the link-state database through areas
+and designated routers speeds the SPF calculation. Taken altogether,
+OSPF is an efficient link-state routing protocol.
+</p>
+
+<p>OSPF also offers additional features that RIP doesn't. It
+provides simple
+<a name="INDEX-1490" />
+<a name="INDEX-1491" />
+<a name="INDEX-1492" />password
+authentication to ensure that the update comes from a valid router
+using an eight-character, clear-text password. It provides Message
+Digest 5 (MD5) crypto-checksum for stronger authentication.
+</p>
+
+<p>OSPF also supports <em class="emphasis">equal-cost multi-path
+routing</em><a name="INDEX-1493" /> <a name="INDEX-1494" />. This mouthful means that OSPF
+routers can maintain more than one path to a single destination.
+Given the proper conditions, this feature can be used for load
+balancing across multiple network links. However, many systems are
+not designed to take advantage of this feature. Refer to your
+router's documentation to see if it supports load balancing
+across equal-cost OSPF routes.
+</p>
+
+<p>With all of these features, OSPF is the preferred TCP/IP interior
+routing protocol for dedicated routers.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.3. Building a Static Routing Table </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7.5. Exterior Routing Protocols </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch07_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:27 GMT -->
+</html>

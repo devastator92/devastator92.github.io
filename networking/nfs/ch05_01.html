@@ -1,0 +1,329 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:36 GMT -->
+<head><title>Living with Multiple Directory Servers  (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 5. Living with Multiple Directory Servers </h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-5-SECT-1">Domain name servers</a><br />
+<a href="ch05_02.html">Implementation</a><br />
+<a href="ch05_03.html">Fully qualified and unqualified hostnames</a><br />
+<a href="ch05_04.html">Centralized versus distributed management</a><br />
+<a href="ch05_05.html">Migrating from NIS to DNS for host naming</a><br />
+<a href="ch05_06.html">What next?</a><br /></p><p></div>
+
+<div class="sect1"><a name="nfs2-CHP-5-SECT-1" /></a>
+<h2 class="sect1">5.1. Domain name servers</h2>
+
+The hostname management provided by NIS
+<a name="INDEX-742" /></a>can
+<a name="INDEX-743" /></a>be integrated with an
+Internet Domain Name Service (DNS), or the DNS facilities can be used
+to replace the NIS host map in its entirety. We'll avoid a
+full-length discussion of setting up a name server. That process
+depends on the type of name server supported by your vendor, and it
+is best described by your vendor's documentation. Instead, this
+section concentrates on differences between the scope of the two
+hostname services, and support for DNS with and without NIS. Note
+that the implementation of Domain name services provided by your
+vendor may not be called DNS. If the Berkeley Internet Name Domain
+name service or one of its derivatives is used, the service is often
+called BIND.
+</p><p>
+
+<a name="nfs2-CHP-5-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">5.1.1. DNS versus NIS</h3>
+
+DNS provides a hierarchical hostname <a name="INDEX-744" /></a>management system that spans the
+entire Internet. Each level in the hierarchy designates authoritative
+name servers that contain maps of hostnames and IP addresses, similar
+to the NIS hosts map but on a larger scale. The DNS server for a
+large name service domain would have host information merged from
+dozens of NIS domains. First among the advantages of DNS is its
+ability to decentralize responsibility for the maintenance of
+hostname-to-IP address mappings and the resulting domain name
+qualification that is used to differentiate identically named hosts.
+</p><p>
+
+Decentralized name management means
+<a name="INDEX-745" /></a> <a name="INDEX-746" /></a>that each organization running a
+name service domain  --  whether it is a subdivision of a
+corporation or an entire company  --  can maintain its own host
+information without having to notify some central authority of
+changes in its local configuration. Host information is published
+through the authoritative name server for that domain, and hosts in
+other name service domains retrieve information from the name server
+when needed. Every domain knows how to reach the next highest level
+in the name space hierarchy, and it can generally find most of its
+peer name servers within the same organization. If a name server does
+not know how to reach the name server for another domain, it can ask
+the next higher level domain name server for assistance.
+</p><p>
+
+For example, Princeton University is part of the educational, or
+<em class="emphasis">.edu,</em> domain. The
+<a name="INDEX-747" /></a> <a name="INDEX-748" /></a>domain name for the entire university is
+<em class="emphasis">princeton.edu</em>, and it is further divided by
+department:
+</p><p>
+
+<blockquote class="simplelist">
+
+cs.princeton.edu </p><p>
+
+politics.princeton.edu </p><p>
+
+history.princeton.edu</p><p>
+
+</blockquote>
+
+and so on. Each of the name servers for the departmental name service
+domains knows how to reach most of the others; therefore each
+department can run its own systems without having to notify a
+campus-wide network manager of any changes to host information. There
+is also a name server for the entire
+<em class="emphasis">princeton.edu</em> domain that points to lower-level
+name servers for incoming queries and locates other domains in
+<em class="emphasis">.edu</em>, <em class="emphasis">.com</em>, or
+<em class="emphasis">.gov</em> for outbound requests.
+</p><p>
+
+In a world in which every machine name must be unique, all of the
+good names are taken very quickly. DNS allows each domain to have a
+distinct name space, so that two domains may have hosts with the same
+name: the name service domain suffix distinguishes them on a higher
+level in the hierarchy. This is a job that cannot be performed by
+NIS, since the concatenation of <em class="emphasis">/etc/hosts</em> files
+from several different domains would result in hostname clashes. If
+the NIS domains are left independent, there is no global naming
+authority, because NIS lacks a mechanism for cross-domain <a name="INDEX-749" /></a>hostname queries.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-5-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">5.1.2. DNS integration with NIS</h3>
+
+Hostnames are managed <a name="INDEX-750" /></a> <a name="INDEX-751" /></a>in a hierarchy. Each host manages
+its own name, so the hosts are the "leaf nodes" in this
+management tree. Hosts are grouped together into NIS or DNS domains,
+creating a two-level tree. DNS domains may be further grouped
+together by company, department, or physical location, adding more
+levels to the management hierarchy. NIS fits into the DNS management
+scheme at the lowest level in this hierarchy.
+</p><p>
+
+Within a single DNS domain, there may be many physical networks with
+several system administrators. NIS provides a system for the
+independent management of these small networks; NIS host map
+information can be combined to form the DNS host file. The approaches
+for doing this are described in <a href="ch05_02.html#nfs2-CHP-5-SECT-2">Section 5.2, "Implementation"</a> later in this chapter.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-5-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">5.1.3. NIS and DNS domain names</h3>
+
+If an Internet DNS is used in conjunction <a name="INDEX-752" /></a> <a name="INDEX-753" /></a> <a name="INDEX-754" /></a>with
+NIS, it is helpful to tie the NIS domain names to the DNS domain
+name. Deriving NIS
+domain<a name="INDEX-755" /></a>
+<a name="INDEX-756" /></a> names
+from the DNS domain name links the two management schemes: the
+DNS-derived portion of the NIS domain name indicates where the NIS
+domain looks for its hostname information. Joining NIS and DNS domain
+names also makes sense if you have a single DNS domain that spans
+several physical locations. Each office will have its own networks,
+and its own NIS domains, so using the DNS domain name in the NIS
+domain name indicates how these locations fit into the "big
+picture."
+</p><p>
+
+For example, the Polygon Company uses the DNS domain name
+<em class="emphasis">polygon.com</em>. It has four NIS domains in its main
+office, which uses the <em class="emphasis">polygon.com</em> DNS domain
+name. The NIS domain names use the DNS domain name as a suffix:
+</p><p>
+
+<blockquote class="simplelist">
+
+bos-engin.polygon.com </p><p>
+
+philly-engin.polygon.com </p><p>
+
+finance.polygon.com </p><p>
+
+sales.polygon.com</p><p>
+
+</blockquote>
+
+If NIS is set up as the primary directory service, then Solaris
+versions of <em class="emphasis">sendmail</em> assume that an NIS domain
+name was derived from a DNS domain name, and they will strip the
+first component to derive the mail domain name. That is, if your NIS
+domain name is <em class="emphasis">bos-engin.polygon.com</em>, then
+<em class="emphasis">sendmail</em> uses <em class="emphasis">polygon.com</em>
+as your mail domain name by default. There may be many NIS domains in
+this DNS domain; <em class="emphasis">sendmail</em> strips off the leading
+component to form the DNS domain name.
+</p><p>
+
+However, if there are multiple NIS domains within the DNS domain
+ --  several sales offices in different cities, for example
+ --  then the NIS domain names should reflect the subdivision of
+the DNS domain, as shown in <a href="ch05_01.html#nfs2-CHP-5-TABLE-1">Table 5-1</a>.
+</p><p>
+
+<a name="nfs2-CHP-5-TABLE-1" /></a><h4 class="objtitle">Table 5-1. Subdividing a DNS domain into NIS domains </h4><table border="1">
+
+
+
+<tr>
+<th>
+NIS Domain</p><p>
+</th>
+<th>
+DNS Domain </p><p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+boston.sales.polygon.com</p><p>
+</td>
+<td>
+.sales.polygon.com</p><p>
+</td>
+</tr>
+<tr>
+<td>
+philly.sales.polygon.com</p><p>
+</td>
+<td>
+.sales.polygon.com</p><p>
+</td>
+</tr>
+<tr>
+<td>
+rahway.sales.polygon.com</p><p>
+</td>
+<td>
+.sales.polygon.com</p><p>
+</td>
+</tr>
+<tr>
+<td>
+waltham.engin.polygon.com</p><p>
+</td>
+<td>
+.engin.polygon.com</p><p>
+</td>
+</tr>
+<tr>
+<td>
+alameda.engin.polygon.com</p><p>
+</td>
+<td>
+.engin.polygon.com</p><p>
+</td>
+</tr>
+
+</table><p>
+
+Because the NIS domain name contains four dot-separated components,
+<em class="emphasis">sendmail</em> drops the first component and uses the
+remainder as a DNS domain name. This allows all of the sales offices
+to be treated as a single administrative unit for mail and hostname
+management, even though they require distinct NIS domains.
+</p>
+
+It is important to note that each single administrative unit, whether
+it is implemented with one NIS domain or multiple NIS domains must
+share the same map entries. Thus, all the hosts listed in the hosts
+map of <em class="emphasis">waltham.engin.polygon.com</em> must be listed
+in the hosts map of <em class="emphasis">alameda.engin.polygon.com</em>.
+The converse must be true as well. Getting all hosts to agree on
+usernames, <em class="emphasis">uid/gid</em> values, and host addresses is
+a<a name="INDEX-757" /></a>
+<a name="INDEX-758" /></a>
+<a name="INDEX-759" /></a>
+prerequisite for adding other distributed services such as the
+Network File System.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-5-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">5.1.4. Domain aliases</h3>
+
+Some systems impose a fairly small limit on the length <a name="INDEX-760" /></a>
+<a name="INDEX-761" /></a>of a domain name. If you've chosen
+a long NIS domain name, say
+<em class="emphasis">nesales.East.Sun.COM</em>, then implementations of
+NIS that restrict the length of a domain name will not be able to
+bind to a server.
+</p><p>
+
+You could build a second NIS domain with a shorter name and duplicate
+the maps from the first domain, but this leaves you with twice the
+administrative work. An easier solution to this problem is to create
+a domain name alias for the longer name by making a symbolic link in
+the NIS server directory <em class="emphasis">/var/yp</em> on each server
+host:
+</p><p>
+
+<blockquote><pre class="code">master# <tt class="userinput"><b>cd /var/yp</b></tt> 
+master# <tt class="userinput"><b>ln -s nesales.East.Sun.COM nesales</b></tt></pre></blockquote>
+
+NIS servers in the fully qualified domain respond to requests for
+service for the truncated domain name because they believe they have
+a set of maps for the specified domain. It is of no consequence that
+the "directory" is really a link to another
+domain's directory. This trick can also be used to force two
+distinct NIS domains to share exactly the same set of maps.
+</p><p>
+
+In a simple network, your domain names are likely to be short and
+easily managed. However, if you integrate DNS with NIS, and choose
+NIS domain names based on name service domains, you may end up with
+long, multicomponent names such as
+<em class="emphasis">grad.history.princeton.edu</em>. Using symbolic links
+to create <a name="INDEX-762" /></a> <a name="INDEX-763" /></a>aliases for long names may be necessary
+to make all of your NIS clients find NIS servers.
+</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch04_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">4.4. Managing multiple domains</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.2. Implementation</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch05_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:37 GMT -->
+</html>

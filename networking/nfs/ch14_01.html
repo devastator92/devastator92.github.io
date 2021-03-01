@@ -1,0 +1,366 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:49 GMT -->
+<head><title>NFS Diagnostic Tools (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch14_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 14. NFS Diagnostic Tools</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-14-SECT-1">NFS administration tools</a><br />
+<a href="ch14_02.html">NFS statistics</a><br />
+<a href="ch14_03.html">snoop</a><br />
+<a href="ch14_04.html">Publicly available diagnostics</a><br />
+<a href="ch14_05.html">Version 2 and Version 3 differences</a><br />
+<a href="ch14_06.html">NFS server logging</a><br />
+<a href="ch14_07.html">Time synchronization</a><br /></p><p></div>
+
+The previous chapter described diagnostic tools used <a name="INDEX-2143" /></a> <a name="INDEX-2144" /></a>to trace and resolve network and name
+service problems. In this chapter, we present tools for examining the
+configuration and performance of NFS, tools that monitor NFS network
+traffic, and tools that provide various statistics on the NFS client
+and server.
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-14-SECT-1" /></a>
+<h2 class="sect1">14.1. NFS administration tools</h2>
+
+NFS administration problems can be of <a name="INDEX-2145" /></a>
+<a name="INDEX-2146" /></a>
+<a name="INDEX-2147" /></a>different types. You can
+experience problems mounting a filesystem from a server due to export
+misconfiguration, problems with file permissions, missing
+information, out-of-date information, or severe performance
+constraints. The output of the NFS tools described in this chapter
+will serve as input for the performance analysis and tuning
+procedures in <a href="ch17_01.html">Chapter 17, "Network Performance Analysis"</a>.
+</p><p>
+
+Mount information is <a name="INDEX-2148" /></a>maintained in three files, as shown
+in <a href="ch14_01.html#nfs2-CHP-14-TABLE-1">Table 14-1</a>.
+</p><p>
+
+<a name="nfs2-CHP-14-TABLE-1" /></a><h4 class="objtitle">Table 14-1. Mount information files </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+File</p><p>
+</th>
+<th>
+Host</p><p>
+</th>
+<th>
+Contents</p><p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+/etc/dfs/sharetab</p><p>
+</td>
+<td>
+server</p><p>
+</td>
+<td>
+Currently exported filesystems</p><p>
+</td>
+</tr>
+<tr>
+<td>
+/etc/rmtab</p><p>
+</td>
+<td>
+server</p><p>
+</td>
+<td>
+host:directory name pairs for clients of this server</p><p>
+</td>
+</tr>
+<tr>
+<td>
+/etc/mnttab</p><p>
+</td>
+<td>
+client</p><p>
+</td>
+<td>
+Currently mounted filesystems</p><p>
+</td>
+</tr>
+
+</table><p>
+
+An NFS server is interested in the filesystems (and directories
+within those filesystem) it has exported and what clients have
+mounted filesystems from it. The
+<em class="emphasis">/etc/dfs/sharetab</em> file contains a list of the
+current exported filesystems <a name="INDEX-2149" /></a>and under normal conditions, it
+reflects the contents of the <em class="emphasis">/etc/dfs/dfstab</em>
+file line-for-line.
+</p>
+
+The existence of <em class="emphasis">/etc/dfs/dfstab</em> usually
+determines whether a machine becomes an NFS server and runs
+<a name="INDEX-2150" /></a> <a name="INDEX-2151" /></a>the <em class="emphasis">mountd</em> and
+<em class="emphasis">nfsd</em> daemons. During the boot process, the
+server checks for this file and executes the
+<em class="emphasis">shareall</em> script which, in turn, exports all
+filesystems specified in <em class="emphasis">/etc/dfs/dfstab</em>. The
+<em class="emphasis">mountd</em> and <em class="emphasis">nfsd</em> daemons
+will be started if at least one filesystem was successfully exported
+via NFS. An excerpt of the
+<em class="emphasis">/etc/init.d/nfs.server</em> boot script is shown
+here:
+</p><p>
+
+<blockquote><pre class="code">startnfsd=0
+if [ -f /etc/dfs/dfstab ]; then
+	 /usr/sbin/shareall -F nfs
+	 if /usr/bin/grep -s nfs /etc/dfs/sharetab &gt;/dev/null; then
+           startnfsd=1
+     fi
+fi
+
+if [ $startnfsd -ne 0 ]; then
+	 /usr/lib/nfs/mountd
+     /usr/lib/nfs/nfsd -a 16
+fi</pre></blockquote>
+
+The dynamically managed file of exported filesystems,
+<em class="emphasis">/etc/dfs/sharetab</em>, is truncated to zero length
+during the boot process. This takes place in the
+<em class="emphasis">nfs.server</em> boot script, although the truncation
+code is not shown in this example. Once <em class="emphasis">mountd</em>
+is running, the contents of <em class="emphasis">/etc/dfs/sharetab</em>
+determine the mount operations that will be permitted by
+<em class="emphasis">mountd</em>.
+</p><p>
+
+<em class="emphasis">/etc/dfs/sharetab</em> is maintained by the
+<em class="emphasis">share</em> utility, so <a name="INDEX-2152" /></a>
+<a name="INDEX-2153" /></a>the modification time of
+<em class="emphasis">/etc/dfs/sharetab</em> indicates the last time
+filesystem export information was updated. If a client is unable to
+mount a filesystem even though the filesystem is named in the
+server's <em class="emphasis">/etc/dfs/dfstab</em> file, verify that
+the filesystem appears in the server's
+<em class="emphasis">/etc/dfs/sharetab</em> file by using
+<em class="emphasis">share</em> with no arguments:
+</p><p>
+
+<blockquote><pre class="code">server% <tt class="userinput"><b>share</b></tt> 
+-               /export/home1   rw   "Cool folks"
+-               /export/home2   root=mahimahi:thud   ""  </pre></blockquote>
+
+If the <em class="emphasis">sharetab</em> file is out-of-date, then
+re-running <em class="emphasis">share</em> on the server should make the
+filesystem available. Note that there's really no difference
+between <em class="emphasis">cat /etc/dfs/sharetab</em> and
+<em class="emphasis">share</em> with no arguments. Except for formatting
+differences, the output is the same.
+</p><p>
+
+When <em class="emphasis">mountd</em> accepts a mount request from a
+client, it notes the directory name passed in the mount request and
+the client hostname in <em class="emphasis">/etc/rmtab</em>. Entries in
+<em class="emphasis">rmtab</em> are long-lived; they remain in the file
+until the client performs an explicit <em class="emphasis">umount</em> of
+the filesystem. This file is not purged when a server reboots because
+the NFS mounts themselves are persistent across server failures.
+</p><p>
+
+Before an NFS client shuts down, it should
+try<a name="INDEX-2154" /></a> to unmount its remote
+filesystems. Clients that mount NFS filesystems, but never unmount
+them before shutting down, leave stale information in the
+server's <em class="emphasis">rmtab</em> file.
+</p><p>
+
+In an extreme case, changing a hostname
+<a name="INDEX-2155" /></a>without performing a
+<em class="emphasis">umountall</em> before taking the host down makes
+permanent entries in the server's <em class="emphasis">rmtab</em>
+file. Old information in <em class="emphasis">/etc/rmtab</em> has an
+annoying effect on <em class="emphasis">shutdown</em>, which uses the
+remote mount table to warn clients of the host that it is about to be
+rebooted. <em class="emphasis">shutdown</em> actually asks the
+<em class="emphasis">mountd</em> daemon for the current version of the
+remote mount table, but <em class="emphasis">mountd</em> loads its initial
+version of the table from the <em class="emphasis">/etc/rmtab</em> file.
+If the <em class="emphasis">rmtab</em> file is not accurate, then
+uninterested clients may be notified, or
+<em class="emphasis">shutdown</em> may attempt to find hosts that are no
+longer on the network. The out-of-date <em class="emphasis">rmtab</em>
+file won't cause the shutdown procedure to hang, but it will
+produce confusing messages. The contents of the
+<em class="emphasis">rmtab</em> file should only be used as a hint;
+mission-critical processing should never depend on its contents. For
+instance, it would be a very bad idea for a server to skip backups of
+filesystems listed in <em class="emphasis">rmtab</em> on the simple
+assumption that they are currently in use by NFS clients. There are
+multiple reasons why this file can be out-of-date.
+</p><p>
+
+The <em class="emphasis">showmount</em> command is used
+<a name="INDEX-2156" /></a>
+<a name="INDEX-2157" /></a>to
+review server-side mount information. It has three invocations:
+</p><p>
+
+<blockquote><pre class="code">showmount -a [server]    <i class="lineannotation">Prints client:directory pairs for server's clients.</i> 
+showmount -d [server]    <i class="lineannotation">Simply prints directory names mounted by server's clients.</i>
+showmount -e [server]   <i class="lineannotation">  Prints the list of shared filesystems.</i></pre></blockquote>
+
+For example:</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>showmount -a</b></tt> 
+bears:/export/home1 
+bears:/export/home2/wahoo 
+honeymoon:/export/home2/wahoo
+131.40.52.44:/export/home1
+131.40.52.44:/export/home2
+ 
+% <tt class="userinput"><b>showmount -d mahimahi</b></tt> 
+/export/home1 
+/export/home2
+
+%<tt class="userinput"><b> showmount -e mahimahi</b></tt>
+/export/home1       (everyone)
+/export/home2       (everyone)</pre></blockquote>
+
+In the first example, an unknown host, indicated by the presence of
+an IP address instead of a hostname, has mounted filesystems from the
+local host. If the IP address is valid on the local network, then the
+host's name and IP address are mismatched in the name service
+hosts file or in the client's <em class="emphasis">/etc/hosts</em>
+file. However, this could also indicate a breach of security,
+particularly if the host is on another network or the host number is
+known to be unallocated.
+</p><p>
+
+Finally, the client can review its currently mounted filesystems
+using <em class="emphasis">df</em>, getting a brief look at the mount
+points and corresponding remote filesystem information:
+</p><p>
+
+<blockquote><pre class="code">df               <i class="lineannotation">Shows current mount information. </i>
+df -F fstype     <i class="lineannotation">Looks at filesystems of type fstype only. </i>
+df directory     <i class="lineannotation"> Locates mount point for directory.</i></pre></blockquote>
+
+For example:</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>df -k -F nfs</b></tt> 
+filesystem            kbytes    used   avail capacity  Mounted on 
+onaga:/export/onaga   585325  483295   43497    92%    /home/onaga 
+thud:/export/thu      427520  364635   20133    95%    /home/thud 
+mahimahi:/export/mahimahi 
+                      371967  265490   69280    79%    /home/mahimahi</pre></blockquote>
+
+The -k option is used to report the total space allocated in the
+filesystem in kilobytes. When <em class="emphasis">df</em> is used to
+locate the mount point
+for<a name="INDEX-2158" /></a> <a name="INDEX-2159" /></a> a
+directory, it resolves symbolic links and determines the filesystem
+mounted at the link's target:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ls -l /usr/local/bin</b></tt> 
+lrwxrwxrwx  1 root         16 Jun  8 14:51 /usr/local/bin -&gt; /tools/local/bin 
+% <tt class="userinput"><b>df -k /usr/local/bin</b></tt> 
+filesystem            kbytes    used   avail capacity  Mounted on 
+mahimahi:/tools/local 217871  153022   43061    78%    /tools/local</pre></blockquote>
+
+<em class="emphasis">df</em> may produce confusing or conflicting results
+in heterogeneous environments. Not all systems agree on what the
+bytes used and bytes available fields should represent; in most cases
+they are the number of usable bytes available to the user left on the
+filesystem. Other systems may include the 10% space buffer included
+in the filesystem and overstate the amount of free space on the
+filesystem.
+</p><p>
+
+Detailed mount information is maintained in the
+<em class="emphasis">/etc/mnttab</em> file on the local host. Along with
+host (or device) names and mount points, <em class="emphasis">mnttab</em>
+lists the mount options used on the filesystem.
+<em class="emphasis">mnttab</em> shows the current state of the system,
+while <em class="emphasis">/etc/vfstab</em> only shows the filesystems to
+be mounted "by default." Invoking
+<em class="emphasis">mount</em> with no options prints the contents of
+<em class="emphasis">mnttab</em> ; supplying the <em class="emphasis">-p</em>
+option produces a listing that is suitable for inclusion in the
+<em class="emphasis">/etc/vfstab</em> file:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>mount</b></tt> 
+/proc on /proc read/write/setuid on Wed Jul 26 01:33:02 2000
+/ on /dev/dsk/c0t0d0s0 read/write/setuid/largefiles on Wed Jul 26 01:33:02 2000
+/usr on /dev/dsk/c0t0d0s6 read/write/setuid/largefiles on Wed Jul 26 01:33:02 2000
+/dev/fd on fd read/write/setuid on Wed Jul 26 01:33:02 2000
+/export/home on /dev/dsk/c0t0d0s7 setuid/read/write/largefiles on Wed Jul 26 01:33:04 2000
+/tmp on swap read/write on Wed Jul 26 01:33:04 2000
+/home/labiaga on berlin:/export/home11/labiaga intr/nosuid/noquota/remote on Thu Jul 27 17:39:59 2000
+/mnt on paris:/export/home/rome read/write/remote on Thu Jul 27 17:41:07 2000
+ 
+% <tt class="userinput"><b>mount -p</b></tt> 
+/proc - /proc proc - no rw,suid
+/dev/dsk/c0t0d0s0 - / ufs - no rw,suid,largefiles
+/dev/dsk/c0t0d0s6 - /usr ufs - no rw,suid,largefiles
+fd - /dev/fd fd - no rw,suid
+/dev/dsk/c0t0d0s7 - /export/home ufs - no suid,rw,largefiles
+swap - /tmp tmpfs - no rw
+berlin:/export/home11/labiaga - /home/labiaga nfs - no intr,nosuid,noquota
+paris:/export/home/rome - /mnt nfs - no rw</pre></blockquote>
+
+Although you can take the output of the <em class="emphasis">mount -p</em>
+command and include the NFS mounts in the client's
+<em class="emphasis">/etc/vfstab</em> file, it is not recommended. <a href="ch09_01.html">Chapter 9, "The Automounter"</a> describes the many reasons why dynamic mounts
+are preferred. However, if static cross-mounting is required, use the
+background (<em class="emphasis">bg</em>) option to avoid deadlock during
+server reboots when two servers cross-mount filesystems from each
+<a name="INDEX-2160" /></a>
+<a name="INDEX-2161" /></a>
+<a name="INDEX-2162" /></a>other and
+<a name="INDEX-2163" /></a>reboot at
+the same time.
+</p><p>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.5. Network analyzers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.2. NFS statistics</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:51 GMT -->
+</html>

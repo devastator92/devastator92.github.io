@@ -1,0 +1,398 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:42 GMT -->
+<head><title>Unix and Linux Bastion Hosts (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_12.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 11. Unix and Linux Bastion Hosts</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch11-68788">Which Version of Unix?</a><br />
+<a href="ch11_02.html">Securing Unix</a><br />
+<a href="ch11_03.html">Disabling Nonrequired Services</a><br />
+<a href="ch11_04.html">Installing and Modifying Services</a><br />
+<a href="ch11_05.html">Reconfiguring for Production</a><br />
+<a href="ch11_06.html">Running a Security Audit</a><br /></p><p></div>
+
+
+
+
+
+
+
+<a name="INDEX-874" /></a> <a name="INDEX-875" /></a> <a name="INDEX-876" /></a> <a name="INDEX-877" /></a>This chapter
+discusses the details of configuring Unix for use in a firewall
+environment, building on the principles discussed in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>. You should be sure to read both chapters
+before attempting to build a bastion host. As usual, we use the word
+"Unix" for both Unix and Linux, except when we explicitly
+say otherwise.</p><p>
+
+
+
+
+
+It's impossible to give complete instructions on how to
+configure any given machine; the details vary greatly depending on
+what version of Unix you're running and exactly what you intend
+to do with the machine. This chapter is intended to give you an
+outline of what needs to be done, and how to figure out how to do it.
+For more complete configuration details, you will need to look at
+resources that are specific to your platform.<a name="INDEX-878" /></a></p><p>
+
+
+
+
+
+<a name="ch11-2553" /></a><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Useful Unix Capabilities</h4>
+
+
+
+
+
+Every operating system has certain special capabilities or features
+that can be useful in building a bastion host. We can't
+describe all these capabilities for all systems, but we'll tell
+you about a few special features of Unix because it's a common
+bastion host platform:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>setuid/setgid</i></dt>
+<dd><a name="INDEX-879" /></a>Every Unix user has a numeric user
+identification (<em class="emphasis">uid</em> ) in addition to his or her
+login name and belongs to one or more groups of users, also
+identified by numbers (<em class="emphasis">gid</em>s). The Unix kernel
+uses the <em class="emphasis">uid</em> and the various
+<em class="emphasis">gid</em>s of a particular user to determine what
+files that user has access to. Normally, Unix programs run with the
+file access permissions of the user who executes the program. The
+<em class="emphasis">setuid</em> capability allows a program to be
+installed so that it always runs with the permissions of the owner of
+the program, regardless of which user is running the program. The
+<em class="emphasis">setgid</em> capability is similar; it allows the
+program temporarily (while running the program) to grant membership
+in a group to users who are not normally members of that group.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<dl>
+<dt><i>chroot</i></dt>
+<dd><a name="INDEX-880" /></a>The
+<em class="emphasis">chroot</em> mechanism allows a program to
+irreversibly change its view of the filesystem by changing the
+program's idea of where the root of the filesystem is. Once a
+program <em class="emphasis">chroot</em>s to a particular piece of the
+filesystem, that piece becomes the whole filesystem as far as the
+program is concerned; the rest of the filesystem ceases to exist from
+the program's point of view. This can provide a very high level
+of protection, but it is by no means perfect. Programs may not need
+access to the filesystem to achieve nefarious ends, particularly if
+they have large numbers of other permissions.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Environmental modifications, such as those made by
+<em class="emphasis">setuid/setgid</em> and <em class="emphasis">chroot,</em>
+are inherited by any subsidiary processes a program starts. A common
+way of restricting what the programs on a bastion host can do is to
+run the programs under "wrapper" programs; the wrapper
+programs do whatever <em class="emphasis">setuid/setgid</em>,
+<em class="emphasis">chroot</em>, or other environmental change work is
+necessary, and then start the real program.
+<em class="emphasis">chrootuid</em> is a wrapper program for this purpose;
+<a href="appb_01.html">Appendix B, "Tools"</a>, gives information on how to get it.</p><p>
+
+
+
+
+</td></tr></table><p></blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch11-68788" /></a>
+<h2 class="sect1">11.1. Which Version of Unix?</h2>
+
+
+
+
+
+<a name="INDEX-881" /></a>Which version of Unix should
+you choose? You want to balance what you're familiar with
+against which tools are available for which versions. If your site
+already uses one version of Unix, you will most likely want to use
+that version. If your site has some familiarity with several versions
+of Unix, and the relevant tools (discussed throughout this chapter)
+and support are available for all of them, use the
+<em class="emphasis">least</em> popular one that you still like. Doing so
+maximizes your happiness and minimizes the likelihood that attackers
+have precompiled ways of attacking your bastion host. If you have no
+Unix familiarity, choose any version you like, provided that it is in
+reasonably widespread use (you don't want "Joe's
+Unix, special today $9.95"). As a rule of thumb, if your chosen
+version of Unix has a user's group associated with it,
+it's probably well-known enough to rely on.</p><p>
+
+
+
+
+
+Although Unix suppliers differ vastly in their openness about
+security issues, the difference in the actual security between
+different general-purpose versions of Unix is much smaller.
+Don't assume that the publicity given to security holes
+reflects the number of security holes; it's a more accurate
+reflection of the popularity of the operating system and the
+willingness of a vendor to admit and fix security problems.
+Don't assume that proprietary versions of Unix are more secure
+than open source versions, either; paying money to a vendor
+doesn't guarantee that they care about security, only that they
+care about money. Ironically, the operating systems with the most
+worrisome tales may be the most secure ones, because they're
+the ones getting fixed.</p><p>
+
+
+
+
+
+Some versions of Unix are particularly designed for security and are
+therefore particularly suited for use in bastion hosts.
+"Designed for security" means different things to
+different vendors. It ranges from relatively minor changes to the
+packages that are installed (for instance, the Debian Linux
+distribution tries to install securely, and the SuSE Linux
+distribution provides a post installation security script) to major
+changes to the internals (for instance, OpenBSD has made significant
+changes to all parts of the operating system).</p><p>
+
+
+
+
+
+Several commercial vendors offer secure versions of their operating
+systems that are designed to meet government security needs. These
+versions usually lag behind the main releases (the government
+approval process is slow) and may not support all the add-on products
+that the main releases do. On the other hand, the auditing
+capabilities they offer are useful for bastion hosts. If you can
+afford the extra cost and the delayed release schedule, these
+operating systems are a good choice for bastion hosts.<a name="INDEX-882" /></a><a name="INDEX-883" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_12.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.12. Protecting the Machine and Backups</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.2. Securing Unix</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:43 GMT -->
+</html>

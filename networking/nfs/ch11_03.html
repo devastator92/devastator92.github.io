@@ -1,0 +1,262 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Troubleshooting locking problems (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.3. Troubleshooting locking problems</h2>
+
+Lock problems will be evident when an NFS client tries<a name="INDEX-1641" />
+<a name="INDEX-1642" />
+<a name="INDEX-1643" /> to lock a file, and it fails because
+someone has it locked. For applications that share access to files,
+the expectation is that locks will be short-lived. Thus, the pattern
+your users will notice when something is awry is that yesterday an
+application started up quite quickly, but today it hangs. Usually it
+is because an NFS/NLM client holds a lock on a file that your
+application needs to lock, and the holding client has crashed.
+</p>
+
+<a name="nfs2-CHP-11-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">11.3.1. Diagnosing NFS lock hangs</h3>
+
+On Solaris, you can use tools like <em class="emphasis">pstack</em> and
+<em class="emphasis">truss</em> to verify that <a name="INDEX-1644" />processes
+are hanging in a lock request:
+</p>
+
+<blockquote><pre class="code">client1% <tt class="userinput"><b>ps -eaf | grep SuperApp</b></tt>
+     mre 23796 10031  0 11:13:22 pts/6    0:00 SuperApp
+client1% <tt class="userinput"><b>pstack 23796</b></tt>
+23796:  SuperApp
+ ff313134 fcntl    (1, 7, ffbef9dc)
+ ff30de48 fcntl    (1, 7, ffbef9dc, 0, 0, 0) + 1c8
+ ff30e254 lockf    (1, 1, 0, 2, ff332584, ff2a0140) + 98
+ 0001086c main     (1, ffbefac4, ffbefacc, 20800, 0, 0) + 1c
+ 00010824 _start   (0, 0, 0, 0, 0, 0) + dc
+client1% <tt class="userinput"><b>truss -p 23796</b></tt>
+fcntl(1, F_SETLKW, 0xFFBEF9DC)  (sleeping...)</pre></blockquote>
+
+This verifies that the application is stuck in a lock request. We can
+use <em class="emphasis">pfiles</em> to see what is going on with the
+files of process <tt class="literal">23796</tt>:
+</p>
+
+<blockquote><pre class="code">client1%<tt class="userinput"><b> pfiles 23796</b></tt>
+pfiles 23796
+23796:  SuperApp
+  Current rlimit: 256 file descriptors
+   0: S_IFCHR mode:0620 dev:136,0 ino:37990 uid:466 gid:7 rdev:24,37
+      O_RDWR
+   1: S_IFREG mode:0644 dev:208,1823 ino:5516985 uid:466 gid:300 size:0
+      O_WRONLY|O_LARGEFILE
+      advisory write lock set by process 3242
+   2: S_IFCHR mode:0620 dev:136,0 ino:37990 uid:466 gid:7 rdev:24,37
+      O_RDWR</pre></blockquote>
+
+That we are told that there is an advisory lock set on file
+descriptor 1 that is set by another process, process ID 3242, is
+useful, but unfortunately it doesn't tell us if 3242 is a local
+process or a process on another NFS client or NFS server. We also
+aren't told if the file mapped to file descriptor 1 is a local
+file, or an NFS file. We are, however, told that the major and minor
+device numbers of the filesystem are 208 and 1823 respectively. If
+you run the mount command without any arguments, this dumps the list
+of mounted file systems. You should see a display similar to:
+</p>
+
+<blockquote><pre class="code">/ on /dev/dsk/c0t0d0s0 read/write/setuid/intr/largefiles/onerror=panic/dev=2200000 
+on Thu Dec 21 11:13:33 2000
+/usr on /dev/dsk/c0t0d0s6 read/write/setuid/intr/largefiles/onerror=panic/
+dev=2200006 on Thu Dec 21 11:13:34 2000
+/proc on /proc read/write/setuid/dev=31c0000 on Thu Dec 21 11:13:29 2000
+/dev/fd on fd read/write/setuid/dev=32c0000 on Thu Dec 21 11:13:34 2000
+/etc/mnttab on mnttab read/write/setuid/dev=3380000 on Thu Dec 21 11:13:35 2000
+/var on /dev/dsk/c0t0d0s7 read/write/setuid/intr/largefiles/onerror=panic/
+dev=2200007 on Thu Dec 21 11:13:40 2000
+/home/mre on spike:/export/home/mre remote/read/write/setuid/intr/dev=340071f on 
+Thu Dec 28 08:51:30 2000</pre></blockquote>
+
+The numbers after <em class="emphasis">dev=</em> are in hexadecimal.
+Device numbers are constructed by taking the major number, shifting
+it left several bits, and then adding the minor number. Convert the
+minor number 1823 to hexadecimal, and look for it in the mount table:
+</p>
+
+<blockquote><pre class="code">client1% <tt class="userinput"><b>printf "%x\n" 1823</b></tt>
+71f
+client1% <tt class="userinput"><b>mount | grep 'dev=.*71f'</b></tt>
+/home/mre on spike:/export/home/mre remote/read/write/setuid/intr/dev=340071f on 
+Thu Dec 28 08:51:30 2000</pre></blockquote>
+
+We now know four things:</p>
+
+<ul><li>
+This is an NFS file we are blocking on.</p>
+</li><li>
+The NFS server name is <em class="emphasis">spike.</em></p>
+</li><li>
+The filesystem on the server is <em class="emphasis">/export/home/mre.</em></p>
+</li><li>
+The inode number of the file is <tt class="literal">5516985</tt>.</p>
+</li></ul>
+One obvious cause you should first eliminate is whether the NFS
+server <em class="emphasis">spike</em> has crashed or not. If it
+hasn't crashed, then the next step is to examine the <a name="INDEX-1645" />server.
+</p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">11.3.2. Examining lock state on NFS/NLM servers</h3>
+
+Solaris and other System V-derived systems have a useful tool
+<a name="INDEX-1646" /> <a name="INDEX-1647" />called <em class="emphasis">crash</em> for
+analyzing system state. Crash actually reads the Unix kernel's
+memory and formats its data structures in a more human readable form.
+Continuing with the example from <a href="ch11_03.html#nfs2-CHP-11-SECT-3.1">Section 11.3.1, "Diagnosing NFS lock hangs"</a>,
+assuming <em class="emphasis">/export/home/mre</em> is a directory on a
+UFS filesystem, which can be verified by doing:
+</p>
+
+<blockquote><pre class="code">spike# df -F ufs | grep /export
+/export               (/dev/dsk/c0t0d0s7 ):  503804 blocks   436848 files</pre></blockquote>
+
+then you can use <em class="emphasis">crash</em> to get more lock state.</p>
+
+The <em class="emphasis">crash</em> command is like a shell, but with
+internal commands for examining kernel state. The internal command we
+will be using is <em class="emphasis">lck</em> :
+</p>
+
+<blockquote><pre class="code">spike# <tt class="userinput"><b>crash</b></tt>
+dumpfile = /dev/mem, namelist = /dev/ksyms, outfile = stdout
+&gt; <tt class="userinput"><b>lck</b></tt>
+Active and Sleep Locks:
+INO         TYP  START END     PROC  PID  FLAGS STATE   PREV     NEXT     LOCK
+30000c3ee18  w   0      0       13   136   0021 3       48bf0f8  ae9008   6878d00 
+30000dd8710  w   0      MAXEND  17   212   0001 3       8f1a48   8f02d8   8f0e18  
+30001cce1c0  w   193    MAXEND  -1   3242  2021 3       6878850  c43a08   2338a38 
+
+Summary From List:
+ TOTAL    ACTIVE  SLEEP
+   3      3       0
+&gt; </pre></blockquote>
+
+An important field is PROC. PROC is the "slot" number of
+the process. If it is -1, that indicates that the lock is being held
+by a nonlocal (i.e., an NFS client) process, and the PID field thus
+indicates the process ID, relative to the NFS client. In the sample
+display, we see one such entry:
+</p>
+
+<blockquote><pre class="code">30001cce1c0  w   193    MAXEND  -1   3242  2021 3       6878850  c43a08   2338a38 </pre></blockquote>
+
+Note that the process id, 3242, is equal to that which the
+<em class="emphasis">pfiles</em> command displayed earlier in this
+example. We can confirm that this lock is for the file in question
+via <em class="emphasis">crash</em>'s <em class="emphasis">uinode</em>
+command:
+</p>
+
+<blockquote><pre class="code">&gt; <tt class="userinput"><b>uinode 30001cce1c0</b></tt>
+UFS INODE MAX TABLE SIZE = 34020
+ADDR         MAJ/MIN   INUMB  RCNT LINK   UID   GID    SIZE    MODE  FLAGS
+30001cce1c0  136,  7   5516985   2    1   466   300    403  f---644  mt rf
+&gt; </pre></blockquote>
+
+The inode numbers match what <em class="emphasis">pfiles</em> earlier
+displayed on the NFS client. However, inode numbers are unique per
+local filesystem. We can make doubly sure this is the file by
+comparing the major and minor device numbers from the
+<em class="emphasis">uinode</em> command, 136 and 7, with that of the
+filesystem that is mounted on <em class="emphasis">/export</em> :
+</p>
+
+<blockquote><pre class="code">spike# <tt class="userinput"><b>ls -lL /dev/dsk/c0t0d0s7</b></tt>
+brw-------   1 root     sys      136,  7 May  6  2000 /dev/dsk/c0t0d0s7
+spike#</pre></blockquote>
+
+</div>
+<a name="nfs2-CHP-11-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">11.3.3. Clearing lock state </h3>
+
+Continuing with our example from <a href="ch11_03.html#nfs2-CHP-11-SECT-3.2">Section 11.3.2, "Examining lock state on NFS/NLM servers"</a>,
+at this point we know that the file is locked by another NFS client.
+Unfortunately, we don't know which client it is, as
+<em class="emphasis">crash</em> won't give us that information. We
+do however have a potential list of clients in the server's
+<em class="emphasis">/var/statmon/sm</em> directory:
+</p>
+
+<blockquote><pre class="code">spike# <tt class="userinput"><b>cd /var/statmon/sm</b></tt>
+spike# <tt class="userinput"><b>ls</b></tt>
+client1       ipv4.10.1.0.25  ipv4.10.1.0.26  gonzo      java</pre></blockquote>
+
+The entries prefixed with ipv4 are just symbolic links to other
+entries. The non-symbolic link entries identify the hosts we want to
+check for.
+</p>
+
+The most likely cause of the lock not getting released is that the
+holding NFS client has crashed. You can take the list of hosts from
+the <em class="emphasis">/var/statmon/sm</em> directory and check if any
+are dead, or not responding due to a network partition. Once you
+determine which are dead, you can use Solaris's
+<em class="emphasis">clear_locks</em> command to clear lock state.
+Let's suppose you determine that <em class="emphasis">gonzo</em> is
+dead. Then you would do:
+</p>
+
+<blockquote><pre class="code">spike# <tt class="userinput"><b>clear_locks gonzo</b></tt></pre></blockquote>
+
+If clearing the lock state of dead clients doesn't fix the
+problem, then perhaps a now-live client crashed, but for some reason
+after it rebooted, its status monitor did not send a notification to
+the NLM server's status monitor. You can log onto the live
+clients and check if they are currently mounting the filesystem from
+the server (in our example, <em class="emphasis">spike:/export).</em> If
+they are not, then you should consider using
+<em class="emphasis">clear_locks</em> to clear any residual lock state
+those clients might have had.
+</p>
+
+Ultimately, you may be forced to reboot your server. Short of that
+there are other things you could do. Since you know the inode number
+and filesystem of file in question, you can determine the
+file's name:
+</p>
+
+<blockquote><pre class="code">spike# cd /export
+find . -inum 5516985 -print
+./home/mre/database</pre></blockquote>
+
+You could rename file <em class="emphasis">database</em> to something
+else, and copy it back to a file named <em class="emphasis">database</em>.
+Then kill and restart the <em class="emphasis">SuperApp</em> application
+on <em class="emphasis">client1</em>. Of course, such an approach requires
+intimate knowledge or experience with the application to<a name="INDEX-1648" /> <a name="INDEX-1649" /> know if<a name="INDEX-1650" /> <a name="INDEX-1651" /> <a name="INDEX-1652" /> this will be safe.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. NFS and file locking</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12. Network Security</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

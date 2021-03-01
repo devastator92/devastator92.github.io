@@ -1,0 +1,238 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:51 GMT -->
+<head><title>Debugging Network Problems (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch15_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<a name="INDEX-2325" /></a><a name="INDEX-2326" /></a><h1 class="chapter">Chapter 15. Debugging Network Problems</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-15-SECT-1">Duplicate ARP replies</a><br />
+<a href="ch15_02.html">Renegade NIS server</a><br />
+<a href="ch15_03.html">Boot parameter confusion</a><br />
+<a href="ch15_04.html">Incorrect directory content caching</a><br />
+<a href="ch15_05.html">Incorrect mount point permissions</a><br />
+<a href="ch15_06.html">Asynchronous NFS error messages</a><br /></p><p></div>
+
+
+This chapter consists of case studies in network problem analysis and
+debugging, ranging from Ethernet addressing problems to a machine
+posing as an NIS server in the wrong domain. This chapter is a bridge
+between the formal discussion of NFS and NIS tools and their use in
+performance analysis and tuning. The case studies presented here walk
+through debugging scenarios, but they should also give you an idea of
+how the various tools work together.</p><p>
+
+
+When debugging a network problem, it's important to think about
+the potential cause of a problem, and then use that to start ruling
+out other factors. For example, if your attempts to bind to an NIS
+server are failing, you should know that you could try testing the
+network using <em class="emphasis">ping</em>, the health of
+<em class="emphasis">ypserv</em> processes
+using<a name="INDEX-2327" /></a>
+<a name="INDEX-2328" /></a><a name="INDEX-2329" /></a><a name="INDEX-2330" /></a><a name="INDEX-2331" /></a> <em class="emphasis">rpcinfo</em>, and finally
+the binding itself with <em class="emphasis">ypset</em>. Working your way
+through the protocol layers ensures that you don't miss a
+low-level problem that is posing as a higher-level failure. Keeping
+with that advice, we'll start by looking at a network layer
+problem.</p><p>
+
+
+<div class="sect1"><a name="nfs2-CHP-15-SECT-1" /></a>
+<a name="INDEX-2332" /></a><h2 class="sect1">15.1. Duplicate ARP replies</h2>
+
+
+ARP misinformation was briefly mentioned<a name="INDEX-2333" /></a> in <a href="ch13_02.html#nfs2-CHP-13-SECT-2.3">Section 13.2.3, "IP to MAC address mappings"</a>, and this story showcases some of the baffling
+effects it creates. A network of two servers and ten clients suddenly
+began to run very slowly, with the following symptoms:</p><p>
+
+
+<ul><li>Some users attempting to start a document-processing application were
+waiting ten to 30 <em class="emphasis">minutes</em> for the
+application's window to appear, while those on well-behaved
+machines waited a few seconds. The executables resided on a
+fileserver and were NFS mounted on each client. Every machine in the
+group experienced these delays over a period of a few days, although
+not all at the same time.</p><p></li><li>Machines would suddenly "go away" for several minutes.
+Clients would stop seeing their NFS and NIS servers, producing
+streams of messages like:</p><p>
+<blockquote><pre class="code">NFS server muskrat not responding still trying</pre></blockquote>
+
+
+or:</p><p>
+
+<blockquote><pre class="code">ypbind: NIS server not responding for domain "techpubs"; still trying</pre></blockquote>
+</li></ul>
+
+The local area network with the problems was joined to the
+campus-wide backbone via a bridge. An identical network of machines,
+running the same applications with nearly the same configuration, was
+operating without problems on the far side of the bridge. We were
+assured of the health of the physical network by two engineers who
+had verified physical connections and cable routing.</p><p>
+
+
+The very sporadic nature of the problem  --  and the fact that it
+resolved itself over time  --  pointed toward a problem with ARP
+request and reply<a name="INDEX-2334" /></a> mismatches. This
+hypothesis neatly explained the extraordinarily slow loading of the
+application: a client machine trying to read the application
+executable would do so by issuing NFS Version 2 requests over UDP. To
+send the UDP packets, the client would
+ARP<a name="INDEX-2335" /></a> the server, randomly get the wrong reply,
+and then be unable to use that entry for several minutes. When the
+ARP table entry had aged and was deleted, the client would again ARP
+the server; if the correct ARP response was received then the client
+could continue reading pages of the executable. Every wrong reply
+received by the client would add a few minutes to the loading time.</p><p>
+
+
+There were several possible sources of the ARP confusion, so to
+isolate the problem, we forced a client to ARP the server and watched
+what happened to the ARP table:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>arp -d muskrat</b></tt> 
+muskrat (139.50.2.1) deleted 
+# <tt class="userinput"><b>ping -s muskrat</b></tt> 
+PING muskrat: 56 data bytes 
+<i class="lineannotation">No further output from ping</i></pre></blockquote>
+
+
+By deleting the ARP table entry and then directing the client to send
+packets to <em class="emphasis">muskrat</em>, we forced an ARP of
+<em class="emphasis">muskrat</em> from the client.
+<em class="emphasis">ping</em> timed out without receiving any ICMP echo
+replies, so we examined the ARP table and found a surprise:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>arp -a | fgrep muskrat</b></tt> 
+le0   muskrat               255.255.255.255       08:00:49:05:02:a9</pre></blockquote>
+
+
+Since <em class="emphasis">muskrat</em> was a Sun workstation, we expected
+its Ethernet address to begin with 08:00:20 (the prefix assigned to
+Sun Microsystems), not the 08:00:49 prefix used by Kinetics gateway
+boxes. The next step was to figure out how the wrong Ethernet address
+was ending up in the ARP table: was <em class="emphasis">muskrat</em>
+lying in its ARP replies, or had we found a network imposter?</p><p>
+
+
+Using a network analyzer, we repeated the ARP experiment and watched
+ARP replies returned. We saw two distinct replies: the correct one
+from <em class="emphasis">muskrat</em>, followed by an invalid reply from
+the Kinetics FastPath gateway. The root of this problem was that the
+Kinetics box had been configured using the IP broadcast address
+0.0.0.0, allowing it to answer all ARP requests. Reconfiguring the
+Kinetics box with a non-broadcast IP address solved the problem.</p><p>
+
+
+The last update to the ARP table is the one that
+"sticks," so the wrong Ethernet address was overwriting
+the correct ARP table entry. The Kinetics FastPath was located on the
+other side of the bridge, virtually guaranteeing that its replies
+would be the last to arrive, delayed by their transit over the
+bridge. When <em class="emphasis">muskrat</em> was heavily loaded, it was
+slow to reply to the ARP request and its ARP response would be the
+last to arrive. Reconfiguring the Kinetics FastPath to use a proper
+IP address and network mask cured the problem.</p><p>
+
+
+ARP servers that have out-of-date information create similar
+problems. This situation arises if an IP address is changed without a
+corresponding update of the server's published ARP table
+initialization, or if the IP address in question is re-assigned to a
+machine that implements the ARP protocol. If an ARP server was
+employed because <em class="emphasis">muskrat</em> could not answer ARP
+requests, then we should have seen exactly one ARP reply, coming from
+the ARP server. However, an ARP server with a published ARP table
+entry for a machine capable of answering its own ARP requests
+produces exactly the same duplicate response symptoms described
+above. With both machines on the same local network, the failures
+tend to be more intermittent, since there is no obvious time-ordering
+of the replies.</p><p>
+
+
+There's a moral to this story: you should rarely need to know
+the Ethernet address of a workstation, but it does help to have them
+recorded in a file or NIS map. This problem was solved with a bit of
+luck, because the machine generating incorrect replies had a
+different manufacturer, and therefore a different Ethernet address
+prefix. If the incorrectly configured machine had been from the same
+vendor, we would have had to compare the Ethernet addresses in the
+ARP table with what we believed to be the correct addresses for the
+machine in <a name="INDEX-2336" /></a>question.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.7. Time synchronization</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15.2. Renegade NIS server</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch15_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:53 GMT -->
+</html>

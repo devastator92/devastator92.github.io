@@ -1,0 +1,299 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:00 GMT -->
+<head><title>A Cryptography Primer (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.2. A Cryptography Primer</h2>
+
+
+
+<a name="INDEX-248" />We've
+covered the basic properties of SSH. Now we focus on cryptography,
+introducing important terms and ideas regarding the technology in
+general. There are many good references on cryptographic theory and
+practice, and we make no attempt here to be comprehensive. (For more
+detailed information, check out Bruce Schneier's excellent
+book, <em class="citetitle">Applied Cryptography</em>, published by John
+Wiley &amp; Sons.) We introduce encryption and decryption, plaintext
+and ciphertext, keys, secret-key and public-key cryptography, and
+hash functions, both in general and as they apply to SSH.</p>
+
+
+
+<em class="emphasis">Encryption</em><a name="INDEX-249" /> is
+the process of scrambling data so that it can't be read by
+unauthorized parties. An <em class="emphasis">encryption algorithm</em>
+(or
+<em class="emphasis">cipher</em><a name="INDEX-250" />)
+is a particular method of performing the scrambling; examples of
+currently popular encryption algorithms are RSA, RC4, DSA, and IDEA.
+The original, readable data is called the
+<em class="emphasis">plaintext,</em><a name="INDEX-251" />
+or data in the clear, while the encrypted version is called the
+corresponding ciphertext. To convert plaintext to ciphertext, you
+apply an encryption algorithm parameterized by a <a name="INDEX-252" />key, a string that is
+typically known only to you. An encryption algorithm is considered
+secure if it is infeasible for anyone to read (or
+<em class="emphasis">decrypt</em><a name="INDEX-253" />)
+the encrypted data without the key. An attempt to decrypt data
+without its key is called
+<em class="emphasis">cryptanalysis.</em><a name="INDEX-254" /></p>
+
+
+
+<a name="ch03-6-fm2xml" /><div class="sect2">
+<h3 class="sect2">3.2.1. How Secure Is Secure?</h3>
+
+
+
+It's important to understand the word "infeasible"
+in the previous paragraph. Today's most popular and secure
+ciphers are vulnerable to
+<em class="emphasis">brute-force</em><a name="INDEX-255" /> attacks: if you try every possible key,
+you will eventually succeed in decryption. However, when the number
+of possible keys is large, a brute-force search requires a great deal
+of time and computing power. Based on the state of the art in
+computer hardware and algorithms, it is possible to pick sufficiently
+large key sizes so as to render brute-force key search infeasible for
+your adversary. What counts as infeasible, though, varies depending
+on how valuable the data is, how long it must stay secure, and how
+motivated and well-funded your adversary is. Keeping something secret
+from your rival startup for a few days is one thing; keeping it
+secret from a major world government for 10 years is quite another.</p>
+
+
+
+Of course, for all this to make sense, you must be convinced that
+brute force is the only way to attack your cipher. Encryption
+algorithms have structure and are susceptible to mathematical
+analysis. Over the years, many ciphers previously thought secure have
+fallen to advances in cryptanalysis. It isn't currently
+possible to <em class="emphasis">prove</em> a practical cipher secure.
+Rather, a cipher acquires respectability through intensive study by
+mathematicians and cryptographers. If a new cipher exhibits good
+design principles, and well-known researchers study it for some time
+and fail to find a practical, faster method of breaking it than brute
+force, then people will consider it secure.<a href="#FOOTNOTE-16">[16]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-16" />[16]In his
+pioneering works on information theory and encryption, the
+mathematician Claude Shannon defined a model for cipher security and
+showed there is a cipher that is perfectly secure under that model:
+the so-called <em class="emphasis">one-time pad.</em> It is perfectly
+secure: the encrypted data gives an attacker no information
+whatsoever about the possible plaintexts. The ciphertext literally
+can decrypt to any plaintext at all with equal likelihood. The
+problem with the one-time pad is that it cumbersome and fragile. It
+requires that keys be as large as the messages they protect, be
+generated perfectly randomly, and never be reused. If any of these
+requirements are violated, the one-time pad becomes extremely
+insecure. The ciphers in common use today aren't perfectly
+secure in Shannon's sense, but for the best of them,
+brute-force attacks are infeasible.</p>
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-92389" /><div class="sect2">
+<h3 class="sect2">3.2.2. Public- and Secret-Key Cryptography</h3>
+
+
+
+Encryption algorithms as described so far are called
+<em class="emphasis">symmetric</em> or
+<em class="emphasis">secret-key</em><a name="INDEX-256" /> ciphers; the same key is used for
+encrypting and decrypting. Examples are Blowfish, DES, IDEA, and RC4.
+Such a cipher immediately introduces the
+<a name="INDEX-257" /><a name="INDEX-258" />key-distribution
+problem: how do you get the key to your intended recipient? If you
+can meet in person every once and a while and exchange a list of
+keys, all well and good, but for dynamic communication over computer
+networks, this doesn't work.</p>
+
+
+
+<em class="emphasis">Public-key,</em><a name="INDEX-259" /><a name="INDEX-260" /> or
+<em class="emphasis">asymmetric,</em><a name="INDEX-261" /> cryptography replaces the single key
+with a pair of related keys: public and private. They are related in
+a mathematically clever way: data encrypted with the public key may
+be decrypted with its private counterpart, and it is infeasible to
+derive the private key from the public one. You keep your private
+key, well... private, and give the public key to anyone who wants it,
+without worrying about disclosure. Ideally, you publish it in a
+directory next to your name, like a telephone book. When someone
+wants to send you a secret message, they encrypt it with your public
+key. Other people may have your public key, but that won't
+allow them to decrypt the message; only you can do that with the
+corresponding private key. Public-key cryptography goes a long way
+towards solving the key-distribution problem.<a href="#FOOTNOTE-17">[17]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-17" />[17]There
+is still the issue of reliably determining whose public key is whose;
+but that gets into public-key infrastructure, or PKI systems, and is
+a broader topic.</p>
+
+
+</blockquote>
+
+
+
+Public-key methods are also the basis for <em class="emphasis">digital
+signatures:</em><a name="INDEX-262" /><a name="INDEX-263" /><a name="INDEX-264" /> extra information attached to a
+digital document to provide evidence that a particular person has
+seen and agreed to it, much as a pen-and-ink signature does with a
+paper document. Any asymmetric cipher (RSA, ElGamal, Elliptic Curve,
+etc.) may be used for digital signatures, though the reverse
+isn't true. For instance, the DSA algorithm, which is used by
+the SSH-2 protocol for its keys, is a signature-only public-key
+scheme and can't be used for encryption.<a href="#FOOTNOTE-18">[18]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-18" />[18]That's the idea, anyway, although it has been pointed out
+that it's easy to use a general DSA implementation for both RSA
+and ElGamal encryption. That was not the intent, however.</p>
+
+
+</blockquote>
+
+
+
+Secret- and public-key encryption algorithms differ in another way:
+performance. All common public-key algorithms are enormously slower
+than secret-key ciphers -- by orders of magnitude. It is simply
+infeasible to encrypt large quantities of data using a public-key
+cipher. For this reason, modern data encryption uses both methods
+together. Suppose you want to send some data securely to your friend
+Bob Bitflipper. Here's what a modern encryption program does:</p>
+
+
+
+<ol><li>Generate a random key, called the <em class="emphasis">bulk
+key,</em><a name="INDEX-265" /><a name="INDEX-266" /> for a fast, secret-key algorithm such as 3
+DES (a.k.a the <em class="emphasis">bulk cipher</em>).</p></li><li>Encrypt the plaintext with the bulk key.</p></li><li>Secure the bulk key by encrypting it with Bob Bitflipper's
+public key, so only Bob can decrypt it. Since secret keys are small
+(a few hundred bits long at most), the speed of the public-key
+algorithm isn't an issue.</p></li></ol>
+To reverse the operation, Bob's decryption program first
+decrypts the bulk key, and then uses it to decrypt the ciphertext.
+This method yields the advantages of both kinds of encryption
+technology, and in fact, SSH uses this technique. User data crossing
+an SSH connection is encrypted using a fast secret-key cipher, the
+key for which is shared between the client and server using
+public-key methods.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-98801" /><div class="sect2">
+<h3 class="sect2">3.2.3. Hash Functions</h3>
+
+
+
+In cryptography (and elsewhere in computing and network technology),
+it is often useful to know if some collection of data has changed. Of
+course, one can just send along (or keep around) the original data
+for comparison, but that can be prohibitively expensive both in time
+and storage. The common tool addressing this need is called a
+<em class="emphasis">hash function.</em><a name="INDEX-267" /><a name="INDEX-268" /> Hash functions are used by SSH-1 for
+integrity checking (and have various other uses in cryptography we
+won't discuss here).</p>
+
+
+
+A hash function is simply a mapping from a larger set of data values
+to a smaller set. For instance, a hash function
+<em class="emphasis">H</em> might take an input bit string of any length
+up to 50,000 bits, and uniformly produce a 128-bit output. The idea
+is that when sending a message <em class="emphasis">m</em> to Alice, I
+also send along the hash value <em class="emphasis">H(m)</em>. Alice
+computes <em class="emphasis">H(m)</em> independently and compares it to
+the <em class="emphasis">H(m)</em> value I sent; if they differ, she
+concludes that the message was modified in transit.</p>
+
+
+
+This simple technique can't be completely effective. Since the
+range of the hash function is strictly smaller than its domain, many
+different messages have the same hash value. To be useful,
+<em class="emphasis">H</em> must have the property that the kinds of
+alterations expected to happen to the messages in transit, must be
+overwhelmingly likely to cause a change in the message hash. Put
+another way: given a message <em class="emphasis">m</em> and a typical
+changed message <em class="emphasis">m'</em>, it must be extremely
+unlikely that <em class="emphasis">H(m) = H(m')</em>.</p>
+
+
+
+Thus a hash function must be tailored to its intended use. One common
+use is in networking: datagrams transmitted over a network frequently
+include a message hash that detects transmission errors due to
+hardware failure or software bugs. Another use is in cryptography, to
+implement digital signatures. Signing a large amount of data is
+prohibitively expensive, since it involves slow public-key operations
+as well as shipping along a complete encrypted copy of the data. What
+is actually done is to first hash the document, producing a small
+hash value, and then sign that, sending the signed hash along
+instead. A verifier independently computes the hash, then decrypts
+the signature using the appropriate public key, and compares them. If
+they are the same, he concludes (with high probability) that the
+signature is valid, and that the data hasn't changed since the
+private key holder signed it.</p>
+
+
+
+These two uses, however, have different requirements, and a hash
+function suitable for detecting transmission errors due to line noise
+might be ineffective at detecting deliberate alterations introduced
+by a human attacker! A cryptographic hash function must make it
+computationally infeasible to find two different messages having the
+same hash or to find a message having a particular fixed hash. Such a
+function is said to be
+<em class="emphasis">collision-resistant</em><a name="INDEX-269" /> (or
+<em class="emphasis">collision-proof,</em> though that's a bit
+misleading), and
+<em class="emphasis">pre-image-resistant</em><a name="INDEX-270" /> <a name="INDEX-271" />.
+The <a name="INDEX-272" />Cyclic Redundancy Check hash commonly
+used to detect accidental data changes (e.g., in Ethernet frame
+transmissions) is an example of a non-collision-resistant hash. It is
+easy to find CRC-32 hash collisions, and the SSH-1 insertion attack
+is based on this fact. [<a href="ch03_10.html#ch03-50330">Section 3.10.5, "The Insertion Attack"</a>] Examples of
+cryptographically strong hash functions are MD5 and SHA-1.<a name="INDEX-273" /> <a name="INDEX-274" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3. Inside SSH</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.3. The Architecture of an SSH System</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:00 GMT -->
+</html>

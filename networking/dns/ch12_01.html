@@ -1,0 +1,298 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:31 GMT -->
+<head><title>nslookup and dig (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch12_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 12. nslookup and dig</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-12-SECT-1">Is nslookup a Good Tool?</a><br />
+<a href="ch12_02.html">Interactive Versus Noninteractive</a><br />
+<a href="ch12_03.html">Option Settings</a><br />
+<a href="ch12_04.html">Avoiding the Search List</a><br />
+<a href="ch12_05.html">Common Tasks</a><br />
+<a href="ch12_06.html">Less Common Tasks</a><br />
+<a href="ch12_07.html">Troubleshooting nslookup Problems</a><br />
+<a href="ch12_08.html">Best of the Net</a><br />
+<a href="ch12_09.html">Using dig</a><br /><p></p></div>
+
+
+<em>"Don't stand chattering to yourself like that,"
+Humpty Dumpty said, looking at her for the first time, "but
+tell me your name and your business."</p><p>
+
+
+"My name is Alice, but -- "</p><p>
+
+
+"It's a stupid name enough!" Humpty Dumpty
+interrupted impatiently. "What does it mean?"</p><p>
+
+
+"Must a name mean something?" Alice asked doubtfully.</p><p>
+
+
+"Of course it must," Humpty Dumpty said with a short
+laugh...</em></p><p>
+
+
+<a name="INDEX-1953" /></a> <a name="INDEX-1954" /></a>To be proficient at troubleshooting name
+server problems, you'll need a troubleshooting tool to send DNS
+queries, one that gives you complete control. We'll cover
+<em class="filename">nslookup </em>in this chapter because it's
+distributed with BIND and with many vendors' operating systems.
+That doesn't mean it's the best DNS troubleshooting tool
+available, though. <em class="filename">nslookup</em> has its
+faults -- so many, in fact, that it's now deprecated
+(geekish for "officially out of favor") in the BIND 9
+distribution. We'll cover it anyway, since it's
+pervasive. We'll also cover <em class="filename">dig</em>, which
+provides similar functionality and doesn't suffer from
+<em class="filename">nslookup</em>'s deficiencies.</p><p>
+
+
+Note that this chapter isn't comprehensive; there are aspects
+of <em class="filename">nslookup </em>and <em class="filename">dig (</em>mostly
+obscure and seldom used) that we won't cover. You can always
+consult the manual pages for those.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-12-SECT-1" /></a>
+<h2 class="sect1">12.1. Is nslookup a Good Tool?</h2>
+
+
+<a name="INDEX-1955" /></a>Much of the
+time, you'll use <em class="filename">nslookup</em> to send queries
+in the same way the resolver sends them. Sometimes, though,
+you'll use <em class="filename">nslookup</em> to query other name
+servers as a name server would instead. The way you use it will
+depend on the problem you're trying to debug. You might wonder,
+"How accurately does <em class="filename">nslookup</em> emulate a
+resolver or a name server? Does <em class="filename">nslookup</em>
+actually use the BIND resolver library routines?" No,
+<em class="filename">nslookup</em> uses its own routines for querying name
+servers, but those routines are based on the resolver routines.
+Consequently, <em class="filename">nslookup</em>'s behavior is very
+similar to the resolver's behavior, but it does differ
+slightly. We'll point out some of those differences. As for
+emulating name server behavior, <em class="filename">nslookup</em> allows
+us to query another server with the same query message that a name
+server would use, but the retransmission scheme is quite different.
+Like a name server, though, <em class="filename">nslookup</em> can
+transfer a copy of the zone data. So <em class="filename">nslookup</em>
+doesn't emulate either the resolver or the name server exactly,
+but it does emulate them well enough to make a decent troubleshooting
+tool. Let's delve into those differences we alluded to.</p><p>
+
+
+<a name="dns4-CHP-12-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">12.1.1. Multiple Servers</h3>
+
+
+<a name="INDEX-1956" /></a><em class="filename">nslookup</em>
+talks to only one name server at a time. This is the biggest
+difference between <em class="filename">nslookup</em>'s behavior and
+the resolver's behavior. The resolver makes use of each
+<em class="emphasis">nameserver</em> directive in
+<em class="filename">resolv.conf</em>. If there are two
+<em class="emphasis">nameserver</em> directives in
+<em class="filename">resolv.conf</em><a name="INDEX-1957" /></a>, the
+resolver tries the first name server, then the second, then the
+first, then the second, until it receives a response or gives up. The
+resolver does this for every query. On the other hand,
+<em class="filename">nslookup</em> tries the first name server in
+<em class="filename">resolv.conf</em> and keeps retrying until it finally
+gives up on the first name server and tries the second. Once it gets
+a response, it locks onto that server and doesn't try the next.
+However, you <em class="emphasis">want</em> your troubleshooting tool to
+talk to only one name server so you can reduce the number of
+variables when analyzing a problem. If <em class="filename">nslookup</em>
+used more than one name server, you wouldn't have as much
+control over your troubleshooting session. So talking to only one
+server is the right thing for a troubleshooting tool to do.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">12.1.2. Timeouts</h3>
+
+
+The
+<em class="filename">nslookup</em><a name="INDEX-1958" /></a> timeouts match the resolver timeouts when
+the resolver is querying only one name server. A name server's
+timeouts, however, are based on how quickly the remote server
+answered the last query, a dynamic measure.
+<em class="filename">nslookup</em>'s timeouts will never match a
+name server's timeouts, but that's not a problem either.
+When you're querying remote name servers with
+<em class="filename">nslookup</em>, you probably only care what the
+response was, not how long it took.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">12.1.3. The Search List</h3>
+
+
+<em class="filename">nslookup</em><a name="INDEX-1959" /></a>
+implements the search list just as the resolver code does. Versions
+of <em class="filename">nslookup</em> shipped with pre-BIND 4.9 name
+servers tend to use a "full" search list: the local
+domain name and all ancestor domain names with at least two labels.
+Versions of <em class="filename">nslookup</em> shipped with BIND 4.9 and
+later name servers use an abridged search list that includes just the
+local domain name. We'll show you how to determine your type of
+<em class="filename">nslookup</em> later, in case you're not sure.</p><p>
+
+
+Name servers don't implement search lists, so, to act like a
+name server, the <em class="filename">nslookup</em> search function must
+be turned off -- more on that later.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">12.1.4. Zone Transfers</h3>
+
+
+<a name="INDEX-1960" /></a><em class="filename">nslookup</em> does zone
+transfers just like a name server. Unlike a name server, however,
+<em class="filename">nslookup</em> does not check SOA
+<a name="INDEX-1961" /></a>serial numbers before pulling the zone
+data; if you want to do that, you'll have to do it manually.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-12-SECT-1.5" /></a><div class="sect2">
+<h3 class="sect2">12.1.5. Using NIS and /etc/hosts</h3>
+
+
+This last point doesn't compare <em class="filename">nslookup</em>
+to the resolver or name server but to ways of looking up names in
+general. As distributed from the Internet Software Consortium,
+<em class="filename">nslookup</em> uses only DNS; it won't use
+<a name="INDEX-1962" /></a>NIS
+or <em class="filename">/etc/hosts</em>. Most applications can use DNS,
+NIS, or <a name="INDEX-1963" /></a><em class="filename">/etc/hosts</em>, depending
+on how the system is configured. Don't count on
+<em class="filename">nslookup</em> to help you find your lookup problem
+unless your host is really configured to use name servers.<a href="#FOOTNOTE-93">[93]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-93" /></a>[93]Or your vendor's <em class="filename">nslookup </em>has been
+enhanced to query NIS servers and check
+<em class="filename">/etc/hosts</em>, like the one in HP-UX.</p><p>
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.4. The DNS Security Extensions</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.2. Interactive Versus Noninteractive</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch12_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:33 GMT -->
+</html>

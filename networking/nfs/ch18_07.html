@@ -1,0 +1,151 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:44 GMT -->
+<head><title>Mount point constructions (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch18_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">18.7. Mount point constructions</h2>
+
+The choice of a mount point naming scheme <a name="INDEX-2709" />
+<a name="INDEX-2710" />can have a significant impact on NFS
+server usage. Two common but inefficient constructions are
+stepping-stone mounts and server-resident symbolic links. In each
+case, the client must first query the NFS server owning the
+intermediate mount point (or symbolic link) before directing a
+request to the correct target server.
+</p>
+
+A stepping-stone mount exists when you<a name="INDEX-2711" />
+<a name="INDEX-2712" />
+mount one NFS filesystem on top of another directory, which is itself
+part of an NFS-mounted filesystem from a different server. For
+example:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount mahimahi:/usr           /usr</b></tt> 
+# <tt class="userinput"><b>mount wahoo:/usr/local        /usr/local</b></tt> 
+# <tt class="userinput"><b>mount poi:/usr/local/bin      /usr/local/bin</b></tt></pre></blockquote>
+
+To perform a name lookup on
+<em class="emphasis">/usr/local/bin/emacs</em>, the NFS client performs
+directory searches and file attribute queries on all three NFS
+servers, when the only "interesting" server is
+<em class="emphasis">poi</em>. It's best to mount all of the
+subdirectories of <em class="emphasis">/usr</em> and
+<em class="emphasis">/usr/local</em> from a single fileserver, so that you
+don't send RPC requests to other fileservers simply because
+they own the intermediate components in the pathname. Stepping-stone
+mounts are frequently created for consistent naming schemes, but they
+add to the load of "small" RPC calls handled by all NFS
+servers.
+</p>
+
+Symbolic links are also <a name="INDEX-2713" /> <a name="INDEX-2714" />useful for imposing symmetric naming
+conventions across multiple filesystems but they impose an
+unnecessary load on an NFS server that is regularly called upon to
+resolve the links (if the NFS client does not perform symbolic link
+caching). NFS pathnames are resolved a component at a time, so any
+symbolic links encountered in a pathname must be resolved by the host
+owning them.
+</p>
+
+For example, consider a <em class="emphasis">/usr/local</em> that is
+composed of links to various subdirectories on other servers:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount wahoo:/usr/local /usr/local</b></tt> 
+# <tt class="userinput"><b>cd /usr/local</b></tt> 
+# <tt class="userinput"><b>ls -l</b></tt> 
+lrwxrwxrwx 1 root 16 May 17 19:12 bin -&gt; /net/poi/bin 
+lrwxrwxrwx 1 root 16 May 17 19:12 lib -&gt; /net/mahimahi/lib 
+lrwxrwxrwx 1 root 16 May 17 19:12 man -&gt; /net/irie/man</pre></blockquote>
+
+Each reference to any file in <em class="emphasis">/usr/local</em> must
+first go through the server <em class="emphasis">wahoo</em> to get the
+appropriate symbolic link resolved. Once the link is read, the client
+machine can then look up the directory entry in the correct
+subdirectory of <em class="emphasis">/net</em>. Every request that
+requires looking up a pathname now requires two server requests
+instead of just one. Solaris, as well as other modern NFS
+implementations reduce this penalty by caching symbolic links. This
+helps the client avoid unnecessary trips to the intermediate server
+to resolve readlink requests.
+</p>
+
+Use <em class="emphasis">nfsstat -s</em> to examine the number of symbolic
+link resolutions performed on each server:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -ns</b></tt> 
+Server nfs:
+calls       badcalls    
+221628      769         
+Version 2: (774 calls)
+null        getattr     setattr     root        lookup      readlink    
+8 1%        0 0%        0 0%        0 0%        762 98%     0 0%        
+read        wrcache     write       create      remove      rename      
+0 0%        0 0%        0 0%        0 0%        0 0%        0 0%        
+link        symlink     mkdir       rmdir       readdir     statfs      
+0 0%        0 0%        0 0%        0 0%        0 0%        4 0%        
+Version 3: (219984 calls)
+null        getattr     setattr     lookup      access      readlink    
+1023 0%     73495 33%   4383 1%     31493 14%   26672 12%   46299 21%      
+read        write       create      mkdir       symlink     mknod       
+11606 5%    7618 3%     1892 0%     64 0%       37 0%       0 0%        
+remove      rmdir       rename      link        readdir     readdirplus 
+3183 1%     5 0%        308 0%      1145 0%     456 0%      1138 0%     
+fsstat      fsinfo      pathconf    commit      
+7076 3%     109 0%      178 0%       1804 0%     </pre></blockquote>
+
+If the total percentage of <em class="emphasis">readlink</em> calls is
+more than 10% of the total number of <em class="emphasis">lookup</em>
+calls on all NFS servers, there is a symbolic link fairly high up in
+a frequently traversed path component. You should look at the total
+number of <em class="emphasis">lookup</em> and
+<em class="emphasis">readlink</em> calls on all servers, since the
+<em class="emphasis">readlink</em> is counted by the server that owns the
+link while the <em class="emphasis">lookup</em> is directed to the target
+of the symbolic link.
+</p>
+
+If you have one or more symbolic links that are creating a pathname
+lookup bottleneck on the server, remove the links (on the server) and
+replace them with a client-side NFS mount of the link's target.
+In the previous example, mounting the <em class="emphasis">/net</em>
+subdirectories directly in <em class="emphasis">/usr/local</em> would cut
+the number of <em class="emphasis">/usr/local</em>-related operations in
+half. The performance improvement derived from this change may be
+substantial when symbolic links are not cached, since every
+<em class="emphasis">readlink</em> call requires the server to read the
+link from disk. Stepping-stone mounts, although far from ideal, are
+faster than an equivalent configuration built from symbolic links
+when the clients do not cache symbolic link lookups.
+</p>
+
+Most filesystem naming problems can be resolved more easily and with
+far fewer performance penalties by using the automounter, as
+described in <a href="ch09_01.html">Chapter 9, "The Automounter"</a>.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch18_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">18.6. Attribute caching</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">18.8. Stale filehandles</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:44 GMT -->
+</html>

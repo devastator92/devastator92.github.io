@@ -1,0 +1,384 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:35 GMT -->
+<head><title>Checking Routing  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch13_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">13.5. Checking Routing </h2>
+
+<p>The "network unreachable" error
+<a name="INDEX-2907" />
+<a name="INDEX-2908" />
+<a name="INDEX-2909" /> <a name="INDEX-2910" />message clearly
+indicates a routing problem. If the problem is in the local
+host's routing table, it is easy to detect and resolve. First,
+use <tt class="literal">netstat</tt> <tt class="literal">-nr</tt> and
+<tt class="literal">grep</tt> to see whether or not a valid route to your
+destination is installed in the routing table.<a href="#FOOTNOTE-147">[147]</a></p><blockquote class="footnote">
+<a name="FOOTNOTE-147" /><p>[147]<tt class="literal">netstat</tt> <tt class="literal">-nr</tt> works on most
+systems, but Linux administrators prefer <tt class="literal">route</tt>
+<tt class="literal">-n</tt>.</p> </blockquote>
+
+<p>This example checks for a
+specific route to network 128.8.0.0:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">netstat -nr | grep '^128\.8\.'</b>
+128.8.0.0     26.20.0.16     UG     0    37    dnet0</pre></blockquote>
+
+<p>This same test, run on a system that did not have this route in its
+routing table, would return no response at all. For example, a user
+reports that the "network is down" because he cannot
+<tt class="literal">ftp</tt> to
+<em class="emphasis">helios.metalab.unc.edu</em>, and a
+<tt class="literal">ping</tt> test returns the following results:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">ping -s helios.metalab.unc.edu 56 2</b> 
+PING helios.metalab.unc.edu: 56 data bytes 
+sendto: Network is unreachable 
+ping: wrote helios.metalab.unc.edu 64 chars, ret=-1 
+sendto: Network is unreachable 
+ping: wrote helios.metalab.unc.edu 64 chars, ret=-1 
+ 
+----helios.metalab.unc.edu PING Statistics----
+2 packets transmitted, 0 packets received, 100% packet loss</pre></blockquote>
+
+<p>Based on the "network unreachable" error message, check
+the user's routing table. In our example, we're looking
+for a route to <em class="emphasis">helios.metalab.unc.edu</em>. The IP
+address<a href="#FOOTNOTE-148">[148]</a> of
+<em class="emphasis">helios.metalab.unc.edu</em> is 152.2.210.81. So we
+check for any route to a destination that begins with 152.2:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-148" /><p>[148]Use <tt class="literal">nslookup</tt> to find the
+IP address if you don't know it. <tt class="literal">nslookup</tt> is
+discussed later in this chapter.</p> </blockquote>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">netstat -nr | grep '^152\.2\.'</b>
+%</pre></blockquote>
+
+<p>This test shows that there is no <em class="emphasis">specific</em> route
+to a destination that begins with 152.2. If a route was found,
+<tt class="literal">grep</tt> would display it. Since there's no
+specific route to the destination, remember to look for a default
+route. This example shows a successful check for a default route on a
+Solaris system:<a href="#FOOTNOTE-149">[149]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-149" /><p>[149]On a Linux system,
+<tt class="literal">grep</tt> for network 0.0.0.0, which Linux uses instead
+of the word "default" to indicate the default
+route.</p> </blockquote>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">netstat -nr | grep def</b>
+default       172.16.12.1     UG    0   101277   dnet0</pre></blockquote>
+
+<p>If <tt class="literal">netstat</tt> shows the correct specific route or a
+valid default route, the problem is not in the routing table. In that
+case, use <tt class="literal">traceroute</tt>, as described in the next
+section, to trace the route all the way to its destination.
+</p>
+
+<p>If the routing table doesn't contain the expected route,
+it's a local routing problem. There are two ways to approach
+local routing problems, depending on whether the system uses static
+or dynamic routing. If you're using static routing, install the
+missing route using the <tt class="literal">route</tt>
+<tt class="literal">add</tt> command. Remember, most systems that use
+static routing rely on a default route, so the missing route could be
+the default route. Make sure that the startup files add the needed
+route to the table whenever the system reboots. See <a href="ch07_01.html">Chapter 7, "Configuring Routing "</a> for details about the <tt class="literal">route
+add</tt> command.
+</p>
+
+<p>If you're using dynamic routing, make sure that the routing
+program is running. For example, the command below makes sure that
+<tt class="literal">gated</tt> is running:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">ps 'cat /etc/gated.pid'</b> 
+  PID TT STAT  TIME COMMAND
+27711 ?  S   304:59 gated -tep /etc/log/gated.log</pre></blockquote>
+
+<p>If the correct routing daemon is not running, restart it and specify
+tracing. Tracing allows you to check for problems that might be
+causing the daemon to terminate abnormally.
+</p>
+
+<a name="tcp3-CHP-13-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">13.5.1. Tracing Routes </h3>
+
+<p>If the local routing
+<a name="INDEX-2911" />
+<a name="INDEX-2912" /> <a name="INDEX-2913" />table is correct, the problem may be
+occurring some distance away from the local host. Remote routing
+problems can cause the "no answer" error message, as well
+as the "network unreachable" error message. But the
+"network unreachable" message does not always signify a
+routing problem. It can mean that the remote network cannot be
+reached because something is down between the local host and the
+remote destination. <tt class="literal">traceroute</tt> is the program that
+can help you locate these problems.
+</p>
+
+<p><tt class="literal">traceroute</tt> traces the route of UDP packets from
+the local host to a remote host. It prints the name (if it can be
+determined) and IP address of each gateway along the route to the
+remote host.
+</p>
+
+<p><tt class="literal">traceroute</tt> uses two techniques, small TTL
+(time-to-live) values and an invalid port number, to trace packets to
+their destination. <tt class="literal">traceroute</tt> sends out UDP
+packets with small TTL values to detect the intermediate gateways.
+The TTL values start at 1 and increase in increments of 1 for each
+group of three UDP packets sent. When a gateway receives a packet, it
+decrements the TTL. If the TTL is then 0, the packet is not forwarded
+and an ICMP "Time Exceeded" message is returned to the
+source of the packet. <tt class="literal">traceroute</tt> displays one line
+of output for each gateway from which it receives a "Time
+Exceeded" message. <a href="ch13_05.html#tcp3-CHP-13-FIG-2">Figure 13-2</a> presents a
+sample of the single line of output that is displayed for a gateway,
+and shows the meaning of each field in the line.
+</p>
+
+<a name="tcp3-CHP-13-FIG-2" /><div class="figure"><img height="67" alt="Figure 13-2" src="figs/tcp3_1302.gif" width="402" /></div><h4 class="objtitle">Figure 13-2. traceroute output</h4>
+
+<p>When the destination host receives a packet from
+<tt class="literal">traceroute</tt>, it returns an ICMP
+<a name="INDEX-2914" /> <a name="INDEX-2915" />"Unreachable Port"
+<a name="INDEX-2916" />message. This happens because
+<tt class="literal">traceroute</tt> intentionally uses an invalid port
+number (33434) to force this error. When
+<tt class="literal">traceroute</tt> receives the "Unreachable
+Port" message, it knows that it has reached the destination
+host, and it terminates the trace. So, <tt class="literal">traceroute</tt>
+is able to develop a list of the gateways, starting at one hop away
+and increasing one hop at a time until the remote host is reached.
+<a href="ch13_05.html#tcp3-CHP-13-FIG-3">Figure 13-3</a> illustrates the flow of packets tracing
+to a host three hops away. The following shows a
+<tt class="literal">traceroute</tt> to
+<em class="emphasis">www.internic.net</em> from a Solaris system hanging
+off the Comcast network. <tt class="literal">traceroute</tt> sends out
+three packets at each TTL value. If no response is received to a
+packet, <tt class="literal">traceroute</tt> prints an asterisk
+(<tt class="literal">*</tt>). If a response is received,
+<tt class="literal">traceroute</tt> displays the name and address of the
+gateway that responded and the packet's round trip time in
+milliseconds.
+</p>
+
+<a name="tcp3-CHP-13-FIG-3" /><div class="figure"><img height="396" alt="Figure 13-3" src="figs/tcp3_1303.gif" width="405" /></div><h4 class="objtitle">Figure 13-3. Flow of traceroute packets </h4>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">traceroute www.internic.net</b>
+traceroute to www.internic.net (207.151.159.3), 30 hops max, 40 byte packets
+ 1 ani (192.168.0.1)  1.712 ms  1.40 ms  1.34 ms
+ 2 10.81.130.1 (10.81.130.1)  52.01 ms  34.38 ms  118.97 ms
+ 3 bb1-fe1-0.mtgmry1.md.home.net (24.11.248.1) 13.30 ms 100.92 ms 31.99 ms
+ 4 c2-se9-0-10.washdc1.home.net (24.7.73.25) 118.63 ms 94.92 ms 121.10 ms
+ 5 24.7.71.6 (24.7.71.6) 127.63 ms  26.29 ms  132.07 ms
+ 6 p4-6-1-0.r00.plalca01.us.bb.verio.net (129.250.2.245) 186.02 ms 164.81 ms 156.44 ms
+ 7 p16-0-0-0.r06.plalca01.us.bb.verio.net (129.250.2.161) 86.59 ms 130.28 ms 121.09 ms
+ 8 p16-0-0-0.r04.snjsca03.us.bb.verio.net (129.250.3.162) 84.594 ms 117.42 ms 174.59 ms
+ 9 p16-3-0-0.r01.snjsca03.us.bb.verio.net (129.250.2.63) 123.87 ms 91.39 ms 119.79 ms
+10 p4-2-0-0.r00.lsanca01.us.bb.verio.net (129.250.2.26) 142.38 ms 166.11 ms 95.32 ms
+11 ge-0-0-0.a02.lsanca02.us.ra.verio.net (129.250.29.116) 137.59 ms 98.28 ms 256.11 ms
+12 uscisi-pl.customer.ni.net (209.189.66.66) 98.64 ms 125.03 ms 231.11 ms
+13 207.151.151.2 (207.151.151.2) 192.06 ms 164.52 ms 103.30 ms
+14 icann-IWC.interworld.net (206.124.230.170) 113.33 ms 145.72 ms 107.39 ms
+15 * host159-3.icann.org (207.151.159.3) 99.67 ms 178.72 ms</pre></blockquote>
+
+<p>This trace shows that 15 intermediate gateways are involved, that
+packets are making the trip, and that round trip travel time for
+packets from this host to <em class="emphasis">www.internic.net</em> is
+about 140 ms.
+</p>
+
+<p>Variations and bugs in the implementation of ICMP on different types
+of gateways, as well as the unpredictable nature of the path a
+datagram can take through a network, can cause some odd displays. For
+this reason, you shouldn't examine the output of
+<tt class="literal">traceroute</tt> too closely. The most important things
+in the <tt class="literal">traceroute</tt> output are:
+</p>
+
+<ul><li>
+<p>Did the packet get to its remote destination?</p>
+</li><li>
+<p>If not, where did it stop?</p>
+</li></ul>
+<p>In the code below we show another trace of the path to
+<em class="emphasis">www.internic.net</em>. This time the trace does not
+go all the way through to the InterNIC.
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">traceroute www.internic.net</b>
+traceroute to www.internic.net (207.151.159.3), 30 hops max, 40 byte packets
+ 1 ani (192.168.0.1)  1.712 ms  1.40 ms  1.34 ms
+ 2 10.81.130.1 (10.81.130.1)  52.01 ms  34.38 ms  118.97 ms
+ 3 bb1-fe1-0.mtgmry1.md.home.net (24.11.248.1) 13.30 ms 100.92 ms 31.99 ms
+ 4 c2-se9-0-10.washdc1.home.net (24.7.73.25) 118.63 ms 94.92 ms 121.10 ms
+ 5 24.7.71.6 (24.7.71.6) 127.63 ms  26.29 ms  132.07 ms
+ 6 p4-6-1-0.r00.plalca01.us.bb.verio.net (129.250.2.245) 186.02 ms 164.81 ms 156.44 ms
+ 7 p16-0-0-0.r06.plalca01.us.bb.verio.net (129.250.2.161) 86.59 ms 130.28 ms 121.09 ms
+ 8 p16-0-0-0.r04.snjsca03.us.bb.verio.net (129.250.3.162) 84.594 ms 117.42 ms 174.59 ms
+ 9  * * * 
+10  * * * 
+    . 
+    . 
+    . 
+29  * * *
+30  * * *</pre></blockquote>
+
+<p>When <tt class="literal">traceroute</tt> fails to get packets through to
+the remote end system, the trace trails off, displaying a series of
+three asterisks at each hop count until the count reaches 30. If this
+happens, contact the administrator of the remote host you're
+trying to reach, and the administrator of the last gateway displayed
+in the trace. Describe the problem to them; they may be able to help.
+In our example, the last gateway that responded to our packets was
+<em class="emphasis">p16-0-0-0.r04.snjsca03.us.bb.verio.net</em>. We would
+therefore contact this system administrator and the administrator of
+<em class="emphasis">www.internic.net</em>.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">13.5.2. Locating an Administrator </h3>
+
+<p>To contact a remote <a name="INDEX-2917" />
+<a name="INDEX-2918" />
+<a name="INDEX-2919" />administrator, you must
+know who to contact. <tt class="literal">whois</tt> helps you locate
+important people. One of the most important pieces of information in
+a network is who is in charge at the other end. When troubleshooting
+a network problem, <tt class="literal">whois</tt> is a tool that helps you
+find this out.
+</p>
+
+<p><tt class="literal">whois</tt> obtains the requested information from the
+Internet white pages. The white pages is a database of information
+about responsible people that is maintained by the Internet
+registrars. When you request an official network number or domain
+name, you are asked to provide contact information, which becomes
+your personal record in the white pages database. Because of this,
+everyone who is responsible for an official network or domain is
+supposed to have an entry in the white pages, and that entry can be
+retrieved by anyone who needs to contact them.
+</p>
+
+<p>Many Unix systems provide a <tt class="literal">whois</tt> command to query
+the white pages. The general form of this command is:
+</p>
+
+<blockquote><pre class="code">% whois [-h <em class="replaceable">server</em>] <em class="replaceable">name</em></pre></blockquote>
+
+<p>The <em class="emphasis">name</em> field is the information to be searched
+for in the white pages database. The <em class="emphasis">server</em>
+field is the name of a system containing the white pages.
+</p>
+
+<p>In the following example, we search for contact information for the
+<em class="emphasis">verio.net</em> domain, which is the domain where the
+remote router from the <tt class="literal">traceroute</tt> example is
+located.
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">whois verio.net</b>
+[whois.crsnic.net]
+
+Whois Server Version 1.3
+
+Domain names in the .com, .net, and .org domains can now be registered
+with many different competing registrars. Go to http://www.internic.net
+for detailed information.
+
+   Domain Name: VERIO.NET
+   Registrar: MELBOURNE IT, LTD. D/B/A INTERNET NAMES WORLDWIDE
+   Whois Server: whois.inww.com
+   Referral URL: http://www.inww.com
+   Name Server: NS0.VERIO.NET
+   Name Server: NS1.VERIO.NET
+   Name Server: NS2.VERIO.NET
+   Updated Date: 13-jun-2001
+
+
+&gt;&gt;&gt; Last update of whois database: Tue, 17 Jul 2001 02:04:28 EDT &lt;&lt;&lt;
+
+The Registry database contains ONLY .COM, .NET, .ORG, .EDU domains and
+Registrars.
+
+
+[whois.inww.com]
+
+Domain Name.......... verio.net
+  Creation Date........ 1996-12-07
+  Registration Date.... 2000-05-10
+  Expiry Date.......... 2001-12-06
+  Organisation Name.... Verio, Inc.
+  Organisation Address. 8005 South Chester Street
+  Organisation Address. Suite 200
+  Organisation Address. Englewood
+  Organisation Address. CO
+  Organisation Address. 80112
+  Organisation Address. UNITED STATES
+
+Admin Name........... Hostmaster Verio
+  Admin Address........ 8005 South Chester Street
+  Admin Address........ Suite 200
+  Admin Address........ Englewood
+  Admin Address........ 80112
+  Admin Address........ CO
+  Admin Address........ UNITED STATES
+  Admin Email.......... DomainAdmin@verio.net
+  Admin Phone.......... 214 290 8620
+  Admin Fax............ .
+
+Tech Name............ Hostmaster Verio
+  Tech Address......... 8005 South Chester Street
+  Tech Address......... Suite 200
+  Tech Address......... Englewood
+  Tech Address......... CO
+  Tech Address......... 80112
+  Tech Address......... UNITED STATES
+  Tech Email........... hostmaster@verio.net
+  Tech Phone........... 214 290 8620
+  Tech Fax............. .
+  Name Server.......... NS0.VERIO.NET
+  Name Server.......... NS1.VERIO.NET
+  Name Server.......... NS2.VERIO.NET</pre></blockquote>
+
+<p>The query displays the name, address, and telephone number of the
+contacts for the domain, as well as a list of hosts providing
+authoritative name service for the domain. This example shows how it
+is supposed to work, and for substantial, well-run networks such as
+<em class="emphasis">verio.net</em>, it usually does. Unfortunately, many
+<tt class="literal">whois</tt> queries return no useful information because
+the white pages database is poorly maintained. If
+<tt class="literal">whois</tt> provides no information, try checking DNS
+name service. The DNS SOA record should contain a mailing address for
+a domain contact who may be able to point you to the right system
+administrator.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.4. Troubleshooting Network Access </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.6. Checking Name Service </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+</html>

@@ -1,0 +1,872 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:43 GMT -->
+<head><title>The Automounter (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 9. The Automounter</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-9-SECT-1">Automounter maps</a><br />
+<a href="ch09_02.html">Invocation and the master map</a><br />
+<a href="ch09_03.html">Integration with NIS</a><br />
+<a href="ch09_04.html">Key and variable substitutions</a><br />
+<a href="ch09_05.html">Advanced map tricks</a><br />
+<a href="ch09_06.html">Side effects</a><br /></p><p></div>
+
+The automounter is a tool that automatically <a name="INDEX-1378" /></a>mounts
+NFS filesystems when they are referenced and unmounts them when they
+are no longer needed. It applies NIS management to NFS configuration
+files so that you can edit a single NIS map and have it affect client
+mount information throughout the network. Using the automounter, you
+don't have to keep <em class="emphasis">/etc/vfstab</em> files
+up-to-date by hand.<a href="#FOOTNOTE-13">[13]</a> Mount information, including the server's name,
+filesystem pathname on the server, local mount point and mount
+options, is contained in automounter <em class="emphasis">maps</em>, which
+are usually maintained in NIS maps.
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-13" /></a>[13]The automounter is included in
+Solaris, Compaq's Tru64 Unix, SGI's IRIX, IBM's
+AIX, and other commercial Unix operating systems. A public domain
+version called <em class="emphasis">amd</em> is available on
+<a href="http://www.cs.columbia.edu/~ezk/am-utils/">http://www.cs.columbia.edu/~ezk/am-utils/</a> and
+<em class="emphasis">amd</em> runs on almost any Unix system. Because it
+is kernel- and server-independent, the <em class="emphasis">amd</em>
+automounter is easily migrated to other NFS client platforms.</p><p>
+</blockquote>
+
+Why would you want to bother with another administrative tool?
+What's wrong with putting all of the remote filesystem
+information in each hosts' <em class="emphasis">/etc/vfstab</em>
+file? There are many motivations for using
+the<a name="INDEX-1379" /></a> automounter:
+</p><p>
+
+<ul><li>
+<em class="emphasis">/etc/vfstab</em> files on every host become much less
+complex as the automounter handles the common entries in this file.
+</p><p>
+</li><li>
+The automounter maps may be maintained using NIS, streamlining the
+administration of mount tables for all hosts in the network the same
+way NIS streamlines user account information.
+</p><p>
+</li><li>
+Your exposure to hanging a process when an NFS server crashes is
+greatly reduced. The automounter unmounts all filesystems that are
+not in use, removing dependencies on fileservers that are not
+currently referenced by the client.
+</p><p>
+</li><li>
+The automounter extends the basic NFS mount protocol to find the
+"nearest server" for replicated, read-only filesystems.
+The NFS server that is closest to the client  --  going through
+the fewest number of bridges and routers  --  will handle the
+mount request. Distributing client load in this manner reduces the
+load on the more heavily used network hardware.
+</p><p>
+</li></ul>
+In a large and dynamic NFS environment, it is difficult to
+keep<a name="INDEX-1380" /></a> the <em class="emphasis">vfstab</em> file on
+each machine up-to-date. Doing so requires creating mount points and
+usually hand-editing configuration files; automatic distribution of
+<em class="emphasis">vfstab</em> files is made difficult by the large
+number of host-specific entries in each. As you add new software
+packages or filesystems on the network, you usually have to edit
+every <em class="emphasis">vfstab</em> file. Using the automounter, you
+change one NIS map and allow the automounter to provide the new mount
+point information on all NIS clients.
+</p><p>
+
+Adding NFS servers is usually accompanied by a juggling of
+directories. It is likely that every client will be required to mount
+filesystems from the new server. As new NFS servers add filesystems
+to the network, the clients develop new dependencies on these
+servers, and their <em class="emphasis">vfstab</em> files grow in
+complexity.
+</p><p>
+
+Users cannot simply mount filesystems at their whim without
+<em class="emphasis">root</em> privileges. The automounter handles this
+problem by performing the mount as the filesystems are referenced,
+which is usually the point at which users decide they need to perform
+the mount themselves. Some users request that their machines mount
+only those filesystems of interest to them to eliminate the
+possibility that their machines will hang if a server containing
+"uninteresting" files hangs. The automounter eliminates
+dependencies on these unrelated NFS servers by imposing a working-set
+notion on the set of mounted filesystems. When a filesystem is first
+referenced, the automounter mounts it at the appropriate place in the
+local filesystem. After several minutes (ten by default), the
+automounter attempts to unmount all filesystems that it previously
+mounted. If the filesystem is quiescent, and therefore probably
+uninteresting to the client, then the automounter's
+<em class="emphasis">umount( )</em> system <a name="INDEX-1381" /></a>call succeeds, and the
+client is relieved of the server dependency. If the filesystem is
+busy, the automounter ignores the error returned by <em class="emphasis">umount(
+)</em>.
+</p><p>
+
+Using the automounter also adds another level of transparency to the
+network. Once a client's <em class="emphasis">/etc/vfstab</em> file
+is created, the <a name="INDEX-1382" /></a>client has a static idea of
+<em class="emphasis">where</em> each remote filesystem is located. It
+becomes difficult for the system administrator to move tools, users,
+or any other directory without going to each host and changing the
+<em class="emphasis">/etc/vfstab</em> files to reflect the change. The
+automounter makes the location of NFS filesystems even more
+transparent to NFS clients by removing hardcoded server names and
+pathnames from the clients' <em class="emphasis">/etc/vfstab</em>
+files.
+</p><p>
+
+Placing NFS filesystems in automounter maps greatly simplifies the
+administrative overhead of adding or reconfiguring NFS servers.
+Because the maps may be maintained using NIS, a single file is
+propagated to all NFS clients. Editing the individual
+<em class="emphasis">/etc/vfstab</em> files is not required. The
+automounter is also conducive to simpler mounting schemes. For
+example, mounting 50 directories of tools and utilities under
+<em class="emphasis">/tools</em> produces an unwieldy
+<em class="emphasis">vfstab</em> file. In addition, the
+<em class="emphasis">tools</em> mount point becomes a bottleneck, since
+any directory <em class="emphasis">stat( )</em> or <em class="emphasis">getwd(
+)</em> call that touches it also touches all NFS servers with
+filesystems mounted in <em class="emphasis">/tools</em>. More frequently,
+tools and utilities are mounted haphazardly, creating administrative
+problems. Simply remembering where things are is difficult, as users
+become confused by irregular naming schemes.
+</p><p>
+
+Managing <em class="emphasis">/tools</em> with the automounter offers
+several advantages. All of the individual mount points are replaced
+by a single map that creates the appropriate mount points as needed.
+The automounter mount point contains only the handful of entries
+corresponding to the working set of tools that the user employs at
+any one time. It's also much simpler to add a new tool: instead
+of having to create the mount point and edit
+<em class="emphasis">/etc/vfstab</em> on every host in the network, you
+simply update the NIS-managed automounter map.
+</p><p>
+
+Finally, the automounter looks for a filesystem on one of several
+servers. Manual pages, read-only libraries, and other replicated
+filesystems will be mounted from the first server in a set to respond
+to the mount request. In addition to providing a simple
+load-balancing scheme similar to that of NIS, the automounter removes
+single-host dependencies that would make a diskless or dataless
+workstation unusable <a name="INDEX-1383" /></a>in the event of a server crash.
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-9-SECT-1" /></a>
+<h2 class="sect1">9.1. Automounter maps</h2>
+
+The behavior of the automounter is governed
+<a name="INDEX-1384" /></a>by
+its maps. An <em class="emphasis">indirect map</em> is useful when you are
+mounting several filesystems with common pathname prefixes (as seen
+on the clients, not necessarily on the servers). A good example is
+the <em class="emphasis">/tools</em> directory described previously,
+although home directories also fit the indirect map model well. A
+<em class="emphasis">direct map</em> is
+used<a name="INDEX-1385" /></a>
+<a name="INDEX-1386" /></a>
+<a name="INDEX-1387" /></a>
+for irregularly named filesystems, where each mount point does not
+have a common prefix with other mount points. Some good examples of
+mounts requiring direct maps are <em class="emphasis">/usr/local</em> and
+<em class="emphasis">/usr/man</em>.
+</p><p>
+
+Direct and indirect maps vary in how the automounter emulates the
+underlying mount point. For a direct map, the automounter looks like
+a symbolic link at each mount point in the map. With an indirect map,
+the automounter emulates a directory of symbolic links, where the
+directory is the common pathname prefix shared by all of the
+automounter-managed mount points. This is confusing and is best
+explained by the examples that follow.
+</p><p>
+
+The <em class="emphasis">master map</em> is a meta-map (a map describing
+other maps). It
+<a name="INDEX-1388" /></a>
+<a name="INDEX-1389" /></a>
+<a name="INDEX-1390" /></a>contains a list of indirect maps and
+direct mount points and tells the automounter where to look for all
+of its map information. We'll look at a typical master map
+after seeing how the indirect and direct maps are used to mount NFS
+filesystems.
+</p><p>
+
+<a name="nfs2-CHP-9-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">9.1.1. Indirect maps</h3>
+
+Indirect maps are the simplest and <a name="INDEX-1391" /></a> <a name="INDEX-1392" /></a>
+<a name="INDEX-1393" /></a>most useful automounter convention.
+They correspond directly to regularly named filesystems, such as home
+directories, desktop tools, and system utility software. While tools
+directories may not be consistently named across fileservers, for
+example, you can use NFS mounts to make them appear consistent on a
+client machine. The automounter replaces all of the
+<em class="emphasis">/etc/vfstab</em> entries that would be required to
+effect this naming scheme on the clients.
+</p><p>
+
+Each indirect map has a directory associated with it that is
+specified on the command line or in the master map (see <a href="ch09_02.html#nfs2-CHP-9-SECT-2.1">Section 9.2.1, "The master map"</a> later in this chapter). The map itself
+contains a <em class="emphasis">key</em>, which is the name of the mount
+point in the directory, optional NFS mount options, and the
+server:pathname pair identifying the source of the filesystem.
+Automounter maps are usually named
+<em class="emphasis">auto_contents</em>, where
+<em class="emphasis">contents</em> describes the map. The map name does
+not have to correspond to its mount point  --  it can be anything
+that indicates the map's function. Maps are placed in
+<em class="emphasis">/etc</em> or maintained via NIS.
+</p><p>
+
+The best way to understand how an indirect map works is to look at an
+example. We'll look at an automounter map and equivalent
+<em class="emphasis">vfstab</em> file for a directory structure like this:
+</p><p>
+
+<blockquote><pre class="code">/tools/deskset 
+/tools/sting 
+/tools/news 
+/tools/bugview</pre></blockquote>
+
+Here is an indirect automounter map for the
+<em class="emphasis">/tools</em> directory, called
+<em class="emphasis">auto_tools</em>:
+</p><p>
+
+<blockquote><pre class="code">deskset         -ro      mahimahi:/tools2/deskset 
+sting                    mahimahi:/tools2/sting 
+news                     thud:/tools3/news 
+bugview                  jetstar:/usr/bugview</pre></blockquote>
+
+The first field is called the <em class="emphasis">map key</em> and is the
+final component of the mount point. The map name suffix and the mount
+point do not have to share the same name, but adopting this
+convention makes it easy to associate map names and mount points.
+This four-entry map is functionally equivalent to the
+<em class="emphasis">/etc/vfstab</em> excerpt:
+</p><p>
+
+<blockquote><pre class="code">mahimahi:/tools2/desket - /tools/deskset  nfs - - ro 
+mahimahi:/tools2/string - /tools/sting    nfs - -  
+thud:/tools3/news       - /tools/news     nfs - -  
+jetstar:/usr/bugview    - /tools/bugview  nfs - - </pre></blockquote>
+
+Notice that the server-side mount points have no common pathname
+prefixes, but that the client's <em class="emphasis">vfstab</em> and
+automounter map establish a regularly named view of filesystems.
+</p><p>
+
+There are basically two kinds of automounters: older ones that use
+symbolic links and newer ones that don't. Using the
+<em class="emphasis">auto_tools</em> map, older implementations of the
+automounter emulate <em class="emphasis">tools</em> in a directory of
+symbolic links. When any process on the client makes a reference to
+something in <em class="emphasis">/tools</em>, the automounter completes
+the appropriate NFS mount and makes a symbolic link in
+<em class="emphasis">/tools</em> pointing to the actual mount point for
+the filesystem. Suppose you go to execute
+<em class="emphasis">/tools/news/bin/rn</em>. Using the automounter
+effectively breaks this pathname up into three components:
+</p><p>
+
+<ul><li>
+The prefix <em class="emphasis">/tools</em> picks an automounter map. (We
+will see in the section <a href="ch09_02.html#nfs2-CHP-9-SECT-2.1">Section 9.2.1, "The master map"</a> just
+how <em class="emphasis">/tools</em> refers to the
+<em class="emphasis">auto_tools</em> map.) In this case, the map for the
+<em class="emphasis">/tools</em> directory is the
+<em class="emphasis">auto_tools</em> map.
+</p><p>
+</li><li>
+The next pathname component is the key within this map.
+<em class="emphasis">news</em> selects the server filesystem
+<em class="emphasis">thud:/tools3/news</em> ; the automounter mounts this
+filesystem and makes a link to it in <em class="emphasis">/tools</em> on
+the client.
+</p><p>
+</li><li>
+The remainder of the path, <em class="emphasis">bin/rn</em>, is passed to
+the NFS server <em class="emphasis">thud</em> since it is relative to the
+directory from which the <em class="emphasis">news</em> toolset is
+mounted.
+</p><p>
+</li></ul>
+Keep in mind that this list applies to older automounters that use
+symbolic link map entries to NFS mount points. There are problems
+with using symbolic links, and newer automounters solve them. The
+newer automounters don't use <a name="INDEX-1394" /></a>
+<a name="INDEX-1395" /></a>symbolic links and effectively put the NFS
+mounts "in place." The next section will explain in more
+detail.
+</p><p>
+
+Note that the automounter map doesn't contain any information
+about the <em class="emphasis">/tools</em> directory itself, only about
+the subdirectories in it that are used for mount points. This makes
+it extremely easy to relocate a set of mount points  --  you
+simply change the master map that associates the directory
+<em class="emphasis">/tools</em> with the map
+<em class="emphasis">auto_tools</em>. We'll come<a name="INDEX-1396" /></a> <a name="INDEX-1397" /></a> <a name="INDEX-1398" /></a> back to the master
+map later on.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-9-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">9.1.2. Inside the automounter</h3>
+
+At this point, it's useful to take a look under the hood of the
+automounter. This background makes the operation of indirect maps a
+little clearer and will make direct maps much easier to understand.
+</p><p>
+
+As mentioned before, automounter implementations come in two designs.
+The first one is a purely user-level approach that relies heavily on
+symbolic links. The second is a hybrid user-level and kernel-level
+approach called<a name="INDEX-1399" /></a>
+<a name="INDEX-1400" /></a>
+the <em class="emphasis">autofs</em> automounter, which eschews symbolic
+links.
+</p><p>
+
+<a name="nfs2-CHP-9-SECT-1.2.1" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.1. User-level automounters</h3>
+
+The original automounters were strictly <a name="INDEX-1401" /></a> <a name="INDEX-1402" /></a>user-level daemons that required
+no support in the kernel. SunOS 4.x automounters were all user-level,
+as were the automounters in Solaris 2.0 through Solaris 2.3. As many
+automounters were derived from SunOS 4.x or Solaris code,
+you'll find that several non-Solaris implementations are still
+user-level.
+</p><p>
+
+Before walking through the sequence of automounter operations in
+detail, some knowledge of mount information is necessary. The
+<em class="emphasis">mount( )</em> system call takes the filesystem type
+(<em class="emphasis">ufs</em>, <em class="emphasis">nfs</em>,
+<em class="emphasis">hsfs</em>, etc.) and mount point from the
+<em class="emphasis">/etc/vfstab</em> table, and a packet of parameters
+that are type-specific. For NFS mounts, the argument vector passed to
+<em class="emphasis">mount( )</em> includes the server's hostname
+and a socket address (IP host address and port number pair) to be
+used for sending requests to that server. For normal NFS mounts, the
+remote server's hostname and IP address are used, and the IP
+port number is the well-known NFS port number 2049. The kernel uses
+this information to put together an RPC client handle for calling the
+remote NFS server.
+</p><p>
+
+User-level automounters capitalize on this architecture by creating a
+set of mount arguments that points to itself, a process on the local
+host, with a different port number than 2049. In effect, a system
+running the automounter has mounted a <em class="emphasis">daemon</em> on
+each mount point, instead of a remote filesystem. NFS requests for
+these mount points are intercepted by the automounter, since it
+appears to be a regular, remote NFS server to the kernel. No kernel
+modifications are necessary to run the automounter, and the
+automounter's functions are transparent to user processes.
+</p><p>
+
+We'll take a look at how the user-level automounter works using
+<a name="INDEX-1403" /></a>the indirect <em class="emphasis">auto_tools</em>
+map discussed earlier. The NFS client host is named
+<em class="emphasis">wahoo</em>. From boot time, the complete sequence of
+events is:
+</p><p>
+
+<ol><li>
+The user-level automounter advertises the <em class="emphasis">/tools</em>
+mount point in <em class="emphasis">/etc/mnttab</em>, making it look like
+any other NFS-mounted filesystem except for the more verbose
+information about the server's IP address and port:
+</p><p>
+
+<blockquote><pre class="code"><i class="lineannotation">/etc/mnttab excerpt </i>
+thud:/export/home/thud /tmp_mnt/home/thud nfs rw,dev=218980f 929944999
+wahoo:(pid161)     /tools      nfs     ro,ignore,map=/etc/auto_
+tools,indirect,dev=2180009 920935886</pre></blockquote>
+
+
+The first <em class="emphasis">mnttab</em> entry is for a normal NFS mount
+point listed in the <em class="emphasis">vfstab</em> file. The second is
+for an indirect map and was added when the automounter was started.
+Instead of a server:directory pair, the automounter entry contains
+its process ID and the local host's name. The device numbers
+for NFS-mounted filesystems are simply unique values assigned by the
+kernel on each <em class="emphasis">mount</em> operation. This entry is
+added to <em class="emphasis">mnttab</em> when the automounter starts up
+and reads its maps.
+</p><p>
+</li><li>
+A user goes to execute <em class="emphasis">/tools/news/bin/rn</em>. The
+kernel performs a lookup of the executable's pathname and finds
+that the <em class="emphasis">tools</em> component is a mount point. An
+NFS <em class="emphasis">lookup</em> request for the next component,
+<em class="emphasis">news</em>, is sent to the listed process  --  the
+automounter  --  via a loopback RPC mechanism.
+</p><p>
+</li><li>
+The user-level automounter emulates a directory of symbolic links
+under the indirect map mount point. The <em class="emphasis">lookup</em>
+request on the <em class="emphasis">news</em> component is received by the
+automounter daemon, and it returns information identical to that
+received when performing a <em class="emphasis">lookup</em> on a symbolic
+link on a remote NFS server. The automounter looks up the appropriate
+filesystem in <em class="emphasis">/etc/auto_tools</em> and mounts it in
+its staging area, <em class="emphasis">/tmp_mnt</em>. This operation uses
+the <em class="emphasis">mount( )</em> system call, which places a new
+entry in the <em class="emphasis">mnttab</em> file.
+</p><p>
+</li><li>
+Now that the automounted filesystem has been referenced, the
+user-level automounter adds a symbolic link to its emulated
+directory. The new link in <em class="emphasis">/tools</em> points to the
+newly mounted filesystem. The equivalent command-line operations are:
+</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount thud:/tools3/news /tmp_mnt/tools/news</b></tt> 
+# <tt class="userinput"><b>ln -s /tmp_mnt/tools/news /tools/news</b></tt></pre></blockquote>
+</li>
+
+<li>
+The client-side process receives the reply from its
+<em class="emphasis">lookup</em> request and goes to read the link. This
+time, the automounter returns the contents of the symbolic link,
+which points to the automounter staging area. Note that the
+automounter fabricates a response to the client's
+<em class="emphasis">readlink</em> request; it looks like there's a
+symbolic link on the disk but it's really an artifact of the
+automounter. The client process follows the link's target
+pathname to the appropriate subdirectory of
+<em class="emphasis">/tmp_mnt</em>.
+</p><p>
+</li><li>
+The client process can now trace every pathname in
+<em class="emphasis">/tools/news</em> to a subdirectory of
+<em class="emphasis">/tmp_mnt/tools/news</em>, through the new entry in
+<em class="emphasis">/etc/mnttab</em> and the symbolic link emulation
+provided by the automounter. A client process pathname lookup finds
+<em class="emphasis">/tools</em> in the mount table and sends its query to
+the automounter. The automounter's link points to
+<em class="emphasis">/tmp_mnt/news</em>, which is also listed in the mount
+table. To the client, the automounter looks exactly like a directory
+and a symbolic link.
+</p><p>
+</li></ol>
+If this seems to be a convoluted mechanism for mounting a single
+filesystem, it is. However, this approach is taken to minimize the
+number of NFS mounts performed and to thereby improve performance by
+keeping <em class="emphasis">/etc/mnttab</em> as small as possible. When
+you mount several subdirectories of the same remote filesystem, only
+one NFS mount is required. The various subdirectories of this common
+mount point are referenced by symbolic links, not by individual
+mounts. In the sample indirect map earlier,
+<em class="emphasis">mahimahi:/tools2</em> contains several utilities.
+<em class="emphasis">/tools2</em> will be mounted on the NFS client when
+the first utility in it is referenced, and references to other
+subdirectories of <em class="emphasis">/tools2</em> simply contain links
+back to the existing mount in <em class="emphasis">/tmp_mnt</em>.
+</p><p>
+
+The staging area <em class="emphasis">/tmp_mnt</em> is a key to the
+indirect map mechanism. If the staging area concept is eliminated,
+then the indirect map mount point becomes another directory filled
+with direct mounts. The primary advantage of indirect maps is that
+they allow the mount points in a directory to be managed
+independently  --  the mounts occur when a process references the
+mount point, and not the parent directory itself. We'll look at
+some problems with direct mounts shortly.
+</p><p>
+
+As a result of linking <em class="emphasis">/tools</em> to the actual NFS
+mount point, a user would encounter the following:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cd /tools/bin</b></tt>
+% <tt class="userinput"><b>/usr/bin/pwd</b></tt>
+/tmp_mnt/tools/bin</pre></blockquote>
+
+In other words, instead of <em class="emphasis">pwd</em> displaying
+<em class="emphasis">/tools/bin</em>, it gets
+<em class="emphasis">/tmp_mnt/tools/bin</em>. This behavior breaks lots of
+software. For example, a program might record the current working
+directory, and cache it in a file. A subsequent invocation of the
+program might read the cache, and attempt to access
+<em class="emphasis">/tmp_mnt/tools/bin</em>, and find that it isn't
+there. This is because a user-level automounter responds to attempts
+to access <em class="emphasis">/tools</em>, not
+<em class="emphasis">/tmp_mnt/tools</em>. For the remainder of this
+chapter, we will refer to this issue as the
+"<em class="emphasis">pwd</em> problem."
+</p><p>
+
+There are other side-effects of the user-level automounter that may
+catch the user off-guard. The automounter creates and controls the
+indirect map mount point. It emulates the entire directory, so that
+no user, even the superuser, can create entries in it. This has an
+important implication for creating indirect maps: they cannot be
+mounted over an existing directory, because the automounter hides the
+underlying files. If a directory must contain a mixture of
+automounter mount points and "normal" directory entries,
+a direct map must be used.
+</p><p>
+
+This is an important but subtle point: when you poke at a user-level
+automounter mount point with <em class="emphasis">ls</em>, it appears that
+there is a directory filled with symbolic links. In reality, this
+directory and the links in it do not exist on any disk. If this hurts
+to think about, it's really no different than the way NFS
+itself works: there may be no filesystem called
+<em class="emphasis">/tools/news</em> on your local disk, but NFS makes it
+<em class="emphasis">look</em> like it's there. The user-level
+automounter speaks to the NFS protocol, allowing it to fabricate
+replies to NFS RPC calls that are indistinguishable from the real
+thing.
+</p><p>
+
+Because the user-level automounter controls the contents of a
+<em class="emphasis">readdir</em> NFS RPC reply, <em class="emphasis">ls</em>
+behaves strangely. The user-level automounter displays only currently
+mounted links in the directory it emulates. If no reference is made
+to a subdirectory of the indirect map directory, it appears empty:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cd /tools</b></tt> 
+% <tt class="userinput"><b>ls</b></tt> 
+% <tt class="userinput"><b>ls /tools/news</b></tt> 
+bin lib spool 
+% <tt class="userinput"><b>cd /tools</b></tt> 
+% <tt class="userinput"><b>ls -l</b></tt> 
+total 1 
+lrwxrwxrwx  1 root           19 Aug 31 12:59 news -&gt; /tmp_mnt/tools/news</pre></blockquote>
+
+Why not display potential mounts as well? Doing so could result in a
+great deal of unintended mounting activity  --  a <em class="emphasis">mount
+storm</em>  --  when <em class="emphasis">ls -l</em> is executed
+in this directory. A newer automounter described in the next section
+allows you to browse potential mounts, as well as fix the
+<em class="emphasis">pwd</em> problem described earlier. Another approach
+is to <a name="INDEX-1404" /></a>
+<a name="INDEX-1405" /></a>use
+<em class="emphasis">hierarchical mounts</em>, as described later in this
+chapter.
+</p><p>
+
+</div>
+
+<a name="nfs2-CHP-9-SECT-1.2.2" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.2. The autofs automounter</h3>
+
+The <em class="emphasis">pwd</em> problem described in the
+previous<a name="INDEX-1406" /></a>
+section was solved in Solaris 2.4 with the introduction of a hybrid
+user-level and kernel-level automounter, which retained a user-level
+automounter daemon, but introduced a new filesystem known as
+<em class="emphasis">autofs</em>. The <em class="emphasis">autofs</em>
+filesystem is a pseudo-filesystem that allows you to mount
+automounter points like <em class="emphasis">/tools/news</em> as directory
+objects directly underneath <em class="emphasis">/tools</em>, instead of
+as symbolic links. The automounter daemon is no longer an NFS server,
+but instead responds to requests from the in-kernel
+<em class="emphasis">autofs</em> filesystem to mount NFS filesystems on
+the mount points that <em class="emphasis">autofs</em> creates.
+</p><p>
+
+Let's take a look at how adding <em class="emphasis">autofs</em>
+changes how the automounter works using the example of the indirect
+<em class="emphasis">auto_tools</em> map. The NFS client host is still
+named <em class="emphasis">wahoo</em>. From boot time, the complete
+sequence of events is:
+</p><p>
+
+<ol><li>
+The <em class="emphasis">autofs</em> automounter advertises the
+<em class="emphasis">/tools</em> mount point in
+<em class="emphasis">/etc/mnttab</em>, making it look like any other
+NFS-mounted filesystem except for the more verbose information about
+the server's IP address and port:
+</p><p>
+
+<blockquote><pre class="code"><i class="lineannotation">/etc/mnttab excerpt</i>
+thud:/export/home/thud /home/thud nfs nosuid,dev=218980f 929944999
+auto_tools /tools     autofs
+ignore,indirect,nosuid,dev=2b40002 922482272</pre></blockquote>
+
+The first <em class="emphasis">mnttab</em> entry is for a normal NFS mount
+point listed in the <em class="emphasis">vfstab</em> file. Note that the
+mount point is <em class="emphasis">/home/thud</em> and not
+<em class="emphasis">/tmp_mnt/home/thud</em>. The second is for an
+indirect map and was added when the automounter was started. Instead
+of a process ID and the local host's name, the entry simply has
+the map name and a filesystem type of <em class="emphasis">autofs</em>.
+The device numbers for <em class="emphasis">autofs</em>-mounted
+filesystems are assigned by the kernel on each
+<em class="emphasis">mount</em> operation. This entry is added to
+<em class="emphasis">mnttab</em> when the automounter starts up and reads
+its maps.
+</p><p>
+</li><li>
+A user goes to execute <em class="emphasis">/tools/news/bin/rn</em>. The
+kernel performs a lookup of the executable's pathname, and
+finds that the <em class="emphasis">tools</em> component is a mount point.
+The kernel invokes the <em class="emphasis">lookup</em> entry point of the
+<em class="emphasis">autofs</em> filesystem request for
+<em class="emphasis">tools</em>. The kernel then proceeds to the next
+component in the pathname, <em class="emphasis">news</em>, and again
+invokes the lookup entry point of <em class="emphasis">autofs</em>. The
+<em class="emphasis">autofs</em> filesystem sends a request to the
+automounter daemon (<em class="emphasis">automountd</em> )  --  via a
+loopback RPC mechanism  --  to mount <em class="emphasis">news</em>.
+</p><p>
+</li><li>
+The automounter daemon receives the request from
+<em class="emphasis">autofs</em>. The request includes the name of the map
+(<em class="emphasis">auto_tools</em>), the entry in the map
+<em class="emphasis">autofs</em> is interested in
+(<em class="emphasis">news</em>), and the mount point the client wants to
+mount <em class="emphasis">news</em> onto
+(<em class="emphasis">/tools/news</em>). The automounter daemon examines
+the <em class="emphasis">tools</em> indirect map looking for the entry:
+</p><p>
+
+<blockquote><pre class="code">news      thud:/tools3/news</pre></blockquote>
+
+The automounter daemon checks if <em class="emphasis">/tools/news</em>
+exists, and if not, creates the <em class="emphasis">news</em> directory
+under <em class="emphasis">/tools</em>. Because
+<em class="emphasis">/tools</em> is an <em class="emphasis">autofs</em>
+filesystem, the result of the <em class="emphasis">mkdir( )</em> system
+call from the daemon is a call to the <em class="emphasis">mkdir</em>
+entry point in the <em class="emphasis">autofs</em> filesystem.
+</p><p>
+
+The automounter daemon then determines that the
+<em class="emphasis">news</em> map entry is to be satisfied by NFS, and so
+does the equivalent of:
+</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -F nfs thud:/tools3 /tools/news</b></tt></pre></blockquote>
+
+The results of the mount are returned  --  again, via a loopback
+RPC mechanism  --  to <em class="emphasis">autofs</em>.
+</p><p>
+</li><li>
+The <em class="emphasis">autofs</em> filesystem receives the reply from
+the automounter daemon, and now the kernel can proceed with the next
+components in the pathname, <em class="emphasis">bin</em> and
+<em class="emphasis">rn</em>. Because the automounter daemon mounted an
+NFS filesystem onto <em class="emphasis">/tools/news</em>, the automounter
+is not involved in the processing of <em class="emphasis">bin</em> and
+<em class="emphasis">rn</em>.
+</p><p>
+</li></ol>
+
+As with the user-level automounter, the original
+<em class="emphasis">autofs</em> automounter didn't display
+potential mounts of indirect maps like
+<em class="emphasis">auto_tools</em>. The next section describes an
+enhanced <em class="emphasis">autofs</em> automounter that supports the
+ability to browse the potential mounts under a mount point such as
+<em class="emphasis">/tools</em>.
+</p><p>
+
+</div>
+
+<a name="nfs2-CHP-9-SECT-1.2.3" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.3. The enhanced autofs automounter: Browsing indirect maps</h3>
+
+In Solaris 2.6, the <em class="emphasis">autofs</em> automounter was
+modified so that displaying directories of the mount points of
+indirect maps shows every entry; in other words, it allows a user to
+<em class="emphasis">browse</em> the map:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cd /tools</b></tt> 
+% <tt class="userinput"><b>ls -l</b></tt> 
+total 4 
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 bugview
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 deskset
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 news
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 sting</pre></blockquote>
+
+When the <em class="emphasis">readdir</em> entry point in the
+<em class="emphasis">autofs</em> filesystem is called on
+<em class="emphasis">/tools</em> for the first time, there are no
+<em class="emphasis">autofs</em> directories underneath it, and so,
+<em class="emphasis">autofs</em> makes an RPC call to the automounter
+daemon to read the <em class="emphasis">auto_tools</em> map to return the
+list of map entries. The map entries are used to construct a
+directory listing for the <em class="emphasis">ls</em> command. Note that
+the attributes of the directories are faked. This is because we want
+to avoid mount storms, as described in <a href="ch09_01.html#nfs2-CHP-9-SECT-1.2.1">Section 9.1.2.1, "User-level automounters"</a>.
+</p><p>
+
+Now see what happens we start to populate <em class="emphasis">/tools</em>
+with real entries:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ls /tools/news</b></tt> 
+bin lib spool 
+% <tt class="userinput"><b>cd /tools</b></tt> 
+% <tt class="userinput"><b>ls -l</b></tt> 
+total 1 
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 bugview
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 deskset
+drwxrwxr-x 5  root  other 512 Jun 10 17:03 news
+dr-xr-xr-x  1 root  root   19 Aug 31 12:59 sting</pre></blockquote>
+
+Invoking the <em class="emphasis">ls</em> command on
+<em class="emphasis">/tools/news</em> causes
+<em class="emphasis">/tools/news</em> to be NFS-mounted from
+<em class="emphasis">thud:/tools3/news</em>. When the
+<em class="emphasis">readdir</em> entry point in the
+<em class="emphasis">autofs</em> filesystem is called on
+<em class="emphasis">/tools</em> for the second time, there is now an NFS
+directory, <em class="emphasis">news</em>, underneath it. Thus,
+<em class="emphasis">autofs</em> combines the list of map entries with the
+list of NFS-mounted directories.
+</p><p>
+
+By default, indirect maps can be browsed, but browsing <a name="INDEX-1407" /></a>can be turned off
+with the -<em class="emphasis">nobrowse</em> option to an indirect map.
+</p><p>
+
+</div>
+</div>
+<a name="nfs2-CHP-9-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">9.1.3. Direct maps</h3>
+
+Direct maps define point-specific, nonuniform<a name="INDEX-1408" /></a>
+<a name="INDEX-1409" /></a>
+<a name="INDEX-1410" /></a> mount points. The best example of
+the need for a direct map entry is <em class="emphasis">/usr/man</em>. The
+<em class="emphasis">/usr</em> directory contains numerous other entries,
+so it cannot be an indirect mount point. Building an indirect map for
+<em class="emphasis">/usr/man</em> that uses <em class="emphasis">/usr</em> as
+a mount point will "cover up"
+<em class="emphasis">/usr/bin</em> and <em class="emphasis">/usr/etc</em>. A
+direct map allows the automounter to complete mounts on a single
+directory entry.
+</p><p>
+
+The key in a direct map is a full pathname, instead of the last
+component found in the indirect map. Direct maps also follow the
+<em class="emphasis">/etc/auto_contents</em> naming scheme. Here is a
+sample <em class="emphasis">/etc/auto_direct</em>:
+</p><p>
+
+<blockquote><pre class="code">/usr/man        wahoo:/usr/share/man 
+/usr/local/bin  mahimahi:/usr/local/bin.sun4</pre></blockquote>
+
+The automounter registers the entire direct mount point pathname in
+the <em class="emphasis">mnttab</em> file, instead of the parent directory
+of all of the mount points:
+</p><p>
+
+<blockquote><pre class="code">auto_direct /usr/local/bin autofs ignore,direct,intr,ro,dev=2cc000a  933723158</pre></blockquote>
+
+The <em class="emphasis">mnttab</em> entry's map type is listed as
+<em class="emphasis">direct</em>. Operation of the automounter on a direct
+mount point is similar to the handling of an indirect mount. The
+<em class="emphasis">autofs</em> automounter is passed the entire direct
+mount point pathname in the RPC from <em class="emphasis">autofs</em>,
+since the mount point is the key in the map. See <a href="ch09_01.html#nfs2-CHP-9-TABLE-1">Table 9-1</a> for automounter map entry formats.
+</p><p>
+
+A major difference in behavior is that the real direct mount points
+are always visible to <em class="emphasis">ls</em> and other tools that
+read directory structures. The automounter treats direct mounts as
+individual directory entries, not as a complete directory, so the
+automounter gets queried whenever the directory containing the mount
+point is read. Client performance is affected in a marked fashion if
+direct mount points are used in several well-traveled directories.
+When a user reads a directory containing a number of direct mounts,
+the automounter initiates a flurry of mounting activity in response
+to the directory read requests. <a href="ch09_05.html#nfs2-CHP-9-SECT-5.3">Section 9.5.3, "Conversion of direct maps"</a> describes a trick
+that lets you use indirect maps instead of direct maps. By using this
+trick, you can avoid mount storms caused by multiple<a name="INDEX-1411" /></a> <a name="INDEX-1412" /></a> <a name="INDEX-1413" /></a> direct mount
+points.
+</p><p>
+
+<a name="nfs2-CHP-9-TABLE-1" /></a><h4 class="objtitle">Table 9-1. Automounter map entry formats </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Key</p><p>
+</th>
+<th>
+Mount options</p><p>
+</th>
+<th>
+Server:directory pair</p><p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<em class="emphasis">indirect map:</em> <tt class="literal">deskset</tt></p><p>
+</td>
+<td>
+
+</td>
+<td>
+<tt class="literal">mahimahi:/tools2/deskset</tt></p><p>
+</td>
+</tr>
+<tr>
+<td>
+<em class="emphasis">direct map:</em> <tt class="literal">/usr/man</tt></p><p>
+</td>
+<td>
+<tt class="literal">-ro</tt></p><p>
+</td>
+<td>
+<tt class="literal">thud:/usr/man</tt></p><p>
+</td>
+</tr>
+
+</table><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_09.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.9. Client/server ratios</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.2. Invocation and the master map</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:44 GMT -->
+</html>

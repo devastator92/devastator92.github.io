@@ -1,0 +1,739 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Advanced map tricks (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.5. Advanced map tricks</h2>
+
+The automounter has several features that <a name="INDEX-1469" />complement the "normal"
+NFS mount options. It can mount replicated filesystems from one of
+several potential servers, and it can perform hierarchical mounts of
+all of a server's directories when any one of them is
+referenced. This section starts with a discussion of these advanced
+automounter features, then explains how to get better performance out
+of the automounter by converting direct map entries into indirect
+maps and by using the automounter's subdirectory mount feature.
+</p>
+
+<a name="nfs2-CHP-9-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">9.5.1. Replicated servers</h3>
+
+Multiple location support in the automounter implements <a name="INDEX-1470" /> <a name="INDEX-1471" /> <a name="INDEX-1472" />
+<a name="INDEX-1473" />a simple network load-balancing
+scheme for replicated filesystems. At first glance, this seems to be
+a bit of overkill; after all, you don't need or want
+replication for read-write filesystems. However, serving large,
+read-only filesystems such as the manpages may add to an NFS
+server's request load. Having multiple servers share this load
+improves performance by reducing the total load placed on the most
+heavily used servers. Ideally, you want clients that are
+"close" to each server to mount its filesystems, reducing
+the amount of traffic that must go through bridges or routers.
+</p>
+
+For example, if you have four NFS servers that each export the
+manpages, the best client mounting scheme is probably not to have
+one-quarter of the clients mount <em class="emphasis">/usr/man</em> from
+each server. Instead, clients should mount the manpages from the
+server that is closest to them. Replicated filesystems are included
+in automounter maps simply by listing all possible servers in the
+map:
+</p>
+
+<blockquote><pre class="code">/usr/man        -ro     wahoo:/usr/man mahimahi:/usr/man \ 
+                        thud:/usr/man onaga:/usr/man</pre></blockquote>
+
+The backslash at the end of the first line continues this indirect
+map entry onto the next line. If more than one
+<em class="emphasis">server:directory</em> pair is listed in an
+automounter map, the automounter pings all servers by sending a
+request to the <em class="emphasis">null</em> procedure of all NFS
+servers. From the set that responds, the automounter picks one that
+is "closest" by comparing the address of the servers with
+that of the clients. Ties are broken by using the server that
+responded to the ping first. The selected server is used by the
+automounter to serve the mount point.
+</p>
+
+There is also an element of load balancing at work here: if one of
+the <em class="emphasis">/usr/man</em> servers is so heavily loaded with
+other NFS traffic that it cannot reply to the ping before another
+server on the same net, then the client will choose the other server
+to handle its mount request. Solaris 2.6 introduced the feature of
+client-side failover, which was discussed in <a href="ch06_05.html#nfs2-CHP-6-SECT-5">Section 6.5, "Replication"</a>. While it doesn't explicitly implement
+load balancing, if, after the mount, one server becomes overloaded
+enough, a client will find the server to be unresponsive and will
+dynamically switch to another server. Keep in mind the following:
+</p>
+
+<ul><li>
+If the <em class="emphasis">ro</em> mount option is not present, or if the
+<em class="emphasis">soft</em> option is present, client-side failover is
+not enabled, and in that situation, once a client performs a mount
+from a server, it continues to use that server until it unmounts the
+filesystem.
+</p>
+</li><li>
+If the list of servers providing the filesystem changes, once the
+filesystem is mounted, with or without failover, the client cannot
+choose a different server before unmounting its first choice.
+</p>
+</li></ul>
+You can use the first-answer feature of replicated map entries to
+solve the multihomed host problem presented in <a href="ch16_05.html#nfs2-CHP-16-SECT-5.7">Section 16.5.7, "Multihomed servers"</a>. Let's say that you have an NFS server
+on four networks, with hostnames <em class="emphasis">boris</em>,
+<em class="emphasis">boris-bb2</em>, <em class="emphasis">boris-bb3</em>, and
+<em class="emphasis">boris-bb4</em> on those networks. Mounting all
+filesystems from <em class="emphasis">boris</em> makes the multihomed host
+perform loopback packet routing, but using the "right"
+hostname requires knowing which name is on your network. Building an
+automounter map with replicated entries solves this problem by
+letting the automounter find the fastest route to
+<em class="emphasis">boris</em>:
+</p>
+
+<blockquote><pre class="code">natasha    -rw,hard       boris:/export/home/boris \ 
+                              boris-bb2:/export/home/boris \ 
+                              boris-bb3:/export/home/boris \ 
+                              boris-bb4:/export/home/boris</pre></blockquote>
+
+This would be an entry in the <em class="emphasis">auto_home</em> map.
+Since the server pathnames are the same, you can use a shorter form
+of the replicated map entry, putting all of the server names in a
+comma-separated list:
+</p>
+
+<blockquote><pre class="code">natasha  -rw,hard   boris,boris-bb2,boris-bb3,boris-bb4:/home/boris</pre></blockquote>
+
+The network interface on <em class="emphasis">boris</em> that is closest
+to the client will respond first, and each NFS client of
+<em class="emphasis">boris</em> will mount
+<em class="emphasis">/home/natasha</em> from the best network interface.
+Note that the replicated mount points don't refer to multiple
+filesystems, but rather multiple names for the same filesystem. The
+automounter just provides a neat way of managing all of them in a
+single place. Because <em class="emphasis">/export/home/natasha</em> is
+mounted read-write, client-side failover is not enabled. This is
+somewhat unfortunate since this is the one situation where
+client-side failover of a writable filesystem is safe: the filesystem
+is the same, because the physical host is the same. But the client
+has no way of knowing that.
+</p>
+
+When the automounter pings
+the<a name="INDEX-1474" /> remote servers, it's
+performing the equivalent of:
+</p>
+
+<blockquote><pre class="code">rpcinfo -u hostname nfs</pre></blockquote>
+
+for each listed server. If you see a larger number of
+<em class="emphasis">null</em> procedure calls than usual in the output of
+<em class="emphasis">nfsstat</em> on the NFS server, it might indicate
+that your automounter mounts of replicated filesystems are being
+performed repeatedly. The <em class="emphasis">null</em> calls do not
+require any disk accesses to service, but they can consume network
+bandwidth on the server; if the number of <em class="emphasis">null</em>
+calls becomes excessive it may be due to client machines continually
+mounting and unmounting replicated filesystems. Changing the value of
+the <em class="emphasis">-t</em> option to <em class="emphasis">automount</em>
+(as discussed previously in <a href="ch09_02.html#nfs2-CHP-9-SECT-2.4">Section 9.2.4, "Tuning timeout values"</a>)
+reduces the frequency of mounting and unmounting.
+</p>
+
+You can also examine the <em class="emphasis">/etc/rmtab</em> file on the
+server to see how frequently its clients are mounting and unmounting
+automounted filesystems. When a filesystem is mounted, an entry is
+added to the <em class="emphasis">/etc/rmtab</em> file. When it gets
+unmounted, the entry isn't deleted from the file  --  it is
+commented out by making the first character in the line a pound sign
+(<em class="emphasis">#</em>):
+</p>
+
+<blockquote><pre class="code">#epeche:/usr/share/man 
+#haos:/usr/share/man 
+#epeche:/usr/share/man 
+depeche:/usr/share/man 
+chaos:/usr/share/man</pre></blockquote>
+
+In this example, client <em class="emphasis">depeche</em> has mounted
+<em class="emphasis">/usr/share/man</em> three times, and client
+<em class="emphasis">chaos</em> has mounted that filesystem twice. This
+gives you client information to go along with the
+<em class="emphasis">null</em> NFS RPC counts provided by
+<em class="emphasis">nfsstat</em>  --  you can tell which clients have
+been repeatedly mounting and unmounting a filesystem. Watch the size
+of the <em class="emphasis">/etc/rmtab</em> file over time; if it grows
+regularly and contains multiple entries for the same clients and
+filesystems, then you may want to change the automounter timeout
+value on<a name="INDEX-1475" />
+<a name="INDEX-1476" />
+<a name="INDEX-1477" />
+<a name="INDEX-1478" /> those
+clients.
+</p>
+
+</div>
+<a name="nfs2-CHP-9-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">9.5.2. Hierarchical mounts</h3>
+
+In addition to handling multiple servers<a name="INDEX-1479" /> <a name="INDEX-1480" /> for the same filesystem, the
+automounter can mount multiple trees from the same server in a
+hierarchy of mount points. Hierarchical <a name="INDEX-1481" />mounts are simply a special form of
+indirect maps.
+</p>
+
+<a name="nfs2-CHP-9-SECT-5.2.1" /><div class="sect3">
+<h3 class="sect3">9.5.2.1. The -hosts map</h3>
+
+The most widely used hierarchical<a name="INDEX-1482" />
+<a name="INDEX-1483" />
+mount is the builtin <em class="emphasis">-hosts</em> map, which mounts
+all exported filesystems from a named host.
+</p>
+
+The <em class="emphasis">-hosts</em> map references only the hosts
+database; the map semantics are built into the automounter. It is
+usually mounted on <em class="emphasis">/net</em> indicating that it
+contains filesystems from the entire network. The following line
+would appear in the master map:
+</p>
+
+<blockquote><pre class="code">/net -hosts -nobrowse</pre></blockquote>
+
+Except when using the enhanced <em class="emphasis">autofs</em>
+automounter, a user can then force mounts of all filesystems from a
+server by referencing the server's name as a subdirectory of
+<em class="emphasis">/net</em>:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>showmount -e wahoo</b></tt> 
+/export1      (everyone) 
+/export2  honeymoon 
+/export3  honeymoon 
+% <tt class="userinput"><b>cd /net/wahoo</b></tt> 
+% <tt class="userinput"><b>ls -l</b></tt>
+total 3
+drwxrwxr-x  22 root     staff        512 Aug 12 16:02 export1
+drwxrwxr-x   8 root     staff        512 Feb 18  1999 export2
+drwxrwxr-x   9 root     staff        512 Sep  8 16:19 export3</pre></blockquote>
+
+When the automounter has to mount a filesystem on
+<em class="emphasis">/net</em>, it sends a request to the server asking
+for all exported filesystems. The automounter sorts the filesystems
+by pathname length, ensuring that subdirectories of exported
+filesystems appear later in the list than their parents.<a href="#FOOTNOTE-14">[14]</a> The original automounter would then mount each
+item in the sorted list.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-14" />[14]If a directory pathname has a length of <em class="emphasis">x</em>
+characters, then any of its subdirectory's pathnames
+have length &gt; <em class="emphasis">x</em>. Sorting by pathname length
+puts a parent directory ahead of all paths to its subdirectories.
+</p> </blockquote>
+
+The enhanced <em class="emphasis">autofs</em> automounter will lazily
+mount each exported filesystem as soon as a process does something
+significant such as changing its current working directory to an
+exported filesystem:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cd /net/wahoo</b></tt> 
+% <tt class="userinput"><b>ls -l</b></tt> 
+total 3
+dr-xr-xr-x   1 root     root           1 Sep 28 14:54 export1
+dr-xr-xr-x   1 root     root           1 Sep 28 14:54 export2
+dr-xr-xr-x   1 root     root           1 Sep 28 14:54 export3
+% <tt class="userinput"><b>cd export1</b></tt>
+% <tt class="userinput"><b>cd ..</b></tt>
+% <tt class="userinput"><b>ls -l</b></tt>
+total 3
+drwxrwxr-x  22 root     root         512 Aug 12 16:02 export1
+dr-xr-xr-x   1 root     root           1 Sep 28 14:54 export2
+dr-xr-xr-x   1 root     root           1 Sep 28 14:54 export3
+</pre></blockquote>
+
+The act of doing the <em class="emphasis">cd export1</em>causes the automounter to perform an NFS
+mount over the <em class="emphasis">/net/wahoo/export1</em>
+<em class="emphasis">autofs</em> vnode. Thus, users cannot casually force
+the client to mount each filesystem unless they do something like:
+</p>
+
+<blockquote><pre class="code">% ls /net/wahoo/*</pre></blockquote>
+
+This command invocation tells <em class="emphasis">ls</em> to read each
+directory of each exported filesystem of <em class="emphasis">wahoo</em>.
+The <em class="emphasis">autofs</em> filesystem considers an invocation of
+its <em class="emphasis">readdir</em> entry point to be a significant
+operation worthy of triggering an NFS mount.
+</p>
+
+There are a number of caveats for using the
+<em class="emphasis">-hosts</em> map with automounters that don't
+support lazy mounting of hierarchies:
+</p>
+
+<ul><li>
+By including the entire <em class="emphasis">hosts</em> database, the
+hosts map references servers that are both local and on remote
+networks; a casual reference to a remote server causes an NFS mount
+to occur through a router or gateway.
+</p>
+</li><li>
+If the server itself is slow, or has a large number of filesystems
+(diskless client servers), then the <em class="emphasis">-hosts</em> map
+has a definite performance impact.
+</p>
+</li><li>
+Unmounts of the filesystems are done from the bottom up, in the
+reverse order of the mounts. If a higher-level mount point is busy,
+then an unmount of the entire hierarchy fails. When the automounter
+fails to unmount a higher-level mount point, it must remount the
+filesystems it just unmounted. It walks back down the hierarchy from
+the busy mount point, mounting each filesystem. The remote
+server's filesystems are mounted on an all-or-nothing basis.
+</p>
+</li><li>
+Earlier in this section, we said that the "most widely used
+hierarchical mount is the builtin <em class="emphasis">-hosts</em>
+map." If you are not careful, it can be the most widely used
+map, period. The reason why this is not good is that
+<em class="emphasis">-hosts</em> is location-dependent. Once your users
+get used to accessing resources like
+<em class="emphasis">/net/wahoo/tools</em>, instead of accessing
+<em class="emphasis">/tools</em>, it becomes difficult to move the
+resource to a different physical location. It is best to discourage
+use of <em class="emphasis">/net</em>. One way to do so is to respond
+rapidly to requests to modify existing maps, or add new maps, and
+also, bury the physical location several directories deep on the
+server that holds the resource. Users will prefer pathnames like
+<em class="emphasis">/tools/debugger</em> over
+<em class="emphasis">/net/wahoo/export/software/tools/debugger</em>.
+</p>
+</li></ul>
+These caveats don't apply to the enhanced
+<em class="emphasis">autofs</em> automounter. However, by default it does
+support browsing. Thus a new caveat is that if a network has lots of
+hosts, then users that do:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ls /net</b></tt></pre></blockquote>
+
+will trigger lots of network traffic as the automounter gets the list
+of hosts from NIS. Thus, you should use the
+<em class="emphasis">-nobrowse</em> option on the <em class="emphasis">-hosts</em>
+map.
+<a name="INDEX-1484" /> <a name="INDEX-1485" />
+</p>
+
+
+
+<a name="ch09-8-fm2xml" /><blockquote><b>TIP: </b> 
+Users sometimes complain that they cannot see a new filesystem
+exported from a server. This is because a <em class="emphasis">/net</em>
+mount from the server was in effect before the filesystem was
+exported, and the automounter has to timeout the mount before
+unmounting and remounting. Rather than waiting for that to happen, a
+simple workaround is to tell your users to access the server under
+<em class="emphasis">/net</em> with a name that differs by capitalizing
+one letter of the hostname. This works because hostnames are
+case-insensitive, yet Unix pathnames are case-sensitive. So, for
+example, if <em class="emphasis">/net/wahoo</em> was in effect before
+<em class="emphasis">wahoo:/export4</em> was exported, then simply
+accessing <em class="emphasis">/net/Wahoo</em> will allow you to access
+<em class="emphasis">export4</em> as well as 
+the pre-existing
+<em class="emphasis">export1</em>, <em class="emphasis">export2</em>, and
+<em class="emphasis">export3</em>.
+</p>
+</blockquote>
+
+</div>
+
+<a name="nfs2-CHP-9-SECT-5.2.2" /><div class="sect3">
+<h3 class="sect3">9.5.2.2. Hierarchical mounts in non -hosts maps</h3>
+
+Let's return to our <em class="emphasis">/tools</em> example. Recall
+that <em class="emphasis">/tools</em> has:
+</p>
+
+<blockquote><pre class="code">/tools/deskset 
+/tools/sting 
+/tools/news 
+/tools/bugview</pre></blockquote>
+
+and is an indirect automounter map for the
+<em class="emphasis">/tools</em> directory, called
+<em class="emphasis">auto_tools</em>:
+</p>
+
+<blockquote><pre class="code">deskset         -ro,intr mahimahi:/tools2/deskset 
+sting                    mahimahi:/tools2/sting 
+news                     thud:/tools3/news 
+bugview                  jetstar:/usr/bugview</pre></blockquote>
+
+<em class="emphasis">/tools/deskset</em> contains several subdirectories,
+one of which is <em class="emphasis">wonderworks-v1.0.</em> You recently
+get a Version 2.0 of Wonderworks, and you find that it requires more
+disk space than what <em class="emphasis">mahimahi:/tools2/deskset</em>
+has available. You have several choices here:
+</p>
+
+<ul><li>
+Create a new map entry into <em class="emphasis">auto_tools</em> called
+<em class="emphasis">deskset2</em> for the new version of wonderworks. The
+problem with this is that your users expect to look in
+<em class="emphasis">/tools/deskset</em>, and not
+<em class="emphasis">/tools/deskset2</em> for the desktop productivity
+tools.
+</p>
+</li><li>
+Move the <em class="emphasis">deskset</em> directory from
+<em class="emphasis">mahimahi</em> to a server with a large partition. The
+problem is that this will impact existing users that have
+<em class="emphasis">mahimahi:/tools2/deskset</em> mounted.
+</p>
+</li><li>
+Create a hierarchical mount for the <em class="emphasis">deskset</em> map
+entry such that <em class="emphasis">/tools/deskset/wonderworks-v2.0</em>
+is mounted from somewhere else. This solution has none of the
+disadvantages of the previous choices.
+</p>
+</li></ul>
+To do the last choice requires the following steps:</p>
+
+<ol><li>
+Create a mount point for <em class="emphasis">wonderworks-v2.0</em> on
+server <em class="emphasis">mahimahi</em>:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">On mahimahi:</i>
+# <tt class="userinput"><b>mkdir /tools/deskset/wonderworks-v2.0</b></tt></pre></blockquote>
+</li>
+
+
+<li>
+Create a directory on another server (e.g.,
+<em class="emphasis">wahoo:/export/tools/deskset/wonderworks-v2.0</em>)
+with sufficient disk space, and copy the
+<em class="emphasis">wonderworks-v2.0</em> package to it. If necessary,
+export the directory via a new entry in
+<em class="emphasis">/etc/dfs/dfstab</em> and the
+<em class="emphasis">shareall</em> command.
+</p>
+</li><li>
+Change the deskset entry in the <em class="emphasis">auto_tools</em> map
+to:
+</p>
+
+<blockquote><pre class="code">deskset         <tt class="userinput"><b>/ -ro,intr mahimahi:/tools2/deskset \</b></tt>
+	                <tt class="userinput"><b>/wonderworks-v2.0</b></tt> <tt class="userinput"><b>-ro,intr</b></tt> <tt class="userinput"><b>mahimahi:/tools2/deskset</b></tt></pre></blockquote>
+</li></ol>
+
+Now when the user accesses <em class="emphasis">/tools/deskset</em>, he or
+she will be able reference both
+/<em class="emphasis">tools/wonderworks-v1.0</em> and
+<em class="emphasis">/tools/wonderworks-v1.0</em>. 
+</p>
+
+As the example suggests, the syntax of a hierarchical mount's
+map entry is:
+</p>
+
+<blockquote><pre class="code"><em class="emphasis">key-name</em> subdirectory1 [ -<em class="emphasis">mount-options</em> ] <em class="emphasis">server-filesystem-1</em> [ <em class="emphasis">subdirectory2</em> [ -mount-options ] <em class="emphasis">server-filesystem-2</em> ] ...</pre></blockquote>
+
+where a <em class="emphasis">server-filesystem</em> is<a name="INDEX-1486" /> <a name="INDEX-1487" /> one of:
+</p>
+
+<ul><li>
+<em class="emphasis">server_name</em>:<em class="emphasis">pathname</em></p>
+</li><li>
+<em class="emphasis">server_name-i</em>:<em class="emphasis">pathname-i</em>,<em class="emphasis">server_name-ii:pathname-ii</em>
+[,<em class="emphasis">...</em>]
+</p>
+</li><li>
+<em class="emphasis">server_name-i,server_name-ii</em>
+[,...]:<em class="emphasis">pathname</em>
+</p>
+</li></ul>
+</div>
+</div>
+<a name="nfs2-CHP-9-SECT-5.3" /><div class="sect2">
+<h3 class="sect2">9.5.3. Conversion of direct maps</h3>
+
+Direct mounts are useful for handling <a name="INDEX-1488" />
+<a name="INDEX-1489" />
+<a name="INDEX-1490" />nonuniform
+naming schemes, but they may cause a number of performance problems
+if several direct mount points are included in a directory that is
+frequently searched. You can usually get better performance out of
+the automounter by converting direct maps into indirect maps. Instead
+of putting direct map mount points in the client filesystem, create
+symbolic links that point to a staging area managed by an indirect
+map.
+</p>
+
+Again, an example helps to explain the conversion process. Consider
+replacing a direct map for <em class="emphasis">/usr/local</em> with an
+indirect map <em class="emphasis">auto_stage</em>. To convert the direct
+map into an indirect map, we first create a symbolic link
+<em class="emphasis">/usr/local</em> that points to a staging area that
+we'll let the automounter manage:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">Original direct map </i>
+/usr/local      mahimahi:/local/$ARCH 
+# <tt class="userinput"><b>ln -s /stage/local /usr/local</b></tt> 
+
+<i class="lineannotation">New entry in auto_master map</i>
+/stage          auto_stage      -ro 
+
+<i class="lineannotation">New indirect map auto_stage containing</i>
+local   -ro     mahimahi:/local/$ARCH</pre></blockquote>
+
+Note that <em class="emphasis">/usr/local</em> didn't exist before
+we made the link, since it was managed by the automounter. Also, we
+don't have to create the <em class="emphasis">/stage</em> staging
+directory, since it is an indirect map mount point.
+</p>
+
+The symbolic link points to a subdirectory of the mount point managed
+by the indirect map <em class="emphasis">auto_stage</em>. With the direct
+map, any reference to <em class="emphasis">/usr/local</em> is directed to
+the <em class="emphasis">/stage</em> mount point, which causes the
+automounter to mount the appropriate architecture-specific directory.
+This makes <em class="emphasis">/usr/local</em> look like a link to the
+mount.
+</p>
+
+Let's say a user now accesses
+<em class="emphasis">/usr/local/bin/emacs</em>. The client kernel follows
+<em class="emphasis">/usr/local</em> down to the symbolic link, which
+points to the <em class="emphasis">/stage/local</em> automounter mount
+point. The automounter picks up the reference to
+<em class="emphasis">/stage</em> as a reference to the
+<em class="emphasis">auto_stage</em> map, and it uses the next component
+ --  <em class="emphasis">local</em>  --  as a key in the map. This
+causes <em class="emphasis">mahimahi:/local/$ARCH</em> to be automounted.
+If you have several direct mount points, they can <a name="INDEX-1491" /> <a name="INDEX-1492" /> <a name="INDEX-1493" />all be converted
+into links sharing a single <em class="emphasis">auto_stage</em> map.
+</p>
+
+</div>
+<a name="nfs2-CHP-9-SECT-5.4" /><div class="sect2">
+<h3 class="sect2">9.5.4. Multiple indirection</h3>
+
+So far the only map we've seen that <a name="INDEX-1494" />
+<a name="INDEX-1495" />
+<a name="INDEX-1496" />refers
+to other maps is the <em class="emphasis">auto_master</em> map.
+Let's collect all of the indirect maps we've added to
+<em class="emphasis">auto_master</em> in this chapter:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             Mount Options 
+/home           auto_home       -nobrowse
+/net            -hosts          -nobrowse
+/tools          auto_tools      -ro 
+/source         auto_source     -rw
+/stage          auto_stage      -ro </pre></blockquote>
+
+One problem with this approach is that the top-level root (
+<em class="emphasis">/</em> ) directory is beginning to get cluttered. Of
+course, one could simply add another component to the mount
+directory. If we want to put everything under
+<em class="emphasis">/auto</em>, then we could change indirect map entries
+of the master map to:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             Mount Options 
+/auto/home      auto_home       -nobrowse
+/auto/net       -hosts          -nobrowse
+/auto/tools     auto_tools      -ro 
+/auto/source    auto_source     -rw
+/auto/stage     auto_stage      -ro </pre></blockquote>
+
+If you are using the <em class="emphasis">autofs</em> automounter, then
+there is a more elegant approach: simply treat each indirect map as a
+map entry in new indirect map called <em class="emphasis">auto_auto</em>.
+To do this, the master map would look like:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             Mount Options
+/auto           auto_auto
+/-              auto_direct</pre></blockquote>
+
+The <em class="emphasis">auto_auto</em> map is an indirect map. Like all
+other indirect maps, its first field has to be a directory relative
+to <em class="emphasis">/auto</em>, its second field has to be a set of
+mount options, and its third field has to be the name of the thing we
+are mounting. Here is what <em class="emphasis">auto_auto</em> looks like:
+</p>
+
+<blockquote><pre class="code"># Directory    Options                     Map being mounted 
+home           -fstype=autofs,nobrowse     auto_home
+net            -fstype=autofs,nobrowse     -hosts
+tools          -fstype=autofs,ro           auto_tools 
+source         -fstype=autofs,rw           auto_source
+stage          -fstype=autofs,ro           auto_stage</pre></blockquote>
+
+The second and third fields in <em class="emphasis">auto_auto</em> are
+basically swapped from what they would be in
+<em class="emphasis">auto_master</em>. The difference is the presence of
+the <em class="emphasis">fstype</em> option. This option is needed to
+unambiguously tell the <em class="emphasis">autofs</em> automounter that
+this is not map entry referring to an NFS-mounted filesystem.
+</p>
+
+There is no limit on multiple indirection. This fact allows you to
+create sensible hierarchies that can be extended ad infinitum.
+Let's return to the <em class="emphasis">auto_source</em> example,
+which contains:
+</p>
+
+<blockquote><pre class="code">sunos5.6        -ro     srcserv:/source/sunos5.6 
+sunos5.7        -ro     srcserv:/source/sunos5.7 
+nfs             -ro     bigguy:/source/nfs_internals </pre></blockquote>
+
+You've decided to add Linux, BSD, FreeBSD, and System V sources
+to this map, and you have multiple versions of each. Rather than
+having a map of contain entries called <em class="emphasis">sunos5.6, sunos5.7,
+linux1.0, linux2.0, bsd4.3, bsd4.4, sysVr3, sysVr4,</em> etc.,
+you decide that you want a hierarchy that branches first on the name
+of the operating system and then on the release. So you change
+<em class="emphasis">auto_source</em> to:
+</p>
+
+<blockquote><pre class="code">bsd             -fstype=autofs         auto_bsd
+linux           -fstype=autofs         auto_linux
+nfs             -ro                    bigguy:/source/nfs_internals
+sunos           -fstype=atofs          auto_sunos
+sysv            -fstype=atofs          auto_sysv</pre></blockquote>
+
+The <em class="emphasis">auto_bsd</em> map might contain:</p>
+
+<blockquote><pre class="code">4.1c        -ro     ancient:/export/source/bsd4.1c
+4.2         -ro     ancient:/export/source/bsd4.2
+4.3         -ro     ancient:/export/source/bsd4.3
+4.4         -ro     srcsrv:/source/bsd4.4</pre></blockquote>
+
+This should be enough to get the idea; for brevity, we won't
+expand on what the other maps might look like.
+</p>
+
+Note that the <em class="emphasis">auto_source</em> map example contains
+both entries with <em class="emphasis">fstype=autofs</em>, and an
+<em class="emphasis">nfs</em> entry referring to
+<em class="emphasis">bigguy:/source/nfs_internals.</em>
+</p>
+
+By the way, you probably will want to leave the
+<em class="emphasis">-hosts</em> and <em class="emphasis">auto_home</em> maps at
+<em class="emphasis">/net</em> and <em class="emphasis">/home</em>. The reason
+is that lots of software assumes<a name="INDEX-1497" /> <a name="INDEX-1498" /> <a name="INDEX-1499" /> these mount points exist. So you would
+want <em class="emphasis">auto_master</em> to look like:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             Mount Options
+/auto           auto_auto
+/home           auto_home       -nobrowse
+/net            -hosts          -nobrowse
+/-              auto_direct</pre></blockquote>
+
+</div>
+<a name="nfs2-CHP-9-SECT-5.5" /><div class="sect2">
+<h3 class="sect2">9.5.5. Executable indirect maps</h3>
+
+The <em class="emphasis">autofs</em> automounter contains another
+<a name="INDEX-1500" />
+<a name="INDEX-1501" /> <a name="INDEX-1502" />feature
+known as executable maps. If permissions on an indirect map file are
+marked as executable, then the <em class="emphasis">autofs</em>
+automounter assumes it is an executable program or shell script, and
+executes it, passing the key as the first and only argument to the
+program or script. The program or script must then display an
+indirect map entry, which can be hierarchal. For example, suppose
+<em class="emphasis">/etc/auto_master</em> has:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             Mount Options
+/auto           auto_auto
+/home           auto_home       -nobrowse
+/net            -hosts          -nobrowse
+/net2           /etc/auto_exec
+/-              auto_direct</pre></blockquote>
+
+Examine <em class="emphasis">/etc/auto_exec</em>:</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ls -l /etc/auto_exe</b></tt>c
+-rwxr-xr-x   1 root      sys         76 Oct 26 09:58 /etc/auto_exec
+% <tt class="userinput"><b>cat /etc/auto_exe</b></tt>c
+#!/bin/sh
+/usr/sbin/showmount -e $1 | \
+awk 'NR &gt; 1 {print $1       "'$1':"$1 " \\"}' | sort</pre></blockquote>
+
+This script takes the key value as if it is a hostname, and asks the
+NFS server, via the <em class="emphasis">showmount</em> command, which
+filesystems are exported. The output of
+<em class="emphasis">showmount</em> is then formatted by the
+<em class="emphasis">awk</em> command to produce a hierarchical map entry.
+You can test the script manually by doing:
+</p>
+
+<blockquote><pre class="code">% /etc/auto_exec foo
+/export1        foo:/export1 \
+/export2        foo:/export2 \</pre></blockquote>
+
+Thus, the script implements functionality similar to
+<em class="emphasis">/net</em>, with one difference. Note that the
+<em class="emphasis">-nobrowse</em> mount option isn't included in
+the <em class="emphasis">/net2</em> entry of
+<em class="emphasis">auto_master</em>. This is because executable maps
+can't be browsed. There doesn't seem to be any reason why
+the enhanced <em class="emphasis">autofs</em> automounter couldn't
+have been implemented to support it, perhaps by having a
+<em class="emphasis">browse=</em> option that referred to yet another
+program or script to do the browsing.
+</p>
+
+If, for some reason, the executable program or script cannot resolve
+the key to a map entry, then it should display zero bytes of output
+to standard output. Any output displayed to standard error will be
+logged by the automounter onto the <a name="INDEX-1503" />system console.
+<a name="INDEX-1504" />
+<a name="INDEX-1505" />
+<a name="INDEX-1506" />
+</p>
+
+
+
+<a name="ch09-13-fm2xml" /><blockquote><b>TIP: </b> 
+Make sure that if you have an automounter map file with the
+executable permission bit set that you actually want it to be
+executed.
+</p>
+</blockquote>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.4. Key and variable substitutions</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.6. Side effects</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

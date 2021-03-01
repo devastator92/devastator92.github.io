@@ -1,0 +1,852 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch16_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:53 GMT -->
+<head><title>Electronic Mail and News (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch16_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 16. Electronic Mail and News</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch16-26442">Electronic Mail</a><br />
+<a href="ch16_02.html">Simple Mail Transfer Protocol (SMTP)</a><br />
+<a href="ch16_03.html">Other Mail Transfer Protocols</a><br />
+<a href="ch16_04.html">Microsoft Exchange</a><br />
+<a href="ch16_05.html">Lotus Notes and Domino</a><br />
+<a href="ch16_06.html">Post Office Protocol (POP)</a><br />
+<a href="ch16_07.html">Internet Message Access Protocol (IMAP)</a><br />
+<a href="ch16_08.html">Microsoft Messaging API (MAPI)</a><br />
+<a href="ch16_09.html">Network News Transfer Protocol (NNTP)</a><br /></p><p></div>
+
+
+
+
+
+
+
+<a name="INDEX-1493" /></a>From a
+user's point of view, electronic mail is one of the most
+crucial Internet services. Mail, along with news, provides a way for
+people to hold discussions with other people, singly or in groups.
+This chapter discusses the security issues related to electronic mail
+and news protocols, including SMTP, POP, IMAP, MIME, and NNTP.</p><p>
+
+
+
+
+<div class="sect1"><a name="ch16-26442" /></a>
+<h2 class="sect1">16.1. Electronic Mail</h2>
+
+
+
+
+
+Traditionally, a mail system has three parts, which may be
+implemented by different programs or by the same program, in any
+combination:</p><p>
+
+
+<dl>
+<dt><i>Mail transfer agent (MTA)</i></dt>
+<dd><a name="INDEX-1494" /></a>
+<a name="INDEX-1495" /></a>Accepts mail from external hosts or sends
+it to external hosts</p><p></dd>
+
+
+
+
+
+<dt><i>Mail delivery agent (MDA)</i></dt>
+<dd><a name="INDEX-1496" /></a>
+<a name="INDEX-1497" /></a>Puts the mail in the correct mailbox on
+the local host</p><p></dd>
+
+
+
+
+
+<dt><i>Mail user agent (MUA)</i></dt>
+<dd><a name="INDEX-1498" /></a>
+<a name="INDEX-1499" /></a>Lets
+the recipient read the mail and compose outgoing mail</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a href="ch16_01.html#ch16-61041">Figure 16-1</a> shows a large mail system and its parts.</p><p>
+
+
+
+
+
+<a name="ch16-61041" /></a><div class="figure"><img height="243" alt="Figure 16-1" src="figs/fire2.1601.gif" width="293" /></div><h4 class="objtitle">Figure 16-1. The parts of a mail system</h4>
+
+Each of these parts is vulnerable for a different reason:</p><p>
+
+
+
+
+
+<ul><li>The transfer agent directly accepts commands (related to transporting
+mail) from external hosts; for this reason, if the transfer agent
+isn't secure, it may end up immediately giving an attacker all
+the access it has itself.</p><p></li><li>The delivery agent needs special permissions because it needs to be
+able to write into every user's mailbox. Although the delivery
+agent doesn't need to talk to the external world, if it can be
+subverted somehow, the intruder obtains very broad access.</p><p></li><li>The user agent runs as one user, and it doesn't talk to the
+external world, which limits its power and accessibility; however, it
+can often run arbitrary other programs in response to the data
+received.</p><p></li></ul>
+A large modern mail system may involve more than three parts. For
+instance, it is common for the user agent to be a client speaking POP
+or IMAP, in which case a POP or IMAP server sits between the delivery
+agent and the user agent. The delivery agent itself may involve
+database transactions (and therefore a database server). The basic
+vulnerabilities remain the same.</p><p>
+
+
+
+
+
+With any service that transfers data around, there are three main
+risks:</p><p>
+
+
+
+
+
+<ul><li>Giving away data that you wanted to keep secret</p><p></li><li>Getting information that you didn't want (whether it's
+illegal, virus-infected, or merely obnoxious)</p><p></li><li>Having people directly attack the parts of the server<p></p></li></ul>
+The last risk is specific to the individual servers and protocols
+that you use, and we will address it as we talk about particular
+protocols. The first two, however, have issues that are different for
+electronic mail than for other kinds of information transfer, but are
+the same for all mail servers, and we will discuss them here.</p><p>
+
+
+
+
+
+<a name="ch16-2-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">16.1.1. Keeping Mail Secret</h3>
+
+
+
+
+
+<a name="INDEX-1500" /></a> <a name="INDEX-1501" /></a>Most protocols that transfer information
+use relatively direct connections; the server and the client that
+talk to each other are usually the original source and final
+destination of the transfer. That's not true for mail, where
+messages usually pass through multiple servers between the source and
+the destination. <a href="ch16_01.html#ch16-37155">Figure 16-2</a> shows a typical mail
+path.</p><p>
+
+
+
+
+
+<a name="ch16-37155" /></a><div class="figure"><img height="309" alt="Figure 16-2" src="figs/fire2.1602.gif" width="470" /></div><h4 class="objtitle">Figure 16-2. A typical path for a mail message </h4>
+
+<a name="INDEX-1502" /></a>
+<a name="INDEX-1503" /></a>In this situation, protocols that make
+encrypted connections between a client and a server don't do
+much good. There are some cases where encryption helps; if you know
+what route mail follows, and only one part of it is unprotected, and
+you control the clients and servers on both ends of that link, you
+can encrypt just that link. For instance, if you are trying to
+protect internal mail that's being read by a user on the
+Internet, it's just the last link between the user and your
+mail server that you're worried about, and you can protect it.
+If you're trying to securely transfer mail between your company
+and a subsidiary, you can set up the mail systems so that you know
+mail goes directly between their server and yours and encrypt that
+connection. As usual, you can use either an encrypted protocol (ESMTP
+with STARTTLS or Secure POP, for instance; both of them are discussed
+later in this chapter) or a virtual private network to protect the
+connection.</p><p>
+
+
+
+
+
+If you're trying to protect mail in a situation where you
+don't control the servers, the clients, and the mail routing
+between them, this sort of encryption isn't going to do you any
+good. You can't guarantee that all the servers involved will
+use it. You can't even guarantee that you'll be able to
+authenticate the servers that you need to exchange mail with (you
+might want to exchange mail with any server on the Internet, and
+there is currently no infrastructure that allows you to authenticate
+arbitrary servers).</p><p>
+
+
+
+
+
+When you're trying to pass information along a path you
+don't control, you have to encrypt the message data, instead of
+using encrypted links. There are a number of systems for doing this;
+many mail user agents offer encryption features. Most systems require
+that the sender and the receiver have compatible software, and that
+they have some way to exchange keys outside of electronic mail. The
+systems that best address these problems are S/MIME and OpenPGP,
+discussed later, which are implemented by a number of different user
+agents and use public key cryptography.</p><p>
+
+
+
+
+
+<a name="INDEX-1504" /></a>
+<a name="INDEX-1505" /></a>People occasionally advocate the
+use of self-decrypting archives. To make a self-decrypting archive,
+you take the file you want to encrypt and use a program that embeds
+your file into another program. You mail this new program to your
+correspondent; when it is run, it asks for a password, and if the
+password is correct, it produces the original file. This removes the
+need for the recipient to have the decryption program (although not
+the need for a way to safely communicate the key). Unfortunately, it
+requires the recipient to have a computer that can run the executable
+and to be willing to run an unknown executable received in
+unauthenticated electronic mail. As we discuss later, people should
+not run executables they get in electronic mail. In addition, it is
+quite difficult to produce a secure program that will make
+self-decrypting archives of a reasonable size. Since most security
+experts are unwilling to have anything to do with self-decrypting
+archives, finding it unethical to encourage people to associate
+security with running random unauthenticated executables, it's
+reasonable to assume that self-decrypting archives are not just a bad
+idea; they're also insecure. <a name="INDEX-1506" /></a> <a name="INDEX-1507" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch16-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">16.1.2. Undesirable Mail</h3>
+
+
+
+
+
+There are two main kinds of undesirable mail: mail that's
+merely annoying and mail that's actively hostile.</p><p>
+
+
+
+
+
+<a name="ch16-4-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">16.1.2.1. Junk mail</h3>
+
+
+
+
+
+<a name="INDEX-1508" /></a>
+<a name="INDEX-1509" /></a>
+<a name="INDEX-1510" /></a> <a name="INDEX-1511" /></a> <a name="INDEX-1512" /></a>These days, the most frequent problems
+with mail servers has to do with something called by a number of
+names, including the serious "Unsolicited Commercial
+Email" (UCE) and the frivolous "spam" (which is not
+a computer-originated acronym, but a reference to a Monty Python skit
+in which the Hormel meat-product SPAM is undesirable but
+unavoidable). By any name, this is junk email --  advertisements
+flooding in electronically. This phenomenon arouses great hostility,
+as well as putting substantial load on the network, so people who
+create it tend to spread out both the load and the repercussions by
+routing it through third parties.</p><p>
+
+
+
+
+
+Thus, if you run an Internet-attached mail server, you have three
+concerns about this kind of mail:</p><p>
+
+
+
+
+
+<ul><li>Preventing outsiders from using your mail server to annoy third
+parties</p><p></li><li>Preventing people from annoying your users<p></p></li><li>Preventing your users from annoying other people<p></p></li></ul>
+A variety of techniques are used to achieve these goals. We
+can't discuss all of them here, as it's a complex and
+implementation-dependent topic, which fills entire books (for
+instance, <em class="emphasis">Stopping Spam</em> by Alan Schwartz and
+Simson Garfinkel, O'Reilly &amp; Associates, 1998<em class="emphasis">,
+</em>which you might want to consult).</p><p>
+
+
+
+
+
+Note that these three goals, while they're related, require
+quite different approaches. When you're evaluating mail
+servers, you need to pay attention to exactly what sort of
+protections they offer you; many "anti-spam" features are
+actually anti-relaying features, designed to prevent outsiders from
+using your mail server to relay mail to other people. These are
+useful and important features to have, but they won't be of any
+immediate use in emptying your mailbox of advertisements for golf
+balls, pictures of naked people, and completely legal ways to make a
+million dollars without doing any work.
+<a name="INDEX-1513" /></a> <a name="INDEX-1514" /></a><a name="INDEX-1515" /></a> <a name="INDEX-1516" /></a> <a name="INDEX-1517" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch16-5-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">16.1.2.2. Viruses and other hostilities</h3>
+
+
+
+
+
+<a name="INDEX-1518" /></a>
+<a name="INDEX-1519" /></a>
+<a name="INDEX-1520" /></a>
+<a name="INDEX-1521" /></a>While junk mail is annoying, some mail
+goes further and actually contains attacks on your machines. This may
+be because the person the mail seems to come from is trying to attack
+you, but more likely, it's the fault of some third party who
+has either forged the mail or tricked the mail's sender. The
+most important way to control these things is to avoid any situation
+where you execute code from an electronic mail message without having
+good authentication (don't accept programs from strangers).
+This is much more difficult than it sounds.</p><p>
+
+
+
+
+
+It's relatively obvious if you receive an attachment
+that's a normal program executable. It may not be at all
+obvious to you that HTML files may contain code (in the form of Java,
+JavaScript, VBScript, or ActiveX controls) or that Microsoft Word
+documents can also be programs (they can contain Visual Basic macros,
+which are capable of doing anything other programs can do). In
+general, don't open any file unless you know exactly where it
+came from, or you know exactly what the program that opens it can do
+(and it can't do much). For instance, you certainly don't
+want to open Microsoft Word documents with Microsoft Word, but you
+might be willing to open them with the specialized Word Viewer, which
+can't execute macros.</p><p>
+
+
+
+
+
+Furthermore, you don't want to open something just because you
+know who it comes from, even if you can authenticate the mail. Some
+programs replicate by reading an infected user's address book
+and mailing themselves to the addresses in it. They'll appear
+as perfectly valid mail sent by somebody you know.</p><p>
+
+
+
+
+
+Worse yet, you may have to specially configure your mail reader to
+keep it from executing code automatically. As we discussed in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>, some mail readers that are integrated with
+web browsers will run code in web extension languages even when it is
+embedded in mail messages. You will want to disable this
+functionality.</p><p>
+
+
+
+
+
+<a name="INDEX-1522" /></a>All of this makes it
+extremely difficult to control hostile mail at the client end. Years
+of education have not succeeded in getting people to think twice
+before forwarding chain letters, and they're not going to
+succeed in the much more difficult task of training people not to
+even open files to read them. It's therefore a very good idea
+to do some content filtering of incoming electronic mail to remove
+known hostile code. You will also need to do the training and
+filtering on the client end; content filtering on the mail server
+will not protect you from the many other sources of hostile code; the
+server is easily deceived by encrypting or otherwise changing the
+code, and it can detect only known attacks. However, it provides you
+a single point of control where you can get rid of current problems
+with one intervention, which can make all the difference in dealing
+with crises.</p><p>
+
+
+
+
+
+If you filter incoming mail, it is both wise and polite to filter
+your outgoing mail as well. Obviously, it's polite to avoid
+infecting other people, but it's also a useful way to diagnose
+and get rid of internal problems; if you're sending out hostile
+code, you have either infected machines or hostile users, and you
+want to get rid of them before they do damage to you.</p><p>
+
+
+
+
+
+Setting up filtering will depend on the details of your mail server
+configuration. Virus filters are available for almost all mail
+servers, as commercial or freely available products. In general,
+virus filters are most effective when they are running on the same
+platform they are trying to protect (that is, the Windows NT-based
+filters are better than the Unix-based filters at protecting
+icrosoft machines), but it is possible to provide basic protections
+for any machine from any mail server.<a name="INDEX-1523" /></a> <a name="INDEX-1524" /></a> <a name="INDEX-1525" /></a> <a name="INDEX-1526" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch16-8457" /></a><div class="sect2">
+<h3 class="sect2">16.1.3. Multimedia Internet Mail Extensions (MIME)</h3>
+
+
+
+
+
+<a name="INDEX-1527" /></a><a name="INDEX-1528" /></a>MIME
+is a set of extensions to the basic Internet electronic mail message
+format supporting things like:</p><p>
+
+
+
+
+
+<ul><li>Non-ASCII character sets</p><p></li><li>Nontext data such as pictures and audio segments<p></p></li><li><p>So-called "rich text" messages (messages containing
+formatted text, with different fonts and so on, rather than simple
+single-font unformatted text)</p><p></li><li>Multipart messages (messages containing multiple pieces, each piece
+in its own format)</p><p></li></ul>
+IME support is mostly a client issue; to mail servers and transport
+systems, a MIME message is generally just another message. The
+question is whether or not a given client can generate outgoing MIME
+messages, and whether or not it can recognize and cope with incoming
+IME messages.</p><p>
+
+
+
+
+
+The MIME standards define certain basic data types, such as plain
+text, formatted text, standard audio, and so on. MIME is designed to
+be extensible, so that new data types can be added as necessary.
+IME-capable mail clients generally understand certain data types
+(often only multipart messages and plain text) and rely on other
+programs to handle other data types (for example, graphics programs
+to display images, and sound programs to play audio clips). The
+clients generally have a list of external programs to run for
+particular types of data; this list can be extended or modified by
+the user.</p><p>
+
+
+
+
+
+The issues for email clients are much the same as the issues for web
+browsers, which are discussed in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>. Since
+you are running additional programs, you are vulnerable to security
+problems in those programs as well as any security problems that may
+be present in your mail client.</p><p>
+
+
+
+
+
+One difference between MIME support in email clients and web browsers
+is how data is obtained. With a web browser, the user chooses what
+data to access; with email, the user accesses whatever anybody sends.
+In theory, email clients are more vulnerable because you can't
+control what other people send you by email. In practice, however,
+the difference isn't that important because it's fairly
+easy to lure web users into accessing whatever you want them to
+access. Either way, you need to carefully control what data types
+your clients understand and how they process that data.<a name="INDEX-1529" /></a></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch16-6-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">16.1.4. S/MIME and OpenPGP</h3>
+
+
+
+
+
+<a name="INDEX-1530" /></a><a name="INDEX-1531" /></a>
+<a name="INDEX-1532" /></a>
+<a name="INDEX-1533" /></a> <a name="INDEX-1534" /></a> <a name="INDEX-1535" /></a> <a name="INDEX-1536" /></a>S/MIME and OpenPGP
+are extensions to MIME that support encryption and digital signatures
+(for indentifying the sender of a message or for protecting it from
+unauthorized modifications). Both S/MIME and OpenPGP are implemented
+as special MIME data types that use public key encryption to
+digitally sign and encrypt messages. S/MIME can include certificate
+information to help senders and receivers establish trust
+relationships. OpenPGP uses a "web of trust" model, which
+requires that you have independent access to certificate information.
+This significantly reduces the overhead added to messages. See <a href="appc_01.html">Appendix C, "Cryptography"</a>, for more information about public key
+encryption and certificates. There are several versions of S/MIME;
+those prior to version 3 do not necessarily provide very strong
+encryption.</p><p>
+
+
+
+
+
+S/MIME version 3 and OpenPGP are being developed as Internet
+standards, and both require the implementation of strong encryption.
+Neither requires a license for using patented encryption technology
+in a commercial environment. There are multiple implementations of
+both S/MIME and OpenPGP; commercial products typically implement
+S/MIME, and freely available software tends to implement
+OpenPGP.<a name="INDEX-1537" /></a>
+<a name="INDEX-1538" /></a>
+<a name="INDEX-1539" /></a>
+<a name="INDEX-1540" /></a>
+<a name="INDEX-1541" /></a>
+<a name="INDEX-1542" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch15_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">15.8. Gopher and WAIS</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16.2. Simple Mail Transfer Protocol </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch16_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:56 GMT -->
+</html>

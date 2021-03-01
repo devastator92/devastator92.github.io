@@ -1,0 +1,629 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Common Internet File System (CIFS) and Server Message Block (SMB) (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.4. Common Internet File System (CIFS) and Server Message Block (SMB)</h2>
+
+
+
+
+
+<a name="INDEX-1312" /> <a name="INDEX-1313" /><a name="INDEX-1314" />
+<a name="INDEX-1315" /> <a name="INDEX-1316" /> <a name="INDEX-1317" />The Common Internet File System (CIFS) is a
+general-purpose information-sharing protocol formerly known as Server
+essage Block (SMB). SMB is a message-based protocol developed by
+icrosoft, Intel, and IBM. SMB is best known as the basis for
+icrosoft's file and printer sharing, which is discussed
+further in <a href="ch17_01.html">Chapter 17, "File Transfer, File Sharing, and Printing"</a>. However, SMB is also used by
+many other applications. The CIFS standard extends Microsoft's
+usage of SMB.</p><p>
+
+
+
+
+
+SMB is normally run on top of NetBT. Newer implementations also
+support SMB over TCP/IP directly; in this configuration, it is almost
+always called CIFS. Note that whatever this protocol is called, it is
+the exact same protocol whether it is run over NetBT or over TCP/IP
+directly, and that it was called CIFS even when it did not run over
+TCP/IP directly. We refer to it as "SMB" here mostly
+because it is used for a variety of things in addition to file
+sharing, and we find it misleading to refer to it as a filesystem in
+this context.</p><p>
+
+
+
+
+
+The SMB protocol provides a variety of different operations. Many of
+these are standard operations for manipulating files (open, read,
+write, delete, and set attributes, for instance), but there are also
+specific operations for other purposes (messaging and printing, for
+instance) and several general-purpose mechanisms for doing
+interprocess communication using SMB. SMB allows sharing not only of
+standard files, but also of other things, including devices, named
+pipes, and mailslots. (Named pipes and mailslots are mechanisms for
+interprocess communication; named pipes provide a data stream, while
+mailslots are message-oriented.) It therefore provides suitable calls
+for manipulating these other objects, including support for device
+controls (I/O controls, or <em class="emphasis">ioctl</em>s) and several
+general-purpose transaction calls for communication between
+processes. It is also sometimes possible to use the same file
+manipulation calls that are used on normal files to manipulate
+special files.</p><p>
+
+
+
+
+
+In practice, there are two major uses for SMB; file sharing and
+general-purpose remote transactions. General-purpose remote
+transactions are implemented by running DCE RPC over SMB, through the
+sharing of named pipes. In general, any application is using DCE RPC
+over SMB if it says it uses named pipes; if it relies on
+<tt class="command">\PIPE\something_or_other</tt>,<em class="emphasis">
+</em><tt class="command">\Named Pipe\something_or_other</tt>, or
+IPC$; if it requires port 138, 139, or 445; or if it mentions SMB or
+CIFS transactions. Applications that normally use this include NTLM
+authentication, the Server Manager, the Registry Editor, the Event
+Viewer, and print spooling.</p><p>
+
+
+
+
+
+Any time that you provide SMB access to a machine, you are providing
+access to all of the applications that use SMB for transactions. Most
+of these applications have their own security mechanisms, but you
+need to be sure to apply those. If you can't be sure that host
+security is excellent, you should not allow SMB access.</p><p>
+
+
+
+
+
+SMB introduces an additional complication for firewalls. Not only do
+multiple different protocols with very different security
+implications use SMB (thereby ending up on the same port numbers),
+but they can all use the very same SMB connection. If two machines
+connect to each other via SMB for one purpose, that connection will
+be reused for all other SMB protocols. Therefore, connection-oriented
+SMB must be treated like a connectionless protocol, with every packet
+a separate transaction that must be evaluated for security.</p><p>
+
+
+
+
+
+For instance, if a client connects to a server in order to access a
+filesystem, it will start an SMB session. If the client then wants to
+print to a printer on that server, or run an SMB-based program (like
+the User Manager or the Event Viewer) on that server, the existing
+connection will be reused.</p><p>
+
+
+
+
+
+In the most common uses of SMB, a client makes a NetBT session
+connection to a host and then starts an SMB session. At the beginning
+of the SMB session, the server and the client negotiate a dialect of
+SMB. Different dialects support different SMB features. Once the
+dialect has been negotiated, the client authenticates if the dialect
+supports authentication at this point, and then requests a resource
+from the server with what is called a <em class="emphasis">tree
+connect</em>. When the client creates the initial SMB
+connection and authenticates, it gets an identifier called a
+<em class="emphasis">user ID</em> or <em class="emphasis">UID</em>. If the
+client wants another resource, the client will reuse the existing
+connection and merely do an additional tree connect request. The
+server will determine whether the client is authorized to do the tree
+request by looking at the permissions granted to the UID. Multiple
+resource connections may be used at the same time; they are
+distinguished by an identifier called a <em class="emphasis">tree ID</em>
+or <em class="emphasis">TID</em>.</p><p>
+
+
+
+
+
+Not all SMB commands require a valid UID and TID. Obviously, the
+commands to set up connections don't require them, but others
+can be used without them, including the messaging commands, the echo
+command, and some commands that give server information. These
+commands can be used by anybody, without authentication.</p><p>
+
+
+
+
+
+<a name="ch14-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.4.1. Authentication and SMB</h3>
+
+
+
+
+
+<a name="INDEX-1318" />
+<a name="INDEX-1319" />Because
+SMB runs on a number of machines with different authentication
+models, it supports several different levels of security. Two
+different types of authentication are possible, commonly called
+<em class="emphasis">share level</em> and <em class="emphasis">user level</em>.
+Samba, which is a popular SMB implementation for Unix, also refers to
+"server-level" authentication; this is a Samba-specific
+term used when user-level authentication is in effect but the Samba
+server is not authenticating users locally. This is not visible to
+the client. Samba is discussed further in <a href="ch17_01.html">Chapter 17, "File Transfer, File Sharing, and Printing"</a>.</p><p>
+
+
+
+
+
+<a name="ch14-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">14.4.1.1. Share-level authentication</h3>
+
+
+
+
+
+In share-level authentication, the initial SMB connection does not
+require authentication. Instead, each time you attach to a resource,
+you provide a password for that particular resource. This
+authentication is meant for servers running under operating systems
+that don't actually have a concept of users. Since it requires
+all users who wish to use a resource to have the same password,
+it's inherently insecure, and you should avoid it. It uses the
+same mechanisms to exchange passwords that are used for user-level
+authentication (which are described in detail in <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a>), but it does the password exchange during the
+tree connect instead of during session setup.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch14-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">14.4.1.2. User-level authentication</h3>
+
+
+
+
+
+User-level authentication occurs at the beginning of the SMB session,
+after dialect negotiation. If the negotiated dialect supports
+user-level authentication, the client provides authentication
+information to the server. The authentication information
+that's provided is a username and password; the method
+that's used to send it depends on the dialect. The password may
+be sent in cleartext or established via challenge-response.
+User-level authentication is discussed in detail in <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a>, because it is used for logon authentication
+as well as for authenticating users who are connecting to file
+servers.</p><p>
+
+
+
+
+
+any SMB servers that do user-level authentication provide guest
+access and will give guest access to clients that fail to
+authenticate for any reason. This is meant to provide backward
+compatibility for clients that cannot do user-level authentication.
+In most configurations, it will also provide access to a number of
+files to anybody that is able to ask. You should either disable guest
+access or carefully control file permissions.<a name="INDEX-1320" /> <a name="INDEX-1321" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-18-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.4.2. Packet Filtering Characteristics of SMB</h3>
+
+
+
+
+
+SMB is generally done over NetBT session service at TCP port 139. It
+is theoretically possible to run it over NetBT datagram service at
+UDP port 138, but this is extremely rare. As of Windows 2000, SMB can
+also be run directly over TCP/IP without involving NetBT, in which
+case it uses TCP or UDP port 445 (again, although UDP is a
+theoretical possibility, it does not appear to occur in
+practice).<a name="INDEX-1322" /></p><p>
+
+
+
+
+
+<a name="ch14-19-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+Source Addr.</p><p></th>
+<th>
+Dest. Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+ACK Set</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+139, 445</p><p></td>
+<td>
+<a href="#FOOTNOTE-33">[33]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Incoming SMB/TCP connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+139, 445</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming SMB/TCP connection, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+138, 445</p><p></td>
+<td>
+<a href="#FOOTNOTE-34">[34]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Incoming SMB/UDP connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+138, 445</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>&nbsp;</td>
+<td>
+Incoming SMB/UDP connection, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+139, 445</p><p></td>
+<td>&nbsp;</td>
+<td>
+Outgoing SMB/TCP connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+139, 445</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing SMB/TCP connection, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+138, 445</p><p></td>
+<td>&nbsp;</td>
+<td>
+Outgoing SMB/UDP connection, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+138, 445</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>&nbsp;</td>
+<td>
+Outgoing SMB/UDP connection, server to client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-33" />[33]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-34" />[34]UDP has no ACK equivalent.</p><p>
+
+
+
+
+</blockquote>
+
+Clients of any SMB protocol will often attempt to reach the
+destination host via NetBIOS name service as well. SMB will work even
+if these packets are denied, but you may log large numbers of denied
+packets. You should be aware of this and should not interpret name
+service requests from SMB clients as attacks. See <a href="ch20_01.html">Chapter 20, "Naming and Directory Services"</a>, for more information about NetBIOS name
+service.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-20-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.4.3. Proxying Characteristics of SMB</h3>
+
+
+
+
+
+SMB is not particularly difficult to proxy, but it is difficult to
+improve its security with a proxy. Because many things are
+implemented as general-purpose transactions, it's hard for a
+proxy to know exactly what effect an operation will have on the end
+machine. The proxy can't just track requests but also needs to
+track the filenames those requests refer to. In addition, the
+protocol allows for some operations to be chained together, so that a
+single transaction may include a tree connect, an open, and a read
+(for instance). This means that a proxy that is trying to control
+what files are opened has to do extensive parsing on transactions to
+make certain that no inappropriate opens are late in the chain. It is
+not sufficient to simply check the transaction type.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-21-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.4.4. Network Address Translation Characteristics of SMB</h3>
+
+
+
+
+
+SMB is normally run over NetBT, which includes embedded IP addresses
+but does not generally use them, as discussed earlier. In Windows
+2000, it is also possible to run SMB directly over IP. In this mode,
+it does not have embedded IP addresses and should function with
+straightforward network address translation.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.4.5. Summary of Recommendations for SMB</h3>
+
+
+
+
+
+<ul><li>Don't allow SMB across your firewall.<a name="INDEX-1323" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.3. NetBIOS over TCP/IP </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.5. Common Object Request Broker Architecture (CORBA) and Internet Inter-Orb Protocol </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+</html>

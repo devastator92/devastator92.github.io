@@ -1,0 +1,1514 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:28 GMT -->
+<head><title>Configuring named  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">8.3. Configuring named </h2>
+
+<p>While the resolver <a name="INDEX-1618" />
+<a name="INDEX-1619" /> <a name="INDEX-1620" /> <a name="INDEX-1621" />configuration requires, at most,
+one configuration file, several files are used to configure
+<tt class="literal">named</tt>. The complete set of
+<tt class="literal">named</tt> files is:
+</p>
+
+<dl>
+<dt><i>The configuration file</i></dt>
+<dd>
+<p>Sets general <tt class="literal">named</tt> parameters and points to the
+sources of DNS database information used by this server. These
+sources can be local disk files or remote servers. This file is
+usually called
+<em class="emphasis">named.conf</em><a name="INDEX-1622" />.
+</p>
+</dd>
+
+
+<a name="INDEX-1623" /><dt><i>The root hints file</i></dt>
+<dd>
+<p>Points to the root zone servers. Some common names for this file are
+<em class="emphasis">named.ca</em>, <em class="emphasis">db.cache</em>,
+<em class="emphasis">named.root,</em> or <em class="emphasis">root.ca</em>.
+</p>
+</dd>
+
+
+<a name="INDEX-1624" /><dt><i>The localhost file</i></dt>
+<dd>
+<p>Used to locally resolve the loopback address. The filename
+<em class="emphasis">named.local</em> is generally used for this file.
+</p>
+</dd>
+
+
+<a name="INDEX-1625" /><dt><i>The forward-mapping zone file</i></dt>
+<dd>
+<p>The zone file that maps hostnames to IP addresses. This is the file
+that contains the bulk of the information about the zone. To make it
+easier to discuss this file, this text generally refers to it as the
+<em class="emphasis">zone file</em>, dropping the
+"forward-mapping" qualifier. The zone file is generally
+given a descriptive name, such as
+<em class="emphasis">wrotethebook.com.hosts</em>, that identifies which
+zone's data is contained in the file.
+</p>
+</dd>
+
+
+<a name="INDEX-1626" /><dt><i>The reverse-mapping zone file</i></dt>
+<dd>
+<p>The zone file that maps IP addresses to hostnames. To make it easier
+to discuss this file, this text generally refers to it as the
+<em class="emphasis">reverse zone file</em>. The reverse zone file is
+generally given a descriptive name, such as
+<em class="emphasis">172.16.rev</em>, that identifies which IP address is
+mapped by the file.
+</p>
+</dd>
+
+</dl>
+
+<p>All of these files can have any names you wish. However, you should
+use descriptive names for your zone files, the filenames
+<em class="emphasis">named.conf</em> and <em class="emphasis">named.local</em>
+for the boot file and the loopback address file, and one of the
+well-known names for the root hints file to make it easier for others
+to maintain your system. In the following sections, we'll look
+at how each of these files is used, starting with
+<em class="emphasis">named.conf</em>.
+</p>
+
+<a name="tcp3-CHP-8-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">8.3.1. The named.conf File </h3>
+
+<p>The <em class="emphasis">named.conf</em><a name="INDEX-1627" />
+<a name="INDEX-1628" />
+<a name="INDEX-1629" />
+file points <tt class="literal">named</tt> to sources of DNS information.
+Some of these sources are local files; others are remote servers. You
+need to create only the files referenced in the master and cache
+statements. We'll look at an example of each type of file you
+may need to create.
+</p>
+
+<p>The structure of the configuration commands in
+<em class="emphasis">named.conf</em> is similar to the structure of the C
+programming language. A statement ends with a semicolon
+(<tt class="literal">;</tt>), literals are enclosed in quotes
+(<tt class="literal">""</tt>), and related items are grouped together
+inside curly braces (<tt class="literal">{}</tt>). A comment can be
+enclosed between <tt class="literal">/*</tt> and <tt class="literal">*/</tt>,
+like a C language comment; it can begin with <tt class="literal">//</tt>,
+like a C++ comment, or with <tt class="literal">#</tt>, like a shell
+comment. These examples use C++ style comments, but, of course, you
+can use any of the three valid styles you like.
+</p>
+
+<p><a href="ch08_03.html#tcp3-CHP-8-TABLE-1">Table 8-1</a> summarizes the basic
+<em class="emphasis">named.conf</em> configuration
+<a name="INDEX-1630" />statements. It provides just enough
+information to help you understand the examples. Not all of the
+<em class="emphasis">named.conf</em> configuration commands are used in
+the examples, and you probably won't use all of the commands in
+your configuration. The commands are designed to cover the full
+spectrum of configurations, even the configurations of root servers.
+If you want more details about the <em class="emphasis">named.conf</em>
+configuration statements, <a href="appc_01.html">Appendix C, "A named Reference"</a> contains a
+full explanation of each command.
+</p>
+
+<a name="tcp3-CHP-8-TABLE-1" /><h4 class="objtitle">Table 8-1. named.conf configuration commands </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Command</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>acl</p>
+</td>
+<td>
+<p>Defines an access control list of IP addresses </p>
+</td>
+</tr>
+<tr>
+<td>
+<p>include</p>
+</td>
+<td>
+<p>Includes another file into the configuration file</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>key</p>
+</td>
+<td>
+<p>Defines security keys for authentication</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>logging</p>
+</td>
+<td>
+<p>Defines what will be logged and where it will be stored </p>
+</td>
+</tr>
+<tr>
+<td>
+<p>options</p>
+</td>
+<td>
+<p>Defines global configuration options and defaults </p>
+</td>
+</tr>
+<tr>
+<td>
+<p>server</p>
+</td>
+<td>
+<p>Defines a remote server's characteristics</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>zone</p>
+</td>
+<td>
+<p>Defines a zone</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>The way you configure the <em class="emphasis">named.conf</em> file
+controls whether the name server acts as a zone's master
+server, a zone's slave server, or a caching-only server. The
+best way to understand these different configurations is to look at
+sample <em class="emphasis">named.conf</em> files. The next sections show
+examples of each type of configuration.
+</p>
+
+<a name="tcp3-CHP-8-SECT-3.1.1" /><div class="sect3">
+<h3 class="sect3">8.3.1.1. A caching-only server configuration </h3>
+
+<p>A <a name="INDEX-1631" />
+<a name="INDEX-1632" />
+<a name="INDEX-1633" /> <a name="INDEX-1634" /> <a name="INDEX-1635" />caching-only server configuration
+is simple. A <em class="emphasis">named.conf</em> file and a
+<em class="emphasis">named.ca</em> file are all that you need, though the
+<em class="emphasis">named.local</em> file is usually also used.
+<a name="INDEX-1636" />
+<a name="INDEX-1637" /> <a name="INDEX-1638" />A possible
+<em class="emphasis">named.conf</em> file for a caching-only server is:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">cat /etc/named.conf</b>
+options {
+        directory "/var/named";
+};
+
+//
+// a caching only name server config
+//
+zone "." {
+        type hint;
+        file "named.ca";
+};
+
+zone "0.0.127.in-addr.arpa" {   
+        type master;
+        file "named.local";
+};</pre></blockquote>
+
+<p>The <tt class="literal">options</tt> statement defines the default
+directory for <tt class="literal">named</tt>. In the sample file, this is
+<em class="emphasis">/var/named</em>. All subsequent file references in
+the <em class="emphasis">named.conf</em> file are relative to this
+directory.
+</p>
+
+<p>The two <tt class="literal">zone</tt><a name="INDEX-1639" />
+statements in this caching-only configuration are found in all server
+configurations. The first <tt class="literal">zone</tt> statement defines
+the hints file that is used to help the name server locate the root
+servers during startup. The second <tt class="literal">zone</tt> statement
+makes the server the master for its own loopback address, and says
+that the information for the loopback domain is stored in the file
+<em class="emphasis">named.local</em>. The loopback domain is an
+<em class="emphasis">in-addr.arpa</em> domain<a href="#FOOTNOTE-86">[86]</a> that
+maps the address 127.0.0.1 to the name
+<em class="emphasis">localhost</em>. The idea of resolving your own
+<a name="INDEX-1640" />loopback address makes sense to most
+people, and <em class="emphasis">named.conf</em> files should contain this
+entry. The hints file and the local host file, along with the
+<em class="emphasis">named.conf</em> file, are used for every server
+configuration.<a href="#FOOTNOTE-87">[87]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-86" /><p>[86]See <a href="ch04_01.html">Chapter 4, "Getting Started"</a> for a description of
+<em class="emphasis">in-addr.arpa</em> domains.</p> </blockquote><blockquote class="footnote"> <a name="FOOTNOTE-87" /><p>[87]BIND 8 requires the root hints file,
+but BIND 9 has hints compiled in that are used if no root hints file
+is provided.</p> </blockquote>
+
+<p>These <tt class="literal">zone</tt> and <tt class="literal">options</tt>
+statements are the only statements used in most caching-only server
+configurations, but the <tt class="literal">options</tt> statement used can
+be more complex. A <tt class="literal">forwarders</tt> option and a
+<tt class="literal">forward</tt> <tt class="literal">only</tt> option are
+sometimes used. The
+<tt class="literal">forwarders</tt><a name="INDEX-1641" />
+option causes the caching-only server to send all of the queries that
+it cannot resolve from its own cache to specific servers. For
+example:
+</p>
+
+<blockquote><pre class="code">options {
+        directory "/var/named";
+        forwarders { 172.16.12.1; 172.16.1.2; };
+};</pre></blockquote>
+
+<p>This <tt class="literal">forwarders</tt> option forwards every query that
+cannot be answered from the local cache to 172.16.12.1 and
+172.16.1.2. The <tt class="literal">forwarders</tt> option builds a rich
+DNS cache on selected servers located on the local network. This
+reduces the number of times that queries must be sent out on the wide
+area network, which is particularly useful if you have limited
+bandwidth to the wide area network or if you are charged for usage.
+</p>
+
+<p>When network access to the outside world is severely limited, use the
+<tt class="literal">forward</tt><a name="INDEX-1642" /> <tt class="literal">only</tt>
+option to force the local server to always use the forwarder:
+</p>
+
+<blockquote><pre class="code">options {
+        directory "/var/named";
+        forwarders { 172.16.12.1; 172.16.1.2; };
+        forward only;
+};</pre></blockquote>
+
+<p>With this option in the configuration file, the local server will not
+attempt to resolve a query itself even if it cannot get an answer to
+that query from the forwarders.
+</p>
+
+<p>Adding options to the <tt class="literal">options</tt> statements does not
+change this from being a caching-only server configuration. Only the
+addition of master and slave <tt class="literal">zone</tt> commands will do
+that.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-8-SECT-3.1.2" /><div class="sect3">
+<h3 class="sect3">8.3.1.2. Master and slave server configurations </h3>
+
+<p>The <a name="INDEX-1643" />
+<a name="INDEX-1644" />
+<a name="INDEX-1645" /> <a name="INDEX-1646" /> <a name="INDEX-1647" />imaginary
+<em class="emphasis">wrotethebook.com</em> domain is the basis for our
+sample master and slave server configurations. Here is the
+<em class="emphasis">named.conf</em> file to define
+<em class="emphasis">crab</em> as the master server for the
+<em class="emphasis">wrotethebook.com</em> domain:
+</p>
+
+<blockquote><pre class="code">options {
+        directory "/var/named";
+};
+
+// a master name server configuration
+//
+zone "." {
+        type hint;
+        file "named.ca";
+};
+
+zone "0.0.127.in-addr.arpa" {   
+        type master;
+        file "named.local";
+};
+
+zone "wrotethebook.com" {   
+        type master;
+        file "wrotethebook.com.hosts";
+};
+
+zone "16.172.in-addr.arpa" {   
+        type master;
+        file "172.16.rev";
+};</pre></blockquote>
+
+<p>The <tt class="literal">directory</tt> option saves keystrokes on the
+subsequent filenames. It tells <tt class="literal">named</tt> that all
+relative filenames (i.e., filenames that don't begin with a /),
+no matter where they occur in the <tt class="literal">named</tt>
+configuration, are relative to the directory
+<em class="emphasis">/var/named</em>. This option also tells
+<tt class="literal">named</tt> where to write various files, such as the
+dump file.
+</p>
+
+<p>The first two <tt class="literal">zone</tt> statements in the sample
+configuration are the <tt class="literal">zone</tt> statements for the
+loopback address and the hints file. These statements were discussed
+earlier in reference to caching-only configurations. They always have
+the same function and are found in almost every configuration.
+</p>
+
+<p>The first new <tt class="literal">zone</tt><a name="INDEX-1648" />
+statement declares that this is the master server for the
+<em class="emphasis">wrotethebook.com</em> domain and that the data for
+that domain is loaded from the file
+<em class="emphasis">wrotethebook.com.hosts</em>.
+</p>
+
+<p>The second new <tt class="literal">zone</tt> statement points to the file
+that maps IP addresses from 172.16.0.0 to hostnames. This statement
+says that the local server is the master server for the reverse
+domain <em class="emphasis">16.172.in-addr.arpa</em> and that the data for
+that domain is loaded from the file <em class="emphasis">172.16.rev</em>.
+</p>
+
+<p>A slave server's <a name="INDEX-1649" />
+<a name="INDEX-1650" />
+<a name="INDEX-1651" /> <a name="INDEX-1652" /> <a name="INDEX-1653" />configuration differs from a
+master's only in the structure of the <tt class="literal">zone</tt>
+statements. Slave server <tt class="literal">zone</tt> statements point to
+remote servers as the source of the domain information instead of
+local disk files, and they define the zone as <tt class="literal">type</tt>
+<tt class="literal">slave</tt>. Unlike the <tt class="literal">file</tt> clause
+in a master <tt class="literal">zone</tt> statement, the
+<tt class="literal">file</tt> clause in a slave <tt class="literal">zone</tt>
+statement contains the name of a local file where information
+received from the remote server will be stored -- not a file from
+which the domain is loaded. The following
+<em class="emphasis">named.conf</em> file configures
+<em class="emphasis">ora</em> as a slave server for the
+<em class="emphasis">wrotethebook.com</em> domain:
+</p>
+
+<blockquote><pre class="code">options {
+        directory "/var/named";
+};
+
+// a slave server configuration
+//
+zone "." {
+        type hint;
+        file "named.ca";
+};
+
+zone "0.0.127.in-addr.arpa" {   
+        type master;
+        file "named.local";
+};
+
+zone "wrotethebook.com" {   
+        type slave;
+        file "wrotethebook.hosts";
+        masters { 172.16.12.1; };
+};
+
+zone "16.172.in-addr.arpa" {   
+        type slave;
+        file "172.16.rev";
+        masters { 172.16.12.1; };
+};</pre></blockquote>
+
+<p>The first <tt class="literal">zone</tt> statement with its type set to
+<tt class="literal">slave</tt> makes this a slave server for the
+<em class="emphasis">wrotethebook.com</em> domain. The statement tells
+<tt class="literal">named</tt> to download the data for the
+<em class="emphasis">wrotethebook.com</em> domain from the server at IP
+address 172.16.12.1 and to store that data in the file
+<em class="emphasis">/var/named/wrotethebook.hosts</em>. If the
+<em class="emphasis">wrotethebook.hosts</em> file does not exist,
+<tt class="literal">named</tt> creates it, gets the zone data from the
+remote server, and writes the data in the newly created file. If the
+file does exist, <tt class="literal">named</tt> checks with the remote
+server to see if the remote server's data is newer than the
+data in the file. If the data has changed, <tt class="literal">named</tt>
+downloads the updated data and overwrites the file's contents
+with the new data. If the data has not changed,
+<tt class="literal">named</tt> loads the contents of the disk file and
+doesn't bother with a zone transfer.<a href="#FOOTNOTE-88">[88]</a> Keeping a copy of the database
+on a local disk file makes it unnecessary to transfer the zone file
+every time the local host is rebooted. It's necessary to
+transfer the zone only when the data changes.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-88" /><p>[88]<a href="appc_01.html">Appendix C, "A named Reference"</a> (in <a href="appc_03.html#tcp3-APP-C-SECT-3.1.1">Section C.3.1.1, "Start of Authority record"</a>) discusses how <tt class="literal">named</tt> determines if data
+has been updated.</p> </blockquote>
+
+<p>The last <tt class="literal">zone</tt> statement in this configuration says
+that the local server is also a slave server for the reverse domain
+<em class="emphasis">16.172.in-addr.arpa</em>, and that the data for that
+domain should also be downloaded from 172.16.12.1. The reverse domain
+data is stored locally in a file named
+<em class="emphasis">172.16.rev</em>, following the same rules discussed
+previously for creating and overwriting
+<em class="emphasis">wrotethebook.hosts</em>.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-8-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">8.3.2. Standard Resource Records </h3>
+
+<p>The configuration <a name="INDEX-1654" />
+<a name="INDEX-1655" />
+<a name="INDEX-1656" />commands discussed above and listed in
+<a href="ch08_03.html#tcp3-CHP-8-TABLE-1">Table 8-1</a> are used only in the
+<em class="emphasis">named.conf</em> file. All other files used to
+configure <tt class="literal">named</tt> (the zone file, the reverse zone
+file, <em class="emphasis">named.local</em>, and
+<em class="emphasis">named.ca</em>) store DNS database information. These
+files all have the same basic format and use the same type of
+database records. They use standard resource records, called RRs.
+These are defined in <a name="INDEX-1657" />RFC 1033, the <em class="emphasis">Domain
+Administrators Operations Guide</em>, and in other RFCs. <a href="ch08_03.html#tcp3-CHP-8-TABLE-2">Table 8-2</a> summarizes all of the standard resource
+records used in this chapter. These records are covered in detail in
+<a href="appc_01.html">Appendix C, "A named Reference"</a>.
+</p>
+
+<a name="tcp3-CHP-8-TABLE-2" /><h4 class="objtitle">Table 8-2. Standard resource records </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+<p>Resource record text name</p>
+</th>
+<th>
+<p>Record type</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>Start of Authority</p>
+</td>
+<td>
+<p>SOA</p>
+</td>
+<td>
+<p>Marks the beginning of a zone's data and defines parameters
+that affect the entire zone.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Nameserver</p>
+</td>
+<td>
+<p>NS</p>
+</td>
+<td>
+<p>Identifies a domain's name server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Address</p>
+</td>
+<td>
+<p>A</p>
+</td>
+<td>
+<p>Converts a hostname to an address.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Pointer</p>
+</td>
+<td>
+<p>PTR</p>
+</td>
+<td>
+<p>Converts an address to a hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Mail Exchange</p>
+</td>
+<td>
+<p>MX</p>
+</td>
+<td>
+<p>Identifies where to deliver mail for a given domain name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Canonical Name</p>
+</td>
+<td>
+<p>CNAME</p>
+</td>
+<td>
+<p>Defines an alias hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Text</p>
+</td>
+<td>
+<p>TXT</p>
+</td>
+<td>
+<p>Stores arbitrary text strings.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>The resource record syntax is described in <a href="appc_01.html">Appendix C, "A named Reference"</a>, but a little understanding of the structure
+of these records is necessary to read the sample configuration files
+used in this chapter.
+</p>
+
+<p>The format of DNS resource records is:</p>
+
+<blockquote><pre class="code"> [<em class="replaceable">name</em>] [<em class="replaceable">ttl</em>] IN <em class="replaceable">type data</em></pre></blockquote>
+
+<dl>
+<a name="INDEX-1658" /><dt><i><em class="replaceable">name</em></i></dt>
+<dd>
+<p>The name of the domain object that the resource record references. It
+can be an individual host or an entire domain. The string entered for
+the <em class="replaceable">name</em> field is relative to the current
+domain unless it ends with a dot. If the
+<em class="replaceable">name</em> field is blank, i.e., contains only
+whitespace, the record applies to the domain object that was named
+last. For example, if the A record for <em class="emphasis">rodent</em> is
+followed by an MX record with a blank <em class="replaceable">name</em>
+field, both the A record and the MX record apply to
+<em class="emphasis">rodent</em>.
+</p>
+</dd>
+
+
+<a name="INDEX-1659" /><dt><i><em class="replaceable">ttl</em></i></dt>
+<dd>
+<p>Time-to-live defines the length of time, in seconds, that the
+information in this resource record should be kept in a remote
+system's cache. Usually this field is left blank and the
+default <em class="replaceable">ttl</em>, set for the entire zone by
+the $TTL directive, is used.<a href="#FOOTNOTE-89">[89]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-89" /><p>[89]See the description of
+the $TTL directive later in this chapter.</p> </blockquote>
+</dd>
+
+
+<a name="INDEX-1660" /><dt><b><tt class="literal">IN</tt></b></dt>
+<dd>
+<p>Identifies the record as an Internet DNS resource record. There are
+other classes of records, but they are rarely used. Curious? See
+<a href="appc_01.html">Appendix C, "A named Reference"</a> for the other, non-Internet, classes.
+</p>
+</dd>
+
+
+<a name="INDEX-1661" /><dt><i><em class="replaceable">type</em></i></dt>
+<dd>
+<p>Identifies the kind of resource record. <a href="ch08_03.html#tcp3-CHP-8-TABLE-2">Table 8-2</a>
+lists the record types under the heading <em class="emphasis">Record
+type</em>. Specify one of these values in the
+<em class="replaceable">type</em> field.
+</p>
+</dd>
+
+
+<a name="INDEX-1662" /><dt><i><em class="replaceable">data</em></i></dt>
+<dd>
+<p>The information specific to this type of resource record. For
+example, in an A record, this is the field that contains the actual
+IP address.
+</p>
+</dd>
+
+</dl>
+
+<p>Later in this chapter we look at each of the remaining configuration
+files. As you look at the files, remember that all of the standard
+resource records in these files follow the format described above.
+</p>
+
+<p>The bulk of a zone file is composed of standard resource records. In
+addition, BIND provides some zone file directives that are used to
+build a DNS database.
+</p>
+
+</div>
+<a name="tcp3-CHP-8-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">8.3.3. Zone File Directives</h3>
+
+<p>BIND provides
+<a name="INDEX-1663" />
+<a name="INDEX-1664" />
+<a name="INDEX-1665" />four
+directives that simplify the construction of a zone file or define a
+value used by the resource records in the file. The four directives
+are evenly divided into two commands that simplify the construction
+of a zone file, $INCLUDE and $GENERATE, and two that define values
+used by the resource records, $ORIGIN and $TTL.
+</p>
+
+<a name="tcp3-CHP-8-SECT-3.3.1" /><div class="sect3">
+<h3 class="sect3">8.3.3.1. The $TTL directive</h3>
+
+<p>The <a name="INDEX-1666" /> <a name="INDEX-1667" />$TTL directive defines the default
+TTL for resource records that do not specify an explicit time to
+live. The time value can be specified as a number of seconds or as a
+combination of numbers and letters. Defining one week as the default
+TTL using the numeric format is:
+</p>
+
+<blockquote><pre class="code">$TTL 604800</pre></blockquote>
+
+<p>One week is equal to 604800 seconds. Using the alphanumeric format,
+one week can be defined simply as:
+</p>
+
+<blockquote><pre class="code">$TTL 1w</pre></blockquote>
+
+<p>The possible values that can be used with the alphanumeric format are:</p>
+
+<ul><li>
+<p><tt class="literal">w</tt> for week</p>
+</li><li>
+<p><tt class="literal">d</tt> for day</p>
+</li><li>
+<p><tt class="literal">h</tt> for hour</p>
+</li><li>
+<p><tt class="literal">m</tt> for minute</p>
+</li><li>
+<p><tt class="literal">s</tt> for second</p>
+</li></ul>
+</div>
+
+<a name="tcp3-CHP-8-SECT-3.3.2" /><div class="sect3">
+<h3 class="sect3">8.3.3.2. The $ORIGIN directive</h3>
+
+<p>The <a name="INDEX-1668" /> <a name="INDEX-1669" />$ORIGIN directive sets
+the current origin, which is the domain name used to complete any
+relative domain names. A relative domain name is any name that does
+not end with a dot. By default, $ORIGIN starts out as the domain name
+defined on the <tt class="literal">zone</tt> statement. Use the $ORIGIN
+directive to change the setting.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-8-SECT-3.3.3" /><div class="sect3">
+<h3 class="sect3">8.3.3.3. The $INCLUDE directive</h3>
+
+<p>The $INCLUDE <a name="INDEX-1670" />
+<a name="INDEX-1671" />directive reads in an external file and
+includes it as part of the zone file. The external file is included
+in the zone file at the point where the $INCLUDE directive occurs.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-8-SECT-3.3.4" /><div class="sect3">
+<h3 class="sect3">8.3.3.4. The $GENERATE directive</h3>
+
+<p>The $GENERATE <a name="INDEX-1672" />
+<a name="INDEX-1673" />directive is used to create a series of
+resource records. The resource records created by the $GENERATE
+directive are almost identical, varying only by a numeric iterator.
+For example:
+</p>
+
+<blockquote><pre class="code">$ORIGIN 20.16.172.in-addr.arpa.
+$GENERATE 1-4 $ CNAME $.1to4</pre></blockquote>
+
+<p>The $GENERATE keyword <a name="INDEX-1674" />is
+followed by the range of records to be created. In the example the
+range is 1 through 4. The range is followed by the template of the
+resource records to be generated. In this case, the template is
+<tt class="literal">$</tt> <tt class="literal">CNAME</tt>
+<tt class="literal">$.1to4</tt>. A <tt class="literal">$</tt> sign in the
+template is replaced by the current iterator value. In the example,
+the value iterates from 1 to 4. This $GENERATE directive produces the
+following resource records:
+</p>
+
+<blockquote><pre class="code">1 CNAME 1.1to4
+2 CNAME 2.1to4
+3 CNAME 3.1to4
+4 CNAME 4.1to4</pre></blockquote>
+
+<p>Given that <em class="emphasis">20.16.172.in-addr.arpa.</em> is the value
+defined for the current origin, these resource records are the same
+as:
+</p>
+
+<blockquote><pre class="code">1.20.16.172.in-addr.arpa. CNAME 1.1to4.20.16.172.in-addr.arpa.
+2.20.16.172.in-addr.arpa. CNAME 2.1to4.20.16.172.in-addr.arpa.
+3.20.16.172.in-addr.arpa. CNAME 3.1to4.20.16.172.in-addr.arpa.
+4.20.16.172.in-addr.arpa. CNAME 4.1to4.20.16.172.in-addr.arpa.</pre></blockquote>
+
+<p>These odd-looking records are helpful for delegating reverse
+subdomains. Delegating domains is described later in this chapter.
+</p>
+
+<p>Except for <em class="emphasis">named.conf</em>, all of the BIND
+configuration files are composed of standard records and directives.
+All four of the remaining configuration files are database files. Two
+of these files, <em class="emphasis">named.ca</em> and
+<em class="emphasis">named.local,</em> are used on all servers, regardless
+of server type.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-8-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">8.3.4. The Cache Initialization File </h3>
+
+<p>The <tt class="literal">zone</tt><a name="INDEX-1675" /> <a name="INDEX-1676" /> <a name="INDEX-1677" /> <a name="INDEX-1678" /> <a name="INDEX-1679" /> statement in
+<em class="emphasis">named.conf</em> that has its type set to
+<tt class="literal">hints</tt> points to the cache initialization file.
+Each server that maintains a cache has such a file. It contains the
+information needed to begin building a cache of domain data when the
+name server starts. The root domain is indicated on the
+<tt class="literal">zone</tt> statement by a single dot in the domain name
+field because the cache initialization file contains the names and
+addresses of the <a name="INDEX-1680" />
+<a name="INDEX-1681" />root servers.
+</p>
+
+<p>The <em class="emphasis">named.ca</em> file is called a
+"hints" file because it contains hints that
+<tt class="literal">named</tt> uses to initialize the cache. The hints it
+contains are the names and addresses of the root servers. The hints
+file is used to help the local server locate a root server during
+startup. Once a root server is found, an authoritative list of root
+servers is downloaded from that server. The hints are not referred to
+again until the local server is forced to restart. The information in
+the <em class="emphasis">named.ca</em> file is not referred to often, but
+it is critical for booting a <tt class="literal">named</tt> server.
+</p>
+
+<p>The basic <em class="emphasis">named.ca</em> file contains
+<a name="INDEX-1682" />NS
+records that name the root servers and <a name="INDEX-1683" />A
+records that provide the addresses of the root servers. A sample
+<em class="emphasis">named.ca</em> file is shown here:
+</p>
+
+<blockquote><pre class="code">; 
+.                     3600000  IN  NS   A.ROOT-SERVERS.NET. 
+A.ROOT-SERVERS.NET.   3600000  IN  A    198.41.0.4 
+; 
+.                     3600000      NS   B.ROOT-SERVERS.NET. 
+B.ROOT-SERVERS.NET.   3600000  IN  A    128.9.0.107 
+; 
+.                     3600000      NS   C.ROOT-SERVERS.NET. 
+C.ROOT-SERVERS.NET.   3600000  IN  A    192.33.4.12 
+; 
+.                     3600000      NS   D.ROOT-SERVERS.NET. 
+D.ROOT-SERVERS.NET.   3600000  IN  A    128.8.10.90 
+; 
+.                     3600000      NS   E.ROOT-SERVERS.NET. 
+E.ROOT-SERVERS.NET.   3600000  IN  A    192.203.230.10 
+; 
+.                     3600000      NS   F.ROOT-SERVERS.NET. 
+F.ROOT-SERVERS.NET.   3600000  IN  A    192.5.5.241 
+; 
+.                     3600000      NS   G.ROOT-SERVERS.NET. 
+G.ROOT-SERVERS.NET.   3600000  IN  A    192.112.36.4 
+; 
+.                     3600000      NS   H.ROOT-SERVERS.NET. 
+H.ROOT-SERVERS.NET.   3600000  IN  A    128.63.2.53 
+; 
+.                     3600000      NS   I.ROOT-SERVERS.NET.
+I.ROOT-SERVERS.NET.   3600000  IN  A    192.36.148.17
+;
+.                    3600000       NS  J.ROOT-SERVERS.NET. 
+J.ROOT-SERVERS.NET.  3600000   IN  A   198.41.0.10
+;
+.                    3600000       NS  K.ROOT-SERVERS.NET.
+K.ROOT-SERVERS.NET.  3600000   IN  A   193.0.14.129
+;
+.                    3600000       NS  L.ROOT-SERVERS.NET.
+L.ROOT-SERVERS.NET.  3600000   IN  A   198.32.64.12
+;
+.                    3600000       NS  M.ROOT-SERVERS.NET.
+.ROOT-SERVERS.NET.  3600000   IN  A   202.12.27.33</pre></blockquote>
+
+<p>This file contains only name server and address records. Each NS
+record identifies a name server for the root (<tt class="literal">.</tt>)
+domain. The associated A record gives the address of each root
+server. The TTL value for all of these records is 3600000 -- a
+very large value that is approximately 42 days.
+</p>
+
+<p>Create the <em class="emphasis">named.ca</em> file by downloading the file
+<em class="emphasis">domain/named.root</em> from
+<em class="emphasis">ftp.rs.internic.net</em> via anonymous
+<tt class="literal">ftp</tt>. The file stored there is in the correct
+format for a Unix system. The following example shows the superuser
+downloading the <em class="emphasis">named.root</em> file directly into
+the local system's <em class="emphasis">named.ca</em> file. The file
+doesn't even need to be edited; it is ready to run.
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ftp ftp.rs.internic.net</b>
+Connected to rs.internic.net.
+220-*****Welcome to the InterNIC Registration Host  *****
+    *****Login with username "anonymous"
+    *****You may change directories to the following:
+      policy            - Registration Policies
+      templates         - Registration Templates
+      netinfo           - NIC Information Files
+      domain            - Root Domain Zone Files
+220 And more!
+Name (ftp.rs.internic.net:craig): <b class="emphasis-bold">anonymous</b>
+331 Guest login ok, send your complete e-mail address as password.
+Password: craig@wrotethebook.com
+230 Guest login ok, access restrictions apply.
+Remote system type is Unix.
+Using binary mode to transfer files. 
+ftp&gt; <b class="emphasis-bold">get /domain/named.root /var/named/named.ca</b>
+local: /var/named/named.ca remote: /domain/named.root
+200 PORT command successful.
+150 Opening BINARY mode data connection for /domain/named.root (2769 bytes).
+226 Transfer complete.
+2769 bytes received in 0.998 secs (2.7 Kbytes/sec)
+ftp&gt; <b class="emphasis-bold">quit</b>
+221 Goodbye.</pre></blockquote>
+
+<p>Download the <em class="emphasis">named.root</em> file every few months to
+keep accurate root server information in your cache. A bogus root
+server entry could cause problems with your local server. The data
+given above is correct as of publication, but could change at any
+time.
+</p>
+
+<p>If your system is not connected to the Internet, it won't be
+able to communicate with the root servers. Initializing your hints
+file with the servers listed above would be useless. In this case,
+initialize your hints with entries that point to the major name
+servers on your local network. Those servers must also be configured
+to answer queries for the "root" domain. However, this
+root domain contains only NS records pointing to the domain servers
+on your local network. For example, assume that
+<em class="emphasis">wrotethebook.com</em> is not connected to the
+Internet and that <em class="emphasis">crab</em> and
+<em class="emphasis">horseshoe</em> are going to act as root servers for
+this isolated domain. <em class="emphasis">crab</em> is declared the
+master server for the root domain in its
+<em class="emphasis">named.conf</em> file. <em class="emphasis">horseshoe</em>
+is configured as the slave server for the root domain. They load the
+root from a zone file that starts with an SOA record identifying
+<em class="emphasis">crab</em> as the server and providing an in-house
+point of contact. Following the SOA record, the file contains NS
+records and A records, stating that <em class="emphasis">crab</em> and
+<em class="emphasis">horseshoe</em> are authoritative for the root and
+delegating the <em class="emphasis">wrotethebook.com</em> and
+<em class="emphasis">16.172.in-addr.arpa</em> domains to the local name
+servers that service those domains. (How domains are delegated is
+covered later in the chapter.) Details of this type of configuration
+are provided in <em class="emphasis">DNS and BIND</em> by Liu and Albitz
+(O'Reilly &amp; <a name="INDEX-1684" /> <a name="INDEX-1685" /> <a name="INDEX-1686" /> <a name="INDEX-1687" /> <a name="INDEX-1688" />Associates).
+</p>
+
+</div>
+<a name="tcp3-CHP-8-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">8.3.5. The named.local File </h3>
+
+<p>The <em class="emphasis">named.local</em><a name="INDEX-1689" /> <a name="INDEX-1690" /> <a name="INDEX-1691" />
+<a name="INDEX-1692" /> file is used to convert the
+address 127.0.0.1 (the "loopback address") into the name
+<em class="emphasis">localhost</em>. It's the zone file for the
+reverse domain <em class="emphasis">0.0.127.IN-ADDR.ARPA</em>. Because all
+systems use 127.0.0.1 as the "loopback" address, this
+file is virtually identical on every server. Here's a sample
+<em class="emphasis">named.local</em> file:
+</p>
+
+<blockquote><pre class="code">$TTL    86400
+@       IN  SOA     crab.wrotethebook.com. alana.crab.wrotethebook.com. ( 
+                    1               ; serial  
+                    360000          ; refresh every 100 hours 
+                    3600            ; retry after 1 hour 
+                    3600000         ; expire after 1000 hours 
+                    3600            ; negative cache is 1 hour 
+                    ) 
+        IN  NS      crab.wrotethebook.com. 
+0       IN  PTR     loopback.
+1       IN  PTR     localhost.</pre></blockquote>
+
+<p>Most zone files start as this one does, with a $TTL directive. This
+directive sets the default TTL for all resource records in this zone.
+It can be overridden on any individual record by defining a specific
+TTL on that record.
+</p>
+
+<p>The SOA record and the NS record identify the zone and the name
+server for the zone. The first <a name="INDEX-1693" />PTR record maps the network 127.0.0.0 to
+the name <em class="emphasis">loopback</em>, which is an alternative to
+mapping the network name in the <em class="emphasis">/etc/networks</em>
+file. The second PTR record is the heart of this file. It maps host
+address 1 on network 127.0.0 to the name
+<em class="emphasis">localhost</em>.
+</p>
+
+<p>The SOA record's data fields and the <a name="INDEX-1694" /> <a name="INDEX-1695" />NS record that contains the
+computer's hostname vary from system to system. The sample SOA
+record identifies <em class="emphasis">crab.wrotethebook.com.</em> as the
+server originating this zone, and the email address
+<em class="emphasis">alana.crab.wrotethebook.com.</em> as the point of
+contact for any questions about the zone. (Note that in an SOA
+record, the email address is written with a dot separating the
+recipient's name from the hostname: <em class="emphasis">alana</em>
+is the user and <em class="emphasis">crab.wrotethebook.com</em> is the
+host. The domain names end in a dot, indicating that they are fully
+qualified and no default domain name should be appended.) The NS
+record also contains the computer's hostname. Change these
+three data fields and you can use this identical file on any host.
+</p>
+
+<p>The files discussed so far, <em class="emphasis">named.conf</em>,
+<em class="emphasis">named.ca</em>, and <em class="emphasis">named.local</em>,
+are the only files required to configure
+<a name="INDEX-1696" /> <a name="INDEX-1697" />caching-only
+servers and slave servers. Most of your servers will use only these
+files, and the files used will contain almost identical information
+on every server. The simplest way to create these three files is to
+copy a sample file and modify it for your system. Most systems come
+with sample files. If your system doesn't, get sample
+configuration files from a running server.
+</p>
+
+<p>The remaining <tt class="literal">named</tt> configuration files are more
+complex, but the relative number of systems that require these files
+is small. Only the master server needs all of the configuration
+files, and there should be only one master server per zone.
+</p>
+
+</div>
+<a name="tcp3-CHP-8-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">8.3.6. The Reverse Zone File </h3>
+
+<p>The reverse <a name="INDEX-1698" /> <a name="INDEX-1699" /> <a name="INDEX-1700" />zone file is very similar in
+structure to the <em class="emphasis">named.local</em> file. Both of these
+files translate IP addresses into hostnames, so both files contain
+PTR records.
+</p>
+
+<p>The <em class="emphasis">172.16.rev</em> file in our example is the
+reverse zone file for the <em class="emphasis">16.172.in-addr.arpa</em>
+domain. The domain administrator creates this file on
+<em class="emphasis">crab</em>, and every other host that needs this
+information gets it from there.
+</p>
+
+<blockquote><pre class="code">$TTL 86400
+; 
+;        Address to hostname mappings. 
+; 
+@       IN      SOA     crab.wrotethebook.com. jan.crab.wrotethebook.com. ( 
+                                2001061401   ;   Serial 
+                                21600        ;   Refresh 
+                                1800         ;   Retry 
+                                604800       ;   Expire 
+                                900 )        ;   Negative cache TTL 
+                IN      NS      crab.wrotethebook.com. 
+                IN      NS      ora.wrotethebook.com. 
+                IN      NS      bigserver.isp.com. 
+1.12            IN      PTR     crab.wrotethebook.com. 
+2.12            IN      PTR     rodent.wrotethebook.com. 
+3.12            IN      PTR     horseshoe.wrotethebook.com. 
+4.12            IN      PTR     jerboas.wrotethebook.com. 
+2.1             IN      PTR     ora.wrotethebook.com. 
+6               IN      NS      linuxuser.articles.wrotethebook.com.
+                IN      NS      horseshoe.wrotethebook.com.</pre></blockquote>
+
+<p>Like all zone files, the first resource record in the reverse zone
+file is an <a name="INDEX-1701" />SOA record. The <tt class="literal">@</tt> in
+the name field of the SOA record references the current origin.
+Because this zone file does not contain an $ORIGIN directive to
+explicitly define the origin, the current origin is the domain
+<em class="emphasis">16.172.in-addr.arpa</em> defined by the
+<tt class="literal">zone</tt> statement for this file in our sample
+<em class="emphasis">named.conf</em> file:
+</p>
+
+<blockquote><pre class="code"> zone "16.172.in-addr.arpa" {   
+        type master;
+        file "172.16.rev";
+};</pre></blockquote>
+
+<p>The <tt class="literal">@</tt> in the SOA record allows the
+<tt class="literal">zone</tt> statement to define the zone file domain.
+This same SOA record is used on every zone; it always references the
+correct domain name because it references the domain defined for that
+particular zone file in <em class="emphasis">named.conf</em>. Change the
+hostname (<em class="emphasis">crab.wrotethebook.com.</em>) and the
+manager's mail address
+(<em class="emphasis">jan.crab.wrotethebook.com.</em>), and use this SOA
+record in any of your zone files.
+</p>
+
+<p>The <a name="INDEX-1702" />NS records that follow the SOA record
+define the name servers for the domain. Generally the name servers
+are listed immediately after the SOA and have a blank name field.
+Recall that a blank name field means that the last domain name is
+still in force. This means that the NS records apply to the same
+domain as the SOA's.
+</p>
+
+<p><a name="INDEX-1703" />PTR records dominate the reverse zone
+file because they are used to translate addresses to hostnames. The
+PTR records in our example provide address-to-name conversions for
+hosts 12.1, 12.2, 12.3, 12.4, and 2.1 on network 172.16. Because they
+don't end in dots, the values in the name fields of these PTR
+records are relative to the current domain. For example, the value
+3.12 is interpreted as <em class="emphasis">3.12.16.172.in-addr.arpa.</em>
+The hostname in the data field of the PTR record is fully qualified
+to prevent it from being relative to the current domain name (and
+therefore it ends with a dot). Using the information in this PTR,
+<tt class="literal">named</tt> will translate
+<em class="emphasis">3.12.16.172.in-addr.arpa</em> into
+<em class="emphasis">horseshoe.wrotethebook.com.</em>
+</p>
+
+<p>The last two lines of this file are additional NS records. As with
+any domain, subdomains can be created in an
+<em class="emphasis">in-addr.arpa</em> domain. This is what the last two
+NS records do. These NS records point to
+<em class="emphasis">horseshoe</em> and <em class="emphasis">linuxuser</em> as
+name servers for the subdomain
+<em class="emphasis">6.16.172.in-addr.arpa</em>. Any query for information
+in the <em class="emphasis">6.16.172.in-addr.arpa</em> subdomain is
+referred to them. NS records that point to the servers for a
+subdomain must be placed in the higher-level domain before you can
+use that subdomain.
+</p>
+
+<p>Domain names and IP addresses are not the same thing and do not have
+the same structure. When an IP address is turned into an
+<em class="emphasis">in-addr.arpa</em> domain name, the four bytes of the
+address are treated as four distinct pieces of a name. In reality,
+the IP address is 32 contiguous bits, not four distinct bytes.
+Subnets divide up the IP address space and subnet masks are
+bit-oriented, which does not limit them to byte boundaries. Limiting
+subdomains to byte boundaries makes them less flexible than the
+subnets they must support. Our example
+<em class="emphasis">in-addr.arpa</em> domain delegates the subdomain at a
+full byte boundary, which treats each byte of the address as a
+distinct "name." This is the simplest reverse subdomain
+delegation, but it might not be flexible enough for your situation.
+</p>
+
+<p>The <a name="INDEX-1704" />$GENERATE example shown earlier in
+this chapter helps create more flexible reverse domain delegations.
+The $GENERATE directive created CNAME records to map a range of
+addresses in an <em class="emphasis">in-addr.arpa</em> domain to a
+different domain that has more flexible domain name rules. Real
+<em class="emphasis">in-addr.arpa</em> domain names
+<em class="emphasis">must</em> be four numeric fields, corresponding to
+the four bytes of the IP address, followed by the string
+<em class="emphasis">in-addr.arpa</em>. In the $GENERATE example, we
+mapped these names to longer names that give us more flexibility.
+Here is a larger example of the $GENERATE command:
+</p>
+
+<blockquote><pre class="code">$ORIGIN 30.168.192.in-addr.arpa.
+$GENERATE 0-63    $ CNAME $.1ST64
+$GENERATE 63-127  $ CNAME $.2ND64
+$GENERATE 128-191 $ CNAME $.3RD64
+$GENERATE 192-255 $ CNAME $.4TH64</pre></blockquote>
+
+<p>These four $GENERATE commands map the 256 numeric names in the
+<em class="emphasis">30.168.192.in-addr.arpa</em> domain into four other
+domains, each composed of 64 numeric names. When a remote server
+seeks the PTR record for
+<em class="emphasis">52.30.168.192.in-addr.arpa</em>, it is told that the
+canonical name for that host is
+<em class="emphasis">52.1st64.30.168.192.in-addr.arpa</em> and that the
+server must seek the pointer record for that host from the server for
+the <em class="emphasis">1st64.30.168.192.in-addr.arpa</em> domain. In
+effect, the $GENERATE directive lets us divide the single
+<em class="emphasis">30.168.192.in-addr.arpa</em> domain into multiple
+domains. Once it is divided, each piece can be delegated to a
+different server.
+</p>
+
+<p>Subdomain delegation can make reverse domains complex.<a href="#FOOTNOTE-90">[90]</a> In most cases,
+however, reverse zone files are simpler than the forward-mapping
+<a name="INDEX-1705" /> <a name="INDEX-1706" /> <a name="INDEX-1707" />zone file.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-90" /><p>[90]For even more complex examples, see <em class="emphasis">DNS and
+BIND</em> by Albitz and Liu.</p> </blockquote>
+
+</div>
+<a name="tcp3-CHP-8-SECT-3.7" /><div class="sect2">
+<h3 class="sect2">8.3.7. The Forward-Mapping Zone File </h3>
+
+<p>The forward-mapping <a name="INDEX-1708" /> <a name="INDEX-1709" /> <a name="INDEX-1710" />zone file contains most of the
+domain information. This file converts hostnames to IP addresses, so
+A records predominate, but it also contains MX, CNAME, and other
+records. The zone file, like the reverse zone file, is created only
+on the master server; all other servers get this information from the
+master server.
+</p>
+
+<blockquote><pre class="code">$TTL 86400
+; 
+;       Addresses and other host information. 
+; 
+@      IN      SOA     crab.wrotethebook.com. jan.crab.wrotethebook.com. ( 
+                                2001061401   ;   Serial 
+                                21600        ;   Refresh 
+                                1800         ;   Retry 
+                                604800       ;   Expire 
+                                900 )        ;   Negative cache TTL 
+;       Define the name servers and the mail servers 
+                IN      NS      crab.wrotethebook.com. 
+                IN      NS      ora.wrotethebook.com. 
+                IN      NS      bigserver.isp.com. 
+                IN      MX      10 crab.wrotethebook.com. 
+                IN      MX      20 horseshoe.wrotethebook.com. 
+; 
+;       Define localhost 
+; 
+localhost       IN      A       127.0.0.1 
+; 
+;       Define the hosts in this zone 
+; 
+crab            IN      A       172.16.12.1 
+loghost         IN      CNAME   crab.wrotethebook.com. 
+rodent          IN      A       172.16.12.2 
+                IN      MX      5 crab.wrotethebook.com. 
+mouse           IN      CNAME   rodent.wrotethebook.com. 
+horseshoe       IN      A       172.16.12.3 
+jerboas         IN      A       172.16.12.4 
+ora             IN      A       172.16.1.2 
+;       host table has BOTH host and gateway entries for 10.104.0.19 
+wtb-gw          IN      A       10.104.0.19 
+; 
+;    Glue records for servers within this domain 
+; 
+linuxmag.articles  IN      A       172.16.18.15 
+24seven.events     IN      A       172.16.6.1 
+; 
+;       Define sub-domains 
+; 
+articles           IN      NS      linuxmag.articles.wrotethebook.com. 
+                   IN      NS      horseshoe.wrotethebook.com. 
+events             IN      NS      24seven.events.wrotethebook.com.
+                   IN      NS      linuxmag.articles.wrotethebook.com.</pre></blockquote>
+
+<p>Like the reverse zone file, the zone file begins with an
+<a name="INDEX-1711" />SOA record and a few
+<a name="INDEX-1712" />NS records that define the domain and
+its servers, but the zone file contains a wider variety of resource
+records than a reverse zone file does. We'll look at each of
+these records in the order they occur in the sample file, so you can
+follow along using the sample file as your reference.
+</p>
+
+<p>The first <a name="INDEX-1713" />MX record identifies a mail server for
+the entire domain. This record says that <em class="emphasis">crab</em> is
+the mail server for <em class="emphasis">wrotethebook.com</em> with a
+preference of 10. Mail addressed to
+<em class="emphasis">user@wrotethebook.com</em> is redirected to
+<em class="emphasis">crab</em> for delivery. Of course, for
+<em class="emphasis">crab</em> to successfully deliver the mail, it must
+be properly configured as a mail server. The MX record is only part
+of the story. We look at configuring sendmail in <a href="ch10_01.html">Chapter 10, "sendmail "</a>. 
+</p>
+
+<p>The second MX record identifies <em class="emphasis">horseshoe</em> as a
+mail server for <em class="emphasis">wrotethebook.com</em> with a
+preference of 20. Preference numbers let you define alternate mail
+servers. The lower the preference number, the more desirable the
+server. Therefore, our two sample MX records say "send mail for
+the <em class="emphasis">wrotethebook.com</em> domain to
+<em class="emphasis">crab</em> first; if <em class="emphasis">crab</em> is
+unavailable, try sending the mail to
+<em class="emphasis">horseshoe</em>." Rather than relying on a
+single mail server, preference numbers allow you to create backup
+servers. If the main mail server is unreachable, the domain's
+mail is sent to one of the backups instead.
+</p>
+
+<p>These sample MX records redirect mail addressed to
+<em class="emphasis">wrotethebook.com</em>, but mail addressed to
+<em class="emphasis">user@jerboas.wrotethebook.com</em> will still be sent
+directly to <em class="emphasis">jerboas.wrotethebook.com</em> -- not
+to <em class="emphasis">crab</em> or <em class="emphasis">horseshoe</em>. This
+configuration allows simplified mail addressing in the form
+<em class="emphasis">user@wrotethebook.com</em> for those who want to take
+advantage of it, but it continues to allow direct mail delivery to
+individual hosts for those who wish to take advantage of that.
+</p>
+
+<p>The first A record in this example defines the address for
+<em class="emphasis">localhost</em>. This is the opposite of the PTR entry
+in the <em class="emphasis">named.local</em> file. It allows users within
+the <em class="emphasis">wrotethebook.com</em> domain to enter the name
+<em class="emphasis">localhost</em> and have it resolved to the address
+127.0.0.1 by the local name server.
+</p>
+
+<p>The next A record defines the IP address for
+<em class="emphasis">crab</em>, which is the master server for this
+domain. This A record is followed by a CNAME record that defines
+<em class="emphasis">loghost</em> as an alias for
+<em class="emphasis">crab</em>.
+</p>
+
+<p><em class="emphasis">rodent</em>'s A record is followed by an MX
+record and a <a name="INDEX-1714" />CNAME record. (Note that the records
+that relate to a single host are grouped together, which is the most
+common structure used in zone file.)
+<em class="emphasis">rodent</em>'s MX record directs all mail
+addressed to <em class="emphasis">user@rodent.wrotethebook.com</em> to
+<em class="emphasis">crab</em>. This MX record is required because the MX
+records at the beginning of the zone file redirect mail only if it is
+addressed to <em class="emphasis">user@wrotethebook.com</em>. If you also
+want to redirect mail addressed to <em class="emphasis">rodent</em>, you
+need a "rodent-specific" MX record.
+</p>
+
+<p>The name field of the CNAME record contains an alias for the official
+hostname. The official name, called the <a name="INDEX-1715" />
+<a name="INDEX-1716" /><em class="emphasis">canonical name</em>, is
+provided in the data field of the record. Because of these records,
+<em class="emphasis">crab</em> can be referred to by the name
+<em class="emphasis">loghost</em>, and <em class="emphasis">rodent</em> can be
+referred to as <em class="emphasis">mouse</em>. The
+<em class="emphasis">loghost</em> alias is a generic hostname used to
+direct <tt class="literal">syslogd</tt> output to
+<em class="emphasis">crab</em>.<a href="#FOOTNOTE-91">[91]</a> Hostname aliases should
+<em class="emphasis">not</em> be used in other resource records.<a href="#FOOTNOTE-92">[92]</a>
+For example, don't use an alias as the name of a mail server in
+an MX record. Use <em class="emphasis">only</em> the canonical (official)
+name that's defined in an A record.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-91" /><p>[91]See <a href="ch03_01.html">Chapter 3, "Network Services"</a> for a further discussion of generic
+hostnames.</p> </blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-92" /><p>[92]See <a href="appc_01.html">Appendix C, "A named Reference"</a> for additional information
+about using CNAME records in the zone data file.</p> </blockquote>
+
+<p>Your zone file could be much larger than the sample file we've
+discussed, but it will contain essentially the same records. If you
+know the names and addresses of the hosts in your domain, you have
+most of the information necessary to create the
+<tt class="literal">named</tt><a name="INDEX-1717" /> <a name="INDEX-1718" /> <a name="INDEX-1719" /> configuration.
+</p>
+
+</div>
+<a name="tcp3-CHP-8-SECT-3.8" /><div class="sect2">
+<h3 class="sect2">8.3.8. Controlling the named Process</h3>
+
+<p>After you construct <a name="INDEX-1720" />the
+<em class="emphasis">named.conf</em> file and the required zone files,
+start <tt class="literal">named</tt>. <tt class="literal">named</tt> is usually
+started at boot time from a startup script. On a
+<a name="INDEX-1721" />Solaris 8 system,
+<tt class="literal">named</tt> is started by the
+<em class="emphasis">/etc/init.d/inetsvc</em> script. On a
+<a name="INDEX-1722" />Red Hat Linux system, the script that
+starts <tt class="literal">named</tt> is
+<em class="emphasis">/etc/rc.d/init.d/named</em>. The Red Hat script can
+be run from the command prompt with optional arguments. For example,
+on a Red Hat system, the following <a name="INDEX-1723" />command can be used to stop the name
+server:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">/etc/rc.d/init.d/named stop</b></pre></blockquote>
+
+<p>To resume name service, use the command:</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">/etc/rc.d/init.d/named start</b></pre></blockquote>
+
+<p>Startup scripts work, but the <tt class="literal">named</tt> control
+(<tt class="literal">ndc</tt><a name="INDEX-1724" />) program is a more effective tool for
+managing the <tt class="literal">named</tt> process. It comes with BIND 8
+and provides a variety of functions designed to help you manage
+<tt class="literal">named</tt>. BIND 9 has a similar tool named
+<tt class="literal">rndc</tt>. <a href="ch08_03.html#tcp3-CHP-8-TABLE-3">Table 8-3</a> lists the
+<tt class="literal">ndc</tt> options and the purpose of each.<a href="#FOOTNOTE-93">[93]</a>
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-93" /><p>[93]At this writing, the <tt class="literal">status</tt>,
+<tt class="literal">trace</tt>, and <tt class="literal">restart</tt> commands are
+not yet implemented for <tt class="literal">rndc</tt>.</p> </blockquote>
+
+<a name="tcp3-CHP-8-TABLE-3" /><h4 class="objtitle">Table 8-3. ndc options  </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Option</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>status</p>
+</td>
+<td>
+<p>Displays the process status of named.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>dumpdb</p>
+</td>
+<td>
+<p>Dumps the cache to <em class="emphasis">named_dump.db</em>.<a href="#FOOTNOTE-94">[94]</a>
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>reload</p>
+</td>
+<td>
+<p>Reloads the name server.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>stats</p>
+</td>
+<td>
+<p>Dumps statistics to <em class="emphasis">named.stats</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>trace</p>
+</td>
+<td>
+<p>Turns on tracing to <em class="emphasis">named.run</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>notrace</p>
+</td>
+<td>
+<p>Turns off tracing and closes <em class="emphasis">named.run</em>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>querylog</p>
+</td>
+<td>
+<p>Toggles query logging, which logs each incoming query to syslogd.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>start</p>
+</td>
+<td>
+<p>Starts named.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>stop</p>
+</td>
+<td>
+<p>Stops named.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>restart</p>
+</td>
+<td>
+<p>Stops the current named process and starts a new one.</p>
+</td>
+</tr>
+
+</table><p>
+<a name="FOOTNOTE-94" /><p>[94]This file is stored in the directory defined by the directory
+option in the <em class="emphasis">named.conf</em> file.</p>
+</blockquote>
+
+<p><tt class="literal">ndc</tt> options are simple to understand and easy to
+use. The following commands would stop, then restart the
+<tt class="literal">named</tt> process:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ndc stop</b>
+# <b class="emphasis-bold">ndc start</b>
+new pid is 795</pre></blockquote>
+
+<p>This command sequence assumes that there is some length of time
+between stopping the old <tt class="literal">named</tt> process and
+starting a new one. If you really want to quickly kill and restart
+the <tt class="literal">named</tt> process, use the
+<tt class="literal">restart</tt> option:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">ndc restart</b>
+new pid is 798</pre></blockquote>
+
+<p>The first time you run <tt class="literal">named</tt>, watch for
+<a name="INDEX-1725" /> <a name="INDEX-1726" />error messages.
+<tt class="literal">named</tt> logs errors to the
+<em class="emphasis">messages</em> file.<a href="#FOOTNOTE-95">[95]</a> Once <tt class="literal">named</tt> is
+running to your satisfaction, use <tt class="literal">nslookup</tt> to
+query the name server to make sure it is providing the correct
+information.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-95" /><p>[95]This file is
+found in <em class="emphasis">/usr/adm/messages</em> on our Solaris system
+and in <em class="emphasis">/var/log/messages</em> on our Red Hat system.
+It might be located somewhere else on your system; check your
+documentation.</p> </blockquote>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.2. Configuring the Resolver </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.4. Using nslookup </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch08_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:28 GMT -->
+</html>

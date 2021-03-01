@@ -1,0 +1,278 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+<head><title>Analyzing Protocol Problems  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch13_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">13.7. Analyzing Protocol Problems </h2>
+
+<p>Problems caused
+<a name="INDEX-2962" />
+<a name="INDEX-2963" />by
+bad TCP/IP configurations are much more common than problems caused
+by bad TCP/IP protocol implementations. Most of the problems you
+encounter will succumb to analysis using the simple tools we have
+already discussed. But on occasion, you may need to analyze the
+protocol interaction between two systems. In the worst case, you may
+need to analyze the packets in the data stream bit by bit. Protocol
+analyzers help you do this.
+</p>
+
+<p><tt class="literal">snoop</tt> is the tool we'll use. It is provided
+with the Solaris operating system.<a href="#FOOTNOTE-154">[154]</a> Although we use
+<tt class="literal">snoop</tt> in all of our examples, the concepts
+introduced in this section should be applicable to the analyzer that
+you use, since most protocol analyzers function in basically the same
+way. Protocol analyzers allow you to select, or filter, the packets
+you want to examine, and to examine those packets byte by byte.
+We'll discuss both of these functions.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-154" /><p>[154]If you use Linux,
+try <tt class="literal">tcpdump</tt>. It is similar to
+<tt class="literal">snoop</tt>.</p> </blockquote>
+
+<p>Protocol analyzers watch all the packets on the network. Therefore,
+you only need one system that runs analyzer software on the affected
+part of the network. One Solaris system with <tt class="literal">snoop</tt>
+can monitor the network traffic and tell you what the other hosts are
+(or aren't) doing. This, of course, assumes a shared media
+network. If you use an Ethernet switch, only the traffic on an
+individual segment can be seen. Some switches provide a monitor port.
+For others you may need to take your monitor to the location of the
+problem.
+</p>
+
+<a name="tcp3-CHP-13-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">13.7.1. Packet Filters </h3>
+
+<p><tt class="literal">snoop</tt> reads all <a name="INDEX-2964" />
+<a name="INDEX-2965" /> <a name="INDEX-2966" />the
+packets on<a name="INDEX-2967" />
+an Ethernet. It does this by placing the Ethernet interface into
+<em class="emphasis">promiscuous mode</em>.<a href="#FOOTNOTE-155">[155]</a> Normally, an Ethernet interface only passes
+packets that are destined for the local host up to the higher layer
+protocols. In promiscuous mode, all packets are accepted and passed
+to the higher layer. This allows <tt class="literal">snoop</tt> to view all
+packets and to select packets for analysis, based on a filter you
+define. Filters can be defined to capture packets from, or to,
+specific hosts, protocols, ports, or combinations of all these. As an
+example, let's look at a very simple <tt class="literal">snoop</tt>
+filter. The following <tt class="literal">snoop</tt> command displays all
+packets sent between the hosts <em class="emphasis">crab</em> and
+<em class="emphasis">rodent</em><tt class="literal">:</tt>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-155" /><p>[155]This works
+only if the interface supports promiscuous mode; not all interfaces
+do.</p> </blockquote>
+
+<blockquote><pre class="code"><b class="emphasis-bold"># snoop host crab and host rodent</b> 
+Using device /dev/le (promiscuous mode) 
+rodent.wrotethebook.com -&gt; crab.wrotethebook.com ICMP Echo request 
+crab.wrotethebook.com -&gt; rodent.wrotethebook.com ICMP Echo reply 
+rodent.wrotethebook.com -&gt; crab.wrotethebook.com RLOGIN C port=1023 
+crab.wrotethebook.com -&gt; rodent.wrotethebook.com RLOGIN R port=1023
+<b class="emphasis-bold">^C</b></pre></blockquote>
+
+<p>The filter "host crab and host rodent" selects only those
+packets that are from <em class="emphasis">rodent</em> to
+<em class="emphasis">crab</em>, or from <em class="emphasis">crab</em> to
+<em class="emphasis">rodent</em>. The filter is constructed from a set of
+primitives, and associated hostnames, protocol names, and port
+numbers. The primitives can be modified and combined with the
+operators <tt class="literal">and</tt>, <tt class="literal">or</tt>, and
+<tt class="literal">not</tt>. The filter may be omitted; this causes
+<tt class="literal">snoop</tt> to display all packets from the network.
+</p>
+
+<p><a href="ch13_07.html#tcp3-CHP-13-TABLE-2">Table 13-2</a> shows the primitives used to build
+<tt class="literal">snoop</tt> filters. There are a few additional
+primitives and some variations that perform the same functions, but
+these are the essential primitives. See the <tt class="literal">snoop</tt>
+manpage for additional details.
+</p>
+
+<a name="tcp3-CHP-13-TABLE-2" /><h4 class="objtitle">Table 13-2. Expression primitives </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Primitive</p>
+</th>
+<th>
+<p>Matches packets</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>dst host | net | port <em class="emphasis">destination</em></p>
+</td>
+<td>
+<p>To <em class="emphasis">destination</em> host, net, or port</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>src host | net | port <em class="emphasis">source</em></p>
+</td>
+<td>
+<p>From <em class="emphasis">source</em> host, net, or port</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>host <em class="emphasis">destination</em></p>
+</td>
+<td>
+<p>To or from <em class="emphasis">destination</em> host</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>net <em class="emphasis">destination</em></p>
+</td>
+<td>
+<p>To or from <em class="emphasis">destination</em> network</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>port <em class="emphasis">destination</em></p>
+</td>
+<td>
+<p>To or from <em class="emphasis">destination</em> port</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>ether <em class="emphasis">address</em></p>
+</td>
+<td>
+<p>To or from Ethernet <em class="emphasis">address</em></p>
+</td>
+</tr>
+<tr>
+<td>
+<p><em class="emphasis">protocol</em></p>
+</td>
+<td>
+<p>Of <em class="emphasis">protocol</em> type (icmp, udp, or tcp)</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>Using these primitives with the operators <tt class="literal">and</tt> and
+<tt class="literal">or</tt>, complex filters can be constructed. However,
+filters are usually simple. Capturing the traffic between two hosts
+is probably the most common filter. You may further limit the data
+captured to a specific protocol, but often you're not sure
+which protocol will reveal the problem. Just because the user sees
+the problem in <tt class="literal">ftp</tt> or <tt class="literal">telnet</tt>
+does not mean that is where the problem actually occurs. Analysis
+must often start by capturing all packets, and can only be narrowed
+after test evidence points to <a name="INDEX-2968" />some specific problem.
+</p>
+
+<a name="tcp3-CHP-13-SECT-7.1.1" /><div class="sect3">
+<h3 class="sect3">13.7.1.1. Modifying analyzer output </h3>
+
+<p>The example <a name="INDEX-2969" /> <a name="INDEX-2970" /> <a name="INDEX-2971" />in the previous section shows that
+<tt class="literal">snoop</tt> displays a single line of summary
+information for each packet received. All lines show the source and
+destination addresses, and the protocol being used (ICMP and RLOGIN
+in the example). The lines that summarize the ICMP packets identify
+the packet types (Echo request and Echo reply in the example). The
+lines that summarize the application protocol packets display the
+source port and the first 20 characters of the packet data.
+</p>
+
+<p>This summary information is sufficient to gain insight into how
+packets flow between two hosts and into potential problems. However,
+troubleshooting protocol problems requires more detailed information
+about each packet. <tt class="literal">snoop</tt> has options that give you
+control over what information is displayed. To display the data
+contained in a packet, use the <tt class="literal">-x</tt> option. It
+causes the entire contents of the packet to be dumped in hex and
+ASCII. In most cases, you don't need to see the entire packet;
+usually, the headers are sufficient to troubleshoot a protocol
+problem. The <tt class="literal">-v</tt> option displays the headers in a
+well-formatted and very detailed manner. Because of the large number
+of lines displayed for each packet, use <tt class="literal">-v</tt> only
+when you need it.
+</p>
+
+<p>The following example shows an ICMP Echo Request packet displayed
+with the <tt class="literal">-v</tt> option. The same type of packet was
+summarized in the first line of the previous example.
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">snoop -v host crab and host minasi</b> 
+Using device /dev/le (promiscuous mode) 
+ETHER:  ----- Ether Header ----- 
+ETHER:   
+ETHER:  Packet 3 arrived at 16:56:57.90 
+ETHER:  Packet size = 98 bytes 
+ETHER:  Destination = 8:0:20:22:fd:51, Sun 
+ETHER:  Source      = 0:0:c0:9a:d0:db, Western Digital 
+ETHER:  Ethertype = 0800 (IP) 
+ETHER:   
+IP:   ----- IP Header ----- 
+IP:    
+IP:   Version = 4 
+IP:   Header length = 20 bytes 
+IP:   Type of service = 0x00 
+IP:         xxx. .... = 0 (precedence) 
+IP:         ...0 .... = normal delay 
+IP:         .... 0... = normal throughput 
+IP:         .... .0.. = normal reliability 
+IP:   Total length = 84 bytes 
+IP:   Identification = 3049 
+IP:   Flags = 0x0 
+IP:         .0.. .... = may fragment 
+IP:         ..0. .... = last fragment 
+IP:   Fragment offset = 0 bytes 
+IP:   Time to live = 64 seconds/hops 
+IP:   Protocol = 1 (ICMP) 
+IP:   Header checksum = fde0 
+IP:   Source address = 172.16.55.106, minasi.wrotethebook.com 
+IP:   Destination address = 172.16.12.1, crab.wrotethebook.com 
+IP:   No options 
+IP:    
+ICMP:  ----- ICMP Header ----- 
+ICMP:   
+ICMP:  Type = 8 (Echo request) 
+ICMP:  Code = 0 
+ICMP:  Checksum = ac54 ICMP:</pre></blockquote>
+
+<p>The detailed formatting done by <tt class="literal">snoop</tt> maps the
+bytes received from the network to the header structure. Look at the
+description of the various header fields in <a href="ch01_01.html">Chapter 1, "
+Overview of TCP/IP"</a> and <a href="appg_01.html">Appendix G, "RFC Excerpts"</a> for more
+information.
+</p>
+
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.6. Checking Name Service </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.8. Protocol Case Study </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+</html>

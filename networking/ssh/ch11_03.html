@@ -1,0 +1,588 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:14 GMT -->
+<head><title>Pine, IMAP, and SSH (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.3. Pine, IMAP, and SSH</h2>
+
+
+
+<a name="INDEX-1656" />Pine is a
+popular, Unix-based email program from the University of Washington
+(<a href="http://www.washington.edu/pine/">http://www.washington.edu/pine/</a>). In addition to handling mail stored and delivered in
+local files, Pine also supports IMAP<a href="#FOOTNOTE-136">[136]</a> for accessing remote
+mailboxes and SMTP<a href="#FOOTNOTE-137">[137]</a> for posting mail.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-136" />[136]Internet Message
+Access Protocol, RFC-2060.</p>
+
+
+</blockquote><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-137" />[137]Simple Mail Transfer Protocol,
+RFC-821.</p>
+
+
+</blockquote>
+
+
+
+In this case study, we integrate Pine and SSH to solve two common
+problems:</p>
+
+
+
+<dl>
+<dt><i><em class="emphasis">IMAP authentication</em></i></dt>
+<dd>In many cases, IMAP permits a password to be sent in the clear over
+the network. We discuss how to protect your password using SSH, but
+(surprisingly) not by port forwarding.</p></dd>
+
+
+
+<dt><i><em class="emphasis">Restricted mail relaying</em></i></dt>
+<dd>Many ISPs permit their mail and news servers to be accessed only by
+their customers. In some circumstances, this restriction may prevent
+you from legitimately relaying mail through your ISP. Once again, SSH
+comes to the rescue.</p></dd>
+
+</dl>
+
+
+
+We also discuss wrapping <tt class="command">ssh</tt> in a script to avoid
+Pine connection delays and facilitate access to multiple mailboxes.
+This discussion will delve into more detail than the previous one on
+Pine/SSH integration. [<a href="ch04_05.html#ch04-58541">Section 4.5.4, "Pine"</a>]</p>
+
+
+
+<a name="ch11-27-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.3.1. Securing IMAP Authentication </h3>
+
+
+
+<a name="INDEX-1657" />Like SSH, <a name="INDEX-1658" />IMAP is a
+client/server protocol. Your email program (e.g., Pine) is the
+client, and an IMAP server process (e.g., <tt class="command">imapd </tt>)
+runs on a remote machine, the <em class="emphasis">IMAP host</em>, to
+control access to your remote mailbox. Also like SSH, IMAP generally
+requires you to authenticate before accessing your mailbox, typically
+by password. Unfortunately, in many cases this password is sent to
+the IMAP host in the clear over the network; this represents a
+security risk (see <a href="ch11_03.html#ch11-70838">Figure 11-8</a>).<a href="#FOOTNOTE-138">[138]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-138" />[138]IMAP does support more secure methods of authentication, but
+they aren't widely deployed.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch11-70838" /><div class="figure"><img height="116" alt="Figure 11-8" src="figs/ssh_1108.gif" width="378" /></div><h4 class="objtitle">Figure 11-8. A normal IMAP connection</h4>
+
+If you have an account on the IMAP host, and if it is running an SSH
+server, you can protect your password. Because IMAP is a TCP/IP-based
+protocol, one approach is to use SSH <a name="INDEX-1659" />port forwarding between the machine
+running Pine and the IMAP host (see <a href="ch11_03.html#ch11-97657">Figure 11-9</a>).
+[<a href="ch09_02.html#ch09-96388">Section 9.2.1, "Local Forwarding"</a>]</p>
+
+
+
+<a name="ch11-97657" /><div class="figure"><img height="207" alt="Figure 11-9" src="figs/ssh_1109.gif" width="378" /></div><h4 class="objtitle">Figure 11-9. Forwarding an IMAP connection</h4>
+
+However, this technique has two drawbacks:</p>
+
+
+
+<dl>
+<dt><i>Security risk</i></dt>
+<dd>On a multiuser machine, any other user can connect to your forwarded
+port. [<a href="ch09_02.html#ch09-31004">Section 9.2.4.3, "Listening on ("binding") an interface"</a>] If you use forwarding only to
+protect your password, this isn't a big deal, since at worst,
+an interloper could access a separate connection to the IMAP server
+having nothing to do with your connection. On the other hand, if port
+forwarding is permitting you to access an IMAP server behind a
+firewall, an interloper can breach the firewall by hijacking your
+forwarded port, a more serious security risk.</p></dd>
+
+
+
+<dt><i>Inconvenience</i></dt>
+<dd>In this setup, you must authenticate twice: first to the SSH server
+on the IMAP host (to connect and to create the tunnel) and then to
+the IMAP server by password (to access your mailbox). This is
+redundant and annoying.</p></dd>
+
+</dl>
+
+
+
+Fortunately, we can address both these drawbacks and run Pine over
+SSH securely and conveniently.</p>
+
+
+
+<a name="ch11-28-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.3.1.1. Pine and preauthenticated IMAP</h3>
+
+
+
+The IMAP protocol defines two modes in which an IMAP server can
+start: normal and
+<a name="INDEX-1660" />preauthenticated (see <a href="ch11_03.html#ch11-21854">Figure 11-10</a>). Normally, the server runs with special
+privileges to access any user's mailbox, and hence it requires
+authentication from the client. Unix-based IMAP servers enter this
+mode when started as root.</p>
+
+
+
+<a name="ch11-21854" /><div class="figure"><img height="209" alt="Figure 11-10" src="figs/ssh_1110.gif" width="409" /></div><h4 class="objtitle">Figure 11-10. Pine/IMAP over SSH, preauthenticated</h4>
+
+Here's a sample session that invokes an IMAP server,
+<tt class="command">imapd</tt>, through
+<tt class="command">inetd</tt><a name="INDEX-1661" />
+so it runs as root:</p>
+
+
+
+<blockquote><pre class="code">server% telnet localhost imap
+* OK localhost IMAP4rev1 v12.261 server ready
+0 login res <em class="replaceable">password'</em>
+1 select inbox
+* 3 EXISTS
+* 0 RECENT
+* OK [UIDVALIDITY 964209649] UID validity status
+* OK [UIDNEXT 4] Predicted next UID
+* FLAGS (\Answered \Flagged \Deleted \Draft \Seen)
+* OK [PERMANENTFLAGS (\* \Answered \Flagged \Deleted \Draft \Seen)] Permanent flags
+1 OK [READ-WRITE] SELECT completed
+2 logout
+* BYE imap.example.com IMAP4rev1 server terminating connection
+2 OK LOGOUT completed</pre></blockquote>
+
+
+
+Alternatively, in preauthenticated mode, the IMAP server assumes that
+authentication has already been done by the program that started the
+server and that it already has the necessary rights to access the
+user's mailbox. If you invoke <tt class="command">imapd</tt> on the
+command line under a nonroot uid, <tt class="command">imapd</tt> assumes
+you have already authenticated and opens your email inbox. You can
+then type IMAP commands and access your mailbox without
+authentication:</p>
+
+
+
+<blockquote><pre class="code">server% /usr/local/sbin/imapd
+* PREAUTH imap.example.com IMAP4rev1 v12.261 server ready
+0 select inbox
+* 3 EXISTS
+* 0 RECENT
+* OK [UIDVALIDITY 964209649] UID validity status
+* OK [UIDNEXT 4] Predicted next UID
+* FLAGS (\Answered \Flagged \Deleted \Draft \Seen)
+* OK [PERMANENTFLAGS (\* \Answered \Flagged \Deleted \Draft \Seen)] Permanent flags
+0 OK [READ-WRITE] SELECT completed
+1 logout
+* BYE imap.example.com IMAP4rev1 server terminating connection
+1 OK LOGOUT completed</pre></blockquote>
+
+
+
+Notice the <tt class="literal">PREAUTH</tt> response at the beginning of
+the session, indicating pre-authenticated mode. It is followed by the
+command <tt class="literal">select</tt> <tt class="literal">inbox</tt>, which
+causes the IMAP server implicitly to open the inbox of the current
+user without demanding authentication.</p>
+
+
+
+Now, how does all this relate to Pine? When instructed to access an
+IMAP mailbox, Pine first attempts to log into the IMAP host using
+<tt class="command">rsh</tt> and to run a preauthenticated instance of
+<tt class="command">imapd</tt> directly. If this succeeds, Pine then
+converses with the IMAP server over the pipe to
+<tt class="command">rsh</tt> and has automatic access to the user's
+remote inbox without further authentication. This is a good idea and
+very convenient; the only problem is that <tt class="command">rsh</tt> is
+very insecure. However, you can make Pine use SSH instead.</p>
+</div>
+
+
+
+
+
+<a name="ch11-29-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.3.1.2. Making Pine use SSH instead of rsh</h3>
+
+
+
+<a name="INDEX-1662" />Pine's
+<em class="emphasis">rsh</em><a name="INDEX-1663" /> feature is
+controlled by three configuration variables in the
+<em class="filename">~/.pinerc</em><a name="INDEX-1664" /> file:
+<tt class="literal">rsh-path</tt><a name="INDEX-1665" />,
+<tt class="literal">rsh-command</tt>, and
+<tt class="literal">rsh-open-timeout</tt>.
+<tt class="literal">rsh-path</tt> stores the program name for
+opening a Unix remote shell connection. Normally it is the fully
+qualified path to the <tt class="command">rsh</tt> executable (e.g.,
+<em class="filename">/usr/ucb/rsh</em>). To make Pine use SSH, instruct it
+to use the <tt class="command">ssh</tt> client rather than
+<tt class="command">rsh</tt>, setting
+<tt class="literal">rsh-path</tt> to the location of the SSH
+client:</p>
+
+
+
+<blockquote><pre class="code">rsh-path=/usr/local/bin/ssh</pre></blockquote>
+
+
+
+<tt class="literal">rsh-command</tt><a name="INDEX-1666" /> <a name="INDEX-1667" /> represents the Unix command
+line for opening the remote shell connection: in this case, the IMAP
+connection to the IMAP host. The value is a
+<tt class="function">printf</tt>-style format string with four
+"%s" conversion specifications that are automatically
+filled in at runtime. From first to last, these four specifications
+stand for:</p>
+
+
+
+<ol><li>The value of <tt class="literal">rsh-path</tt></p></li><li>The remote hostname</p></li><li>The username for accessing your remote mailbox</p></li><li><p>The connection method; in this case, "imap"</p></li></ol>
+For example, the default value of
+<tt class="literal">rsh-command</tt>is:</p>
+
+
+
+<blockquote><pre class="code">"%s %s -l %s exec /etc/r%sd"</pre></blockquote>
+
+
+
+which can instantiate to:</p>
+
+
+
+<blockquote><pre class="code">/usr/ucb/rsh imap.example.com -l smith exec /etc/rimapd</pre></blockquote>
+
+
+
+To make this work properly with <tt class="command">ssh</tt>, modify the
+default format string slightly, adding the <span class="option">-q</span> option
+for quiet mode:</p>
+
+
+
+<blockquote><pre class="code">rsh-command="%s %s -q -l %s exec /etc/r%sd"</pre></blockquote>
+
+
+
+This instantiates to:</p>
+
+
+
+<blockquote><pre class="code">/usr/local/bin/ssh imap.example.com -w -l smith exec /etc/rimapd</pre></blockquote>
+
+
+
+The <span class="option">-q</span> option is necessary so that
+<tt class="command">ssh</tt> doesn't emit diagnostic messages that
+may confuse Pine, such as:</p>
+
+
+
+<blockquote><pre class="code">Warning: Kerberos authentication disabled in SUID client.
+fwd connect from localhost to local port sshdfwd-2001</pre></blockquote>
+
+
+
+Pine otherwise tries to interpret these as part of the IMAP protocol.
+The default IMAP server location of /<em class="emphasis">etc/r %sd</em>
+becomes
+<em class="emphasis">/etc/rimapd.</em></p>
+
+
+
+The third variable, <tt class="literal">rsh-open-timeout</tt>, sets the number of seconds for Pine to open the remote shell
+connection. Leave this setting at its default value, 15, but any
+integer greater than or equal to 5 is permissible.</p>
+
+
+
+So finally, the Pine configuration is:</p>
+
+
+
+<blockquote><pre class="code">rsh-path=/usr/local/bin/ssh
+rsh-command="%s %s -q -l %s exec /etc/r%sd"
+rsh-open-timeout=</pre></blockquote>
+
+
+
+<a name="ch11-30-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Remote Usernames in Pine</h4>
+
+
+
+<a name="INDEX-1668" />By the way, it's not mentioned
+in the Pine manpage or configuration file comments, but if you need
+to specify a different username for connecting to a remote mailbox,
+the syntax is:</p>
+
+
+
+<blockquote><pre class="code">{hostname/user=jane}mailbox</pre></blockquote>
+
+
+
+This causes Pine to call the
+<tt class="literal">rsh-command</tt> with "jane"
+as the remote username (i.e., the third %s substitution).</p>
+
+
+</td></tr></table><p></blockquote>
+
+Generally, you want to use an SSH authentication method that
+doesn't require typing a password or passphrase, such as
+trusted-host or public-key with an agent. SSH is run behind the
+scenes by Pine and doesn't have access to the terminal to
+prompt you. If you're running the X Window System,
+<tt class="command">ssh</tt> can pop up an X widget instead to get input,
+<tt class="command">ssh-askpass</tt>, but you probably don't want
+that either. Pine may make several separate IMAP connections in the
+course of reading your mail, even if it's all on the same
+server. This is just how the IMAP protocol works.</p>
+
+
+
+With the previous settings in your <em class="filename">~/.pinerc</em>
+file and the right kind of SSH authentication in place, you're
+ready to try Pine over SSH. Just start Pine and open your remote
+mailbox; if all goes well, it will open without prompting for a
+password.<a name="INDEX-1669" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-51522" /><div class="sect2">
+<h3 class="sect2">11.3.2. Mail Relaying and News Access</h3>
+
+
+
+<a name="INDEX-1670" />Pine uses IMAP <a name="INDEX-1671" />to read mail but not to send it.
+For that, it can either call a local program (such as
+<tt class="command">sendmail </tt>) or use an SMTP server. Pine can also be
+a newsreader and use NNTP (the Network News Transfer Protocol,
+RFC-977) to contact a news server.</p>
+
+
+
+An ISP commonly provides NNTP and SMTP servers for its customers when
+connected to the ISP's network. However, for security and usage
+control reasons, the ISP generally restricts this access to
+connections originating within its own network (including its own
+dial-up connections). In other words, if you're connected to
+the Internet from elsewhere and try to use your ISP's services,
+the attempt will probably fail. Access to your usual servers can be
+blocked by a firewall, or if not, your outgoing mail can bounce with
+a message about "no relaying," and the news server
+rejects you with a message about "unauthorized use."</p>
+
+
+
+You are authorized to use the services, of course, so what do you do?
+Use SSH port forwarding! By forwarding your SMTP and NNTP connections
+over an SSH session to a machine inside the ISP's network, your
+connections appear to come from that machine, thus bypassing the
+address-based restrictions. You can use separate SSH commands to
+forward each port:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -L2025:localhost:25 smtp-server ...
+$ ssh -L2119:localhost:119 nntp-server ...</pre></blockquote>
+
+
+
+Alternatively, if you have a shell account on one of the ISP's
+machines running SSH but can't log into the mail or news
+servers directly, do this:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -L2025:smtp-server:25 -L2119:nntp-server:119 shell-server ...</pre></blockquote>
+
+
+
+This is an off-host forwarding, and thus the last leg of the
+forwarded path isn't protected by SSH. <a href="ch09_02.html#ch09-10068">Section 9.2.4, "Forwarding Off-Host"</a> But since the reason for this forwarding
+isn't so much protection as it is bypassing the source-address
+restriction, that's OK. Your mail messages and news postings
+are going to be transferred insecurely once you drop them off,
+anyway. (If you want security for them, you need to sign or encrypt
+them separately, e.g., with PGP or S/MIME.)</p>
+
+
+
+In any case, now configure Pine to use the forwarded ports by setting
+the <tt class="literal">smtp-server</tt> and <tt class="literal">nntp-server</tt> configuration options in
+your <em class="filename">~/.pinerc</em> file:</p>
+
+
+
+<blockquote><pre class="code">smtp-server=localhost:2025
+nntp-server=localhost:2119</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.3.3. Using a Connection Script</h3>
+
+
+
+The Pine configuration option <tt class="literal">rsh-path</tt> can point not only to
+<tt class="command">rsh</tt> or <tt class="command">ssh</tt>, but also to any
+other program: most usefully, a script you've written providing
+any needed customizations. There are a couple of reasons why you
+might need to do this:</p>
+
+
+
+<ul><li>The <tt class="literal">rsh-path</tt> setting
+is global, applying to every remote mailbox. That is, Pine tries to use this
+style of access either for every remote mailbox or for none. If you
+have multiple remote mailboxes but only some of them are accessible
+via SSH/<tt class="command">imapd</tt>, this leads to annoyance. Pine falls
+back to a direct TCP connection if SSH fails to get an IMAP
+connection, but you have to wait for it to fail. If the server in
+question is behind a firewall silently blocking the SSH port, this
+can be a lengthy delay.</p></li>
+
+<li>The "multiple forwarding" problem. You might think to add
+forwarding options to Pine's
+<tt class="literal">rsh-path</tt> command, rather than run a
+separate SSH session to get them:</p>
+<blockquote><pre class="code">rsh-command="%s %s -q -l %s -L2025:localhost:25 exec /etc/r%sd"</pre></blockquote>
+This solution can get tricky if you're accessing multiple
+mailboxes, not only because the command is run for every mailbox, but
+also because it may run multiple times
+<a name="INDEX-1672" />concurrently. Once the forwarded
+ports are already established, subsequent invocations will fail. More
+specifically, SSH1 and OpenSSH will fail altogether; SSH2 issues a
+warning but continues.</p></li></ul>
+A custom connection script can solve these and other problems. The
+following Perl script examines the target server and returns failure
+immediately if it isn't among a small set of known names. This
+means that Pine moves quickly past the
+<tt class="literal">rsh-path</tt> command for other servers
+and attempts a direct IMAP connection. The script also discovers
+whether SMTP and NNTP forwardings are in place, and includes those in
+the SSH command only if they aren't. To use this script or
+another like it, point Pine's
+<tt class="literal">rsh-path</tt> option to your script, and
+set <tt class="literal">rsh-command</tt> to be compatible
+with your script:</p>
+
+
+
+<blockquote><pre class="code">rsh-path=/path/to/script
+rsh-command=%s %s %s %s</pre></blockquote>
+
+
+
+Here is a sample implementation of the script, using Perl:</p>
+
+
+
+<blockquote><pre class="code">#!/usr/bin/perl
+
+# TCP/IP module
+use IO::Socket;
+
+# get the arguments passed by Pine
+($server,$remoteuser,$method) = @ARGV;
+
+die "usage: $0 &lt;server&gt; &lt;remote user&gt; &lt;method&gt;"
+    unless scalar @ARGV == 3;
+
+if ($server eq "mail.isp.com") {
+    # on this machine, I had to compile my own imapd
+    $command = 'cd ~/bin; exec imapd';
+} else if ($server eq "clueful.isp.com") {
+    # on this box, the POP and IMAP servers are in the expected place
+    $command = 'exec /etc/r${method}d';
+} else {
+    # signal Pine to move on
+    exit 1;
+}
+
+$smtp = 25;  # well-known port for SMTP 
+$nntp = 119; # and NNTP 
+$smtp_proxy = 2025; # local port for forwarding SMTP connection
+$nntp_proxy = 2119; # local port for forwarding NNTP connection
+$ssh = '/usr/local/bin/ssh1'; # which SSH do I want to run?
+
+# Try to connect to the forwarded SMTP port; only do forwarding if the
+# attempt fails.  Also, do forwarding only if we're not in the domain
+# "home.net".  The idea is that that's your home network, where you have
+# direct access to your ISP's mail and news servers.
+
+$do_forwards = !defined($socket = IO::Socket::INET-&gt;new("localhost:$smtp_proxy"))
+    &amp;&amp; `domainname` !~ /HOME.NET/i;
+
+# be tidy
+close $socket if $socket;
+
+# Set the forwarding options if we're doing forwarding.  This assumes that
+# the mail and news servers are called "mail" and "news", respectively, in
+# your ISP's domain; a common and useful convention.
+
+@forward = ('-L',"$smtp_proxy:mail:$smtp",'-L',"$nntp_proxy:news:$nntp");
+    if ($do_forwards);
+
+# prepare the arguments to ssh
+@ssh_argv = ('-a','-x','-q',@forward,"$remoteuser\@$server");
+
+# run ssh
+exec $ssh, @ssh_argv, $command;<a name="INDEX-1673" /></pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. FTP Forwarding</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.4. Kerberos and SSH</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:14 GMT -->
+</html>

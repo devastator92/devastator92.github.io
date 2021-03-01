@@ -1,0 +1,419 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+<head><title>Transport Layer Security (TLS) and Secure Socket Layer (SSL) (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.7. Transport Layer Security (TLS) and Secure Socket Layer (SSL)</h2>
+
+
+
+
+
+<a name="INDEX-1333" />
+<a name="INDEX-1334" /><a name="INDEX-1335" />The Secure Socket Layer (SSL) was
+designed in 1993 by Netscape to provide end-to-end encryption,
+integrity protection, and server authentication for the Web. The
+security services libraries that were available at the time
+didn't provide certain features that were needed for the Web:</p><p>
+
+
+
+
+
+<ul><li>Strong public key authentication without the need for a globally
+deployed public key infrastructure.</p><p></li><li>Reasonable performance with the large number of short connections
+made necessary by the stateless nature of HTTP. State associated with
+SSL can be maintained, at the server's discretion, across a
+sequence of HTTP connections.</p><p></li><li>The ability for clients to remain anonymous while requiring server
+authentication.</p><p></li></ul>
+Like most network protocols, SSL has undergone a number of revisions.
+The commonly found versions of SSL are version 2 and version 3. There
+are known problems with the cryptography in version 2. The
+cryptography used in SSL version 3 contains some significant
+differences from its predecessor and is considered to be free of the
+previous version's cryptographic weaknesses. SSL version 3 also
+provides a clean way to use new versions of the protocol for forward
+compatibility. Unless otherwise noted, this discussion refers to SSL
+version 3; we suggest that you avoid using SSL version 2.</p><p>
+
+
+
+
+
+The SSL protocol is owned by Netscape (and they own a U.S. patent
+relating to SSL), but they approached the IETF to create an Internet
+standard. An IETF protocol definition, RFC 2246, is in the process of
+becoming an Internet standard. The protocol is based very heavily on
+SSL version 3 and is called Transport <a name="INDEX-1336" />Layer Security (TLS). Both TLS and SSL
+use exactly the same protocol greeting and version extensibility
+mechanism. This allows servers to be migrated from supporting SSL to
+TLS, and provisions have been made so that services can be created
+that support both SSL version 3 and TLS. Netscape has granted a
+royalty-free license for the SSL patent for any applications that use
+TLS as part of an IETF standard protocol.</p><p>
+
+
+
+
+
+<a name="ch14-28-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.1. The TLS and SSL Protocols</h3>
+
+
+
+
+
+The TLS and SSL protocols provide server and client authentication,
+end-to-end encryption, and integrity protection. They also allow a
+client to reconnect to a server it has already used without having to
+reauthenticate or negotiate new session keys, as long as the new
+connection is made shortly after the old one is closed down.</p><p>
+
+
+
+
+
+The security of TLS and SSL does not come purely from the fact that
+they use a specific encryption algorithm, cryptographic hash, or
+public key cryptography, but from the way the algorithms are used.
+The important characteristics of a secure private communication
+session are discussed in <a href="appc_01.html">Appendix C, "Cryptography"</a>.</p><p>
+
+
+
+
+
+Both TLS and SSL meet the characteristics for providing a secure
+private communication session because:</p><p>
+
+
+
+
+
+<ul><li>The client and server negotiate encryption and integrity protection
+algorithms.</p><p></li><li>The identity of the server a client is connecting to is always
+verified, and this identity check is performed before the optional
+client user authentication information is sent.</p><p></li><li>The key exchange algorithms that are used prevent man-in-the-middle
+attacks.</p><p></li><li>At the end of the key exchange is a checksum exchange that will
+detect any tampering with algorithm negotiation.</p><p></li><li>The server can check the identity of a client in a number of ways
+(these mechanisms are discussed in the next section). It is also
+possible to have anonymous clients.</p><p></li><li>All data packets exchanged include message integrity checks. An
+integrity check failure causes a connection to be closed.</p><p></li><li>It is possible, using certain sets of negotiated algorithms, to use
+temporary authentication parameters that will be discarded after a
+configurable time period to prevent recorded sessions from being
+decrypted at a later time.</p><p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-29-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.2. Cryptography in TLS and SSL</h3>
+
+
+
+
+
+<a name="INDEX-1337" />
+<a name="INDEX-1338" />TLS and SSL do not depend on a single
+algorithm for each of the following: generating keys, encrypting
+data, or performing authentication. Instead, they can use a range of
+different algorithms. Not all combinations of algorithms are valid,
+and both TLS and SSL define suites of algorithms that should be used
+together. This flexibility provides a number of advantages:</p><p>
+
+
+
+
+
+<ul><li>Different algorithms have different capabilities; supporting multiple
+ones allows an application to choose one particularly suited to the
+kind of data and transaction patterns that it uses.</p><p></li><li>There is frequently a trade-off between strength and speed;
+supporting multiple different algorithms allows applications to use
+faster but weaker methods when security is less important.</p><p></li><li>As time goes by, people find ways to break algorithms that were
+previously considered secure; supporting a range allows applications
+to stop using algorithms that are no longer considered secure.</p><p></li></ul>
+The TLS protocol defines sets of algorithms that can be used
+together. There is only one algorithm suite that an application must
+implement in order to be called a TLS compliant application. Even
+then, if a standard for the application prevents it from using this
+base algorithm suite, it may implement a different one and still be
+called TLS compliant. The required algorithm suite is a
+Diffie-Hellman key exchange authenticated with the Digital Signature
+Standard (DSS) with triple DES used in cipher block-chaining mode
+with SHA cryptographic hashes. The most important thing to know about
+this string of cryptographic terms is that at this time, this
+algorithm suite provides strong encryption and authentication
+suitable for protecting sensitive information. For more information
+about specific cryptographic algorithms and key lengths, see <a href="appc_01.html">Appendix C, "Cryptography"</a>.</p><p>
+
+
+
+
+
+Some algorithm suites use public key cryptography which, depending on
+the application, may require the use of additional network services
+(such as LDAP for verifying digital certificates) in order to perform
+server or client authentication.</p><p>
+
+
+
+
+
+TLS allows clients to be authenticated using either DSS or RSA public
+key cryptography. If clients wish to use other forms of
+authentication, such as a token card or a password, they must
+authenticate with the server anonymously, and then the application
+must negotiate to perform the additional authentication. This is the
+method which a web browser using TLS or SSL uses to perform HTTP
+basic authentication.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-30-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.3. Use of TLS and SSL by Other Protocols</h3>
+
+
+
+
+
+In order for TLS and SSL to be useful, they have to be used in
+conjunction with some higher-level protocol that actually exchanges
+data between applications. In some cases, this is done by integrating
+them into new protocols; for instance, version 2 of the Secure Shell
+(SSH) protocol uses TLS. However, in other situations it's
+useful to add TLS or SSL to an existing protocol. There are two basic
+mechanisms for doing this. One way is to use a new port number for
+the combination of the old protocol and the encrypting protocol; this
+is the way SSL and HTTP were originally integrated to create HTTPS.
+The other common way of integrating TLS or SSL into an existing
+protocol is to add a command to the protocol that starts up an
+encrypted session over the existing port; this is the approach taken
+by ESMTP when using the STARTTLS extension.</p><p>
+
+
+
+
+
+Neither of these approaches is perfect. Using a new port number is
+relatively easy to implement (you don't have to change command
+parsers) and allows a firewall to easily distinguish between
+protected and unprotected versions of the protocol (so that you can
+require the use of TLS, for instance). However, it uses up port
+numbers (and there are only 1024 in the reserved range to be
+allocated), and it requires changing firewall configurations to
+permit TLS-protected connections.</p><p>
+
+
+
+
+
+Adding a new command to start up a TLS connection makes more
+efficient use of port numbers and increases the chances that the
+upgraded protocol will work through firewalls (it may still be denied
+by an intelligent proxy that's watching the commands that are
+used). However, it's harder to implement. In particular,
+it's hard to make sure that no important data is exchanged
+before TLS is started up. Furthermore, it's critical for
+programmers to be cautious about failure conditions. A server or
+client that supports TLS needs to fail gracefully when talking to one
+that doesn't. However, if both the server and the client
+support TLS, it should not be possible for an attacker to force them
+to converse unprotected by interfering with the negotiation to use
+TLS.</p><p>
+
+
+
+
+
+In addition, once a protocol has upgraded to using TLS, it should
+restart all protocol negotiation from the beginning. Any information
+from the unprotected protocol could have been modified by an attacker
+and cannot be trusted.<a name="INDEX-1339" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.4. Packet Filtering Characteristics of TLS and SSL</h3>
+
+
+
+
+
+Neither TLS nor SSL is associated with an assigned port, although
+there are a number of ports assigned to specific higher-level
+protocols running over one or the other. We list these ports along
+with any other ports assigned to the higher-level protocols (for
+instance, we list the port assigned to IMAP over SSL in the section
+on packet filtering characteristics of IMAP in <a href="ch16_01.html">Chapter 16, "Electronic Mail and News"</a>). You will sometimes see port 443 shown as
+assigned to SSL, but in fact, it is assigned to HTTP over SSL.</p><p>
+
+
+
+
+
+TLS and SSL connections will always be straightforward TCP
+connections, but that does not prevent higher-level protocols that
+use them from also using other connections or protocols. Because of
+the end-to-end encryption, it is impossible to do intelligent packet
+filtering on TLS and SSL connections; there is no way for a packet
+filter to enforce restrictions on what higher-level protocols are
+being run, for instance.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-32-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.5. Proxying Characteristics of TLS and SSL</h3>
+
+
+
+
+
+Because TLS and SSL use straightforward TCP connections, they work
+well with generic proxies. Proxying provides very little additional
+protection with TLS and SSL, because there is no way for a proxy to
+see the content of packets to do intelligent logging, control, or
+content filtering; a proxy can only control where connections are
+made.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-33-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.6. Network Address Translation Characteristics of  TLS and SSL</h3>
+
+
+
+
+
+TLS and SSL will work well with network address translation. However,
+the end-to-end encryption will prevent the network address
+translation system from intercepting embedded addresses. Higher-level
+protocols that depend on having correct address or hostname
+information in their data will not work, and it will not be possible
+for the network address translation system to protect you from
+inadvertently releasing information about your internal network
+configuration.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-34-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.7.7. Summary of Recommendations for TLS and SSL</h3>
+
+
+
+
+
+<ul><li>TLS and SSL version 3 are good choices for adding end-to-end
+protection to applications.</p><p></li><li>Use TLS and SSL version 3 to protect against eavesdropping, session
+hijacking, and Trojan servers.</p><p></li><li>Use TLS or SSL version 3 rather than SSL version 2. TLS should be
+preferred over SSL version 3.</p><p></li><li>When evaluating programs that use TLS or SSL to add protection to
+existing protocols, verify that the transition to a protected
+connection occurs before confidential data is exchanged. Ideally any
+higher-level protocol negotiation should be completely restarted once
+protection has been established.<a name="INDEX-1340" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.6. ToolTalk</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.8. The Generic Security Services API </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+</html>

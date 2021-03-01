@@ -1,0 +1,732 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch10_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>Sending Traps (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">10.3. Sending Traps</h2>
+
+<a name="INDEX-1641" /><a name="INDEX-1642" /><a name="INDEX-1643" /><a name="INDEX-1644" /> <a name="INDEX-1645" /><a name="INDEX-1646" /><a name="INDEX-1647" />By now you should have a mechanism in
+place for receiving traps. In this section, we'll look at some
+different utilities that send traps and allow you to develop traps
+that are appropriate for your own environment. You'll notice
+that almost all trap utilities are command-line based. This allows
+you to execute the command from within a script, which is almost
+always what you want to do. For example, you can write a shell script
+that checks disk space every five minutes and sends a trap to the NMS
+if you're running low. You can also use these trap generators
+within existing programs and scripts. If you have a Perl script that
+accesses a database, you can use the Perl SNMP module to send a trap
+from within the script if a database insert fails. The possibilities
+are almost endless.
+</p>
+
+Although there are many different <i class="command">snmptrap</i>
+programs, they are all fundamentally similar. In particular, though
+their command-line syntax may vary, they all expect roughly the same
+arguments:
+</p>
+
+<dl>
+<dt><b>Port</b></dt>
+<dd>
+The UDP port to which to send the trap. The default port is 162.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>SNMP version</b></dt>
+<dd>
+The SNMP version appropriate to the trap you want to send. Many traps
+are defined only for Version 2. Note that many SNMP tools support
+only Version 1.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Hostname or IP address of NMS</b></dt>
+<dd>
+<a name="INDEX-1648" /><a name="INDEX-1649" /><a name="INDEX-1650" /><a name="INDEX-1651" />The hostname or IP address of your
+NMS -- i.e., the trap's destination. It is better to use an
+IP address than a hostname in case you are sending traps during a
+Domain Name System (DNS) outage. Remember that SNMP is most valuable
+when your network is failing; therefore, try to avoid assuming that
+you have a fully functional network when you design traps.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Community name</b></dt>
+<dd>
+The community name to be sent with the trap. Most management stations
+can be configured to ignore traps that don't have an
+appropriate community string.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Enterprise OID</b></dt>
+<dd>
+The full enterprise OID for the trap you want to send: everything in
+the trap's OID from the initial <em class="emphasis">.1</em> up to
+the enterprise number, including any subtrees within the enterprise
+but not the specific trap number. For example, if your enterprise
+number is 2789, you've further subdivided your enterprise to
+include a group of traps numbered 5000, and you want to send specific
+trap 1234, the enterprise OID would be
+<em class="emphasis">.1.3.6.1.4.1.2789.5000</em>. 
+</p>
+
+If you have some reason to send a generic trap, you can set the
+enterprise ID to anything you want -- but it's probably best
+to set the enterprise ID to your own enterprise number, if you have
+one.
+</p>
+
+Now for the most confusing case. There are a few specific traps
+defined in various public MIBs. How do you send them? Basically, you
+construct something that looks like an enterprise OID. It's
+best to look at an example. One such trap is
+<em class="emphasis">rdbmsOutOfSpace</em>, which is defined in the RDBMS
+MIB. Its complete OID is <em class="emphasis">.1.3.6.1.2.1.39.2.2</em>
+(<em class="emphasis">.iso.org.dod.internet.mgmt.mib-2.rdbmsMIB.rdbmsTraps.rdbmsOutOfSpace</em>).
+To send this trap, which is really an SNMPv2 notification, you would
+use everything up to <em class="emphasis">rdbmsTraps</em> as the
+enterprise OID, and the entire object ID as the specific trap number.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Hostname or IP address of sender</b></dt>
+<dd>
+<a name="INDEX-1652" /><a name="INDEX-1653" />The IP address of the agent that is
+sending the trap. Although this may appear to be superfluous, it can
+be important if there is a proxy server between the agent and the
+NMS. This parameter allows you to record the actual address of the
+agent within the SNMP packet; in turn, the NMS will read the
+agent's address from the trap and ignore the packet's
+sender address. If you don't specify this parameter, it will
+almost always default to the address of the machine sending the trap.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Generic trap number</b></dt>
+<dd>
+A number in the range 0-6. The true generic traps have numbers 0-5;
+if you're sending an enterprise-specific trap, set this number
+to 6. <a href="ch02_06.html#enettdg-CHP-2-TABLE-8">Table 2-8</a> lists the generic traps.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Specific trap number</b></dt>
+<dd>
+<a name="INDEX-1654" />A number indicating the specific trap
+you want to send. If you're sending a generic trap, this
+parameter is ignored -- you're probably better off setting
+it to zero. If you're sending a specific trap, the trap number
+is up to you. For example, if you send a trap with the OID
+<em class="emphasis">.1.3.6.1.4.1.2500.3003.0</em>, 3003 is the specific
+trap number.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>Timestamp</b></dt>
+<dd>
+<a name="INDEX-1655" /><a name="INDEX-1656" />The time elapsed
+between the last initialization of the network entity and the
+generation of the trap.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>OID_1, type_1, value_1</b></dt>
+<dd>
+<a name="INDEX-1657" /><a name="INDEX-1658" />
+<a name="INDEX-1659" /><a name="INDEX-1660" />Data bindings to be included in the trap.
+Each data binding consists of an OID together with a datatype,
+followed by the value you want to send. Most programs let you include
+any number of data bindings in a trap. Note that the OIDs for these
+variable bindings are often specific to the trap and therefore
+"underneath" the specific OID for the trap. But this
+isn't a requirement, and it's often useful to send
+bindings that aren't defined as part of the trap.
+</p>
+</dd>
+
+</dl>
+
+Before we start to tackle this section, let's take a moment to
+review what we learned in <a href="ch02_01.html">Chapter 2, "A Closer Look at SNMP"</a> about the
+various datatypes:
+</p>
+
+<ul><li>
+Each variable that we send has a particular datatype.</p>
+</li><li>
+Different datatypes are supported by different versions of SNMP.</p>
+</li><li>
+Some common datatypes are <tt class="literal">INTEGER</tt>,
+<tt class="literal">OctetString</tt>, <tt class="literal">Null</tt>,
+<tt class="literal">Counter</tt>, <tt class="literal">Gauge</tt>, and
+<tt class="literal">TimeTicks</tt>.
+</p>
+</li></ul>
+<a name="INDEX-1661" />Be aware that
+not all programs support all datatypes. For example, the Perl SNMP
+module supports only the <tt class="literal">OctetString</tt>,
+<tt class="literal">INTEGER</tt>, and <tt class="literal">OID</tt> types, while
+the OpenView and Net_SNMP <i class="command">snmptrap</i> commands
+support these three and many more. For each of the packages we use we
+will list, if applicable, each datatype the program supports.
+</p>
+
+In the next sections, we'll discuss <i class="command">snmptrap</i>
+programs from OpenView, Network Computing Technologies, and Net-SNMP.
+We'll also include a script that uses a Perl module to send
+traps. If you are not using these particular programs in your
+environment, don't worry. You should still be able to relate
+these examples to your in-house programs.
+</p>
+
+<a name="enettdg-CHP-10-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">10.3.1. Sending Traps with OpenView</h3>
+
+<a name="INDEX-1662" /><a name="INDEX-1663" /><a name="INDEX-1664" /><a name="INDEX-1665" /><a name="INDEX-1666" /><a name="INDEX-1667" /><a name="INDEX-1668" />OpenView
+has a command-line program for generating arbitrary traps called
+<i class="command">snmptrap</i>. <i class="command">snmptrap</i> supports the
+<tt class="literal">counter</tt>, <tt class="literal">counter32</tt>,
+<tt class="literal">counter64</tt>,<a href="#FOOTNOTE-50">[50]</a>
+<tt class="literal">gauge</tt>, <tt class="literal">gauge32</tt>,
+<tt class="literal">integer</tt>, <tt class="literal">integer32</tt>,
+<tt class="literal">ipaddress</tt>, <tt class="literal">null</tt>,
+<tt class="literal">objectidentifier</tt>, <tt class="literal">octetstring</tt>,
+<tt class="literal">octetstringascii</tt>,
+<tt class="literal">octetstringhex</tt>,
+<tt class="literal">octetstringoctal</tt>, <tt class="literal">opaque</tt>,
+<tt class="literal">opaqueascii</tt>, <tt class="literal">opaquehex</tt>,
+<tt class="literal">opaqueoctal</tt>, <tt class="literal">timeticks</tt>, and
+<tt class="literal">unsigned32</tt> datatypes. Its command-line structure
+looks like this:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-50" />[50]This type will work
+only on agents that support SNMPv2.</p> </blockquote>
+
+<blockquote><pre class="code">snmptrap -c community [-p port] node_addr enterprise_id agent-addr generic \
+specific timestamp [OID type value] ...</pre></blockquote>
+
+Here's a typical <i class="command">snmptrap</i> command. It sends
+one trap, with three ASCII-string variable bindings for values:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/bin/snmptrap -c public nms \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.2500 "" 6 3003 "" \ </b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.2500.3003.1 octetstringascii "Oracle" \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.2500.3003.2 octetstringascii "Backup Not Running" \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.2500.3003.3 octetstringascii "Call the DBA Now for Help"</b></tt></pre></blockquote>
+
+<a name="INDEX-1669" /><a name="INDEX-1670" /><a name="INDEX-1671" />It's a
+complicated command, and it's hard to imagine that you would
+ever type it on the command line. Let's break it up into
+pieces. The first line specifies the community string
+(<tt class="literal">public</tt>) and the address to which the trap should
+be sent (<tt class="literal">nms</tt>, though in practice it would be
+better to use an IP address rather than a node name). The next line
+is in many respects the most complicated. It specifies the enterprise
+ID for the trap we're going to send
+(<tt class="literal">.1.3.5.1.6.1.2789.2500</tt>, which is a subtree of the
+enterprise-specific tree we've devoted to traps); the address
+of the agent sending the trap (in this case, the null string
+<tt class="literal">""</tt>, which defaults to the agent's address;
+if you're using a proxy server, it is useful to specify the
+agent's address explicitly); the generic trap number
+(<tt class="literal">6</tt>, which is used for all enterprise-specific
+traps); the specific trap number (<tt class="literal">3003</tt>, which
+we've assigned); and a timestamp (<tt class="literal">""</tt>, which
+defaults to the current time).
+</p>
+
+<a name="INDEX-1672" />
+<a name="INDEX-1673" />The remaining three lines specify
+three variable bindings to be included with the trap. For each
+binding, we have the variable's object ID, its datatype, and
+its value. The variables we're sending are defined in our
+private (enterprise-specific) MIB, so their OIDs all begin with
+<em class="emphasis">.1.3.6.1.4.1.2789.2500</em>. All the variables are
+strings, so their datatype is <tt class="literal">octetstringascii</tt>.
+The trap PDU will be packed with these three strings, among other
+things. The program that receives the trap will decode the trap PDU
+and realize that there are three variable bindings in the trap. These
+variable bindings, like the one that reads "Call the DBA Now
+for Help," can be used to alert the operator that something bad
+has happened.
+</p>
+
+</div>
+<a name="enettdg-CHP-10-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">10.3.2. Sending Traps with Perl</h3>
+
+<a name="INDEX-1674" /><a name="INDEX-1675" /><a name="INDEX-1676" /><a name="INDEX-1677" /><a name="INDEX-1678" /><a name="INDEX-1679" /><a name="INDEX-1680" />In <a href="ch08_01.html">Chapter 8, "Polling and Setting"</a> we learned how to use the
+<i class="command">get</i> and <i class="command">set</i> pieces of the SNMP
+Perl module. In this section we'll see how to use the
+<tt class="literal">snmptrap( )</tt> routine to generate traps. Currently,
+<tt class="literal">SNMP_util</tt> supports only three types for traps:
+<tt class="literal">string</tt>, <tt class="literal">int</tt>, and
+<tt class="literal">oid</tt>. This can seem limiting, but it covers most
+needs. Here's how <i class="command">snmptrap</i> is called:
+</p>
+
+<blockquote><pre class="code"><em class="replaceable">snmptrap(communityname@host:port_number, enterpriseOID, host_name_from, \
+generic_ID, specific_ID, OID, type, value, [OID, type, value ...])</em></pre></blockquote>
+
+One call to <i class="command">snmptrap</i> can include any number of
+values; for each value, you must specify the object ID, the datatype,
+and the value you're reporting. The next script generates a
+trap with only one value:
+</p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+# Filename: /opt/local/perl_scripts/snmptrap.pl 
+
+use SNMP_util "0.54";  # This will load the BER and SNMP_Session for us
+
+snmptrap("public\@nms:162", ".1.3.6.1.4.1.2789", "sunserver1", 6, 1247, \
+         ".1.3.6.1.4.1.2789.1247.1", "int", "2448816");</pre></blockquote>
+
+The call to <tt class="literal">snmptrap( )</tt> sends a trap to port 162
+on host <tt class="literal">nms</tt>. The trap is sent from host
+<tt class="literal">sunserver1</tt>; it contains a single variable binding,
+for the object <tt class="literal">.1.3.6.1.4.1.2789.1247.1</tt>. The
+OID's type is <tt class="literal">int</tt> and its value is
+<tt class="literal">2448816</tt>.
+</p>
+
+<a name="INDEX-1681" />
+<a name="INDEX-1682" />Now let's try sending a trap
+with multiple values (multiple variable bindings). The first object
+we'll report is an integer, to which we give the arbitrary
+value <tt class="literal">4278475</tt>. The second object has a string
+value and is a warning that our database has stopped. Because
+we're using OIDs that belong to our own enterprise, we can
+define these objects to be anything we want:
+</p>
+
+<blockquote><pre class="code">snmptrap("public\@nms:162", ".1.3.6.1.4.1.2789", "sunserver2", 6, 3301, \
+         ".1.3.6.1.4.1.2789.3301.1", "int",    "4278475", \
+         ".1.3.6.1.4.1.2789.3301.2", "string", "Sybase DB Stopped");</pre></blockquote>
+
+We can use the Net-SNMP <i class="command">snmptrapd</i> program to
+monitor the traps coming in. We executed the preceding Perl code
+while running <i class="command">snmptrapd</i> in
+<em class="emphasis">stdout</em> mode, and received:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>./snmptrapd -P</b></tt>
+1999-10-12 09:45:08  [12.1.45.26] enterprises.2789.3000:
+        Enterprise Specific Trap (3301) Uptime: 0:00:00
+        enterprises.2789.3301.1 = 4278475
+        enterprises.2789.3301.2 = "Sybase DB Stopped"</pre></blockquote>
+
+<i class="command">snmptrapd</i><a name="INDEX-1683" /><a name="INDEX-1684" /> reported both of the values we sent in
+the trap: we see the integer value <tt class="literal">4278475</tt> and the
+notification that Sybase has stopped. Although this example is highly
+artificial, it's not all that different from what you would do
+when writing your own monitoring software. You would write whatever
+code is necessary to monitor vital systems such as your database and
+use the Perl SNMP module to send traps when significant events occur.
+You can then use any program capable of receiving traps to inform you
+when the traps arrive. If you want, you can add logic that analyzes
+the values sent in the trap or takes other actions, such as notifying
+an operator via a pager.
+</p>
+
+</div>
+<a name="enettdg-CHP-10-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">10.3.3. Sending Traps with Network Computing Technologies Trap Generator</h3>
+
+<a name="INDEX-1685" /><a name="INDEX-1686" /><a name="INDEX-1687" /><a name="INDEX-1688" /><a name="INDEX-1689" /><a name="INDEX-1690" />
+<a name="INDEX-1691" /><a name="INDEX-1692" />This Windows-based
+command-line utility gives us the same features as its Unix
+counterparts. It understands the <tt class="literal">String</tt>,
+<tt class="literal">Counter</tt>, <tt class="literal">Gauge</tt>,
+<tt class="literal">Integer</tt>, <tt class="literal">Address</tt>,
+<tt class="literal">OID</tt>, and <tt class="literal">TimeTicks</tt> datatypes.
+The command line for <i class="command">nttrapgen</i> looks like this:
+</p>
+
+<blockquote><pre class="code">nttrapgen.exe -d DestinationIpAddress:port -c CommunityName
+              -o senderOID -i senderIP -g GenericTrapType 
+              -s SpecificTrapType -t timestamp -v OID TYPE VALUE</pre></blockquote>
+
+Here's how to use <i class="command">nttrapgen</i> to send a trap
+notifying us that the UPS battery is running low. We use the
+<tt class="literal">String</tt> datatype to send an informative message,
+and we use trap 4025.1 from our private enterprise ID, 2789:
+</p>
+
+<blockquote><pre class="code">C:\tools&gt; <tt class="userinput"><b>nttrapgen.exe -d nms:162 -c public -o ^ </b></tt>
+<tt class="userinput"><b>1.3.6.1.4.1.2789.4025 -i 10.123.456.4 -g 6 -s 4025 -t 124501 ^</b></tt>
+<tt class="userinput"><b>-v 1.3.6.1.4.1.2789.4025.1 STRING 5 Minutes Left On UPS Battery</b></tt></pre></blockquote>
+
+This trap will be sent to our network-management station (which has
+the hostname <tt class="literal">nms</tt>) on port 162, which is the
+standard port for SNMP traps. Any management station should be able
+to receive the trap and act on it appropriately. You can use this
+command in batch scripts, which are essentially the same as Unix
+shell scripts. Therefore, you can use <i class="command">nttrapgen</i> to
+generate traps as you need them: you can write scripts that monitor
+key processes and generate traps when any interesting events take
+place. As with the earlier Perl example, you can use this simple trap
+generator in your environment if you don't need a heavy-duty
+management system.
+</p>
+
+</div>
+<a name="enettdg-CHP-10-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">10.3.4. Sending Traps with Net-SNMP</h3>
+
+<a name="INDEX-1693" /><a name="INDEX-1694" /><a name="INDEX-1695" /><a name="INDEX-1696" /><a name="INDEX-1697" /><a name="INDEX-1698" />This
+<i class="command">snmptrap</i> program looks very similar to
+OpenView's <i class="command">snmptrap</i>. This program uses a
+single letter to refer to datatypes, as shown in <a href="ch10_03.html#enettdg-CHP-10-TABLE-2">Table 10-2</a>. 
+</p>
+
+<a name="enettdg-CHP-10-TABLE-2" /><h4 class="objtitle">Table 10-2. Net-SNMP snmptrap Datatypes </h4><table border="1">
+
+
+
+<tr>
+<th>
+<a name="INDEX-1699" /><a name="INDEX-1700" /><a name="INDEX-1701" />Abbreviation
+</p>
+</th>
+<th>
+Datatype</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+a</p>
+</td>
+<td>
+IP address</p>
+</td>
+</tr>
+<tr>
+<td>
+c</p>
+</td>
+<td>
+Counter</p>
+</td>
+</tr>
+<tr>
+<td>
+d</p>
+</td>
+<td>
+Decimal string</p>
+</td>
+</tr>
+<tr>
+<td>
+i</p>
+</td>
+<td>
+Integer</p>
+</td>
+</tr>
+<tr>
+<td>
+n</p>
+</td>
+<td>
+Null</p>
+</td>
+</tr>
+<tr>
+<td>
+o</p>
+</td>
+<td>
+Object ID</p>
+</td>
+</tr>
+<tr>
+<td>
+s</p>
+</td>
+<td>
+String</p>
+</td>
+</tr>
+<tr>
+<td>
+t</p>
+</td>
+<td>
+Time ticks</p>
+</td>
+</tr>
+<tr>
+<td>
+u</p>
+</td>
+<td>
+Unsigned integer</p>
+</td>
+</tr>
+<tr>
+<td>
+x</p>
+</td>
+<td>
+Hexadecimal string</p>
+</td>
+</tr>
+
+</table><p>
+
+Here's how the Net-SNMP <i class="command">snmptrap</i> program is
+invoked:
+</p>
+
+<blockquote><pre class="code"><em class="replaceable">snmptrap hostname community enterprise-oid agent \
+generic-trap specific-trap uptime [OID type value]...</em></pre></blockquote>
+
+<a name="INDEX-1702" /><a name="INDEX-1703" />If you use two single quotes
+(<tt class="literal">''</tt>) in place of the time,
+<i class="command">snmptrap</i> inserts the current time into the trap.
+The following command generates a trap with a single value. The
+object ID is <tt class="literal">2005.1</tt>, within our private
+enterprise; the value is a string that tells us that the web server
+has been restarted:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmptrap nms public .1.3.6.1.4.1.2789.2005 ntserver1 6 2476317 '' \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.2005.1 s "WWW Server Has Been Restarted"</b></tt></pre></blockquote>
+
+<a name="INDEX-1704" />
+<a name="INDEX-1705" />Here's how to send a Version
+2 notification with Net-SNMP:<a href="#FOOTNOTE-51">[51]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-51" />[51]For information about
+sending Version 3 notifications with Net-SNMP, see <a href="appf_01.html">Appendix F, "SNMPv3"</a>.</p> </blockquote>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmptrap -v2c nms public '' .1.3.6.1.6.3.1.1.5.3 \</b></tt>
+<tt class="userinput"><b>ifIndex i 2 ifAdminStatus i 1 ifOperStatus i 1</b></tt></pre></blockquote>
+
+<a name="INDEX-1706" /><a name="INDEX-1707" /><a name="INDEX-1708" /><a name="INDEX-1709" /><a name="INDEX-1710" />The command is actually simpler than
+its Version 1 equivalent. There are no generic numbers, specific
+numbers, or vendor IDs. The <tt class="literal">""</tt> argument defaults
+to the current system uptime. The OID specifies the
+<em class="emphasis">linkDown</em> notification, with three data bindings
+specifying the link's status. The definition of
+<em class="emphasis">linkDown</em> in the IF-MIB states that the
+<em class="emphasis">linkDown</em> notification must include the
+<em class="emphasis">ifIndex</em>, <em class="emphasis">ifAdminStatus</em>, and
+<em class="emphasis">ifOperStatus</em> objects, which report the index of
+the interface that went down, its administrative status, and its
+operational status, respectively. For
+<em class="emphasis">ifAdminStatus</em> and
+<em class="emphasis">ifOperStatus</em>, a value of <tt class="literal">1</tt>
+indicates that the link is up. So this notification reports that
+interface 2 has changed its state from "down" to
+"up."
+</p>
+
+Again, the <i class="command">snmptrap</i> command-line tool lets you
+integrate SNMP monitoring into shell scripts and other programs.
+</p>
+
+</div>
+<a name="enettdg-CHP-10-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">10.3.5. Forcing Your Hardware to Generate Traps</h3>
+
+<a name="INDEX-1711" /><a name="INDEX-1712" /><a name="INDEX-1713" /><a name="INDEX-1714" /><a name="INDEX-1715" /><a name="INDEX-1716" />
+<a name="INDEX-1717" /><a name="INDEX-1718" /><a name="INDEX-1719" /><a name="INDEX-1720" /><a name="INDEX-1721" /> <a name="INDEX-1722" /><a name="INDEX-1723" />When you install a new piece of
+equipment, you should verify that it generates traps correctly.
+Testing your equipment's ability to generate traps has the
+added benefit of testing the behavior of your NMS; you can ensure
+that it handles traps in the way you want. The best way to test new
+hardware is to read your vendor's MIB and look for all the
+<tt class="literal">TRAP-TYPE</tt>s they have defined. This will give you a
+good feel for what sort of traps your vendor has implemented. For
+example, I read through our APC MIB and noticed that the unit will
+send a trap when it goes onto battery power if the AC power goes out.
+To test this feature, I secured the area in our datacenter and
+switched off the circuit breaker to simulate a power failure. The
+trap was generated, but it showed up in the Error event category
+because I did not have the correct MIB loaded in OpenView. I took the
+OID from the Error events and searched the APC MIBs for a match. When
+I found one, I loaded the MIB file into OpenView and repeated the
+test. This time, when the trap was received OpenView put an
+informative message in the Event Categories.
+</p>
+
+<a name="INDEX-1724" /> <a name="INDEX-1725" />Most SNMP-compatible routers, switches,
+and network devices can generate <em class="emphasis">linkDown</em> traps.
+From RFC 1157, a <em class="emphasis">linkDown</em> trap is a
+"failure in one of the communication links represented in the
+agent's configuration." This means that if you start
+unplugging ports on your router you should receive traps, right? Yes,
+but first make sure you don't start disconnecting production
+database servers. Furthermore, make sure you don't disconnect
+the port by which your device would send the trap back to the NMS.
+Remember, SNMP is designed with the assumption that the network is
+unreliable -- if something sends a trap but there's no way
+for the trap to reach its destination, no one will find out. By
+default, a <em class="emphasis">linkDown</em> trap won't appear in
+OpenView's Event Categories, because the default setting for
+<em class="emphasis">linkDown</em> is "Log only"; watch the
+log file <em class="filename">$OV_LOG/trapd.log</em> to see these traps
+arrive. Once you have a mechanism for receiving traps, bringing the
+link up and down on your device should send some traps your way.
+</p>
+
+</div>
+<a name="enettdg-CHP-10-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">10.3.6. Using Hooks with Your Programs</h3>
+
+<a name="INDEX-1726" /><a name="INDEX-1727" /><a name="INDEX-1728" /><a name="INDEX-1729" /><a name="INDEX-1730" /><a name="INDEX-1731" />A <em class="firstterm">hook</em> is a
+convenient interface that lets you integrate your own code into some
+other product. The <em class="emphasis">Emacs</em> text editor is a good
+example of a program that uses hooks, almost entirely, to allow its
+users to extend how it operates. Let's look at the following
+simple program to explain this concept further:
+</p>
+
+<blockquote><pre class="code"># Logical Sample Program NH1
+# PROGRAM COMMENTS
+# PROGRAM BEGINS
+
+		PROGRAM ADDS           $VAR1 + $VAR2 = $VAR3
+		PROGRAM SUBTRACTS      $VAR5 - $VAR6 = $VAR7
+		PROGRAM PRINTS RESULTS $VAR3 $VAR7
+
+# PROGRAM ENDS</pre></blockquote>
+
+This program simply <tt class="literal">ADDS</tt>,
+<tt class="literal">SUBTRACTS</tt>, and <tt class="literal">PRINTS</tt>
+<tt class="literal">RESULTS</tt>; it does not have any hooks. To add a
+feature, you have to modify the code. For a small program like this
+that is a trivial exercise, but it would be difficult in a program of
+any size. The next program contains some hooks that let you add
+extensions:
+</p>
+
+<blockquote><pre class="code"># Logical Sample Program H1
+# PROGRAM COMMENTS
+# PROGRAM BEGINS
+   PROGRAM RUNS $PATH/start.sh
+
+   PROGRAM ADDS           $VAR1 + $VAR2 = $VAR3
+   PROGRAM SUBTRACTS      $VAR5 - $VAR6 = $VAR7
+   PROGRAM PRINTS RESULTS $VAR3 $VAR7
+
+   PROGRAM RUNS $PATH/end.sh
+# PROGRAM ENDS</pre></blockquote>
+
+<a name="INDEX-1732" /><a name="INDEX-1733" />Notice
+the two additional <tt class="literal">RUNS</tt> statements. These hooks
+allow you to run anything you want at the start or end of the
+program. The first program, <em class="filename">start.sh</em>, might be
+as simple as the command <i class="command">echo "I am
+starting"</i>, which sends a simple message to the system
+or management console. This script could also call one of the
+trap-generation programs to send a trap to the NMS stating that some
+program is starting. It would be even more useful to send a message
+when the program terminates, possibly including information about the
+program's status. Here's a slightly more complicated
+program that runs a script, providing a number of arguments so that
+the script can send useful information back to the NMS when it
+generates a trap:
+</p>
+
+<blockquote><pre class="code"># Logical Sample Program H2
+# PROGRAM COMMENTS
+# PROGRAM BEGINS
+   PROGRAM RUNS $PATH/start.sh $PROGRAM_NAME
+
+   PROGRAM ADDS           $VAR1 + $VAR2 = $VAR3
+   PROGRAM SUBTRACTS      $VAR5 - $VAR6 = $VAR7
+   PROGRAM PRINTS RESULTS $VAR3 $VAR7
+
+   PROGRAM RUNS $PATH/end.sh $PROGRAM_NAME $VAR1 $VAR2 $VAR3 $VAR5 $VAR6 $VAR7
+# PROGRAM ENDS</pre></blockquote>
+
+With the additional arguments available to the hook programs, we can
+generate messages like "The Program Widget has ended with sales
+at $4 and YTD at $7." If your hook programs are shell scripts,
+you can simply add <i class="command">snmptrap</i> commands via a text
+editor. Once you finish adding the <i class="command">snmptrap</i> code,
+you can test your hook program by running it on the command line.
+</p>
+
+<a name="INDEX-1734" /><a name="INDEX-1735" /><a name="INDEX-1736" />On most systems, many scripts can
+benefit from <i class="command">snmptrap</i> hooks. On Solaris or Linux
+machines, for example, some of your <em class="filename">/etc/init.d</em>
+scripts can be retrofitted to make use of <i class="command">snmptrap</i>
+commands. It might be useful to have some kind of notification when
+important processes such as your web server or DNS server start and
+stop. Having such information on hand might make life much easier for
+your helpdesk. (The Concord SystemEDGE SNMP agent provides more
+rigorous process-monitoring capabilities. See <a href="ch11_01.html">Chapter 11, "Extensible SNMP Agents"</a> for more information on this product.)
+</p>
+
+<a name="INDEX-1737" />It's harder to add hooks to programs
+written in languages like C, because you need access to the source
+code as well as the ability to figure out where to place the hooks.
+Once you have identified where your hooks go and added them, you must
+recompile the source code. Some programs have hooks built in,
+allowing you to run external programs or RPCs. Check your
+program's documentation for the locations of these hooks. This
+is much more convenient than trying to build your own hooks into
+another program. Once you have established what these external
+programs are called, you can start writing your own traps or adding
+to existing ones.<a name="INDEX-1738" /><a name="INDEX-1739" /><a name="INDEX-1740" /><a name="INDEX-1741" /> 
+</p>
+
+
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.2. Receiving Traps</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11. Extensible SNMP Agents</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch10_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

@@ -1,0 +1,294 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:33 GMT -->
+<head><title>Network Information Service Operation (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<a name="INDEX-319" /></a><h1 class="chapter">Chapter 3. Network Information Service Operation</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-3-SECT-1">Masters, slaves, and clients</a><br />
+<a href="ch03_02.html">Basics of NIS management</a><br />
+<a href="ch03_03.html">Files managed under NIS</a><br />
+<a href="ch03_04.html">Trace of a key match</a><br /></p><p></div>
+
+
+A major problem in running a distributed computing environment is
+maintaining separate copies of common configuration files such as the
+password, group, and hosts files. Ideally, the network should be
+consistent in its configuration, so that users don't have to
+worry about where they have accounts or if they'll be able to
+find a new machine on the network. Preserving consistency, however,
+means that every change to one of these common files must be
+propagated to every host on the network. In a small network, this
+might not be a major chore, but in a computing environment with
+hundreds or thousands of systems, simple administrative tasks can
+turn into all-day projects. Furthermore, without an automated tool
+for making changes, the probability of making mistakes grows with the
+size of the network and the number of places where changes must be
+made.</p><p>
+
+
+The Network Information System (NIS) addresses
+<a name="INDEX-320" /></a> <a name="INDEX-321" /></a>these
+problems. It is a distributed database system that replaces copies of
+commonly replicated configuration files with a centralized management
+facility. Instead of having to manage each host's files (like
+<em class="emphasis">/etc/hosts</em>, <em class="emphasis">/etc/passwd</em>,
+<em class="emphasis">/etc/group</em>, <em class="emphasis">/etc/ethers</em>,
+and so on), you maintain one database for each file on one central
+server. Machines that are using NIS retrieve information as needed
+from these databases. If you add a new system to the network, you can
+modify one file on a central server and propagate this change to the
+rest of the network, rather than changing the
+<em class="emphasis">hosts</em> file for each individual host on the
+network. For a network of two or three systems, the difference may
+not be crucial; but for a large network with hundreds of systems, NIS
+is life-saving.</p><p>
+
+
+Because NIS enforces consistent views of files on the network, it is
+suited for files that have no host-specific information in them. The
+<em class="emphasis">/etc/vfstab</em> file of filesystems
+<a name="INDEX-322" /></a>and
+mount points, for example, is a terrible candidate for management by
+NIS because it's different on just about every machine. Files
+that are generally the same on all hosts in a network, such as
+<em class="emphasis">/etc/passwd</em> and <em class="emphasis">/etc/hosts</em>,
+fit the NIS model of a distributed database nicely.</p><p>
+
+
+In addition to managing configuration files, NIS can be used for any
+general data file that is accessed on one or more key fields. In a
+later chapter, we will discuss how to use NIS to manage your own
+site-specific databases.</p><p>
+
+
+This discussion of networking services starts with NIS because it
+provides the consistency that is a prerequisite for the successful
+administration of a distributed filesystem. Imagine a network in
+which you share files from a common server, but you have a different
+home directory and user ID value on every host. The advantages of the
+shared filesystem are lost in such a loosely run network: you
+can't always read or write your files due to permission
+problems, and you don't get a consistent view of your files
+between machines because you don't always end up in the same
+home directory. We'll start with a brief description of the
+different roles systems play under NIS, and then look at how to
+install NIS on each type of machine.</p><p>
+
+
+<div class="sect1"><a name="nfs2-CHP-3-SECT-1" /></a>
+<h2 class="sect1">3.1. Masters, slaves, and clients</h2>
+
+
+NIS is built on the client-server
+model.<a name="INDEX-323" /></a><a name="INDEX-324" /></a> An NIS server is a host
+that contains NIS data files, called
+<em class="emphasis">maps</em>.<a name="INDEX-325" /></a>
+Clients are hosts that
+<a name="INDEX-326" /></a> <a name="INDEX-327" /></a> <a name="INDEX-328" /></a>request information from these maps.
+Servers are further divided into master and slave servers: the master
+server is the true single owner of the map data. Slave NIS servers
+handle client requests, but they do not modify the NIS maps. The
+master server is responsible for all map maintenance and distribution
+to its slave servers. Once an NIS map is built on the master to
+include a change, the new map file is distributed to all slave
+servers. NIS clients "see" these changes when they
+perform queries on the map file  --  it doesn't matter
+whether the clients are talking to a master or a slave server,
+because once the map data is distributed, all NIS servers have the
+same information.</p><p>
+
+
+Before going any further, let's take a quick and simple look at
+how this works. <a href="ch03_01.html#nfs2-CHP-3-FIG-1">Figure 3-1</a> shows the relationship
+between masters, slaves, and clients.</p><p>
+
+
+<a name="nfs2-CHP-3-FIG-1" /></a><div class="figure"><img height="277" alt="Figure 3-1" src="figs/nfs2.0301.gif" width="441" /></div><h4 class="objtitle">Figure 3-1. NIS masters, slaves, and clients</h4>
+
+Consider the <em class="emphasis">hosts</em> NIS map,
+<a name="INDEX-329" /></a>
+<a name="INDEX-330" /></a>which replaces the
+<em class="emphasis">/etc/hosts</em> files on<a name="INDEX-331" /></a>
+individual systems. If you're familiar with Unix adminstration,
+you know that this file tells the system how to convert hostnames
+into IP (internet) addresses. When a client needs to look up the
+internet address of some system, it would normally read the
+<em class="emphasis">hosts</em> file. If NIS is running, however, the
+client bypasses its <em class="emphasis">hosts</em> file,
+and<a name="INDEX-332" /></a>
+<a name="INDEX-333" /></a> instead asks an NIS server (either
+a master or a slave server  --  it doesn't make any
+difference) for the information it needs.</p><p>
+
+
+Now the other side of the coin: you've added a system, and need
+to modify the <em class="emphasis">hosts</em> NIS map. You only modify
+<a name="INDEX-334" /></a> <a name="INDEX-335" /></a>the <em class="emphasis">hosts</em> file
+on the "master server"  --  remember, the master
+server knows the "truth" about the network.<a href="#FOOTNOTE-4">[4]</a> Once you've made your
+changes, you can rebuild the NIS database (i.e., the NIS maps) on the
+master server. The master server then distributes new versions of the
+NIS maps to the slave servers, which now provide the updated
+information to the NIS clients.</p><p><blockquote class="footnote">
+
+<a name="FOOTNOTE-4" /></a>[4]Remember: when you want to make a global change to the network,
+<a name="INDEX-336" /></a> <a name="INDEX-337" /></a>you must modify the file on the master
+server. Global changes made to slave servers or clients will, at
+best, be ignored.</p><p>
+
+</blockquote>
+
+
+With the distinction between NIS servers and clients firmly
+established, we can see that each system fits into the NIS scheme in
+one of three ways:</p><p>
+
+
+<dl>
+<dt><i>Client only</i></dt>
+<dd>This is typical of <a name="INDEX-338" /></a> <a name="INDEX-339" /></a>desktop workstations, where the system
+administrator tries to minimize the amount of host-specific tailoring
+required to bring a system onto the network. As an NIS client, the
+host gets all of its common configuration information from an extant
+server.</p><p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Server only</i></dt>
+<dd>While the host services client requests <a name="INDEX-340" /></a>
+<a name="INDEX-341" /></a>for map information, it does not use NIS
+for its own operation. Server-only configuration may be useful when a
+server must provide global host and password information for the NIS
+clients, but security concerns prohibit the server from using these
+same files. However, bypassing the central configuration scheme opens
+some of the same loopholes that NIS was intended to close. Although
+it is possible to configure a system to be an NIS server only, we
+don't recommend it and don't cover it in this book.</p><p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Client and server</i></dt>
+<dd>In most cases, an NIS server also <a name="INDEX-342" /></a>
+<a name="INDEX-343" /></a>functions
+as an NIS client so that its management is streamlined with that of
+other client-only hosts.</p><p></dd>
+
+</dl>
+
+
+It is possible to limit the
+<a name="INDEX-344" /></a>scope of NIS to a few files that are
+changed infrequently, such as the <em class="emphasis">/etc/protocols</em>
+file, but doing so defeats the purpose of using NIS and greatly
+increases the cost of network management. Once NIS is running, it
+will be used by all system library functions that refer to maps
+(files) under NIS control. As mentioned in <a href="ch02_03.html#nfs2-CHP-2-SECT-3">Section 2.3, "Name service switch"</a> it is possible to configure a client to get
+map or file information for a particular database from either NIS,
+files, or both.</p><p>
+
+
+Now that we have this client-server model for the major
+administrative files, we need a way to discuss where and when a
+particular set of files applies to a given host. It is much too
+simple-minded for a single set of files to apply to every host on a
+network; a reasonable system must support different clusters of
+systems with different administrative requirements. For example, a
+group of administrative systems and a group of research systems might
+share the same network. In most cases, these two clusters of systems
+don't need to share the same administrative information. In
+some cases, sharing the same administrative files might be harmful.</p><p>
+
+
+To allow an administrator to set different
+<a name="INDEX-345" /></a>policies for different systems, NIS
+provides the concept of a <em class="emphasis">domain.</em> Most
+precisely,
+<a name="INDEX-346" /></a>
+<a name="INDEX-347" /></a><a name="INDEX-348" /></a>a domain is a
+set of NIS maps. A client can refer to a map (for example, the
+<em class="emphasis">hosts</em> map) from any of several different
+domains. Most of the time, however, any given host will only look up
+data from one set of NIS maps. Therefore, it's common (although
+not precisely correct) to use the term "domain" to mean
+"the group of systems that share a set of NIS maps." All
+systems that need to share common configuration information are put
+into an NIS domain. Although each system can potentially look up
+information in any NIS domain, each system is assigned to a
+"default domain," meaning that the system, by default,
+looks up information from a particular set of NIS maps. In our
+example, the research systems would, by default, look at the maps
+<a name="INDEX-349" /></a>
+<a name="INDEX-350" /></a>
+<a name="INDEX-351" /></a>
+<a name="INDEX-352" /></a>in
+the <em class="emphasis">research</em> domain, rather than the maps from
+the <em class="emphasis">accounting</em> domain; and so on.</p><p>
+
+
+It is up to the administrator (or administrators) to decide how many
+different domains are needed. In <a href="ch04_01.html">Chapter 4, "System Management Using NIS"</a>, we
+will give some rules-of-thumb for deciding how many domains are
+needed. Lest you think this is terribly complex, we'll tell you
+now: many networks, possibly even most small networks, can get by
+with a single domain. We will also take a closer look at the precise
+definition of an NIS domain.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.4. Which directory service to use</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.2. Basics of NIS management</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch03_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:34 GMT -->
+</html>

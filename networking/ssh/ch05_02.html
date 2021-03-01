@@ -1,0 +1,237 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Running the Server (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.2. Running the Server</h2>
+
+
+
+Ordinarily, an SSH server is i<a name="INDEX-723" /><a name="INDEX-724" /><a name="INDEX-725" />nvoked
+when the host computer is booted, and it is left running as a daemon.
+This works fine for most purposes. Alternatively, you can invoke the
+server manually. This is advantageous when you're debugging a
+server, experimenting with server options, or running a server as a
+nonsuperuser. Manual invocation requires a bit more work and
+forethought but might be the only alternative for some situations.</p>
+
+
+
+Most commonly, a computer has just one SSH server running on it. It
+handles multiple connections by spawning child processes, one per
+connection.<a href="#FOOTNOTE-55">[55]</a> You can
+run multiple servers if you like, however. For example, you might run
+both <tt class="command">sshd1</tt> and <tt class="command">sshd2</tt>, or
+several versions of a server, each listening on a different TCP port.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-55" />[55]Or <tt class="command">sshd </tt>can be invoked
+by inetd, creating one <tt class="command">sshd </tt>process per
+connection. [<a href="ch05_04.html#ch05-58373">Section 5.4.3.2, "Invocation by inetd"</a>]</p>
+
+
+</blockquote>
+
+
+
+<a name="ch05-3-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.2.1. Running as the Superuser</h3>
+
+
+
+<a name="INDEX-726" />The SSH server is invoked by simply
+typing its name:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd</pre></blockquote>
+
+
+
+The server automatically runs in the background, so no ampersand is
+required at the end of the line.</p>
+
+
+
+To invoke the server when the host computer boots, add appropriate
+lines to <em class="filename">/etc/rc.local</em> or the appropriate
+startup file on your system. For example:</p>
+
+
+
+<blockquote><pre class="code"># Specify the path to sshd.
+SSHD=/usr/local/bin/sshd
+# If sshd exists, run it and echo success to the system console.
+if [ -x "$SSHD" ]
+then  
+  $SSHD &amp;&amp; echo 'Starting sshd'
+fi</pre></blockquote>
+
+
+
+SSH2 comes with a sample SysV-style init control script, named
+<em class="filename">sshd2.startup</em>.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-47530" /><div class="sect2">
+<h3 class="sect2">5.2.2. Running as an Ordinary User</h3>
+
+
+
+<a name="INDEX-727" />Any user can run <tt class="command">sshd</tt>,
+provided that several steps are completed beforehand:</p>
+
+
+
+<ol><li>Get permission from your system administrator<em class="emphasis">.</em></p></li><li>Generate a host key.</p></li><li>Select a port number.</p></li><li><p>Create a server configuration file (optional).</p></li></ol>
+Before starting, ask your system administrator if you may run an SSH
+server. While this isn't necessary from a technical standpoint,
+it is a wise idea. An administrator might not appreciate your
+creating a new avenue for logins behind his back. Likewise, if the
+administrator has disabled SSH or certain SSH features, there's
+probably a good security reason, and you shouldn't just work
+around it!</p>
+
+
+
+Next, you must generate your own <a name="INDEX-728" />host key. Any other existing host key is
+probably readable only by the superuser. Host keys are generated with
+the program
+<tt class="command">ssh-keygen</tt><a name="INDEX-729" />. [<a href="ch06_02.html#ch06-27359">Section 6.2, "Creating an Identity"</a>] For now, to create a 1024-bit host key and
+store it in the file <em class="filename">~/myserver/hostkey</em>, type
+the following for SSH1 or OpenSSH:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ ssh-keygen -N '' -b 1024 -f ~/myserver/hostkey</pre></blockquote>
+
+
+
+This command generates the files <em class="filename">hostkey</em> and
+<em class="filename">hostkey.pub</em> in the directory
+<em class="filename">~/myserver</em> (so make sure the directory exists).
+Here's the analogous command for SSH2:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ ssh-keygen2 -P -b 1024 ~/myserver/hostkey</pre></blockquote>
+
+
+
+The <span class="option">-P</span> and <span class="option">-N</span> cause the generated
+key to be saved in plaintext, because <tt class="command">sshd</tt> expects
+to read it without prompting someone for a passphrase.</p>
+
+
+
+Third, you must select a port number on which the SSH server listens
+for connections. The port number is set with the <span class="option">-p</span>
+command-line option of <tt class="command">sshd</tt> or the
+<tt class="literal">Port</tt><a name="INDEX-730" />
+keyword in the configuration file, as we discuss later. Your server
+can't listen on port 22, the default, because only the
+superuser may run processes to listen on that port. Your port number
+must be greater than or equal to 1024, as lower port numbers are
+reserved by the operating system for use by privileged programs.
+[<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] The port number also must not conflict
+with those in use by other programs on the server computer; if it
+does, you get an error message when you try to start the server:</p>
+
+
+
+<blockquote><pre class="code">error: bind: Address already in use</pre></blockquote>
+
+
+
+If you receive this error, try another integer in the free range
+(above 1024). Avoid numbers mentioned in the computer's
+services map (usually <em class="filename">/etc/services</em> or the
+Network Information Service (NIS) "services" map, which
+you can view with the Unix command <em class="emphasis">ypcat -k</em>
+services). These numbers have been designated by the system
+administrator for use with particular programs or protocols, so you
+might be causing trouble if you steal one.</p>
+
+
+
+Finally, you must create your own SSH server configuration file.
+Otherwise, the server uses built-in defaults or a systemwide
+configuration file (if one exists) and might not operate as you
+intend.</p>
+
+
+
+Assuming you have generated a host key in
+<em class="filename">~/myserver/hostkey</em>, selected the port number
+2345, and created a configuration file in
+<em class="filename">~/myserver/config</em>, the server is invoked with
+the command:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -h ~/myserver/hostkey -p 2345 -f ~/myserver/config</pre></blockquote>
+
+
+
+A server run by an ordinary user has some disadvantages:</p>
+
+
+
+<ul><li>It runs under the uid of the ordinary user, not root, so it can
+connect only to that user's account.</p></li><li>It is invoked manually, rather than automatically when the computer
+boots. As a result, to run the server, you must connect once without
+SSH to the computer. And each time the computer is rebooted, the
+server dies, and you need to redo this step. Conceivably you can set
+up a <em class="emphasis">cron</em> job to keep it running automatically.</p></li><li>While setting up a server, it's useful to read the diagnostic
+messages printed by the server, in case something isn't working
+right. Unfortunately, your server's log messages are written to
+the system log files, which you don't own and possibly
+can't access. Because <tt class="command">sshd</tt> does its logging
+via the syslog service, an ordinary user can't control where
+the log messages are sent. To see them, you need to locate the system
+logs, which might be in <em class="filename">/var/adm/messages</em>,
+<em class="filename">/var/log/messages</em>, or someplace else depending
+on how <tt class="command">syslogd</tt> is set up, and you need appropriate
+permissions to read these files. To get around this annoyance,
+consider running the server in debug mode, so messages will appear on
+your terminal (as well as in the system logs). [<a href="ch05_08.html#ch05-72797">Section 5.8, "History, Logging, and Debugging"</a>] This way, you can more easily see error
+messages until you get the server working.</p></li></ul>
+Nevertheless, for many users, the advantages of SSH outweigh these
+inconveniences. Assuming your system administrator approves, you can
+secure your logins with <tt class="command">sshd</tt> even if you
+aren't a superuser.<a name="INDEX-731" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5. Serverwide Configuration</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.3. Server Configuration: An Overview</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

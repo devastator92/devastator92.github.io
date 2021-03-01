@@ -1,0 +1,340 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:39 GMT -->
+<head><title>Modular Authentication for Unix  (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch21_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">21.4. Modular Authentication for Unix </h2>
+
+
+
+
+
+Traditionally, programs wishing to authenticate a user (such as the
+<em class="emphasis">login</em> program or the <em class="emphasis">ftpd</em>
+daemon) have had to know <em class="emphasis">how</em> to authenticate a
+user; they have had to understand and implement whatever
+authentication method or methods were to be used. In a Unix system,
+this means that these programs have to do all of the following to
+authenticate a user:</p><p>
+
+
+
+
+
+<ol><li>Prompt the user for a login name.</p><p></li><li>Look up that login name and obtain its encrypted password.</p></li><li><p>Prompt the user for a password.</p></li><li><p>Use the user-provided password and the first two characters from the
+encrypted password to encrypt a known string (eight bytes of nulls).</p><p></li><li>Check to see if the result of this encryption matches the encrypted
+password for the user.</p><p></li></ol>
+If you want to add a second authentication mechanism (for example,
+the S/Key mechanism, which we discussed earlier), you have to modify
+all of these programs to understand this second mechanism as well as,
+or instead of, the standard Unix password mechanism. And if you later
+want to add a third authentication mechanism (for example, support
+for the SecurID cards), you have to modify the programs yet again;
+and so it would go for each additional authentication mechanism. Each
+time you modify these programs, you're making them bigger and
+more complex and increase the chances that you've introduced
+some kind of bug that's going to result in a security problem.
+(This is a serious risk because these are very security-critical
+programs  --  they control access to your system.)</p><p>
+
+
+
+
+
+odular authentication takes a different approach. With it, you
+modify all the authenticating programs (e.g.,
+<em class="emphasis">login</em>, <em class="emphasis">ftpd</em>) once, to make
+them talk to an authentication service instead of doing the
+authentication themselves. All of the details of the authentication
+mechanism  --  for example, what to prompt the user with, how to
+validate the user's response, etc.  --  are then handled by
+the authentication service. When you want to add or modify
+authentication methods, you do so by changing the authentication
+service (which is modular and designed to accommodate such changes),
+not by changing the individual authenticating programs.<a name="INDEX-1976" /> <a name="INDEX-1977" /></p><p>
+
+
+
+
+
+<a name="ch21-2-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.4.1. The TIS FWTK Authentication Server</h3>
+
+
+
+
+
+<a name="INDEX-1978" /> <a name="INDEX-1979" /><a name="INDEX-1980" />The authentication server in TIS
+FWTK is a modular solution for authenticating users coming in from
+the Internet. The server implements a variety of authentication
+mechanisms, such as standard reusable passwords (not recommended),
+S/Key, Security Dynamics SecurID cards, and Digital Pathways SNK-004
+cards. In addition, the server is modular and extensible, and is
+designed so that new authentication mechanisms can easily be
+integrated.</p><p>
+
+
+
+
+
+A single authentication server can handle any number of client
+machines and programs, and any number of different authentication
+methods; different users within the same server can use different
+authentication methods. For example, some might use S/Key while some
+might use the Digital Pathways SNK-004 cards.</p><p>
+
+
+
+
+
+When a client program (such as <em class="emphasis">login</em> or
+<em class="emphasis">ftpd</em>) wishes to authenticate someone using the
+TIS FWTK authentication server, it has to go through the following
+steps:</p><p>
+
+
+
+
+
+<ol><li>Prompt the user for a login name.</p><p></li><li>Contact the authentication server and tell it who is trying to log in.</p></li><li><p>Receive a response from the authentication server that tells it what
+to prompt the user with.</p><p></li><li>Display the prompt specified by the authentication server.</p></li><li>Collect the user's response and send it to the authentication
+server.</p><p></li><li>Receive either an OK or an error message from the authentication
+server.</p><p></li><li>Allow the user access (if OK) or display the error message.</p></li></ol>
+This whole process is carried out with a single TCP connection
+between the client and the authentication server, so that the server
+knows it's talking to the same client and the client knows
+it's talking to the same server throughout the authentication
+process.</p><p>
+
+
+
+
+
+The authentication server consults its databases to determine how to
+authenticate that user and determines the appropriate prompt for the
+authentication mechanism for that user. For example:</p><p>
+
+
+
+
+
+<ul><li>If traditional passwords are being used as the authentication method,
+the prompt will be a simple "Password:" prompt.</p><p></li><li>If the authentication method is S/Key, the
+prompt will be the number of the key the user is to respond with.</p><p></li><li>If the authentication method is the Digital Pathways SNK-004 card,
+the prompt will be a randomly generated challenge number.</p><p></li></ul>
+<a href="ch21_04.html#ch21-14117">Figure 21-2</a> shows how the TIS FWTK authentication
+server works.</p><p>
+
+
+
+
+
+<a name="ch21-14117" /><div class="figure"><img height="261" alt="Figure 21-2" src="figs/fire2.2102.gif" width="481" /></div><h4 class="objtitle">Figure 21-2. How the TIS FWTK authentication server works</h4>
+
+TIS FWTK includes a number of programs (such as
+<em class="emphasis">ftpd</em>) that, in addition to other modifications
+and enhancements for security, have already been modified to use the
+authentication server. Converting an existing program to use the
+authentication server, rather than traditional Unix passwords, is
+pretty straightforward. It typically involves only 20 or so lines of
+C code, examples of which are given in the toolkit.</p><p>
+
+
+
+
+
+The toolkit also includes some programs to support binary-only
+systems where you don't have the source to modify. For example,
+for systems in which you don't have the source code to the
+<em class="emphasis">login</em> program available for modification, the
+toolkit includes a program you can use as the user's shell
+(which is specified for each user in the
+<em class="emphasis">/etc/passwd</em> file) instead of one of the normal
+shells (e.g., <em class="emphasis">/bin/csh</em> or
+<em class="emphasis">/bin/sh</em>) This replacement shell authenticates
+the user with the authentication server, and if the user passes,
+starts his or her real shell.</p><p>
+
+
+
+
+
+<a name="ch21-3-fm2xml" /><div class="sect3">
+<h3 class="sect3">21.4.1.1. Problems with the authentication server</h3>
+
+
+
+
+
+The major problem in running an authentication server is getting
+secure communication between the client and the server. An attacker
+who can convincingly pretend to be the authentication server can
+authenticate as anybody.</p><p>
+
+
+
+
+
+Some configurations may have additional problems; for example, using
+shell replacement can produce problems because not all programs deal
+well with situations in which a user's shell environment
+variable and the entry for that user in the <em class="emphasis">/etc/passwd
+</em>file do not match.<a name="INDEX-1981" /> <a name="INDEX-1982" /> <a name="INDEX-1983" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-4-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.4.2. Pluggable Authentication Modules (PAM)</h3>
+
+
+
+
+
+<a name="INDEX-1984" /> <a name="INDEX-1985" />PAM is a more recent system for
+providing modular authentication, which uses an even more flexible
+mechanism than the TIS FWTK authentication server. The basic
+principle is much the same; programs that need to do authentication
+are modified to use the PAM system, after which you can completely
+control what kind of authentication they use through PAM, without
+making further changes to the individual programs. PAM differs from
+the authentication server in that it is a local service; PAM operates
+by dynamically loading authentication modules into applications that
+have been configured to use them. Authentication modules execute with
+the same privileges as the application that loaded them.</p><p>
+
+
+
+
+
+A program can ask PAM to authenticate a user or to change a password.
+The password change feature saves users from having to learn a new
+password change mechanism for each new authentication mechanism.</p><p>
+
+
+
+
+
+An administrator can configure PAM to do extra work in addition to
+authenticating the user. For instance, it can grant or deny access
+based on criteria other than whether or not the user authenticated
+properly. This allows you to control what time of day people can use
+a service, or how many simultaneous users there can be, or whether or
+not they're accessible from the machine's console. PAM
+can also set up the environment that the service will execute in, by
+setting environment variables or by running programs (for instance,
+it can use <em class="emphasis">chroot</em> to limit the parts of the
+filesystem that the service has access to).</p><p>
+
+
+
+
+
+Authentication modules can be stacked up, either to allow for
+fail-over (if you can't authenticate one way, try another) or
+to enforce complicated rules (allow George to log in only at the
+console and only between 3:00 and 5:00 in the morning, but allow
+everybody else to log in from the local network with reusable
+passwords, or from the Internet with a one-time password). It's
+also easy to add new authentication modules, but you should use new
+modules with caution. When you trust a piece of code to authenticate
+users, you are trusting it with the security of your system;
+that's not something you should do lightly.</p><p>
+
+
+
+
+
+PAM is an extraordinarily flexible system, and as a natural
+consequence, it can be hard to configure. Configuration errors will
+often result in an unusable computer, but it's also easy to
+accidentally produce a configuration that has unexpected
+insecurities. The module-stacking features, for instance, provide any
+number of ways to accidentally allow access that you intended to
+deny. Effectively, they give you an entire programming language with
+obscure and varying syntax, and an error as simple as using the
+keyword "required" instead of "requisite" can
+have unfortunate consequences.</p><p>
+
+
+
+
+
+Like any powerful tool, PAM should be used with caution:</p><p>
+
+
+
+
+
+<ul><li>Because relatively minor errors have the potential to disable all
+access to the machine, you should know how to boot your machine into
+single-user mode before you start to configure PAM. Access to
+single-user mode is not controlled by PAM, so it will give you a way
+to re-enable access to the rest of the machine.</p><p></li><li>Because all of PAM's files are security-critical (an intruder
+can easily install back doors by modifying any part of PAM), you
+should use it in conjunction with a checksumming system that will
+detect unauthorized changes (see <a href="ch11_01.html">Chapter 11, "Unix and Linux Bastion Hosts"</a>, for
+more information on such systems).</p><p></li><li>Because PAM configuration is tricky, you should test your
+configurations before relying on them. When you are deciding how to
+configure a service, make a list of the important cases when it
+should allow access and when it should deny access. Once you have
+written the configuration, test each of these cases to make sure
+there are no surprises.</p><p></li></ul>
+In most installations, PAM will allow you to use one single
+configuration file that contains the configuration for all services,
+or a directory with a separate file for each service. You should use
+a separate file for each service; it will help keep configuration
+errors for one service from propagating to others.</p><p>
+
+
+
+
+
+No matter how you set up the configuration files, you will need to
+specify a default behavior for the service called
+"other", which will be used if there is no specific
+information for a PAM-enabled service. You should set this up so that
+it denies access and logs this fact; this way, if you accidentally
+install a PAM-enabled service without installing configuration
+information for it, you will not grant access to it. Of course, if
+you accidentally remove the configuration for an existing service,
+you will turn off all access to it. This is unpleasant, but not as
+unpleasant as a compromised machine.<a name="INDEX-1986" /> <a name="INDEX-1987" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch21_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">21.3. Authentication Mechanisms</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">21.5. Kerberos</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:39 GMT -->
+</html>

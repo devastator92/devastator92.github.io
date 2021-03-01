@@ -1,0 +1,205 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>Time synchronization (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch15_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.7. Time synchronization</h2>
+
+Distributing files across several servers introduces<a name="INDEX-2317" /> <a name="INDEX-2318" /> <a name="INDEX-2319" /> a dependency on synchronized time of day
+clocks on these machines and their clients. Consider the following
+sequence of events:
+</p>
+
+<blockquote><pre class="code">caramba % <tt class="userinput"><b>date</b></tt> 
+Mon Sep 25 18:11:24 PDT 2000 
+caramba % <tt class="userinput"><b>pwd</b></tt> 
+/home/labiaga 
+caramba % <tt class="userinput"><b>touch foo</b></tt> 
+caramba % <tt class="userinput"><b>ls -l foo</b></tt> 
+-rw-r--r--   1 labiaga  staff          0 Sep 25 18:18 foo 
+ 
+aqua % <tt class="userinput"><b>date</b></tt> 
+Mon Sep 25 17:00:01 PDT 2000 
+aqua % <tt class="userinput"><b>pwd</b></tt> 
+/home/labiaga
+aqua % <tt class="userinput"><b>ls -l foo</b></tt> 
+-rw-r--r--   1 labiaga  staff          0 Sep 25  2000 foo 
+aqua % <tt class="userinput"><b>su</b></tt> 
+aqua # <tt class="userinput"><b>rdate caramba</b></tt> 
+Mon Sep 25 18:16:51 2000 
+aqua % <tt class="userinput"><b>ls -l foo</b></tt> 
+-rw-r--r--   1 labiaga  staff          0 Sep 25 18:18 foo</pre></blockquote>
+
+On host <em class="emphasis">caramba</em>, a file is created that is
+stamped with the current time. Over on host
+<em class="emphasis">aqua</em>, the time of day clock is over an hour
+behind, and file <em class="emphasis">foo</em> is listed with the
+month-day-year date format normally reserved for files that are more
+than six months old. The problem stems from the time skew between
+<em class="emphasis">caramba</em> and <em class="emphasis">aqua</em>: when the
+<em class="emphasis">ls</em> process on <em class="emphasis">aqua</em> tries to
+determine the age of file <em class="emphasis">foo</em>, it subtracts the
+file modification time from the current time. Under normal
+circumstances, this produces a positive integer, but with
+<em class="emphasis">caramba</em> 's clock an hour ahead of the
+local clock, the difference between modification time and current
+time is a negative number. This makes file <em class="emphasis">foo</em> a
+veritable Unix artifact, created before the dawn of Unix time. As
+such, its modification time is shown with the "old file"
+format.<a href="#FOOTNOTE-39">[39]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-39" />[39]Some Unix utilities have been modified to
+handle small time skews in a graceful manner. For example,
+<em class="emphasis">ls</em> tolerates clock drifts of a few minutes and
+correctly displays file modification times that are slightly in the
+future.</p> </blockquote>
+
+Time of day clock drift can be caused by repeated bursts of high
+priority interrupts that interfere with the system's hardware
+clock or by powering off (and subsequently booting) a system that
+does not have a battery-operated time of day clock.<a href="#FOOTNOTE-40">[40]</a>
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-40" />[40]The hardware clock, or "hardclock" is a regular,
+crystal-driven timer that provides the system heartbeat. In kernel
+parlance, the hardclock timer interval is a "tick," a
+basic unit of time-slicing that governs CPU scheduling, process
+priority calculation, and software timers. The software time of day
+clock is driven by the hardclock. If the hardclock interrupts at 100
+Hz, then every 100 hardclock interrupts bump the current time of day
+clock by one second. When a hardclock interrupt is missed, the
+software clock begins to lose time. If there is a hardware time of
+day clock available, the kernel can compensate for missed hardclock
+interrupts by checking the system time against the hardware time of
+day clock and adjusting for any drift. If there is no time of day
+clock, missed hardware clock interrupts translate into a tardy system
+clock.</p> </blockquote>
+
+In addition to confusing users, time skew wreaks havoc with the
+timestamps used by <em class="emphasis">make</em>, jobs run out of
+<em class="emphasis">cron</em> that depend on
+<em class="emphasis">cron</em>-started processes on other hosts, and the
+transfer of NIS maps to slave servers, which fail if the slave
+server's time is far enough ahead of the master server. It is
+essential to keep all hosts sharing filesystems or NIS maps
+synchronized to within a few seconds.
+</p>
+
+<em class="emphasis">rdate</em> synchronizes the time of day clocks on two
+hosts to within a one-second granularity. Because it changes the
+local time and date, <em class="emphasis">rdate</em> can only be used by
+the superuser, just as the <em class="emphasis">date</em> utility can only
+be used by <em class="emphasis">root</em> to explicitly set the local
+time. <em class="emphasis">rdate</em> takes the name of the remote time
+source as an argument:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>rdate mahimahi</b></tt> 
+couldn't set time of day: Not owner 
+% <tt class="userinput"><b>su</b></tt> 
+# <tt class="userinput"><b>rdate mahimahi</b></tt> 
+Mon Sep 25 18:16:51 2000</pre></blockquote>
+
+One host is usually selected as the master timekeeper, and all other
+hosts synchronize to its time at regular intervals. The ideal choice
+for a timekeeping host is one that has the minimum amount of time
+drift, or that is connected to a network providing time services. If
+the time host's clock loses a few seconds each day, the entire
+network will fall behind the real wall clock time. All hosts agree on
+the current time, but this time slowly drifts further and further
+behind the real time.
+</p>
+
+While the remote host may be explicitly specified, it is more
+convenient to create the hostname alias <em class="emphasis">timehost</em>
+in the NIS hosts file and to use the alias in all invocations of
+<em class="emphasis">rdate</em>:
+</p>
+
+<blockquote><pre class="code">131.40.52.28    mahimahi timehost 
+131.40.52.26    wahoo 
+131.40.52.150   kfir</pre></blockquote>
+
+Some systems check for the existence of the hostname
+<em class="emphasis">timehost</em> during the boot sequence, and perform
+an <em class="emphasis">rdate timehost</em> if
+<em class="emphasis">timehost</em> is found.
+</p>
+
+This convention is particularly useful if you are establishing a new
+timekeeping host and you need to change its definition if your
+initial choice proves to be a poor time standard. It is far simpler
+to change the definition of <em class="emphasis">timehost</em> in the NIS
+hosts map than it is to modify the invocations of
+<em class="emphasis">rdate</em> on all hosts.
+</p>
+
+Time synchronization may be performed during the boot sequence, and
+at regular intervals using <em class="emphasis">cron</em>. The interval
+chosen for time synchronization depends on how badly each
+system's clock drifts: once-a-day updates may be sufficient if
+the drift is only a few seconds a day, but hourly synchronization is
+required if a system loses time each hour. To run
+<em class="emphasis">rdate</em> from <em class="emphasis">cron</em>, add a line
+like the following to each host's <em class="emphasis">crontab</em>
+file:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">Hourly update: </i>
+52 * * * * rdate timehost &gt; /dev/null 2&gt;&amp;1 
+ 
+<i class="lineannotation">Daily update: </i>
+52 1 * * * rdate timehost &gt; /dev/null 2&gt;&amp;1</pre></blockquote>
+
+The redirection of the standard output and standard error forces
+<em class="emphasis">rdate</em> 's output to
+<em class="emphasis">/dev/null</em>, suppressing the normal echo of the
+updated time. If a <em class="emphasis">cron</em>-driven command writes to
+standard output or standard error, <em class="emphasis">cron</em> will
+mail the output to <em class="emphasis">root</em>.
+</p>
+
+To avoid swamping the <em class="emphasis">timehost</em> with dozens of
+simultaneous <em class="emphasis">rdate</em> requests, the previous
+example performs its <em class="emphasis">rdate</em> at a random offset
+into the hour. A common convention is to use the last octet of the
+machine's IP address (mod 60) as the offset into the hour,
+effectively scattering the <em class="emphasis">rdate</em> requests
+throughout each hour.
+</p>
+
+The use of <em class="emphasis">rdate</em> ensures a gross synchronization
+accurate to within a second or two on the network. The resolution of
+this approach is limited by the <em class="emphasis">rdate</em> and
+<em class="emphasis">cron</em> utilities, both of which are accurate to
+one second. This is sufficient for many activities, but finer
+synchronization with a higher resolution may be needed. The Network
+Time Protocol (NTP) provides fine-grain time synchronization and
+also<a name="INDEX-2320" />
+<a name="INDEX-2321" />
+<a name="INDEX-2322" /> keeps
+wide-area <a name="INDEX-2323" /> <a name="INDEX-2324" />networks in lock step. NTP is outside
+the scope of this book.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch15_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.6. NFS server logging</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">15. Debugging Network Problems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

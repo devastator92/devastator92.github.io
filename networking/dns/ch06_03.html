@@ -1,0 +1,383 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+<head><title>Minimizing Pain and Suffering (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.3. Minimizing Pain and Suffering</h2>
+
+
+<a name="INDEX-804" /><a name="INDEX-805" />Now <a name="INDEX-806" />that you've configured your host to
+use DNS, what's going to change? Will your users be forced to
+type long domain names? Will they have to change their mail addresses
+and mailing lists?</p><p>
+
+
+Thanks to the search list, much of this will continue working as
+before. There are some exceptions, though, and some notable
+differences in the way that some programs behave when they use DNS.
+We'll try to cover all the common ones.</p><p>
+
+
+<a name="dns4-CHP-6-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">6.3.1. Differences in Service Behavior</h3>
+
+
+As you've seen earlier in this chapter, programs such as
+<a name="INDEX-807" /><em class="emphasis">telnet</em>,
+<em class="emphasis">ftp</em><a name="INDEX-808" />,
+<em class="emphasis">rlogin</em><a name="INDEX-809" />, and
+<em class="emphasis">rsh</em><a name="INDEX-810" />
+apply the search list to domain name arguments that aren't
+dot-terminated. That means that if you're in <em class="emphasis">movie.edu</em> (i.e., your local domain name
+is <em class="emphasis">movie.edu</em> and your search
+list includes <em class="emphasis">movie.edu</em>),
+you can type either:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet misery</b></tt></pre></blockquote>
+
+
+or:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet misery.movie.edu</b></tt></pre></blockquote>
+
+
+or even:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet misery.movie.edu.</b></tt></pre></blockquote>
+
+
+and get to the same place. The same holds true for the other
+services, too. There's one other behavioral difference you may
+benefit from: because a name server may return more than one IP
+address when you look up an address, modern versions of Telnet, FTP,
+and web browsers try to connect to the first address returned, and if
+the connection is refused or times out, for example, they try the
+next, and so on:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ftp tootsie</b></tt>
+ftp: connect to address 192.249.249.244: Connection timed out
+Trying 192.253.253.244...
+Connected to tootsie.movie.edu.
+220 tootsie.movie.edu FTP server (Version 16.2 Fri Apr 26
+    18:20:43 GMT 1991) ready.
+Name (tootsie: guest):</pre></blockquote>
+
+
+And remember that with the <em class="filename">resolv.conf
+</em><em class="emphasis">sortlist</em> directive, you can even
+control the order in which your applications try those IP addresses.</p><p>
+
+
+One oddball service is <a name="INDEX-811" /> <a name="INDEX-812" />NFS. The <em class="filename">mount</em>
+command can handle domain names just fine, and you can put domain
+names into <em class="filename">/etc/fstab</em> (your vendor may call it
+<em class="filename">/etc/checklist</em>), too. But watch out for
+<a name="INDEX-813" />
+<a name="INDEX-814" /><em class="filename">/etc/exports</em> and
+<a name="INDEX-815" />
+<a name="INDEX-816" /><em class="filename">/etc/netgroup</em>.
+<em class="filename">/etc/exports</em> controls which filesystems you
+allow various clients to NFS-mount. You can also assign a name to a
+group of hosts in <em class="filename">netgroup</em> and then allow them
+access via <em class="filename">exports</em> by using the name of the
+group.</p><p>
+
+
+Unfortunately, older versions of NFS don't really use DNS to
+check <em class="filename">exports</em> or
+<em class="filename">netgroup -- </em>the client tells the NFS server
+its identity in an <a name="INDEX-817" />
+<a name="INDEX-818" />RPC (Remote Procedure Call) packet.
+Consequently, the client's identity is whatever the client
+claims it is, and the identity a host uses in Sun RPC is the local
+host's <em class="filename">hostname</em>. So the name you use in
+either file needs to match the client's
+<em class="filename">hostname</em>, which isn't necessarily its
+domain name.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">6.3.2. Electronic Mail</h3>
+
+
+<a name="INDEX-819" /><a name="INDEX-820" />Some electronic mail programs, including
+<em class="filename">sendmail</em>, also don't work as expected;
+<em class="filename">sendmail</em> doesn't use the search list quite
+the same way that other programs do. Instead, when configured to use
+a name server, it uses a process called
+<a name="INDEX-821" /><em class="firstterm">canonicalization</em> to
+convert names in electronic mail addresses to full, canonical domain
+names.</p><p>
+
+
+In canonicalization, <em class="filename">sendmail</em> applies the search
+list to a name and looks up data of type ANY, which matches any type
+of record. <em class="filename">sendmail </em>uses the same rule newer
+resolvers do: if the name to canonicalize has at least one dot in it,
+check the name as-is first. If the name server queried finds a
+<a name="INDEX-822" />CNAME record
+(an alias), <em class="filename">sendmail</em> replaces the name looked up
+with the canonical name the alias points to and canonicalizes
+<em class="emphasis">that</em> (in case the target of the alias is itself
+an alias). If the name server queried finds an A record (an address),
+<em class="filename">sendmail</em> uses the domain name that resolved to
+the address as the canonical name. If the name server doesn't
+find an address but does find one or more MX records, one of the
+following actions is performed:</p><p>
+
+
+<ul><li>If the search list has not yet been appended,
+<em class="filename">sendmail</em> uses the domain name that resolved to
+the MX record(s) as the canonical name.</p></li><li>If one or more elements of the search list have been appended,
+<em class="filename">sendmail</em> notes that the domain name is a
+potential canonical name and continues appending elements of the
+search list. If a subsequent element of the search list turns up an
+address, the domain name that turned up the address is the canonical
+name. Otherwise, the domain name that found the first MX record is
+used as the canonical name.<a href="#FOOTNOTE-41">[41]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-41" />[41]All this complexity is
+necessary to deal with wildcard MX records, which we'll discuss
+in <a href="ch16_01.html">Chapter 16, "Miscellaneous"</a>.</p><p>
+
+</blockquote></li></ul>
+<em class="filename">sendmail</em> uses canonicalization several times
+when processing an SMTP message; it canonicalizes the destination
+address and several fields in the SMTP headers.<a href="#FOOTNOTE-42">[42]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-42" />[42]Some
+older versions of <em class="filename">sendmail</em> use a different
+technique for doing canonicalization: they apply the search list and
+query the name server for CNAME records for the name in question.
+CNAME matches only CNAME records. If a record is found, the name is
+replaced with the domain name on the right-hand side of the CNAME
+record.</p><p>
+
+</blockquote>
+
+
+<em class="filename">sendmail</em> also sets macro <em class="emphasis">$w</em>
+to the canonicalized <em class="emphasis">hostname</em> when the
+<em class="filename">sendmail</em> daemon starts up. So even if you set
+your <em class="emphasis">hostname</em> to a short, single-part name,
+<em class="filename">sendmail</em> canonicalizes the
+<em class="emphasis">hostname</em> using the search list defined in
+<em class="filename">resolv.conf</em>. <em class="filename">sendmail</em> then
+adds macro <em class="emphasis">$w</em> and all aliases for <em class="emphasis">$w
+</em>encountered during canonicalization to class
+<em class="emphasis">$=w</em><a name="INDEX-823" />, the list of the mail server's
+other names.</p><p>
+
+
+This is important because class <em class="emphasis">$=w</em> names are
+the only names <em class="filename">sendmail</em> recognizes, by default,
+as the local host's name. <em class="filename">sendmail</em> will
+attempt to forward mail that's addressed to a domain name it
+thinks isn't local. So, for example, unless you configure
+<em class="filename">sendmail</em> to recognize all of the host's
+aliases (by adding them to class <em class="emphasis">w</em> or fileclass
+<em class="emphasis">w</em>, as we showed in <a href="ch05_01.html">Chapter 5, "DNS and Electronic Mail"</a>
+), the host will try to forward messages that arrive addressed to
+anything other than the canonical domain name.</p><p>
+
+
+There's another important implication of class
+<em class="emphasis">$=w</em>, which is that <em class="filename">sendmail</em>
+recognizes only the contents of class <em class="emphasis">$=w</em> as the
+local host's name in MX lists. Consequently, if you use
+anything other than a name you're sure is in <em class="emphasis">$=w
+</em>in the right side of an <a name="INDEX-824" />MX
+record, you run the risk that the host will not recognize it. This
+can cause mail to loop and then be returned to the sender.</p><p>
+
+
+One last note on <em class="filename">sendmail</em>: when you start
+running a name server, if you're running an older version of
+<em class="filename">sendmail</em> (before Version 8), you should set the
+<em class="emphasis">I</em> option in your <a name="INDEX-825" /><em class="filename">sendmail.cf</em> file.
+Option <em class="emphasis">I</em> determines what
+<em class="filename">sendmail</em> does if a lookup for a destination host
+fails. When using <em class="filename">/etc/hosts</em>, a failed lookup is
+fatal. If you search the host table once for a name and don't
+find it, it's doubtful it'll miraculously appear later,
+so the mailer may as well return the message. When using DNS,
+however, a lookup failure may be temporary, because of intermittent
+networking problems, for example. Setting option
+<em class="emphasis">I</em> instructs <em class="filename">sendmail</em> to
+queue mail if a lookup fails instead of returning it to the sender.
+Just add <em class="emphasis">OI</em> to your
+<em class="filename">sendmail.cf</em> file to set<a name="INDEX-826" /> option
+<em class="emphasis">I</em>.<a name="INDEX-827" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">6.3.3. Updating .rhosts, hosts.equiv, etc.</h3>
+
+
+<a name="INDEX-828" /><a name="INDEX-829" /><a name="INDEX-830" />Once
+<a name="INDEX-831" />you
+<a name="INDEX-832" />start using DNS, you may also need to
+disambiguate host names in your host's authorization files.
+Entries that use simple, one-part host names will now be assumed to
+be in the local domain. For example, the
+<em class="filename">lpd.allow</em> file on <em class="emphasis">wormhole.movie.edu</em> might include:</p><p>
+
+
+<blockquote><pre class="code">wormhole
+terminator
+diehard
+robocop
+mash
+twins</pre></blockquote>
+
+
+If we move <em class="emphasis">mash</em> and
+<em class="emphasis">twins</em> into the <em class="emphasis">comedy.movie.edu</em> zone, though, they
+won't be allowed to access <em class="filename">lpd</em>; the
+entries in <em class="filename">lpd.allow</em> allow only <em class="emphasis">mash.movie.edu</em> and <em class="emphasis">twins.movie.edu</em>. So we'd have to
+add the proper domain names to host names outside the <em class="filename">lpd
+</em>server's local domain:</p><p>
+
+
+<blockquote><pre class="code">wormhole
+terminator
+diehard
+robocop
+mash.comedy.movie.edu
+twins.comedy.movie.edu</pre></blockquote>
+
+
+Some other files you should check for host names in need of
+domain-ification are:</p><p>
+
+
+<a name="INDEX-833" /><a name="INDEX-834" /><blockquote><pre class="code">hosts.equiv
+.rhosts
+X0.hosts
+sendmail.cf</pre></blockquote>
+
+
+Sometimes, simply running these files through a
+<a name="INDEX-835" />canonicalization filter -- a program
+that translates host names to domain names using the search
+list -- is enough to disambiguate them. Here's a very short
+canonicalization filter in Perl to help you out:</p><p>
+
+
+<blockquote><pre class="code">#!/usr/bin/perl -ap
+# Expects one hostname per line, in the first field (a la .rhosts,
+# X0.hosts)
+
+s/$F[0]/$d/ if ($d)=gethostbyname $F[0];</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">6.3.4. Providing Aliases</h3>
+
+
+<a name="INDEX-836" />Even
+if you cover all your bases and convert all your
+<em class="filename">.rhosts</em>, <em class="filename">hosts.equiv</em>, and
+<em class="filename">sendmail.cf</em> files after you configure your host
+to use DNS, your users will still have to adjust to using domain
+names. Hopefully, the confusion they feel will be minimal and more
+than offset by the benefits of DNS.</p><p>
+
+
+One way to make your users' lives less confusing after
+configuring DNS is to provide aliases for well-known hosts that are
+no longer reachable using their familiar names. For example, our
+users are accustomed to typing <em class="emphasis">telnet doofy</em> or
+<em class="emphasis">rlogin doofy</em> to get to the bulletin board system
+run by the movie studio on the other side of town. Now they'll
+have to start using <em class="emphasis">doofy</em>'s full domain name, <em class="emphasis">doofy.maroon.com</em>. But most of our users
+don't know the full domain name, and it'll be some time
+before we can tell all of them and they get used to it.</p><p>
+
+
+Luckily, BIND lets you define aliases for your users. All we need to
+do is set the environment variable <a name="INDEX-837" />HOSTALIASES to the pathname
+of a file that contains mappings between aliases and domain names.
+For example, to set up a system-wide alias for <em class="emphasis">doofy</em>, we could set HOSTALIASES to
+<a name="INDEX-838" />
+<a name="INDEX-839" /><em class="filename">/etc/host.aliases</em> in
+the system's shell startup files and add:</p><p>
+
+
+<blockquote><pre class="code">doofy    doofy.maroon.com</pre></blockquote>
+
+
+to <em class="filename">/etc/host.aliases</em>. The alias file format is
+simple: the alias starts the line in column one, followed by
+whitespace and then the domain name that corresponds to the alias.
+The domain name is written without a trailing dot, and the alias
+can't contain any dots.</p><p>
+
+
+Now when our users type <em class="emphasis">telnet doofy</em> or
+<em class="emphasis">rlogin doofy</em>, the resolver transparently
+substitutes <em class="emphasis">doofy.maroon.com</em>
+for <em class="emphasis">doofy</em> in the name server
+query. The message the users see now looks something like:</p><p>
+
+
+<blockquote><pre class="code">Trying...
+Connected to doofy.maroon.com.
+Escape character is '^]'.
+IRIX System V.3 (sgi)
+login:</pre></blockquote>
+
+
+If the resolver falls back to using <em class="filename">/etc/hosts</em>,
+though, our HOSTALIASES won't have any effect. So we should
+also keep a similar alias in <em class="filename">/etc/hosts</em>.</p><p>
+
+
+With time, and perhaps a little instruction, the users will start to
+associate the full domain name they see in the
+<em class="filename">telnet</em> banner with the bulletin board they use.</p><p>
+
+
+With HOSTALIASES, if you know the domain names your users are likely
+to have trouble with, you can save them a little frustration. If you
+don't know which hosts they're trying to get to, you can
+let your users create their own alias files, and having each user
+point the HOSTALIASES variable in his shell startup file to his
+personal alias file.<a name="INDEX-840" /><a name="INDEX-841" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.2. Sample Resolver Configurations</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.4. Vendor -Specific Options</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:25 GMT -->
+</html>

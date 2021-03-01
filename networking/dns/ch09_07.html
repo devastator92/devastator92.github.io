@@ -1,0 +1,183 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Managing the Transition to Subdomains (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch09_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.7. Managing the Transition to Subdomains</h2>
+
+
+<a name="INDEX-1504" />We
+won't lie to you -- the <em class="emphasis">fx.movie.edu</em> example we showed you was
+unrealistic for several reasons. The main one is the magical
+appearance of the special effects lab's hosts. In the real
+world, the lab would start out with a few hosts, probably in the
+<em class="emphasis">movie.edu</em> zone. After a
+generous endowment, an NSF grant, or a corporate gift, they might
+expand the lab a little and buy a few more computers. Sooner or
+later, the lab would have enough hosts to warrant the creation of a
+new subdomain. By that point, however, many of the original hosts
+would be well known by their names in <em class="emphasis">movie.edu</em>.</p><p>
+
+
+We briefly touched on using <a name="INDEX-1505" />CNAME records in the parent zone (in our
+<em class="emphasis">plan9.movie.edu</em> example) to
+help people adjust to a host's change of domain. But what
+happens when you move a whole network or subnet into a new subdomain?</p><p>
+
+
+The strategy we recommend uses CNAME records in much the same way,
+but on a larger scale. Using a tool such as
+<em class="filename">h2n</em><a name="INDEX-1506" />, you can create CNAMEs for hosts
+<em class="emphasis">en masse</em>. This allows users to continue using
+the old domain names for any of the hosts that have moved. When they
+telnet or FTP (or whatever) to those hosts, however, the command will
+report that they're connected to a host in <em class="emphasis">fx.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet plan9 </b></tt>
+Trying...
+Connected to plan9.fx.movie.edu.
+Escape character is '^]'.
+
+HP-UX plan9.fx.movie.edu A.09.05 C 9000/735 (ttyu1)
+
+login:</pre></blockquote>
+
+
+Some <a name="INDEX-1507" />users, of course, don't notice
+subtle changes like this, so you should also do some public relations
+work and notify folks of the change.</p><p>
+
+
+On <em class="emphasis">fx.movie.edu</em> hosts
+running old versions of <em class="filename">sendmail</em>, we may also
+need to configure <em class="filename">sendmail</em> to accept mail
+addressed to the new domain names. Modern versions of
+<em class="filename">sendmail </em>canonicalize the host names in
+addresses in message headers using a name server before sending the
+messages. This will turn a <em class="emphasis">movie.edu</em> alias into a canonical name in
+<em class="emphasis">fx.movie.edu</em>. If, however,
+the <em class="filename">sendmail</em> on the receiving end is older and
+hardcodes the local host's domain name, we have to change the
+name to the new domain name by hand. This usually requires a simple
+change to class <em class="emphasis">w</em> or fileclass
+<em class="emphasis">w</em> in <em class="filename">sendmail.cf</em>; see <a href="ch05_03.html#dns4-CHP-5-SECT-3">Section 5.3, "The MX Algorithm"</a> in <a href="ch05_01.html">Chapter 5, "DNS and Electronic Mail"</a>.</p><p>
+
+
+How do you create all these aliases? You simply tell
+<em class="filename">h2n</em> to create the
+<a name="INDEX-1508" />aliases for hosts on the
+<em class="emphasis">fx.movie.edu</em> networks
+(192.253.254/24 and 192.254.20/24) and indicate (in the
+<em class="filename">/etc/hosts </em>file) the new domain names for the
+hosts. For example, using the <em class="emphasis">fx.movie.edu</em> host table, we could easily
+generate the aliases in <em class="emphasis">movie.edu</em> for all the hosts in
+<em class="emphasis">fx.movie.edu</em>.</p><p>
+
+
+Partial contents of file <em class="filename">/etc/hosts</em>:</p><p>
+
+
+<blockquote><pre class="code">192.253.254.1 movie-gw.movie.edu movie-gw
+# fx primary
+192.253.254.2 bladerunner.fx.movie.edu bladerunner br
+# fx secondary
+192.253.254.3 outland.fx.movie.edu outland
+192.253.254.4 starwars.fx.movie.edu starwars
+192.253.254.5 empire.fx.movie.edu empire
+192.253.254.6 jedi.fx.movie.edu jedi
+192.254.20.3  alien.fx.movie.edu alien</pre></blockquote>
+
+
+<em class="filename">h2n</em>'s <span class="option">-c</span> option takes a
+zone's domain name as an argument. When
+<em class="filename">h2n</em> finds any hosts in that zone on networks
+it's building data for, it'll create aliases for them in
+the current zone (specified with <span class="option">-d</span> ). So by
+running:</p><p>
+
+
+<blockquote><pre class="code">%<tt class="userinput"><b> h2n -d movie.edu -n 192.253.254 -n 192.254.20 \</b></tt>
+<tt class="userinput"><b>-c fx.movie.edu -f options</b></tt></pre></blockquote>
+
+
+(where <em class="emphasis">options</em> contains other command-line
+options for building data from other <em class="emphasis">movie.edu</em> networks), we could create
+aliases in <em class="emphasis">movie.edu</em> for all
+<em class="emphasis">fx.movie.edu</em> hosts.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-7.1" /><div class="sect2">
+<h3 class="sect2">9.7.1. Removing Parent Aliases</h3>
+
+
+<a name="INDEX-1509" />
+<a name="INDEX-1510" />
+<a name="INDEX-1511" />Although parent-level aliases are useful
+for minimizing the impact of moving your hosts, they're also a
+crutch of sorts. Like a crutch, they'll restrict your freedom.
+They'll clutter up your parent namespace when one of your
+motivations for implementing a subdomain may have been making the
+parent zone smaller. And they'll prevent you from using the
+names of hosts in the subdomain as names for hosts in the parent
+zone.</p><p>
+
+
+After a grace period -- which should be well advertised to
+<a name="INDEX-1512" />users -- you should remove all the
+aliases, with the possible exception of aliases for extremely
+well-known Internet hosts. During the grace period, users can adjust
+to the new domain names and modify scripts,
+<em class="filename">.rhosts</em> files, and the like. But don't get
+suckered into leaving all those aliases in the parent zone; they
+defeat part of the purpose of DNS, as they prevent you and your
+subdomain administrator from naming hosts autonomously.</p><p>
+
+
+You might want to leave CNAME records for well-known Internet hosts
+or central network resources intact because of the potential impact
+of a loss of connectivity. On the other hand, rather than moving the
+well-known host or central resource into a subdomain at all, it might
+be better to leave it in the parent zone.</p><p>
+
+
+<em class="filename">h2n</em> gives you an easy way to delete the aliases
+you created so simply with the <span class="option">-c</span> option, even if
+the records for the subdomain's hosts are mixed in the host
+table or on the same network as hosts in other zones. The
+<span class="option">-e</span> option takes a zone's domain name as an
+argument and tells <em class="filename">h2n</em> to exclude (hence
+<span class="option">e</span>) all records containing that domain name on
+networks it would otherwise create data for. This command line, for
+example, would delete all the <a name="INDEX-1513" />
+<a name="INDEX-1514" />CNAME records for <em class="emphasis">fx.movie.edu</em> hosts created earlier while
+still creating an A record for <em class="emphasis">movie-gw.movie.edu</em> (which is on the
+192.253.254/24 network):</p><p>
+
+
+<a name="INDEX-1515" /><blockquote><pre class="code">% <tt class="userinput"><b>h2n -d movie.edu -n 192.253.254 -n 192.254.20 \</b></tt>
+<tt class="userinput"><b>-e fx.movie.edu -f options</b></tt></pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.6. Good Parenting</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.8. The Life of a Parent</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

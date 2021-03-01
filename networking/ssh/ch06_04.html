@@ -1,0 +1,323 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch06_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Multiple Identities (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.4. Multiple Identities</h2>
+
+
+
+Until now, we've assumed you have a single SSH identity that
+uniquely identifies you to an SSH server. You do have a default
+identity -- our earlier <tt class="command">ssh-add</tt> examples
+operated on it -- but you may create as many other identities as
+you like.</p>
+
+
+
+Why use several identities? After all, with a single SSH identity,
+you can connect to remote machines with a single passphrase.
+That's very simple and convenient. In fact, most people can
+survive perfectly well with just one identity. Multiple identities
+have important uses, however:</p>
+
+
+
+<dl>
+<dt><i><em class="emphasis">Additional security</em> </i></dt>
+<dd>If you use different SSH keys for different remote accounts, and one
+of your keys is cracked, only some of your remote accounts will be
+vulnerable.</p></dd>
+
+
+
+<dt><i><em class="emphasis">Secure batch processes</em> </i></dt>
+<dd>Using an SSH key with an empty passphrase, you can create secure,
+automated processes between interacting computers, such as unattended
+backups. [<a href="ch11_01.html#ch11-80380">Section 11.1.2.2, "Using a plaintext key"</a>] However, you definitely
+don't want your regular logins to use an unencrypted private
+key, so you should create a second key for this purpose.</p></dd>
+
+
+
+<dt><i><em class="emphasis">Different account settings</em> </i></dt>
+<dd>You can configure your remote account to respond differently based on
+which key is used for connecting. For example, you can make your Unix
+login session run different startup files depending on which key is
+used.</p></dd>
+
+
+
+<dt><i><em class="emphasis">Triggering remote programs</em> </i></dt>
+<dd>Your remote account can be set up to run specific programs when an
+alternative key is used, via forced commands. [<a href="ch08_02.html#ch08-22858">Section 8.2.4, "Forced Commands "</a>]</p></dd>
+
+</dl>
+
+
+
+In order to use multiple identities, you need to know how to switch
+between them. There are two ways: manually, and automatically with an
+agent.</p>
+
+
+
+<a name="ch06-26-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.4.1. Switching Identities Manually</h3>
+
+
+
+<em class="emphasis">ssh</em> and <em class="emphasis">scp</em> let you switch
+your identity with the <span class="option">-i</span> command-line option and
+the <tt class="literal">IdentityFile</tt> configuration keyword. For either
+of these techniques, you provide the name of your desired private key
+file (SSH1, OpenSSH) or identification file (SSH2). [<a href="ch07_04.html#ch07-80828">Section 7.4.2, "User Identity"</a>] <a href="ch06_04.html#ch06-56012">Table 6-2</a> displays a
+summary of the syntax.</p>
+
+
+
+<a name="ch06-56012" /><h4 class="objtitle">Table 6-2. Syntax Summary </h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Version</p></th>
+<th>
+ssh</p></th>
+<th>
+scp</p></th>
+<th>
+IdentityFile Keyword</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+SSH1, OpenSSH</p></td>
+<td>
+<em class="filename">ssh1 -i</em> <em class="filename">key_file</em> ...</p></td>
+<td>
+<em class="filename">scp1 -i</em> <em class="filename">key_file</em> ...</p></td>
+<td>
+<tt class="literal">IdentityFile</tt> <em class="filename">key_file</em></p></td>
+</tr>
+
+
+<tr>
+<td>
+SSH2</p></td>
+<td>
+<em class="filename">ssh2 -i</em> <em class="filename">id_file</em> ...</p></td>
+<td>
+<em class="filename">scp2 -i</em> <em class="filename">id_file</em> ...</p></td>
+<td>
+<tt class="literal">IdentityFile</tt> <em class="filename">id_file</em></p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-27-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.4.2. Switching Identities with an Agent</h3>
+
+
+
+If you use an SSH agent, identity-switching is handled automatically.
+Simply load all the desired identities into the agent using
+<tt class="command">ssh-add</tt>. Thereafter, when you attempt a
+connection, your SSH client requests and receives a list of all your
+identities from the agent. The client then tries each identity in
+turn until one authenticates successfully, or they all fail. Even if
+you have 10 different identities for 10 different SSH servers, a
+single agent (containing these keys) provides appropriate key
+information to your SSH clients for seamless authentication with all
+10 servers.</p>
+
+
+
+All this happens transparently with no effort on your part. Well,
+almost no effort. There are two potential problems that can strike if
+you have two SSH identities that can connect to the same SSH server.</p>
+
+
+
+The first problem occurs because the
+<a name="INDEX-1125" />agent stores identities in the order in
+which it receives them from <em class="emphasis">ssh-add</em>. As
+we've said, the SSH client tries identities "in
+turn," i.e., in the order it gets them from the agent.
+Therefore, it is your responsibility to add identities to the agent
+in a careful, useful order. Otherwise, if two or more identities
+apply in a situation, an SSH client might authenticate with the wrong
+one.</p>
+
+
+
+For example, suppose you have two SSH1 identities stored in the files
+<em class="filename">id-normal</em> and <em class="filename">id-backups</em>.
+You use <em class="filename">id-normal</em> for normal terminal sessions
+to <em class="emphasis">server.example.com</em> and
+<em class="filename">id-backups</em> for invoking a remote backup program
+on <em class="emphasis">server.example.com</em> (e.g.,
+using a forced command [<a href="ch08_02.html#ch08-22858">Section 8.2.4, "Forced Commands "</a>]). Each day when
+you log in, you load both keys into an agent, using a clever script
+that locates and loads all key files in a given directory:</p>
+
+
+
+<blockquote><pre class="code">#!/bin/csh
+cd ~/.ssh/my-keys						<i class="lineannotation"># An example directory</i></pre></blockquote>
+
+
+
+<blockquote><pre class="code">foreach keyfile (*)
+  ssh-add $keyfile
+end</pre></blockquote>
+
+
+
+What happens when you invoke an SSH client?</p>
+
+
+
+<blockquote><pre class="code">$ ssh server.example.com</pre></blockquote>
+
+
+
+In this case, the remote backup program gets run, authenticating with
+the key in file <em class="filename">id-backups</em>. You see, the
+wildcard in your script returns a list of key files in alphabetical
+order, so <em class="filename">id-backups</em> is added before
+<em class="filename">id-normal</em>, as if you'd typed:</p>
+
+
+
+<blockquote><pre class="code">$ ssh-add id-backups
+$ ssh-add id-normal</pre></blockquote>
+
+
+
+Therefore, your SSH clients will always use the key
+<em class="emphasis">id-backups</em> when connecting to <em class="emphasis">server.example.com</em> because the agent
+provides it first in response to a client request. This might not be
+what you intended.</p>
+
+
+
+The second problem only makes this behavior worse: identities in an
+agent take precedence over identities used manually. If an identity
+in the agent can successfully authenticate, there's no way to
+override the agent manually with the <span class="option">-i</span> command-line
+option or the <tt class="literal">IdentityFile</tt> keyword. So in the
+earlier example, there is literally no way to use the identity
+<em class="emphasis">id-normal</em>. The obvious attempt:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -i id-normal server.example.com</pre></blockquote>
+
+
+
+still authenticates with <em class="emphasis">id-backup</em> s because it
+is loaded first into the agent. Even nonloaded identities can't
+override the agent's selection. For example, if you load only
+one identity into the agent and try authenticating with the other:</p>
+
+
+
+<blockquote><pre class="code">$ ssh-add id-normal
+$ ssh -i id-backups server.example.com</pre></blockquote>
+
+
+
+your <tt class="command">ssh</tt> connection authenticates with the loaded
+identity, in this case <em class="filename">id-normal</em>, regardless of
+the <span class="option">-i</span> option.<a href="#FOOTNOTE-88">[88]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-88" />[88]This undocumented
+behavior drove us insane until we figured out what was happening.
+Similar behavior occurs with Kerberos authentication in SSH1. If you
+have Kerberos credentials that allow you to connect, you aren't
+running an agent, and you specify a key with <span class="option">-i</span>,
+that key isn't used unless you destroy your Kerberos
+credentials (or otherwise make them unusable, for instance, hiding
+them by setting the KRB5CCNAME variable), because Kerberos is tried
+first.</p>
+
+
+</blockquote>
+
+
+
+As a general rule, if you have two SSH identities valid on an SSH
+server, don't load either identity into an agent. Otherwise,
+one of those identities will be unable to access that server.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch06-28-fm2xml" /><div class="sect2">
+<h3 class="sect2">6.4.3. Tailoring Sessions Based on Identity</h3>
+
+
+
+Despite the gloom and doom in the previous section, multiple
+identities can be extremely useful. In particular, you can configure
+your remote accounts to respond differently to different identities.
+This is a three-step process:</p>
+
+
+
+<ol><li>Generate a new SSH identity, as we have discussed in this chapter.</p></li><li>Set up a detailed client configuration that does what you want, using
+your new identity. This is the subject of <a href="ch07_01.html">Chapter 7, "Advanced Client Use"</a>.</p></li><li>Set up your account on the SSH server machine to respond to your new
+identity in a desired manner. This is covered in detail in <a href="ch08_01.html">Chapter 8, "Per-Account Server Configuration"</a>.</p></li></ol>
+We strongly encourage you to experiment with this technique. You can
+do some really powerful and interesting things with SSH this way. If
+you're just running simple terminal sessions with SSH, you are
+missing half the fun.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.3. SSH Agents</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.5. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch06_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

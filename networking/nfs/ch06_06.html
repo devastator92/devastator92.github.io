@@ -1,0 +1,283 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>Naming schemes (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch07_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.6. Naming schemes</h2>
+
+Simple, efficient naming schemes make<a name="INDEX-976" /> <a name="INDEX-977" />
+the difference between a filesystem that is well organized and a
+pleasure to use, and a filesystem that you are constantly fighting
+against. In this section, we'll look at ways of using mount
+points and symbolic links to create simple, consistent naming schemes
+on all NFS clients. NFS provides the mechanism for making distributed
+filesystems transparent to the user, but it has no inherent
+guidelines for creating easy to use and easier to manage filesystem
+hierarchies. There are few global rules, and each network will adopt
+conventions based on the number of servers, the kinds of files
+handled by those servers, and any peculiar naming requirements of
+locally developed or third-party software.
+</p>
+
+Note that this section assumes that you will not be
+using<a name="INDEX-978" /> the automounter (see <a href="ch09_01.html">Chapter 9, "The Automounter"</a>). It is strongly advised that you
+<em class="emphasis">do</em> use the automounter, because every issue
+mentioned and solved here is much more easily solved with the
+automounter.
+</p>
+
+As a system administrator, you should first decide how the various
+NFS fileservers fit together on a client before assigning filesystem
+names and filling them with software or users. Here are some ideas
+and suggestions for choosing NFS naming schemes:
+</p>
+
+<ul><li>
+Avoid having NFS mounts on directories directly under the root (/ )
+directory of each NFS client. The reason is that if an NFS server
+crashes, then any attempts to access the mounted directory will hang
+the application even if it is not interested in the NFS mount point.
+This can happen if an application invokes the library equivalent of
+the <em class="emphasis">pwd</em> command: <em class="emphasis">getcwd( )</em>.
+<a href="#FOOTNOTE-9">[9]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-9" />[9]The <em class="emphasis">getcwd( )</em> routine builds
+its pathname of the current working directory by searching upward via
+the ".." directory, and then reading each directory to
+find the directory with the same file ID number as the current
+working directory. To get the file ID requires invoking the
+<em class="emphasis">stat( )</em> system call on the directory. If the
+directory is served by an NFS server, and the server is unavailable,
+then <em class="emphasis">stat( )</em>, hence <em class="emphasis">getcwd(
+)</em>, and the application will hang indefinitely.</p>
+</blockquote>
+</li><li>
+Pick a common directory on each client under which you will mount
+each user's home directory. For example, if you pick
+<em class="emphasis">/users</em>, then each user's home directory is accessed
+via the <em class="emphasis">/users/username</em> naming scheme.<a href="#FOOTNOTE-10">[10]</a>
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-10" />[10]The example uses <em class="emphasis">/users</em> and not
+<em class="emphasis">/home</em>. This is because the automounter in
+Solaris reserves <em class="emphasis">/home</em>. While you can modify
+each Solaris client to remove the reservation, that is tedious. A
+common error is for people to use <em class="emphasis">vfstab</em> or the
+<em class="emphasis">mount</em> command to mount onto
+<em class="emphasis">/home</em>, and if the automounter has reserved
+/home, things will fail in odd ways.</p> </blockquote>
+
+This makes it easier to deal with servers that have several
+filesystems of home directories. The disadvantage to this approach is
+that it requires a larger <em class="emphasis">/etc/vfstab</em> file, with
+one entry for each user's home directory. If you use the NFS
+automounter, this naming scheme is more easily managed than the
+hostname-oriented one (and the automounter has a
+<em class="emphasis">/home/username</em> scheme preconfigured).
+Directories that follow any regular naming scheme are easily managed
+by the automounter, as discussed in <a href="ch09_01.html">Chapter 9, "The Automounter"</a>.
+</p>
+</li><li>
+Do not allow the physical location of the files on the server to
+dictate the pathnames to be used on the client. For example, if the
+software tools directory is on
+<em class="emphasis">wahoo:/export/home/toolbox</em>, then instead of
+mounting <em class="emphasis">wahoo:/export/home/toolbox</em>
+ontoeachclient's <em class="emphasis">/export/home/toolbox</em>
+directory, use something more user friendly, like
+<em class="emphasis">/software/toolbox</em>:
+</p>
+
+<blockquote><pre class="code">mount wahoo:/export/home/toolbox /software/toolbox</pre></blockquote>
+
+Normally you don't want people running applications on hosts
+that are also NFS servers. However, if you allow this, and if you
+want users on the NFS server to be able to access the toolbox as
+/software/toolbox, then you can either create a symbolic link
+from <em class="emphasis">/software/toolbox</em> to
+<em class="emphasis">/export/home/toolbox</em>, or use the loopback
+filesystem in Solaris to accomplish the same thing without the
+overhead of a symbolic link:
+</p>
+
+<blockquote><pre class="code">mount -F lofs /export/home/toolbox /software/toolbox</pre></blockquote>
+</li></ul>
+<ul><li>
+Keep growth in mind. Having a single third-party software filesystem
+may be the most effective (or only) solution immediately, but over
+the next year you may need to add a second or third filesystem to
+make room for more tools. To provide adequate performance, you may
+want to put each filesystem on a different server, distributing the
+load. If you choose a naming scheme that cannot be extended, you will
+end up renaming things later on and having to support the "old
+style" names.
+</p>
+</li></ul>
+In the third-party tools directory example, you could separate tools
+into subdirectories grouped by function:
+<em class="emphasis">/software/tools/epubs</em> for page composition and
+publishing software, and <em class="emphasis">/software/tools/cae</em> for
+engineering tools. If either directory grows enough to warrant its
+own filesystem, you can move the subdirectory to a new server and
+preserve the existing naming scheme by simply mounting both
+subdirectories on clients:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">Before: single tools depository </i>
+# <tt class="userinput"><b>mount toolbox:/export/home/tools  /software/tools</b></tt> 
+ 
+<i class="lineannotation">After: multiple filesystems </i>
+# <tt class="userinput"><b>mount toolbox:/export/home/epubs /software/tools/epubs</b></tt> 
+# <tt class="userinput"><b>mount backpack:/export/home/case /software/tools/cae</b></tt></pre></blockquote>
+
+<a name="nfs2-CHP-6-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">6.6.1. Solving the /usr/local puzzle</h3>
+
+Let's assume you have a network with many<a name="INDEX-979" /> different kinds of
+workstations: SPARC workstations, PowerPC-based workstations, Unix
+PCs, and so on. Of course, each kind of workstation has its own set
+of executables. The executables may be built from the same source
+files, but you need a different binary for each machine architecture.
+How do you arrange the filesystem so that each system has a
+<em class="emphasis">/usr/local/bin</em> directory (and, by extension,
+other executable directories) that contains only the executables that
+are appropriate for its architecture? How do you "hide"
+the executables that aren't appropriate, so there's no
+chance that a user will mistakenly try to execute them? This is the
+<em class="emphasis">/usr/local</em> puzzle: creating an
+"architecture neutral" executable directory.
+</p>
+
+Implementing an architecture-neutral
+<em class="emphasis">/usr/local/bin</em> is probably one of the first
+challenges posed to the system administrator of a heterogeneous
+network. Everybody wants the standard set of tools, such as emacs,
+PostScript filters, mail-pretty printers, and the requisite telephone
+list utility. Ideally, there should be one <em class="emphasis">bin</em>
+directory for each architecture, and when a user looks in
+<em class="emphasis">/usr/local/bin</em> on any machine, he or she should
+find the proper executables. Hiding the machine architecture is a
+good job for symbolic links.
+</p>
+
+One solution is to name the individual binary directories with the
+machine type as a suffix and then mount the proper one on
+<em class="emphasis">/usr/local/bin</em>:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">On server toolbox: </i>
+# <tt class="userinput"><b>cd /export/home/local</b></tt> 
+# <tt class="userinput"><b>ls</b></tt> 
+bin.mips bin.sun3 bin.sun4 bin.vax 
+ 
+<i class="lineannotation">On client: </i>
+# <tt class="userinput"><b>mount toolbox:/export/home/local/bin.`arch` /usr/local/bin</b></tt></pre></blockquote>
+
+The <em class="emphasis">mount</em> command determines the architecture of
+the local host and grabs the correct binary directory from the
+server.
+</p>
+
+This scheme is sufficient if you only have binaries in your local
+depository, but most sites add manual pages, source code, and other
+ASCII files that are shared across client architectures. There is no
+need to maintain multiple copies of these files. To accommodate a
+mixture of shared ASCII and binary files, use two mounts of the same
+filesystem: the first mount sets up the framework of directories, and
+puts the shared file directories in their proper place. The second
+mount deposits the proper binary directory on top of
+<em class="emphasis">/usr/local/bin</em>:
+</p>
+
+<blockquote><pre class="code"><i class="lineannotation">On server toolbox: </i>
+# <tt class="userinput"><b>cd /export/home/local</b></tt> 
+# <tt class="userinput"><b>ls</b></tt> <tt class="userinput"><b>bin</b></tt>
+bin.mips bin.sun3 bin.sun4 bin.vax mansharesrc 
+ 
+<i class="lineannotation">On client: </i>
+# <tt class="userinput"><b>mount toolbox:/export/home/local /usr/local</b></tt> 
+# <tt class="userinput"><b>mount toolbox:/export/home/local/bin.`arch` /usr/local/bin</b></tt></pre></blockquote>
+
+At first glance, the previous example appears to violate the NFS
+rules prohibiting the export of a directory and any of its
+subdirectories. However, there is only one exported filesystem on
+server <em class="emphasis">toolbox</em>, namely,
+<em class="emphasis">/export/home</em>. The clients mount different parts
+of this exported filesystem on top of one another. NFS allows a
+client to mount any part of an exported filesystem, on any directory.
+</p>
+
+To save disk space with the two-mount approach, populate
+<em class="emphasis">/export/home/bin</em> on the server with the proper
+executables, and make the <em class="emphasis">bin.arch</em> directory a
+symbolic link to <em class="emphasis">bin</em>. This allows clients of the
+same architecture as the server to get by with only one mount.
+</p>
+
+If you keep <em class="emphasis">all</em> executables  --  scripts and
+compiled applications  --  in the <em class="emphasis">bin</em>
+directories, you still have a problem with duplication. At some
+sites, scripts may account for more than half of the tools in
+<em class="emphasis">/usr/local/bin</em>, and having to copy them into
+each architecture-specific <em class="emphasis">bin</em> directory makes
+this solution less pleasing.
+</p>
+
+A more robust solution to the problem is to divide shell scripts and
+executables into two directories: scripts go in
+<em class="emphasis">/usr/local/share</em> while compiled executables live
+in the familiar <em class="emphasis">/usr/local/bin</em>. This makes
+<em class="emphasis">share</em> a peer of the
+<em class="emphasis">/usr/local/man</em> and <em class="emphasis">src</em>
+directories, both of which contain architecture-neutral ASCII files.
+To adapt to the fully architecture-neutral
+<em class="emphasis">/usr/local/bin</em>, users need to put both
+<em class="emphasis">/usr/local/bin</em> and
+<em class="emphasis">/usr/local/share</em> in their search paths, although
+this is a small price to pay for the guarantee that all tools are
+accessible from all systems.
+</p>
+
+There is one problem with mounting one filesystem on top of another:
+if the server for these filesystems goes down, you will not be able
+to unmount them until the server recovers. When you unmount a
+filesystem, it gets information about all of the directories above
+it. If the filesystem is not mounted on top of another NFS
+filesystem, this isn't a problem: all of the directory
+information is on the NFS client. However, the hierarchy of mounts
+used in the <em class="emphasis">/usr/local/bin</em> example presents a
+problem. One of the directories that an unmount operation would need
+to check is located on the server that crashed. An attempt to unmount
+the <em class="emphasis">/usr/local/bin</em> directory will hang because
+it tries to get information about the <em class="emphasis">/usr/local</em>
+mount point  --  and the server for that mount point is the one
+that crashed. Similarly, if you try to unmount the
+<em class="emphasis">/usr/local</em> filesystem, this attempt will fail
+because the <em class="emphasis">/usr/local/bin</em> directory is in use:
+it has a<a name="INDEX-980" />
+<a name="INDEX-981" />
+filesystem <a name="INDEX-982" /> <a name="INDEX-983" />mounted on it.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch07_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.5. Replication</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">7. Network File System Design and Operation</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

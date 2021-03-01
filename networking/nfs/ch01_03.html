@@ -1,0 +1,608 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch01_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+<head><title>Network layer (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch01_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<a name="INDEX-101" /><a name="INDEX-102" /><h2 class="sect1">1.3. Network layer</h2>
+
+
+At the data link layer, things are fairly simple. Machines <a name="INDEX-103" /> <a name="INDEX-104" />agree on the format of packets and a
+standard 48-bit host addressing scheme. However, the packet format
+and encoding vary with different physical layers: Ethernet has one
+set of characteristics, while an X.25-based satellite network has
+another. Because there are many physical networks, there should
+ideally be a standard interface scheme so that it isn't
+necessary to re-implement protocols on top of each physical network
+and its peculiar interfaces. This is where the network layer fits in.
+The higher-level protocols, such as TCP (at the transport layer),
+don't need to know any details about the physical network that
+is in use. As mentioned
+<a name="INDEX-105" />before, TCP runs over Ethernet,
+fiber optic network, or other media; the TCP protocols don't
+care about the physical connection because it is represented by a
+well-defined network layer interface.</p>
+
+
+<a name="INDEX-106" /><a name="INDEX-107" />The
+network layer protocol of <a name="INDEX-108" />primary interest to NFS and NIS is the
+Internet Protocol, or IP. As its name implies, IP is responsible for
+getting packets between hosts on one or more networks. Its job is to
+make a best effort to get the data from point A to point B. IP makes
+no guarantees about getting all of the data to the destination, or
+the order in which the data arrives  --  these details are left
+for higher-level protocols to worry about.</p>
+
+
+<a name="INDEX-109" />On a local area network, IP
+has a fairly simple job, since it just moves packets from a
+higher-level protocol down to the data link layer. In a set of
+connected networks, however, IP is responsible for determining how to
+get data from its source to the correct destination network. The
+process of directing datagrams to another network is
+<a name="INDEX-110" />
+<a name="INDEX-111" />called
+<em class="emphasis">routing</em>; it is one of the primary functions of
+the IP protocol. <a href="appa_01.html">Appendix A, "IP Packet Routing"</a> contains a detailed
+description of how IP performs routing.</p>
+
+
+<a name="nfs2-CHP-1-SECT-3.1" /><div class="sect2">
+<a name="INDEX-112" /><h3 class="sect2">1.3.1. Datagrams and packets</h3>
+
+
+IP deals with data in chunks called <em class="emphasis">datagrams</em>.
+The <a name="INDEX-113" /> <a name="INDEX-114" />terms<a name="INDEX-115" />
+packet and <a name="INDEX-116" />
+<a name="INDEX-117" /><a name="INDEX-118" />datagram
+are often used interchangeably, although a packet is a data
+link-layer object and a datagram is network layer object. In many
+cases, particularly when using IP on Ethernet, a datagram and packet
+refer to the same chunk of data. There's no guarantee that the
+physical link layer can handle a packet of the network layer's
+size. As previously mentioned, the largest packet that can be handled
+by the physical link layer is called the Maximum
+Transmission<a name="INDEX-119" /> Unit, or MTU, of the network media. If
+the medium's MTU is smaller than the network's packet
+size, then the network layer has to break large datagrams down into
+packet-sized chunks that the data link and physical layers can
+digest. This process is called <em class="emphasis">fragmentation</em>.
+The host receiving a fragmented datagram reassembles the pieces in
+the correct
+order.<a name="INDEX-120" /> For
+example, an X.25 network may have an MTU as small as 128 bytes, so a
+1518-byte IP datagram would have to be fragmented into many smaller
+network packets to be sent over the X.25 link. For the scope of this
+book, we'll use packet to describe both the IP and the data
+link-layer objects, since NFS is most commonly run on Ethernet rather
+than over wide-area networks with smaller MTUs. However, the
+distinction will be made when necessary, such as when discussing NFS
+traffic over a wide area <a name="INDEX-121" /> <a name="INDEX-122" />point-to-point <a name="INDEX-123" />link.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-3.2" /><div class="sect2">
+<a name="INDEX-124" /><a name="INDEX-125" /><a name="INDEX-126" /><a name="INDEX-127" /><h3 class="sect2">1.3.2. IP host addresses</h3>
+
+
+The internet protocol identifies hosts with a <a name="INDEX-128" /> <a name="INDEX-129" />
+<a name="INDEX-130" />number called an <em class="emphasis">IP
+address</em> or a <em class="emphasis">host address</em>. To avoid
+confusion with MAC <a name="INDEX-131" /> <a name="INDEX-132" />addresses (which
+<a name="INDEX-133" />are
+machine or <em class="emphasis">station</em> addresses), the term IP
+address will be used to designate this kind of address. IP addresses
+come in two flavors: 32-bit IP Version 4 (IPv4) or 128 bit IPv6
+address. We will talk about IPv6 addresses later in this chapter. For
+now, we will focus on IPv4 addresses. IPv4 addresses are written as
+four dot-separated decimal numbers between 0-255 (a dotted quad):</p>
+
+
+<blockquote><pre class="code">192.9.200.1</pre></blockquote>
+
+
+IP addresses must be unique among all connected machines. Connected
+<a name="INDEX-134" /> <a name="INDEX-135" />machines in this case are any hosts
+that you can get to over a network or connected set of networks,
+including your local area network, remote offices joined by the
+company's wide-area network, or even the entire Internet
+community. For a standalone system or a small office that is not
+connected (via an IP network) to the outside world, you can use the
+standard, private network addresses assigned such purposes. See <a href="ch01_03.html#nfs2-CHP-1-SECT-3.3">Section 1.3.3, "IPv4 address classes"</a> later in this chapter. If
+your network is connected to the Internet, you have to get a range of
+IP addresses assigned to your machines through a central network
+administration authority, via your Internet Service Provider. If you
+are planning on joining the Internet in the future, you will need to
+obtain an address from your network service provider. This may be
+either an actual provider of Internet service, or your own
+organization, if it has addresses to hand out. We won't go into
+this further in this book.</p>
+
+
+The IP address uniqueness requirement differs from that for MAC
+addresses. IP addresses are unique only on connected networks, but
+machine MAC addresses are unique in the world, independent of any
+connectivity. Part of the reason for the difference in the uniqueness
+requirement is that IPv4 addresses are 32 bits, while MAC addresses
+are 48 bits, so mapping every possible MAC address into an IPv4
+address requires some overlap. There are a variety of reasons why the
+IPv4 address is only 32 bits, while the MAC address is 48 bits, most
+of which are historical.</p>
+
+
+Since the network and data link layers use different addressing
+schemes, some system is needed to convert or map the IP addresses to
+MAC addresses. Transport-layer services and user processes use IP
+addresses to identify hosts, but packets that go out on the network
+need MAC addresses.
+The<a name="INDEX-136" /><a name="INDEX-137" />
+Address Resolution Protocol (ARP) is used to convert the 32-bit IPv4
+address of a host into its 48-bit MAC address. When a host wants to
+map an IP address to a MAC address, it broadcasts an ARP request on
+the network, asking for the host using the IP address to respond. The
+host that sees its own IP address in the request returns its MAC
+address to the sender. With a MAC address, the sending host can
+transmit a packet on the Ethernet and know that the receiving host
+will recognize it.</p>
+
+
+A host can have more than one IP address. Usually this is because the
+host is connected to multiple physical network segments (requiring
+one network interface, such as an Ethernet controller, per segment),
+or <a name="INDEX-138" />
+<a name="INDEX-139" />
+<a name="INDEX-140" />because
+the host has multiple interfaces to the same physical network
+segment.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">1.3.3. IPv4 address classes</h3>
+
+
+Each IPv4 address has a <em class="emphasis">network number</em> and a
+<em class="emphasis">host number</em>. The <a name="INDEX-141" />
+<a name="INDEX-142" /> <a name="INDEX-143" />host number identifies a particular
+machine on an organization's network. IP addresses are
+<a name="INDEX-144" />divided
+into <em class="emphasis">classes</em> that determine which parts of the
+address make up the network and host numbers, as demonstrated in
+<a href="ch01_03.html#nfs2-CHP-1-TABLE-2">Table 1-2</a>.</p>
+
+
+<a name="nfs2-CHP-1-TABLE-2" /><h4 class="objtitle">Table 1-2. IPv4 address classes </h4><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Address Class and First Octet Value</p></th>
+<th>
+Network Number Octets</p></th>
+<th>
+Host Number Octets</p></th>
+<th>
+Address Form</p></th>
+<th>
+Number of Networks</p></th>
+<th>
+Number of Hosts per Network</p></th>
+<th>
+Maximum Number of Hosts per Class</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Class A: 1-126</p></td>
+<td>
+1</p></td>
+<td>
+3</p></td>
+<td>
+N.H.H.H</p></td>
+<td>
+126</p></td>
+<td>
+256<sup class="superscript">3</sup> - 2</p></td>
+<td>
+2,113,928,964</p></td>
+</tr>
+
+<tr>
+<td>
+Class B: 128-191</p></td>
+<td>
+2</p></td>
+<td>
+2</p></td>
+<td>
+N.N.H.H</p></td>
+<td>
+16,384</p></td>
+<td>
+256<sup class="superscript">2</sup> - 2</p></td>
+<td>
+1,073,709,056</p></td>
+</tr>
+
+<tr>
+<td>
+Class C: 192-223</p></td>
+<td>
+3</p></td>
+<td>
+1</p></td>
+<td>
+N.N.N.H</p></td>
+<td>
+2,097,152</p></td>
+<td>
+254</p></td>
+<td>
+532,676,608</p></td>
+</tr>
+
+<tr>
+<td>
+Class D: 224-239</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+<td>
+M.M.M.M</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+<tr>
+<td>
+Class E: 240-255</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+<td>
+R.R.R.R</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+<td>
+N/A</p></td>
+</tr>
+
+
+</table><p>
+
+
+Each <em class="emphasis">N</em> represents part of the network number and
+each <em class="emphasis">H</em> is part of the address's host
+number. The 8-bit octet has 256 possible values, but 0 and 255 in the
+last host octet are reserved for forming broadcast addresses.</p>
+
+
+Network numbers with first octet values of 240-254 are reserved for
+future use. The network numbers 0, 127, 255, 10, 172.16-172.31, and
+192.168.0-192.168.255 are also reserved:</p>
+
+
+<ul><li>0 is used as a place holder in forming a network number, and in some
+cases, for IP broadcast addresses.</p></li><li>127 is for a host's loopback<a name="INDEX-145" /> <a name="INDEX-146" /> interface.</p></li><li>255 is used for IPv4 broadcast <a name="INDEX-147" />
+<a name="INDEX-148" />addresses.</p></li><li>10, 172.16-172.31, and 192.168.0-192.168.255 are used for private
+networks that will never be connected to the global Internet.</p></li></ul>
+Note that there are only 126 class A network numbers, but well
+<a name="INDEX-149" />
+<a name="INDEX-150" />over two million class C network
+numbers. When the Internet was founded, it was almost impossible to
+get a class A network number, and few organizations (aside from
+entire networks or countries) had enough hosts to justify a class A
+address. Most companies and universities requested class B or class C
+addresses. A medium-sized company, with several hundred machines,
+could request several class C network numbers, putting up to 254
+hosts on each network. Now that the Internet is much bigger, the
+rules for class A, B, and C network number assignment have changed,
+as explained in <a href="ch01_03.html#nfs2-CHP-1-SECT-3.4">Section 1.3.4, "Classless IP addressing"</a>.</p>
+
+
+Class D addresses look similar to the other classes in that each
+address consists of 4 octets with a value no higher than 255 per
+octet. Unlike classes A, B, and C, a class D address does not have a
+network number and host number. Class D addresses are multicast
+addresses, which are used to send messages to more than one recipient
+host, whereas IP addresses in classes A, B, and C are unicast
+addresses destined for one recipient. Multicast on the Internet
+offers plenty of potential for efficient broadcast of information,
+such as bulk file transfers, audio and video, and stock pricing
+information, but has achieved limited deployment. There is an ongoing
+experiment known as the "MBONE" (Multicast backBONE) on
+<a name="INDEX-151" />the Internet to exploit this
+<a name="INDEX-152" />
+<a name="INDEX-153" />technology.</p>
+
+
+Class E addresses are reserved for future assignment.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">1.3.4. Classless IP addressing</h3>
+
+
+In the early 1990s, due to the advent <a name="INDEX-154" />
+<a name="INDEX-155" />of the World Wide Web, the
+Internet's growth exploded. In theory, if you sum the maximum
+number of hosts per classes A, B, and C (refer back to <a href="ch01_03.html#nfs2-CHP-1-TABLE-2">Table 1-2</a>), the Internet can have a potential for over 3.7
+billion hosts. In reality, the Internet was running out of address
+capacity for two reasons.</p>
+
+
+The first had to do with the inefficiencies built into the class
+partitioning. About 3.2 billion of the theoretical number of hosts
+were class A and class B, leaving about 500 million class C
+addresses. Most organizations did not need class A or class B
+addresses, and of those that did, a significant fraction of their
+assigned address space was not needed. Most users could get by with a
+class C network number, but the typical small business or home user
+did not need 254 hosts. Thus, the number of class C addresses was
+bounded by the maximum number of class C networks, about two million,
+which is far less than the number of users on the Internet.</p>
+
+
+The problem of only two million class C networks was mitigated by the
+introduction of dynamically assigned IP addresses, and by the
+introduction of policies that tended to assign IP network numbers
+only to Internet Service Providers (ISPs), or
+<a name="INDEX-156" />to organizations that effectively
+acted as their own ISP, which would then use the free market to
+efficiently reallocate the IP addresses dynamically or statically to
+their customers. Thus most Intenet users get assigned a single IP
+address, and the ISP is assigned the corresponding network number.</p>
+
+
+The second reason was routing scalability. When the Internet was
+orders of magnitude smaller then it is today, most address
+assignments were for class A or B and so routing between networks was
+straightforward. The routers simply looked at the network number, and
+sent it to a router responsible for that route. With the explosion of
+the Internet, and with most of that growth in class C network
+numbers, each network's router might have to maintain tables of
+hundreds of thousands of routes. As the Internet grew rapidly,
+keeping these tables up to date was difficult.</p>
+
+
+This situation was not sustainable, and so the concept of
+"classless addressing" was introduced. With the exception
+of grandfathered address assignments, each IP address, regardless of
+whether it's class A, B, or C, would not have an implicit
+network number part and host number part. Instead the network part
+would be designated explicitly via a suffix of the form:
+"/XX", where XX is the number of bits of the IP address
+that refer to the network. Those organizations that needed more than
+the 254 hosts that a class C address would provide, would instead be
+assigned consecutive class C addresses. For example, an ISP that was
+assigned 192.1.2 and 192.1.3 could have a classless network number of
+192.1.3.0/23. Any router on a network other than 192.1.2 or 192.1.3
+that wanted to send to either network number would instead route to a
+single router associated with the classless network number
+192.1.3.0/23 (i.e., any IP address that had its first 23 bits equal
+to 1100 0000 0000 0001 0000 001).</p>
+
+
+With this new scheme, larger organizations get more consecutive class
+C network numbers. Within their local networks
+("Intranets"), they can either use traditional
+class-based routing or classless routing that further subdivides the
+local network address space that can be used. The largest
+organizations may find that class-based routing doesn't scale,
+and so classless routing is the best<a name="INDEX-157" /> <a name="INDEX-158" /> approach.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">1.3.5. Virtual interfaces</h3>
+
+
+In <a href="ch01_03.html#nfs2-CHP-1-SECT-3.2">Section 1.3.2, "IP host addresses"</a>, we noted <a name="INDEX-159" /> <a name="INDEX-160" /> <a name="INDEX-161" />that a host could have multiple IP addresses
+assigned to it if it had multiple physical network interfaces. It is
+possible for a physical network segment to support more than one IP
+network number. For example, a segment might have 128.0.0.0/16 and
+192.4.5.6/24. Some hosts on that segment might want to directly
+address hosts with either network number. Some operating systems,
+such as Solaris, will let you define multiple virtual or logical
+interfaces for a physical network interface. On most Unix systems,
+the <em class="emphasis">ifconfig</em> command is used
+<a name="INDEX-162" />to set up
+interfaces. See your vendor's <em class="emphasis">ifconfig</em>
+manual page for <a name="INDEX-163" /> <a name="INDEX-164" /> <a name="INDEX-165" />more details.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">1.3.6. IP Version 6</h3>
+
+
+Until now we have been discussing IPv4 addresses <a name="INDEX-166" />
+<a name="INDEX-167" />that
+are four octets long. The discussion in <a href="ch01_03.html#nfs2-CHP-1-SECT-3.4">Section 1.3.4, "Classless IP addressing"</a> showed a clever way to extend
+the life of the 32 bit IPv4 address space. However, it was recognized
+long ago, even before the introduction of the World Wide Web, that
+the IPv4 address space was under pressure. IP Version 6 (IPv6) has
+been defined to solve the address space limitations by increasing the
+address length to 128 bit addresses. At the time of this writing,
+while most installed systems either do not support it or do not use
+it, most marketed systems support IPv6. Since it seems inevitable
+that you'll encounter some IPv6 networks in the next few years,
+we will explain some of the basics of IPv6. Note that IPv6 is
+sometimes<a name="INDEX-168" /> referred to as IPng: IP Next
+Generation.</p>
+
+
+Instead of dotted quads, IPv6 addresses are usually expressed as:</p>
+
+
+<blockquote><pre class="code">x:x:x:x:x:x:x:x</pre></blockquote>
+
+
+where each <em class="emphasis">x</em> is a 16 bit hexadecimal value. In
+environments where a network is transitioning from IP Version 4 to
+Version 6, you might want to use a form like:</p>
+
+
+<blockquote><pre class="code">x:x:x:x:x:x:d.d.d.d</pre></blockquote>
+
+
+where d.d.d.d represents an IP Version 4 dotted quad.</p>
+
+
+When there are one or more consecutive sequences of
+<em class="emphasis">x's</em> such that each <em class="emphasis">x</em>
+is all zeroes, the sequence can be replaced with "::",
+but there can be only one such "::" abbreviation in an
+IPv6 address. Thus:</p>
+
+
+<blockquote><pre class="code">1234:0000:5678:9ABC:DEF0:1234:5678:9ABC
+3:0:0:0:0:0:3333:4444</pre></blockquote>
+
+
+can be abbreviated as:</p>
+
+
+<blockquote><pre class="code">1234::5678:9ABC:DEF0:1234:5678:9ABC
+3::3333:4444</pre></blockquote>
+
+
+As you might expect, IPv6 dispenses with address classes for unicast
+addresses. You specify classless network numbers (address prefixes),
+using the same classless addressing notation that IP Version 4 uses.</p>
+
+
+<a name="nfs2-CHP-1-SECT-3.6.1" /><div class="sect3">
+<h3 class="sect3">1.3.6.1. IP Version 6 address pools</h3>
+
+
+While the designation of the network <a name="INDEX-169" />number in IPv6 is classless, the
+128-bit address is still carved up into various pools. Portions of
+the address space are allocated for:</p>
+
+
+<ul><li>Reserved or unassigned for future
+purposes</p></li><li>Open Systems Interconnection
+(OSI) network protocols</p></li><li>Novell IPX
+protocols</p></li><li>Unicast addresses,
+including:</p>
+
+<ul>
+<li>global unicast addresses that can be used to send packets to hosts
+outside the local site</p></li><li>site local unicast addresses than can be used to send packets only to
+hosts within a site</p></li><li>link local unicast addresses that can used to send packets only to
+hosts within a physical network
+segment</p></li></ul>
+</li></ul>
+
+<ul><li>Multicast addresses, which start with FF</p></li><li>Addresses of nodes that support just IP Version 4. These are denoted
+as:</p>
+<blockquote><pre class="code">::FFFF:d.d.d.d</pre></blockquote>
+</li></ul>
+
+<ul><li>Addresses of nodes that support IPv6, but want to use existing IP
+Version 4 infrastructure to encapsulate IPv6 packets within IPv4
+packets for transport between networks. The last 32 bits of these
+addresses correspond to IPv4 addresses. These addresses are denoted
+as:</p>
+<blockquote><pre class="code">::d.d.d.d</pre></blockquote>
+
+
+While this scheme does not let you benefit from IPv6's extended
+addressing, it does let you take advantage of IPv6's other
+features (such as a richer set of protocol options) while
+transitioning <a name="INDEX-170" />from IPv4.</p></li></ul>
+</div>
+
+
+
+<a name="nfs2-CHP-1-SECT-3.6.2" /><div class="sect3">
+<h3 class="sect3">1.3.6.2. IP Version 6 loopback address</h3>
+
+
+Instead of dedicating about 16 million addresses
+<a name="INDEX-171" />for
+loopback interfaces as IPv4 does, IPv6 uses just one address for that
+purpose:</p>
+
+
+<blockquote><pre class="code">::1</pre></blockquote>
+</div>
+
+
+
+<a name="nfs2-CHP-1-SECT-3.6.3" /><div class="sect3">
+<h3 class="sect3">1.3.6.3. IP Version 6 unspecified address</h3>
+
+
+IPv6 introduces the concept of an "unspecified" address,
+which <a name="INDEX-172" />
+<a name="INDEX-173" />is
+all zeroes:</p>
+
+
+<blockquote><pre class="code">::0</pre></blockquote>
+
+
+This address can be used by hosts that don't know their own
+address, but need to generate queries to determine their address
+assignment. Such hosts would use "::0" as the source
+<a name="INDEX-174" />
+<a name="INDEX-175" />address
+in <a name="INDEX-176" />
+<a name="INDEX-177" />an IPv6
+packet.</p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch01_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">1.2. Physical and data link layers
+</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">1.4. Transport layer</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch01_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+</html>

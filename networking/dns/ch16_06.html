@@ -1,0 +1,499 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+<head><title>Additional Resource Records (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch16_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">16.6. Additional Resource Records</h2>
+
+
+<a name="INDEX-2413" />There are
+a number of resource records that we haven't covered yet in
+this book. The first of these, HINFO, has been around since the
+beginning but hasn't been widely used. The others were defined
+in <a name="INDEX-2414" />RFC 1183 and
+several successive RFCs. Most are experimental, but some are on the
+standards track and are coming into more prevalent use. We'll
+describe them here to give you a little head start in getting used to
+them.</p><p>
+
+
+<a name="dns4-CHP-16-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">16.6.1. Host Information</h3>
+
+
+<a name="INDEX-2415" />HINFO stands
+for Host INFOrmation. The record-specific data is a pair of strings
+identifying the host's hardware type and operating system. The
+strings are supposed to come from the MACHINE NAMES and OPERATING
+SYSTEM NAMES listed in the "Assigned Numbers" RFC
+(currently RFC 1700), but this requirement is not enforced; you can
+use your own abbreviations. The RFC isn't at all comprehensive,
+so it's quite possible you won't find your system in the
+list anyway. Originally, host information records were intended to
+let services like FTP determine how to interact with a remote system.
+This would have made it possible to negotiate datatype
+transformations automatically, for example. Unfortunately, this
+didn't happen -- few sites supply accurate HINFO values for
+all their systems. Some network administrators use HINFO records to
+help them keep track of machine types instead of recording the
+machine types in a database or a notebook. Here are two examples of
+HINFO records; note that the hardware type and operating system
+fields must be surrounded with quotes if they include any whitespace:</p><p>
+
+
+<blockquote><pre class="code">;
+; These machine names and system names did not come from RFC 1700
+;
+wormhole  IN  HINFO  ACME-HW  ACME-GW
+cujo      IN  HINFO  "Watch Dog Hardware"  "Rabid OS"</pre></blockquote>
+
+
+Before you go adding them to your zone -- particularly a zone
+visible from the Internet -- you should know that HINFO records
+can present a security risk. By providing easily accessible
+information about a system, you may be making it easier for a hacker
+to break into it.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">16.6.2. AFSDB</h3>
+
+
+<a name="INDEX-2416" />AFSDB has a
+syntax like that of the MX record, and semantics a bit like that of
+the NS record. An AFSDB record gives either the location of an
+<a name="INDEX-2417" />
+<a name="INDEX-2418" />AFS
+cell database server or of a DCE cell's authenticated name
+server. The type of server the record points to and the name of the
+host running the server are contained in the record-specific data
+portion of the record.</p><p>
+
+
+So what's an AFS cell database server? Or AFS, for that matter?
+AFS originally stood for the Andrew File System, designed by the good
+folks at Carnegie-Mellon University as part of the Andrew Project.
+(It's now an IBM product.) AFS is a network filesystem, like
+NFS, but one that handles the latency of wide area networks much
+better than NFS does and provides local caching of files to enhance
+performance. An AFS cell database server runs the process responsible
+for tracking the location of filesets (groups of files) on various
+AFS fileservers within a cell (a logical group of hosts). So being
+able to find the AFS cell database server is the key to finding any
+file in the cell.</p><p>
+
+
+And what's an <a name="INDEX-2419" /> <a name="INDEX-2420" />authenticated
+name server? It holds location information about all sorts of
+services available within a DCE cell. A DCE cell? That's a
+logical group of hosts that share services offered by The Open
+Group's Distributed Computing Environment (DCE).</p><p>
+
+
+And now, back to our story. To access another cell's AFS or DCE
+services across a network, you must first find out where that
+cell's cell database servers or authenticated name servers are.
+Hence the new record type. The domain name the record is attached to
+gives the name of the cell the server knows about. Cells often share
+names with DNS domains, so this usually doesn't look at all
+odd.</p><p>
+
+
+As we said, the AFSDB record's syntax is like the MX
+record's syntax. In place of the preference value, you specify
+the number 1 for an AFS cell database server or 2 for a DCE
+authenticated name server.</p><p>
+
+
+In place of the mail exchanger host, you specify the name of the host
+running the server. Simple!</p><p>
+
+
+Say an <em class="emphasis">fx.movie.edu</em> systems
+administrator sets up a DCE cell (which includes AFS services)
+because she wants to experiment with distributed processing to speed
+up graphics rendering. She runs both an AFS cell database server and
+a DCE name server on <em class="emphasis">bladerunner.fx.movie.edu</em>, another cell
+database server on <em class="emphasis">empire.fx.movie.edu</em>, and another DCE
+name server on <em class="emphasis">aliens.fx.movie.edu</em>. She should set up
+the AFSDB records as follows:</p><p>
+
+
+<blockquote><pre class="code">; Our DCE cell is called fx.movie.edu, same as the domain name of the zone
+fx.movie.edu.  IN  AFSDB  1 bladerunner.fx.movie.edu.
+               IN  AFSDB  2 bladerunner.fx.movie.edu.
+               IN  AFSDB  1 empire.fx.movie.edu.
+               IN  AFSDB  2 aliens.fx.movie.edu.</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">16.6.3. X25, ISDN, and RT</h3>
+
+
+These three record types were created specifically in support of
+research on next-generation internets. Two of the records,
+<a name="INDEX-2421" />X25 and
+<a name="INDEX-2422" />ISDN, are
+simply address records specific to
+<a name="INDEX-2423" />X.25
+and
+<a name="INDEX-2424" />ISDN
+networks, respectively. Both take record-specific data appropriate to
+the type of network. The X25 record type uses an
+X.121<a name="INDEX-2425" />
+address (<a name="INDEX-2426" />X.121 is the ITU-T recommendation that
+specifies the format of addresses used in X.25 networks). The ISDN
+record type uses an ISDN address.</p><p>
+
+
+ISDN stands for <a name="INDEX-2427" />Integrated Services
+Digital Network. Telephone companies around the world use ISDN
+protocols to allow their telephone networks to carry both voice and
+data, creating an integrated network. Although ISDN's
+availability is spotty throughout the U.S., it has been widely
+adopted in some international markets. Since ISDN uses the telephone
+companies' networks, an ISDN address is just a phone number,
+and in fact consists of a country code, followed by an area code or
+city code, then by a local phone number. Sometimes there are a few
+extra digits at the end that you wouldn't see in a phone
+number, called a subaddress. The subaddress is specified in a
+separate field in the record-specific data.</p><p>
+
+
+Examples of the X25 and ISDN record types are:</p><p>
+
+
+<blockquote><pre class="code">relay.pink.com.  IN  X25  31105060845
+
+delay.hp.com.    IN  ISDN  141555514539488
+hep.hp.com.      IN  ISDN  141555514539488 004</pre></blockquote>
+
+
+These records are intended for use in conjunction with the Route
+Through (<a name="INDEX-2428" />
+<a name="INDEX-2429" />
+<a name="INDEX-2430" />RT) record type. RT is
+syntactically and semantically similar to the MX record type: it
+specifies an intermediate host that routes
+<em class="emphasis">packets</em> (instead of mail) to a destination host.
+So now, instead of being able to route only mail to a host that
+isn't directly connected to the Internet, you can route any
+kind of IP packet to that host by using another host as a forwarder.
+The packet could be part of a Telnet or FTP session, or perhaps even
+a DNS query!</p><p>
+
+
+Like MX, RT includes a preference value indicating how desirable
+delivery to a particular host is. For example, the records:</p><p>
+
+
+<blockquote><pre class="code">housesitter.movie.edu.  IN  RT  10 relay.pink.com.
+                        IN  RT  20 delay.hp.com.</pre></blockquote>
+
+
+instruct hosts to route packets bound for <em class="emphasis">housesitter.movie.edu</em> through
+<em class="emphasis">relay.pink.com</em> (the first
+choice) or through <em class="emphasis">delay.hp.com</em>(the second choice).</p><p>
+
+
+The way RT works with X25 and ISDN (and even A) records is like this:</p><p>
+
+
+<ol><li>Internet host A wants to send a packet to host B, which is not
+connected to the Internet.</p></li><li>Host A looks up host B's RT records. This search also returns
+all address records (A, X25, and ISDN) for each intermediate host.</p></li><li>Host A sorts the list of intermediate hosts and looks for its own
+domain name. If it finds it, the host removes its name and all
+intermediate hosts at higher preference values. This is analogous to
+<em class="filename">sendmail</em> 's "paring down" a
+list of mail exchangers.</p></li><li>Host A examines the address record(s) for the most preferred
+intermediate host that remains. If host A is attached to a network
+that corresponds to the type of address record indicated, it uses
+that network to send the packet to the intermediate host. For
+example, if host A were trying to send a packet through <em class="emphasis">relay.pink.com</em>, it would need
+connectivity to an X.25 network.</p></li><li>If host A lacks appropriate connectivity, it tries the next
+intermediate host specified by the RT records. For example, if host A
+lacked X.25 connectivity, it might fall back to connecting via ISDN
+to <em class="emphasis">delay.hp.com</em>.</p></li></ol>
+This process continues until the packet is routed to the most
+preferred intermediate host. The most preferred intermediate host may
+then deliver the packet directly to the destination host's
+address (which may be A, X25, or ISDN).</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-6.4" /><div class="sect2">
+<h3 class="sect2">16.6.4. Location</h3>
+
+
+<a name="INDEX-2431" />RFC 1876 defines an
+experimental record type, <a name="INDEX-2432" /> <a name="INDEX-2433" />LOC, that allows domain administrators to
+encode the locations of their computers, subnets, and networks. In
+this case, location means latitude, longitude, and altitude. Future
+applications could use this information to produce network maps,
+assess routing efficiency, and more.</p><p>
+
+
+In its basic form, the LOC record takes latitude, longitude, and
+altitude (in that order) as its record-specific data. Latitude and
+longitude are expressed in the format:</p><p>
+
+
+<blockquote><pre class="code">&lt;degrees&gt; [minutes [seconds.&lt;fractional seconds&gt;]] (N|S|E|W)</pre></blockquote>
+
+
+Altitude is expressed in meters.</p><p>
+
+
+If you're wondering how in the world you're going to get
+that data, check out "RFC 1876 Resources" at <em class="emphasis">http://www.ckdhr.com/dns-loc</em>. This site,
+created by Christopher Davis, one of the authors of RFC 1876, is an
+indispensable collection of information, useful links, and utilities
+for people creating LOC records.</p><p>
+
+
+<a name="INDEX-2434" />If you
+don't have your own Global Positioning System receiver to carry
+around to all of your computers -- and we <em class="emphasis">know
+</em>many of you do -- two sites that may come in handy are
+Etak's Eagle Geocoder at
+<a name="INDEX-2435" /><a href="http://www.geocode.com/eagle.html-ssi">http://www.geocode.com/eagle.html-ssi</a>, which
+you can use to find the latitude and longitude of most addresses in
+the United States, and AirNav's Airport Information at
+<a href="http://www.airnav.com/airports">http://www.airnav.com/airports</a>,
+which lets you find the elevation of the closest airport to you. If
+you don't have a major airport near you, don't worry: the
+database even includes the helipad at my neighborhood hospital!</p><p>
+
+
+Here's a LOC record for one of our hosts:</p><p>
+
+
+<blockquote><pre class="code">huskymo.boulder.acmebw.com.  IN  LOC  40 2 0.373 N 105 17 23.528 W 1638m</pre></blockquote>
+
+
+Optional fields in the record-specific data allow you to specify how
+large the entity you're describing is, in meters (LOC records
+can describe networks, after all, which can be quite large), as well
+as the horizontal and vertical precision. The size defaults to one
+meter, which is perfect for a single host. Horizontal precision
+defaults to 10,000 meters, and vertical precision to 10 meters. These
+defaults represent the size of a typical ZIP or postal code, the idea
+being that you can fairly easily find a latitude and longitude given
+a ZIP code.</p><p>
+
+
+You can also attach LOC records to the names of subnets and networks.
+If you've taken the time to enter information about the names
+and addresses of your networks in the format described in RFC 1101
+(covered earlier in this chapter), you can attach LOC records to the
+network names:</p><p>
+
+
+<blockquote><pre class="code">;
+; Map HP's network name to 15.0.0.0.
+;
+hp-net.hp.com.   IN   PTR 0.0.0.15.in-addr.arpa.
+                 IN   LOC 37 24 55.393 N 122 8 37 W 26m</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-16-SECT-6.5" /><div class="sect2">
+<h3 class="sect2">16.6.5. SRV</h3>
+
+
+<a name="INDEX-2436" />Locating a service or a particular type
+of server within a zone is a difficult problem if you don't
+know which host it runs on. Some zone administrators have attempted
+to solve this problem by using service-specific aliases in their
+zones. For example, at Movie U. we created the alias <em class="emphasis">ftp.movie.edu</em> and pointed it to the domain name of the host that runs our FTP archive:</p><p>
+
+
+<blockquote><pre class="code">ftp.movie.edu.      IN    CNAME           plan9.fx.movie.edu.</pre></blockquote>
+
+
+This makes it easy for people to guess a domain name that will get
+them to our FTP archive, and separates the domain name people use to
+access the archive from the domain name of the host it runs on. If we
+were to move the archive to a different host, we could simply change
+the CNAME record.</p><p>
+
+
+The experimental SRV record, introduced in RFC 2052, is a general
+mechanism for locating services. SRV also provides powerful features
+that allow zone administrators to distribute load and provide backup
+services, similar to what the MX record provides.</p><p>
+
+
+A unique aspect of the SRV record is the format of the domain name
+it's attached to. Like service-specific aliases, the domain
+name to which an SRV record is attached gives the name of the service
+sought, as well as the protocol it runs over, concatenated with a
+domain name. The labels representing the service name and the
+protocol begin with an underscore to distinguish them from labels in
+the domain name of a host. So, for example:</p><p>
+
+
+<blockquote><pre class="code">_ftp._tcp.movie.edu</pre></blockquote>
+
+
+represents the SRV records someone FTPing to <em class="emphasis">movie.edu</em> should retrieve in order to
+find the <em class="emphasis">movie.edu</em> FTP
+servers, while:</p><p>
+
+
+<blockquote><pre class="code">_http._tcp.www.movie.edu</pre></blockquote>
+
+
+represents the SRV records someone accessing the URL <em class="emphasis">http://www.movie.edu</em>should look up in order
+to find the <em class="emphasis">www.movie.edu</em>web servers.</p><p>
+
+
+The names of the service and protocol should appear in the latest
+Assigned Numbers RFC (the most recent as of this writing is RFC 1700)
+or be unique names used only locally. Don't use the port or
+protocol <em class="emphasis">numbers</em>, just the names.</p><p>
+
+
+The SRV record has four resource record-specific fields:
+<em class="firstterm">priority</em>, <em class="firstterm">weight</em>,
+<em class="firstterm">port</em>, and <em class="firstterm">target</em>.
+Priority, weight, and port are unsigned 16-bit numbers (between
+and 65535). Target is a domain name.</p><p>
+
+
+Priority works very similarly to the preference in an MX record: the
+lower the number in the priority field, the more desirable the
+associated target. When searching for hosts offering a given service,
+clients should try targets at the same priority before trying those
+at a higher priority value.</p><p>
+
+
+Weight allows zone administrators to distribute load to multiple
+targets. Clients should query targets that are at the same priority
+in proportion to their weight. For example, if one target has a
+priority of zero and a weight of one, and another target also has a
+priority of zero but a weight of two, the second target should
+receive twice as much load (in queries, connections, whatever) as the
+first. It's up to the service's clients to direct that
+load: they typically use a system call to choose a random number. If
+the number is, say, in the top one-third of the range, they try the
+first target, and if the number is in the bottom two-thirds of the
+range, they try the second target.</p><p>
+
+
+Port specifies the port on which the service being sought is running.
+This allows zone administrators to run servers on nonstandard ports.
+For example, an administrator could use SRV records to point web
+browsers at a web server running on port 8000 instead of the standard
+HTTP port (80).</p><p>
+
+
+Target, finally, specifies the domain name of a host on which the
+service is running (on the port specified in the port field). Target
+must be the canonical name of the host (not an alias), with address
+records attached to it.</p><p>
+
+
+So, for the <em class="emphasis">movie.edu</em> FTP
+server, we added these records to <em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">_ftp._tcp.movie.edu.  IN  SRV  1  0  21  plan9.fx.movie.edu.
+                      IN  SRV  2  0  21  thing.fx.movie.edu.</pre></blockquote>
+
+
+This instructs SRV-capable FTP clients to try the FTP server on
+<em class="emphasis">plan9.fx.movie.edu</em>'s
+port 21 first when accessing <em class="emphasis">movie.edu</em>'s FTP service, and then
+to try the FTP server on <em class="emphasis">thing.fx.movie.edu</em>'s port 21 if
+<em class="emphasis">plan9.fx.movie.edu</em>'s
+FTP server isn't available.</p><p>
+
+
+The records:</p><p>
+
+
+<blockquote><pre class="code">_http._tcp.www.movie.edu.  IN  SRV  0  2  80   www.movie.edu.
+                           IN  SRV  0  1  80   www2.movie.edu.
+                           IN  SRV  1  1  8000 postmanrings2x.movie.edu.</pre></blockquote>
+
+
+direct web queries for <em class="emphasis">www.movie.edu</em>(the web site) to port 80 on <em class="emphasis">www.movie.edu</em> (the host) and <em class="emphasis">www2.movie.edu</em>, with <em class="emphasis">www.movie.edu</em> getting twice the queries
+that <em class="emphasis">www2.movie.edu</em> does. If
+neither is available, the queries will go to <em class="emphasis">postmanrings2x.movie.edu</em> on port 8000.</p><p>
+
+
+To advertise that a particular service isn't available, use a dot in the target field:</p><p>
+
+
+<blockquote><pre class="code">_gopher._tcp.movie.edu.  IN  SRV  0  0  0  .</pre></blockquote>
+
+
+Unfortunately, support for the SRV record among clients is, to put it
+mildly, thin -- with Windows 2000 being the glaring exception.
+(More about that later in this chapter.) That's really too bad,
+given how useful SRV could be. Since SRV isn't widely
+supported, don't use SRV records in lieu of address records.
+It's prudent to include at least one address record for the
+"base" domain name to which your SRV records are
+attached, and more if you'd like the load spread between
+addresses. If you only list a host as a backup in the SRV records,
+don't include its IP address. Also, if a host runs a service on
+a nonstandard port, don't include an address record for it
+since there's no way to redirect clients to a nonstandard port
+with an A record.</p><p>
+
+
+So, for <em class="emphasis">www.movie.edu</em>, we
+included all these records:</p><p>
+
+
+<blockquote><pre class="code">_http._tcp.www.movie.edu.  IN  SRV  0  2  80   www.movie.edu.
+                           IN  SRV  0  1  80   www2.movie.edu.
+                           IN  SRV  1  1  8000 postmanrings2x.movie.edu.
+www.movie.edu.             IN  A    200.1.4.3 ; the address of www.movie.edu and
+                           IN  A    200.1.4.4 ; the address of www2.movie.edu
+                                              ; for the benefit of non-SRV aware
+                                              ; clients</pre></blockquote>
+
+
+Browsers that can handle SRV records will send twice as many requests
+to <em class="emphasis">www.movie.edu</em> as to
+<em class="emphasis">www2.movie.edu</em>, and will use
+<em class="emphasis">postmanrings2x.movie.edu</em>only if both of the main web servers are unavailable.
+Browsers that don't use SRV records will have their requests
+round-robined between the addresses of <em class="emphasis">www.movie.edu</em> and<a name="INDEX-2437" /> <em class="emphasis">www2.movie.edu</em>.<a name="INDEX-2438" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch16_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch16_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">16.5. Network Names and Numbers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">16.7. DNS and WINS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch16_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:33 GMT -->
+</html>

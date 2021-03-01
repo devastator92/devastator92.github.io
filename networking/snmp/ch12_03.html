@@ -1,0 +1,269 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>Throw Core (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">12.3. Throw Core</h2>
+
+<a name="INDEX-1898" /><a name="INDEX-1899" /><a name="INDEX-1900" /><a name="INDEX-1901" /><a name="INDEX-1902" /><a name="INDEX-1903" /><a name="INDEX-1904" /><a name="INDEX-1905" />Programs frequently leave core dumps
+behind. A core file contains all the process information pertinent to
+debugging. It usually gets written when a program dies abnormally.
+While there are ways to limit the size of a dump or prevent core
+dumps entirely, there are still times when they're needed
+temporarily. Therefore, most Unix systems have some sort of
+<i class="command">cron</i> script that automatically searches for core
+files and deletes them. Let's add some intelligence to these
+scripts to let us track what files are found, their sizes, and the
+names of the processes that created them.
+</p>
+
+The following Perl program is divided into four parts: it searches
+for a file with a given name (defaults to the name
+<em class="filename">core</em>), gets the file's statistics, deletes
+the file,<a href="#FOOTNOTE-66">[66]</a> and then sends a trap. Most of
+the processing is performed natively by Perl, but we use the command
+<i class="command">ls -l $FILENAME</i> to include the pertinent core file
+information within the SNMP trap. This command allows our operators
+to see information about the file in a format that's easy to
+recognize. We also use the <i class="command">file</i> command, which
+determines a file's type and its creator. Unless you know who
+created the file, you won't have the chance to fix the real
+problem.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-66" />[66]Before you start deleting core files, you
+should figure out who or what is dropping them and see if the owner
+wants these files. In some cases this core file may be their only
+means of debugging.</p> </blockquote>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+
+# Finds and deletes core files. It sends traps upon completion and 
+# errors. Arguments are:
+# -path directory   : search directory (and subdirectories); default /
+# -lookfor filename : filename to search for; default core
+# -debug value      : debug level
+
+while ($ARGV[0] =~ /^-/)
+{
+    if    ($ARGV[0] eq "-path")    { shift; $PATH    = $ARGV[0]; }
+    elsif ($ARGV[0] eq "-lookfor") { shift; $LOOKFOR = $ARGV[0]; }
+    elsif ($ARGV[0] eq "-debug")   { shift; $DEBUG   = $ARGV[0]; }
+    shift;
+}
+
+
+#################################################################
+##########################  Begin Main  #########################
+#################################################################
+
+require "find.pl";     # This gives us the find function.
+
+$LOOKFOR = "core" unless ($LOOKFOR); # If we don't have something 
+                                     # in $LOOKFOR, default to core
+
+$PATH    = "/"    unless ($PATH);    # Let's use / if we don't get 
+                                     # one on the command line
+
+(-d $PATH) || die "$PATH is NOT a valid dir!";    # We can search
+                                                  # only valid 
+                                                  # directories
+
+&amp;find("$PATH");
+
+#################################################################
+######################  Begin SubRoutines  ######################
+#################################################################
+
+sub wanted
+{
+    if (/^$LOOKFOR$/)
+        {
+            if (!(-d $name)) # Skip the directories named core
+            {
+               &amp;get_stats;
+               &amp;can_file;
+               &amp;send_trap;
+            }
+        }
+}
+
+sub can_file
+{
+    print "Deleting :$_: :$name:\n" unless (!($DEBUG));
+    $RES = unlink "$name";
+    if ($RES != 1) { $ERROR = 1; }
+}
+
+sub get_stats
+{
+    chop ($STATS = `ls -l $name`);
+    chop ($FILE_STATS = `/bin/file $name`);
+
+    $STATS =~ s/\s+/ /g;
+    $FILE_STATS =~ s/\s+/ /g;
+}
+
+sub send_trap
+{
+    if ($ERROR == 0) { $SPEC = 1535; }
+    else             { $SPEC = 1536; }
+    print "STATS: $STATS\n" unless (!($DEBUG));
+    print "FILE_STATS: $FILE_STATS\n" unless (!($DEBUG));
+
+# Sending a trap using Net-SNMP
+#
+#system "/usr/local/bin/snmptrap nms public .1.3.6.1.4.1.2789.2500 '' 6 $SPEC '' 
+#.1.3.6.1.4.1.2789.2500.1535.1 s \"$name\" 
+#.1.3.6.1.4.1.2789.2500.1535.2 s \"$STATS\" 
+#.1.3.6.1.4.1.2789.2500.1535.3 s \"$FILE_STATS\"";
+
+# Sending a trap using Perl
+#
+use SNMP_util "0.54";  # This will load the BER and SNMP_Session for us
+snmptrap("public\@nms:162", ".1.3.6.1.4.1.2789.2500", mylocalhostname, 6, $SPEC, 
+".1.3.6.1.4.1.2789.2500.1535.1", "string", "$name", 
+".1.3.6.1.4.1.2789.2500.1535.2", "string", "$STATS", 
+".1.3.6.1.4.1.2789.2500.1535.3", "string", "$FILE_STATS");
+
+# Sending a trap using OpenView's snmptrap
+#
+#system "/opt/OV/bin/snmptrap -c public nms 
+#.1.3.6.1.4.1.2789.2500 \"\" 6 $SPEC \"\" 
+#.1.3.6.1.4.1.2789.2500.1535.1 octetstringascii \"$name\" 
+#.1.3.6.1.4.1.2789.2500.1535.2 octetstringascii \"$STATS\" 
+#.1.3.6.1.4.1.2789.2500.1535.3 octetstringascii \"$FILE_STATS\"";
+}</pre></blockquote>
+
+<a name="INDEX-1906" />The logic is simple, though it's
+somewhat hard to see since most of it happens implicitly. The key is
+the call to <tt class="literal">find( )</tt>, which sets up lots of things.
+It descends into every directory underneath the directory specified
+by <tt class="literal">$PATH</tt> and automatically sets
+<tt class="literal">$_</tt> (so the <tt class="literal">if</tt> statement at the
+beginning of the <tt class="literal">wanted()</tt> subroutine works).
+Furthermore, it defines the variable <tt class="literal">name</tt> to be
+the full pathname to the current file; this allows us to test whether
+or not the current file is really a directory, which we
+wouldn't want to delete.
+</p>
+
+<a name="INDEX-1907" /><a name="INDEX-1908" />Therefore, we loop through all the
+files, looking for files with the name specified on the comand line
+(or named <em class="filename">core</em>, if no
+<i class="command">-lookfor</i> option is specified). When we find one we
+store its statistics, delete the file, and send a trap to the NMS
+reporting the file's name and other information. We use the
+variable <tt class="literal">SPEC</tt> to store the specific trap ID. We
+use two specific IDs: 1535 if the file was deleted successfully and
+1536 if we tried to delete the file but couldn't. Again, we
+wrote the trap code to use either native Perl, Net-SNMP, or OpenView.
+Uncomment the version of your choice. We pack the trap with three
+variable bindings, which contain the name of the file, the results of
+<i class="command">ls -l</i> on the file, and the results of running
+<em class="filename">/bin/file</em>. Together, these give us a fair amount
+of information about the file we deleted. Note that we had to define
+object IDs for all three of these variables; furthermore, although we
+placed these object IDs under 1535, nothing prevents us from using
+the same objects when we send specific trap 1536.
+</p>
+
+<a name="INDEX-1909" />Now we have a program to delete core
+files and send traps telling us about what was deleted; the next step
+is to tell our trap receiver what to do with these incoming traps.
+Let's assume that we're using OpenView. To inform it
+about these traps, we have to add two entries to
+<em class="filename">trapd.conf</em>, mapping these traps to events. Here
+they are:
+</p>
+
+<blockquote><pre class="code">EVENT foundNDelCore .1.3.6.1.4.1.2789.2500.0.1535 "Status Alarms" Warning
+FORMAT Core File Found :$1: File Has Been Deleted - LS :$2: FILE :$3:
+SDESC
+This event is called when a server using cronjob looks for core 
+files and deletes them.
+
+$1 - octetstringascii   - Name of file
+$2 - octetstringascii   - ls -l listing on the file
+$3 - octetstringascii   - file $name
+EDESC
+#
+#
+#
+EVENT foundNNotDelCore .1.3.6.1.4.1.2789.2500.0.1536 "Status Alarms" Minor
+FORMAT Core File Found :$1: 
+File Has Not Been Deleted For Some Reason - LS :$2: FILE :$3:
+SDESC
+This event is called when a server using cronjob looks for core 
+files and then CANNOT delete them for some reason.
+
+$1 - octetstringascii   - Name of file
+$2 - octetstringascii   - ls -l listing on the file
+$3 - octetstringascii   - file $name
+EDESC
+#
+#
+#</pre></blockquote>
+
+<a name="INDEX-1910" />For each trap, we have an
+<tt class="literal">EVENT</tt> statement specifying an event name, the
+trap's specific ID, the category into which the event will be
+sorted, and the severity. The <tt class="literal">FORMAT</tt> statement
+defines a message to be used when we receive the trap; it can be
+spread over several lines and can use the parameters $1, $2, etc. to
+refer to the variable bindings that are included in the trap.
+</p>
+
+Although it would be a good idea, we don't need to add our
+variable bindings to our private MIB file;
+<em class="filename">trapd.conf</em> contains enough information for
+OpenView to interpret the contents of the trap.
+</p>
+
+Here are some sample traps<a href="#FOOTNOTE-67">[67]</a> generated
+by the <em class="filename">throwcore</em> script:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-67" />[67]We've removed most
+of the host and date/time information.</p> </blockquote>
+
+<blockquote><pre class="code">Core File Found :/usr/sap/HQD/DVEBMGS00/work/core: File Has Been \
+Deleted - LS :-rw-rw---- 1 hqdadm sapsys 355042304 Apr 27 17:04 \ 
+/usr/sap/HQD/DVEBMGS00/work/core: \
+FILE :/usr/sap/HQD/DVEBMGS00/work/core: ELF 32-bit MSB core file \
+SPARC Version 1, from 'disp+work':
+
+Core File Found :/usr/sap/HQI/DVEBMGS10/work/core: File Has Been \
+Deleted - LS :-rw-r--r-- 1 hqiadm sapsys 421499988 Apr 28 14:29 \ 
+/usr/sap/HQI/DVEBMGS10/work/core: \
+FILE :/usr/sap/HQI/DVEBMGS10/work/core: ELF 32-bit MSB core file \
+SPARC Version 1, from 'disp+work':</pre></blockquote>
+
+Here is root's <em class="filename">crontab</em>, which runs the
+<em class="filename">throwcore</em> script at specific intervals. Notice
+that we use the <i class="command">-path</i> switch, which allows us to
+check the development area every hour:
+</p>
+
+<a name="INDEX-1911" /><a name="INDEX-1912" /><a name="INDEX-1913" /><a name="INDEX-1914" /><blockquote><pre class="code"># Check for core files every night and every hour on special dirs
+27 * * * * /opt/local/mib_programs/scripts/throwcore.pl -path /usr/sap
+23 2 * * * /opt/local/mib_programs/scripts/throwcore.pl </pre></blockquote>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.2. Who's Logging into My Machine? </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.4. Veritas Disk Check</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

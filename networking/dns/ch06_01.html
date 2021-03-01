@@ -1,0 +1,1157 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:19 GMT -->
+<head><title>Configuring Hosts (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch06_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 6. Configuring Hosts</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-6-SECT-1">The Resolver</a><br />
+<a href="ch06_02.html">Sample Resolver Configurations</a><br />
+<a href="ch06_03.html">Minimizing Pain and Suffering</a><br />
+<a href="ch06_04.html">Vendor -Specific Options</a><br /><p></p></div>
+
+
+<em>They were indeed a queer-looking party that assembled on the
+bank -- the birds with draggled feathers, the animals with their
+fur clinging close to them, and all dripping wet, cross, and
+uncomfortable.</em></p><p>
+
+
+<a name="INDEX-700" /></a>
+<a name="INDEX-701" /></a>
+<a name="INDEX-702" /></a> <a name="INDEX-703" /></a>Now that you or someone else in your
+organization has set up name servers for your zones, you'll
+want to configure the hosts on your network to use them. That
+involves configuring those hosts' resolvers. You should also
+check files such as <em class="filename">hosts.equiv</em> and
+<em class="filename">.rhosts</em> and make any changes dictated by using
+DNS; you may need to convert some of the host names in these files to
+domain names. And you may also want to add aliases, both for your
+users' convenience and to minimize the shock of the conversion
+to DNS.</p><p>
+
+
+This chapter covers these topics and describes configuring the
+resolver in many common versions of Unix and in Microsoft's
+Windows 95, NT, and 2000.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-6-SECT-1" /></a>
+<h2 class="sect1">6.1. The Resolver</h2>
+
+
+<a name="INDEX-704" /></a>
+<a name="INDEX-705" /></a>We
+introduced resolvers way back in <a href="ch02_01.html">Chapter 2, "How Does DNS Work?"</a>, but we
+didn't say much more about them. The resolver, you'll
+remember, is the client half of the Domain Name System. It's
+responsible for translating a program's request for host
+information into a query to a name server and for translating the
+response into an answer for the program.</p><p>
+
+
+We haven't done any resolver configuration yet, because the
+occasion for it hasn't arisen. When we set up our name servers
+in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, the resolver's default
+behavior worked just fine for our purposes. But if we'd needed
+the resolver to do more than what it does by default or to behave
+differently from the default, we would have had to configure the
+resolver.</p><p>
+
+
+There's one thing we should mention up front: what we'll
+be describing in the next few sections is the behavior of the vanilla
+<a name="INDEX-706" /></a> <a name="INDEX-707" /></a>BIND
+8.2.3 resolver in the absence of other naming services. Not all
+resolvers behave quite this way; some vendors still ship resolvers
+based on earlier versions of the DNS code, and some have implemented
+special resolver functionality that lets you modify the resolver
+algorithm. Whenever we think it's important, we'll point
+out differences between the behavior of the 8.2.3 BIND resolver and
+that of earlier resolvers, particularly the 4.8.3 and 4.9 resolvers,
+which many vendors were shipping when we last updated this book.
+We'll cover various vendors' extensions later in this
+chapter.</p><p>
+
+
+So what exactly does the resolver allow you to configure? Most
+resolvers let you configure at least three aspects of the
+resolver's behavior: the local domain name, the search list,
+and the name server(s) that the resolver queries. Many Unix vendors
+also allow you to configure other resolver behavior through
+nonstandard extensions to DNS. Sometimes these extensions are
+necessary to cope with other software, such as Sun's Network
+Information Service (NIS); sometimes they're simply value added
+by the vendor.<a href="#FOOTNOTE-31">[31]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-31" /></a>[31]NIS used to be called
+"<a name="INDEX-708" /></a>
+<a name="INDEX-709" /></a>Yellow Pages" or
+"YP," but its name was changed to NIS because the British
+phone company had a copyright on the name Yellow Pages.</p><p>
+
+</blockquote>
+
+
+Almost all resolver configuration is done in the file
+<a name="INDEX-710" /></a><em class="filename">/etc/resolv.conf</em> (this
+might be
+<em class="filename">/</em><a name="INDEX-711" /></a><em class="filename">usr/etc/resolv.conf</em> or
+something similar on your host -- check the
+<em class="filename">resolver</em> manual page, usually in section 4 or 5,
+to make sure). There are five main
+<em class="firstterm">directives</em><a name="INDEX-712" /></a>
+you can use in <em class="filename">resolv.conf</em>: the
+<em class="firstterm">domain</em><a name="INDEX-713" /></a> directive, the
+<em class="firstterm">search</em><a name="INDEX-714" /></a> directive, the
+<em class="firstterm">nameserver</em><a name="INDEX-715" /></a> directive, the
+<em class="firstterm">sortlist</em><a name="INDEX-716" /></a> directive, and the
+<em class="firstterm">options</em><a name="INDEX-717" /></a> directive. These directives control
+the behavior of the resolver. There are other, vendor-specific
+directives available on some versions of Unix -- we'll
+discuss them at the end of this chapter.</p><p>
+
+
+<a name="dns4-CHP-6-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">6.1.1. The Local Domain Name</h3>
+
+
+The <a name="INDEX-718" /></a>
+<a name="INDEX-719" /></a>local domain
+name is the domain name in which the resolver resides. In most
+situations, it's the domain name of the zone in which
+you'd find the host running the resolver. For example, the
+resolver on the host <em class="emphasis">terminator.movie.edu</em>would probably use <em class="emphasis">movie.edu</em> as its local domain name.</p><p>
+
+
+The resolver uses the local domain name to interpret domain names
+that aren't fully qualified. For example, when you add an entry
+like:</p><p>
+
+
+<blockquote><pre class="code">relay bernie</pre></blockquote>
+
+
+to your <em class="filename">.rhosts</em> file, the name <em class="emphasis">relay</em> is assumed to be in your local
+domain. This makes a lot more sense than allowing access to a user
+called <em class="emphasis">bernie</em> on every host on the Internet
+whose domain name starts with <em class="emphasis">relay</em>. Other authorization files like
+<em class="filename">hosts.equiv</em> and <em class="filename">hosts.lpd</em>
+work the same way.</p><p>
+
+
+Normally, the local domain name is determined from the host's
+<em class="emphasis">hostname</em> <a name="INDEX-720" /></a>; the local domain name is everything
+after the first "<a name="INDEX-721" /></a>
+<a name="INDEX-722" /></a>." in the name. If the name
+doesn't contain a ".", the local domain is assumed
+to be the root domain. So the <em class="emphasis">hostname</em>
+<em class="emphasis">asylum.sf.ca.us</em> implies a
+local domain name of <em class="emphasis">sf.ca.us</em>, while the
+<em class="emphasis">hostname</em> <em class="emphasis">dogbert</em> implies a root local
+domain -- which probably isn't correct, given that there are
+very few hosts with single-label domain names.<a href="#FOOTNOTE-32">[32]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-32" /></a>[32]There
+are actually some single-label domain names that point to addresses,
+like <em class="emphasis">cc</em>.</p><p>
+
+</blockquote>
+
+
+You can also set the local domain name with the
+<a name="INDEX-723" /></a><em class="emphasis">domain</em> directive in
+<em class="filename">resolv.conf</em>. If you specify the
+<em class="emphasis">domain</em> directive, it overrides deriving the
+local domain name from the <em class="emphasis">hostname</em>.</p><p>
+
+
+The <em class="emphasis">domain</em> directive has a very simple
+<a name="INDEX-724" /></a>syntax, but
+you've got to get it right since the resolver doesn't
+report errors. The keyword <em class="emphasis">domain</em> starts the
+line in column one, followed by whitespace (one or more blanks or
+tabs), then the name of the local domain. The local domain name
+should be written without a <a name="INDEX-725" /></a>trailing dot, like this:</p><p>
+
+
+<blockquote><pre class="code">domain colospgs.co.us</pre></blockquote>
+
+
+In older versions of the BIND resolver (those before BIND 4.8.3),
+<a name="INDEX-726" /></a>trailing spaces <em class="emphasis">are not allowed
+</em>on the line and will cause your local domain to be set to
+a name ending with one or more spaces, which is almost certainly not
+what you want. And there's yet another way to set the local
+domain name -- via the <a name="INDEX-727" /></a>LOCALDOMAIN environment variable.
+LOCALDOMAIN is handy because you can set it on a per-user basis. For
+example, you might have a big, massively parallel box in your
+corporate computing center that employees from all over the world
+access. Each employee may do most of her work in a different company
+subdomain. With LOCALDOMAIN, each employee can set her local domain
+name appropriately in her shell startup file.</p><p>
+
+
+Which method should you use -- <em class="emphasis">hostname</em>, the
+<em class="emphasis">domain</em> directive, or LOCALDOMAIN? We prefer
+using <em class="emphasis">hostname</em> primarily because that's
+the way Berkeley does it and it seems "cleaner" in that
+it requires less explicit configuration. Also, some Berkeley
+software, particularly software that uses the <em class="emphasis">ruserok( )</em> library call to authenticate
+users, allows short host names in files like
+<em class="filename">hosts.equiv</em> only if
+<em class="emphasis">hostname</em> is set to the full domain name.</p><p>
+
+
+If you run software that can't tolerate long
+<em class="emphasis">hostnames</em>, though, you can use the
+<em class="emphasis">domain</em> directive. The
+<em class="emphasis">hostname</em> command will continue to return a short
+name, and the resolver will fill in the domain from
+<em class="filename">resolv.conf</em>. You may even find occasion to use
+LOCALDOMAIN on a host with lots of users.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">6.1.2. The Search List</h3>
+
+
+The local domain name, whether derived from
+<em class="emphasis">hostname</em> or <em class="filename">resolv.conf</em>,
+also determines the
+<a name="INDEX-728" /></a>default <a name="INDEX-729" /></a><em class="firstterm">search list</em>. The
+search list was designed to make users' lives a little easier
+by saving them some typing. The idea is to search one or more domains
+for names typed at the command line that might be
+incomplete -- that is, that might not be <a name="INDEX-730" /></a>
+<a name="INDEX-731" /></a>fully qualified domain
+names.<a name="INDEX-732" /></a></p><p>
+
+
+Most Unix networking commands that take a domain name as an argument,
+like <em class="filename">telnet</em>, <em class="filename">ftp</em>,
+<em class="filename">rlogin</em>, and <em class="filename">rsh</em>, apply the
+search list to those arguments.</p><p>
+
+
+Both the way the default search list is derived and the way it is
+applied changed from BIND 4.8.3 to BIND 4.9. If your resolver is an
+older make, you'll still see the 4.8.3 behavior, but if
+you've got a newer model, including BIND 8.2.3,<a href="#FOOTNOTE-33">[33]</a> you'll see the improvements in the 4.9 resolver.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-33" /></a>[33]Though the ISC added lots of new server functionality in BIND
+8, the resolver is nearly identical to the BIND 4.9 resolver.</p><p>
+
+</blockquote>
+
+
+With any BIND resolver, a user can indicate that a domain name is
+fully qualified by adding a <a name="INDEX-733" /></a>
+<a name="INDEX-734" /></a>
+<a name="INDEX-735" /></a>trailing
+dot to it.<a href="#FOOTNOTE-34">[34]</a> For example, the trailing
+dot in the command:<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-34" /></a>[34]Note that we said that the resolver can
+handle a trailing dot. Some programs, particularly some Unix mail
+user agents, don't deal correctly with a trailing dot in email
+addresses. They choke even before they hand the domain name in the
+address to the resolver.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet ftp.ora.com.</b></tt></pre></blockquote>
+
+
+means "don't bother searching any other domains; this
+domain name is fully qualified." This is analogous to the
+leading slash in full pathnames in the Unix and MS-DOS filesystems.
+Pathnames without a leading slash are interpreted as relative to the
+current working directory while pathnames with a leading slash are
+absolute, anchored at the root.</p><p>
+
+
+<a name="dns4-CHP-6-SECT-1.2.1" /></a><div class="sect3">
+<h3 class="sect3">6.1.2.1. The BIND 4.8.3 search list</h3>
+
+
+With <a name="INDEX-736" /></a>BIND 4.8.3 resolvers, the default search
+list includes the local domain name and the domain names of each of
+its parent domains with two or more labels. Therefore, on a host
+running a 4.8.3 resolver and configured with:</p><p>
+
+
+<blockquote><pre class="code">domain cv.hp.com</pre></blockquote>
+
+
+the default search list would contain first <em class="emphasis">cv.hp.com</em>, the local domain name; then
+<em class="emphasis">hp.com</em>, the local
+domain's parent; but not <em class="emphasis">com</em>, as it has only one label.<a href="#FOOTNOTE-35">[35]</a> The name is looked up as-is, after
+the resolver appends each element of the search list, and only if the
+name typed contains at least one dot. Thus, a user typing:<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-35" /></a>[35]One reason older BIND resolvers didn't append just the
+top-level domain name is that there were -- and still
+are -- very few hosts at the second level of the Internet's
+name space, so tacking on just <em class="filename">com</em> or
+<em class="filename">edu</em> to <em class="filename">foo</em> is unlikely to
+result in the domain name of a real host. Also, looking up the
+address of a <em class="filename">foo.com</em> or
+<em class="filename">foo.edu</em> might well require sending a query to a
+root name server, which taxes the roots and can be
+time-consuming.</p><p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet pronto.cv.hp.com</b></tt></pre></blockquote>
+
+
+causes lookups of <em class="emphasis">pronto.cv.hp.com.cv.hp.com</em> and
+<em class="emphasis">pronto.cv.hp.com.hp.com</em>
+before the resolver looks up <em class="emphasis">pronto.cv.hp.com</em> by itself. A user
+typing:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet asap</b></tt></pre></blockquote>
+
+
+on the same host causes the resolver to look up <em class="emphasis">asap.cv.hp.com</em> and <em class="emphasis">asap.hp.com</em>, but not just <em class="emphasis">asap</em>, since the name typed
+("asap") contains no dots.</p><p>
+
+
+Note that application of the search list stops as soon as a
+prospective domain name turns up the data being looked up. In the
+<em class="emphasis">asap</em> example, the search
+list would never get around to appending <em class="emphasis">hp.com</em> if <em class="emphasis">asap.cv.hp.com</em> resolved to an address.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-6-SECT-1.2.2" /></a><div class="sect3">
+<h3 class="sect3">6.1.2.2. The BIND 4.9 and later search list</h3>
+
+
+With <a name="INDEX-737" /></a>BIND 4.9 and later resolvers, the default
+search list includes just the local domain name. So, if you configure
+a host with:</p><p>
+
+
+<blockquote><pre class="code">domain cv.hp.com</pre></blockquote>
+
+
+the default search list would contain just <em class="emphasis">cv.hp.com</em>. Also, in a change from
+earlier resolvers, the search list is usually applied
+<em class="emphasis">after</em> the name is tried as-is. As long as the
+argument you type has at least one dot in it, it's looked up
+exactly as you typed it <em class="emphasis">before</em> any element of
+the search list is appended. If that lookup fails, the search list is
+applied. Even if the argument has no dots in it (that is, it's
+a single label name), it's tried as-is after the resolver
+appends the elements of the search list.</p><p>
+
+
+Why is it better to try the argument
+<em class="emphasis">literatim</em> first? From experience, the
+designers of DNS found that, more often than not, if a user bothered
+to type in a name with even a single dot in it, he was probably
+typing in a fully qualified domain name without the trailing dot.
+With older search list behavior, the resolver sent several fruitless
+queries before ever trying the name as typed.</p><p>
+
+
+Therefore, with a 4.9 or newer resolver, a user typing:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet pronto.cv.hp.com</b></tt></pre></blockquote>
+
+
+causes <em class="emphasis">pronto.cv.hp.com</em> to
+be looked up first (there are three dots in the argument). If that
+query fails, the resolver tries <em class="emphasis">pronto.cv.hp.com.cv.hp.com</em>. A user who
+types:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet asap</b></tt></pre></blockquote>
+
+
+on the same host causes the resolver to look up <em class="emphasis">asap.cv.hp.com</em> first, since the name
+doesn't contain a dot, and then just <em class="emphasis">asap</em>.</p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">6.1.3. The search Directive</h3>
+
+
+What if you don't like the default search list you get when you
+set your local domain name? In BIND 4.8.3 and all newer resolvers,
+you can set the search list explicitly, domain name by domain name,
+in the order you want the domains searched. You do this with the
+<a name="INDEX-738" /></a><em class="emphasis">search</em> directive.</p><p>
+
+
+The <a name="INDEX-739" /></a>syntax of the
+<em class="emphasis">search</em> directive is very similar to that of the
+<em class="emphasis">domain</em> directive, except that it can take
+multiple domain names as arguments. The keyword
+<em class="emphasis">search</em> starts the line in column one, followed
+by a space or a tab, followed in turn by one to six
+<a name="INDEX-740" /></a>domain names in the order you want them
+searched.<a href="#FOOTNOTE-36">[36]</a> The first domain name
+in the list is interpreted as the local domain name, so the
+<em class="emphasis">search</em> and <em class="emphasis">domain</em>
+directives are mutually exclusive. If you use both in
+<em class="filename">resolv.conf</em>, the one that appears last will
+override the other.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-36" /></a>[36]BIND 9 resolvers actually support eight
+elements in the search list.</p><p>
+
+</blockquote>
+
+
+For example, the directive:</p><p>
+
+
+<blockquote><pre class="code">search corp.hp.com paloalto.hp.com hp.com</pre></blockquote>
+
+
+instructs the resolver to search the <em class="emphasis">corp.hp.com</em> domain first, then
+<em class="emphasis">paloalto.hp.com</em>, and then
+the parent of both domains, <em class="emphasis">hp.com</em>.</p><p>
+
+
+This directive might be useful on a host whose users access hosts in
+both <em class="emphasis">corp.hp.com</em> and
+<em class="emphasis">paloalto.hp.com</em> frequently.
+On the other hand, on a BIND 4.8.3 resolver, the directive:</p><p>
+
+
+<blockquote><pre class="code">search corp.hp.com</pre></blockquote>
+
+
+causes the resolver to skip searching the local domain's parent
+domain when the search list is applied. (On a 4.9 or later resolver,
+the parent domain's name usually isn't in the search
+list, so this is no different from the default behavior.) This might
+be useful if the host's users only access hosts in the local
+domain, or if connectivity to the parent name servers isn't
+good (since it minimizes unnecessary queries to the parent name
+<a name="INDEX-741" /></a>
+servers).</p><p>
+
+<a name="ch06-9-fm2xml" /></a><blockquote><b>TIP: </b>
+If you use the 
+<em class="emphasis">domain</em> directive and
+update your resolver to BIND Version 4.9 or later, users who relied
+on your local domain's parent being in the search list may
+believe the resolver has suddenly broken. You can restore the old
+behavior by using the <em class="emphasis">search</em> directive to
+configure your resolver to use the same search list that it would
+have built before. For example, under BIND 4.9, BIND 8, or BIND 9,
+you can replace <em class="emphasis">domain nsr.hp.com</em> with
+<em class="emphasis">search nsr.hp.com hp.com</em> and get the same
+functionality.</p><p>
+
+</blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">6.1.4. The nameserver Directive</h3>
+
+
+<a name="INDEX-742" /></a> <a name="INDEX-743" /></a> <a name="INDEX-744" /></a>Back in <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a>, we
+talked about two types of name servers: primary master name servers
+and slave name servers. But what if you don't want to run a
+name server on a host, yet still want to use DNS? Or, for that
+matter, what if you <em class="emphasis">can't</em> run a name
+server on a host (because the operating system doesn't support
+it, for example)? Surely you don't have to run a name server on
+<em class="emphasis">every</em> host, right?</p><p>
+
+
+No, of course you don't. By default, the resolver looks for a
+name server running on the local host -- which is why we could use
+<em class="emphasis">nslookup</em> on <em class="emphasis">terminator.movie.edu</em> and <em class="emphasis">wormhole.movie.edu</em> right after we
+configured their name servers. You can, however, instruct the
+resolver to look to another host for name service. This configuration
+is called a <a name="INDEX-745" /></a><em class="firstterm">DNS client </em>in the
+<em class="citetitle">BIND Operations Guide</em>.</p><p>
+
+
+The <em class="firstterm">nameserver</em> directive (yep, all one word)
+tells the resolver the IP address of a name server to query. For
+example, the line:</p><p>
+
+
+<blockquote><pre class="code">nameserver 15.32.17.2</pre></blockquote>
+
+
+instructs the resolver to send queries to the name server running at
+the IP address 15.32.17.2 instead of to the local host. This means
+that on hosts not running name servers, you can use the
+<em class="emphasis">nameserver</em> directive to point them at a remote
+name server. Typically, you configure the resolvers on your hosts to
+query your own name servers.</p><p>
+
+
+However, since name servers before BIND 4.9 don't have any
+notion of access control and many administrators of newer servers
+don't restrict queries, you can configure your resolver to
+query almost anyone's name server. Of course, configuring your
+host to use someone else's name server without first asking
+permission is presumptuous, if not downright rude, and using one of
+your own usually gives you better performance, so we'll
+consider this only an emergency option.</p><p>
+
+
+You can also configure the resolver to query the host's local
+name server by using either the local host's IP address or the
+<a name="INDEX-746" /></a>zero address.
+The zero address, 0.0.0.0, is interpreted by most TCP/IP
+implementations to mean "this host." The host's
+real IP address, of course, also means "this host." On
+hosts that don't understand the zero address, you can use the
+<a name="INDEX-747" /></a>loopback
+address, 127.0.0.1.</p><p>
+
+
+<a name="INDEX-748" /></a>Now what if the name server your resolver
+queries is down? Isn't there any way to specify a backup? Do
+you just fall back to using the host table?</p><p>
+
+
+The resolver also allows you to specify up to three (count 'em,
+three) name servers using multiple <em class="emphasis">nameserver</em>
+directives. The resolver queries those name servers, in the order
+listed, until it receives an answer or times out. For example, the
+lines:</p><p>
+
+
+<blockquote><pre class="code">nameserver 15.32.17.2
+<a name="INDEX-749" /></a>
+nameserver 15.32.17.4</pre></blockquote>
+
+
+tell the resolver to first query the name server at 15.32.17.2, and
+if it doesn't respond, to query the name server at 15.32.17.4.
+Be aware that the number of name servers you configure dictates other
+aspects of the resolver's behavior, too.</p><p>
+
+<a name="ch06-11-fm2xml" /></a><blockquote><b>WARNING: </b>
+If you use multiple <em class="emphasis">nameserver</em> directives,
+<em class="emphasis">don't</em> use the 
+loopback address! There's a bug in
+some Berkeley-derived TCP/IP implementations that can cause problems
+with BIND if the local name server is down. The resolver's
+connected datagram socket won't rebind to a new local address
+if the local name server isn't running, and consequently the
+resolver sends query packets to the fallback remote name servers with
+a source address of 127.0.0.1. When the remote name servers try to
+reply, they end up sending the reply packets to themselves.</p><p>
+
+</blockquote>
+
+<a name="dns4-CHP-6-SECT-1.4.1" /></a><div class="sect3">
+<h3 class="sect3">6.1.4.1. One name server configured</h3>
+
+
+<a name="INDEX-750" /></a> <a name="INDEX-751" /></a>If there's only one name
+server configured,<a href="#FOOTNOTE-37">[37]</a> the resolver queries that name server
+with a timeout of five seconds. The timeout is the length of time the
+resolver will wait for a response from the name server before sending
+another query. If the resolver encounters an
+<a name="INDEX-752" /></a>error that indicates the name server is
+really down or unreachable, or if it times out, it doubles the
+timeout and queries the name server again. The errors that could
+cause this include:<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-37" /></a>[37]When we say "one name server
+configured," that means either one
+<em class="emphasis">nameserver</em> directive in
+<em class="filename">resolv.conf</em> or no
+<em class="emphasis">nameserver</em> directive with a name server running
+locally.</p><p>
+
+</blockquote>
+
+
+<ul><li>Receipt of an <em class="emphasis">ICMP port
+unreachable</em><a name="INDEX-753" /></a><a name="INDEX-754" /></a> message, which means that no name
+server is listening on the name server port<p></p></li><li>Receipt of an <em class="emphasis">ICMP host
+unreachable</em><a name="INDEX-755" /></a> or <em class="emphasis">network
+unreachable</em><a name="INDEX-756" /></a> message, which means that queries
+can't be sent to the destination IP address<p></p></li></ul>
+If the domain name or data doesn't exist, the resolver
+doesn't retry the query. Theoretically, at least, each name
+server should have an equivalent "view" of the name
+space; there's no reason to believe one and not another. So if
+one name server tells you that a given domain name doesn't
+exist or that the type of data you're looking for doesn't
+exist for the domain name you specified, any other name server should
+give you the same answer.<a href="#FOOTNOTE-38">[38]</a> If the resolver receives a network error
+each time it sends a query (for a total of four errors<a href="#FOOTNOTE-39">[39]</a>), it
+falls back to using the host table. Note that these are
+<em class="emphasis">errors</em>, not timeouts. If it times out on even
+one query, the resolver returns a null answer and does not fall back
+to <em class="filename">/etc/hosts</em>.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-38" /></a>[38]The built-in latency of DNS
+makes this a small fib -- a primary master name server can have
+authority for a zone and have different data from a slave that also
+has authority for the zone. The primary master may have just loaded
+new zone data from disk, while the slave may not have had time to
+transfer the new zone data from its master. Both name servers return
+authoritative answers for the zone, but the primary master may know
+about a brand-new host that the slave doesn't yet know
+about.</p><p>
+
+</blockquote><blockquote class="footnote">
+
+<a name="FOOTNOTE-39" /></a>[39]Two for BIND 8.2.1 and newer resolvers.</p><p>
+
+</blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-6-SECT-1.4.2" /></a><div class="sect3">
+<h3 class="sect3">6.1.4.2. More than one name server configured</h3>
+
+
+With more than one name server configured, the behavior is a little
+different. Here's what happens: the resolver starts by querying
+the first name server in the list, with a timeout of five seconds,
+just as in the single name server case. If the resolver times out or
+receives a network error, it falls back to the next name server,
+waiting the same five seconds for that name server. Unfortunately,
+the resolver won't receive many of the possible errors; the
+socket the resolver uses is "unconnected" since it must
+be able to receive responses from any of the name servers it queries,
+and unconnected sockets don't receive ICMP error messages. If
+the resolver queries all the configured name servers to no avail, it
+updates the timeouts and cycles through them again.</p><p>
+
+
+The resolver timeout for the next round of queries is based on the
+number of name servers configured in
+<em class="emphasis">resolv.conf</em>. The timeout for the second round of
+queries is 10 seconds divided by the number of name servers
+configured, rounded down. Each successive round's timeout is
+double the previous timeout. After three sets of retransmissions (a
+total of four timeouts for every name server configured), the
+resolver gives up trying to query name servers.</p><p>
+
+
+In BIND 8.2.1, the ISC changed the resolver to send only one set of
+retries, or a total of two queries to each name server in
+<em class="filename">resolv.conf</em>. This was intended to reduce the
+amount of time a user would have to wait for the resolver to return
+if none of the name servers was responding.</p><p>
+
+
+For you mathophobes, <a href="ch06_01.html#dns4-CHP-6-TABLE-1">Table 6-1</a> shows what the
+timeouts look like when you have one, two, or three name servers
+configured.</p><p>
+
+
+<a name="dns4-CHP-6-TABLE-1" /></a><h4 class="objtitle">Table 6-1. Resolver Timeouts in BIND 4.9 to 8.2 </h4><table border="1">
+
+
+
+
+
+<tr>
+<th />
+<th>
+Name Servers Configured<p></p></th>
+</tr>
+
+<tr>
+<th>
+Retry<p></p></th>
+<th>
+1<p></p></th>
+<th>
+2<p></p></th>
+<th>
+3<p></p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+0<p></p></td>
+<td>
+5s<p></p></td>
+<td>
+(2x) 5s<p></p></td>
+<td>
+(3x) 5s<p></p></td>
+</tr>
+
+<tr>
+<td>
+1<p></p></td>
+<td>
+10s<p></p></td>
+<td>
+(2x) 5s<p></p></td>
+<td>
+(3x) 3s<p></p></td>
+</tr>
+
+<tr>
+<td>
+2<p></p></td>
+<td>
+20s<p></p></td>
+<td>
+(2x) 10s<p></p></td>
+<td>
+(3x) 6s<p></p></td>
+</tr>
+
+<tr>
+<td>
+3<p></p></td>
+<td>
+40s<p></p></td>
+<td>
+(2x) 20s<p></p></td>
+<td>
+(3x) 13s<p></p></td>
+</tr>
+
+<tr>
+<td>
+Total<p></p></td>
+<td>
+75s<p></p></td>
+<td>
+80s<p></p></td>
+<td>
+81s<p></p></td>
+</tr>
+
+
+</table><p>
+
+
+For BIND 8.2 and later resolvers, <a href="ch06_01.html#dns4-CHP-6-TABLE-2">Table 6-2</a> shows
+the default timeout behavior.</p><p>
+
+
+<a name="dns4-CHP-6-TABLE-2" /></a><h4 class="objtitle">Table 6-2. Resolver Timeouts in BIND 8.2.1 and Later </h4><table border="1">
+
+
+
+
+
+<tr>
+<th />
+<th>
+Name Servers Configured<p></p></th>
+</tr>
+
+<tr>
+<th>
+Retry<p></p></th>
+<th>
+1<p></p></th>
+<th>
+2<p></p></th>
+<th>
+3<p></p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+0<p></p></td>
+<td>
+5s<p></p></td>
+<td>
+(2x) 5s<p></p></td>
+<td>
+(3x) 5s<p></p></td>
+</tr>
+
+<tr>
+<td>
+1<p></p></td>
+<td>
+10s<p></p></td>
+<td>
+(2x) 5s<p></p></td>
+<td>
+(3x) 3s<p></p></td>
+</tr>
+
+<tr>
+<td>
+Total<p></p></td>
+<td>
+15s<p></p></td>
+<td>
+20s<p></p></td>
+<td>
+24s<p></p></td>
+</tr>
+
+
+</table><p>
+
+
+So if you configure three servers, the resolver queries the first
+server with a timeout period of five seconds. If that query times
+out, the resolver queries the second server with the same timeout,
+and similarly for the third. If the resolver cycles through all three
+servers, it doubles the timeout period and divides by three (to three
+seconds, 10/3 rounded down) and queries the first server again.</p><p>
+
+
+Do these times seem awfully long? Remember, this describes a
+worst-case scenario. With properly functioning name servers running
+on tolerably fast hosts, your resolvers should get their answers back
+in well under a second. Only if all the configured name servers are
+really busy or they or your network is down will the resolver ever
+make it all the way through the retransmission cycle and give up.</p><p>
+
+
+What does the resolver do after it gives up? It times out and returns
+an error. Typically this results in an error message like:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>telnet tootsie</b></tt>
+tootsie: Host name lookup failure</pre></blockquote>
+
+
+Of course, it may take 75 or so seconds of waiting to see this
+message, so<a name="INDEX-757" /></a> <a name="INDEX-758" /></a> be patient.<a name="INDEX-759" /></a> <a name="INDEX-760" /></a> <a name="INDEX-761" /></a></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.5" /></a><div class="sect2">
+<h3 class="sect2">6.1.5. The sortlist Directive</h3>
+
+
+The <a name="INDEX-762" /></a><em class="firstterm">sortlist</em>
+directive is a mechanism in BIND 4.9 and later resolvers that lets
+you specify <a name="INDEX-763" /></a>subnets and
+<a name="INDEX-764" /></a>networks for the resolver
+to prefer if it receives multiple addresses as the result of a query.
+In some cases, you'll want your host to use a particular
+network to get to certain destinations. For example, say your
+workstation and your NFS server have two network interfaces each: one
+on an Ethernet, subnet 128.32.1/24; and one on an FDDI ring, subnet
+128.32.42/24. If you leave your workstation's resolver to its
+own devices, it's anybody's guess which of the NFS
+server's IP addresses you'll use when you mount a
+filesystem from the server -- presumably, the first one in a reply
+packet from the name server. To make sure you try the interface on
+the FDDI ring first, you can add a <em class="emphasis">sortlist</em>
+directive to <em class="filename">resolv.conf</em> that sorts the address
+on 128.32.42/24 to the preferred position in the structure passed
+back to programs:</p><p>
+
+
+<blockquote><pre class="code">sortlist 128.32.42.0/255.255.255.0</pre></blockquote>
+
+
+The argument after the slash is the subnet mask for the subnet in
+question. To prefer an entire network, you can omit the slash and the
+subnet mask:</p><p>
+
+
+<blockquote><pre class="code">sortlist 128.32.0.0</pre></blockquote>
+
+
+The resolver then assumes you mean the entire network 128.32/16. (The
+resolver derives the default unsubnetted net mask for the network
+from the first two bits of the IP address.)</p><p>
+
+
+And, of course, you can specify several (up to 10) subnets and
+networks to prefer over others:</p><p>
+
+
+<blockquote><pre class="code">sortlist 128.32.42.0/255.255.255.0 15.0.0.0</pre></blockquote>
+
+
+The resolver sorts any addresses in a reply that match these
+arguments into the order in which they appear in the directive, and
+appends addresses that don't match to the end.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.6" /></a><div class="sect2">
+<h3 class="sect2">6.1.6. The options Directive</h3>
+
+
+<a name="INDEX-765" /></a> <a name="INDEX-766" /></a> <a name="INDEX-767" /></a>The
+<em class="firstterm">options</em> directive was introduced with BIND 4.9
+and lets you tweak several internal resolver settings. The first is
+the debug flag, <a name="INDEX-768" /></a>
+<a name="INDEX-769" /></a>RES_DEBUG. The
+directive:</p><p>
+
+
+<a name="INDEX-770" /></a><blockquote><pre class="code">options debug</pre></blockquote>
+
+
+sets RES_DEBUG, producing lots of exciting debugging information on
+standard output, assuming your resolver was configured with DEBUG
+defined. (Actually, that may not be a good assumption, since most
+vendors compile their stock resolvers without DEBUG defined.) This is
+very useful if you're attempting to diagnose a problem with
+your resolver or with name service in general, but very annoying
+otherwise.</p><p>
+
+
+The second setting you can modify is <a name="INDEX-771" /></a> <a name="INDEX-772" /></a>
+<a name="INDEX-773" /></a> <a name="INDEX-774" /></a><em class="firstterm">ndots</em>, which sets
+the minimum number of dots a domain name argument must have for the
+resolver to look it up beforeapplying the
+search list. By default, one or more dots will do; this is equivalent
+to <em class="emphasis">ndots:1</em>. The resolver first tries the domain
+name as typed as long as the name has any dots in it. You can raise
+the threshold if you believe your users are more likely to type
+partial domain names that will need the search list applied. For
+example, if your local domain name is <em class="emphasis">mit.edu</em> and your users are accustomed to
+typing:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ftp prep.ai</b></tt></pre></blockquote>
+
+
+and having <em class="emphasis">mit.edu</em>
+automatically appended to produce <em class="emphasis">prep.ai.mit.edu</em>, you may want to raise
+<em class="emphasis">ndots</em> to two so that your users won't
+unwittingly cause lookups to the root name servers for names in the
+top-level <em class="emphasis">ai</em> domain. You
+could do this with:</p><p>
+
+
+<a name="INDEX-775" /></a><blockquote><pre class="code">options ndots:2</pre></blockquote>
+
+
+BIND 8.2 introduced four new resolver options:
+<em class="firstterm">attempts</em>, <em class="firstterm">timeout</em>,
+<em class="firstterm">rotate</em>, and
+<em class="firstterm">no-check-names.</em> <em class="emphasis">attempts
+</em><a name="INDEX-776" /></a>allows you to specify how many queries
+the resolver should send to each name server in
+<em class="filename">resolv.conf</em> before giving up. If you think the
+new default value, two, is too low for your name servers, you can
+boost it back to four, the default value before BIND 8.2.1, with:</p><p>
+
+
+<blockquote><pre class="code">options attempts:4</pre></blockquote>
+
+
+The maximum value is five.</p><p>
+
+
+<em class="emphasis">timeout</em> <a name="INDEX-777" /></a>allows you to specify the initial timeout
+for a query to a name server in <em class="filename">resolv.conf</em>. The
+default value is five seconds. If you'd like your resolver to
+retransmit more quickly, you could lower the timeout to two seconds
+with:</p><p>
+
+
+<blockquote><pre class="code">options timeout:2</pre></blockquote>
+
+
+The maximum value is 30 seconds. For the second and successive rounds
+of queries, the resolver still doubles the initial timeout and
+divides by the number of name servers in
+<em class="filename">resolv.conf</em>.</p><p>
+
+
+<em class="emphasis">rotate</em><a name="INDEX-778" /></a> lets your resolver make use of all the
+name servers in <em class="filename">resolv.conf</em>, not just the first
+one. As long as your resolver's first name server is healthy,
+it'll service all of your resolver's queries. Unless that
+name server gets very busy or goes down, your resolver will never
+query the second or third name servers in
+<em class="filename">resolv.conf</em>. If you'd like to spread the
+load around, you can set:</p><p>
+
+
+<blockquote><pre class="code">options rotate</pre></blockquote>
+
+
+to have each instance of the resolver rotate the order in which it
+uses the name servers in <em class="filename">resolv.conf</em>. In other
+words, an instance of the resolver still queries the first name
+server in <em class="filename">resolv.conf</em> first, but for the next
+domain name it looks up, it queries the second name server first, and
+so on.</p><p>
+
+
+Note that many programs can't take advantage of this since most
+programs initialize the resolver, look up a name, then exit. Rotation
+has no effect on repeated
+<em class="filename">ping</em><a name="INDEX-779" /></a>
+commands, for example, because each <em class="filename">ping</em> process
+initializes the resolver, queries the first name server in
+<em class="filename">resolv.conf</em>, and then exits before using the
+resolver again. Each successive invocation of
+<em class="filename">ping</em> has no idea which name server the previous
+one used -- or even that <em class="filename">ping</em> was run
+earlier. But long-lived processes that send lots of queries, such as
+a
+<em class="filename">sendmail</em><a name="INDEX-780" /></a> daemon, can take advantage of
+rotation.</p><p>
+
+
+Rotation can also make debugging trickier. If you use it,
+you'll never be sure which name server in <em class="filename">resolv.conf
+</em>your <em class="filename">sendmail</em> daemon queried when it
+received that funky response.</p><p>
+
+
+<em class="emphasis">no-check-names</em><a name="INDEX-781" /></a>, finally, allows you to turn off the
+resolver's name checking, which is on by default.<a href="#FOOTNOTE-40">[40]</a> These routines examine domain names in responses to make
+sure they adhere to Internet host naming standards, which allow only
+alphanumerics and dashes in host names. You'll need to set this
+if you want your users to be able to resolve domain names with
+underscores or other illegal characters in them.<p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-40" /></a>[40]In all resolvers that support it, from BIND 4.9.4 on.</p><p>
+
+</blockquote>
+
+
+If you want to specify multiple options, you can combine them on a
+single line in<em class="filename"> resolv.conf</em>, like so:</p><p>
+
+
+<a name="INDEX-782" /></a><a name="INDEX-783" /></a><a name="INDEX-784" /></a><blockquote><pre class="code">options attempts:4 timeout:2 ndots:2
+
+</pre></blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.7" /></a><div class="sect2">
+<h3 class="sect2">6.1.7. Comments</h3>
+
+
+<a name="INDEX-785" /></a> <a name="INDEX-786" /></a>Also introduced with
+BIND 4.9 resolvers (and it's about time, if you ask us), is the
+ability to put comments in the
+<em class="filename">resolv.conf</em><a name="INDEX-787" /></a>
+<a name="INDEX-788" /></a> file. Lines that
+begin with a <a name="INDEX-789" /></a>
+<a name="INDEX-790" /></a>pound sign or semicolon in the first
+column are interpreted as comments and ignored by the resolver.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-6-SECT-1.8" /></a><div class="sect2">
+<h3 class="sect2">6.1.8. A Note on the 4.9 Resolver Directives</h3>
+
+
+If you're just moving to a
+<a name="INDEX-791" /></a>BIND 4.9 resolver, be careful when using
+the new directives. You may still have older resolver code statically
+linked into programs on your host. Often, this isn't a problem
+because Unix resolvers ignore directives they don't understand.
+But don't count on all programs on your host obeying the new
+directives.</p><p>
+
+
+If you're running on a host with programs that include really
+old resolver code (before 4.8.3) and you still want to use the
+<em class="emphasis">search</em> directive with programs that can take
+advantage of it, here's a trick: use both a
+<em class="emphasis">domain</em> directive and a
+<em class="emphasis">search</em> directive in
+<em class="filename">resolv.conf</em>, with the
+<em class="emphasis">domain</em> directive first. Old resolvers will read
+the <em class="emphasis">domain</em> directive and ignore the
+<em class="emphasis">search</em> directive because they won't
+recognize it. New resolvers will read the <em class="emphasis">domain</em>
+directive, but the <em class="emphasis">search</em> directive will
+override its behavior.</p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.3. The MX Algorithm</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.2. Sample Resolver Configurations</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch06_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:20 GMT -->
+</html>

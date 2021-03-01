@@ -1,0 +1,1515 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:27 GMT -->
+<head><title>Keeping Everything Running Smoothly (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">7.6. Keeping Everything Running Smoothly</h2>
+
+
+<a name="INDEX-1144" /> <a name="INDEX-1145" />A
+significant part of maintenance is being aware that something is
+wrong before it becomes a real problem. If you catch a problem early,
+chances are it'll be that much easier to fix. As the old adage
+says, an ounce of prevention is worth a pound of cure.</p><p>
+
+
+This isn't quite troubleshooting -- we'll devote an
+entire chapter to troubleshooting later -- think of it more as
+"pre-troubleshooting." Troubleshooting (the pound of
+cure) is what you have to do after your problem has developed
+complications, and then you need to identify the problem by its
+symptoms.</p><p>
+
+
+The next two sections deal with preventative maintenance: looking
+periodically at the <em class="filename">syslog</em> file and at the BIND
+name server statistics to see whether any problems are developing.
+Consider this a name server's medical checkup.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">7.6.1. Common Syslog Messages</h3>
+
+
+<a name="INDEX-1146" /> <a name="INDEX-1147" />There are a large number of
+<em class="emphasis">syslog</em> messages that <em class="filename">named</em>
+can emit. In practice, you'll see only a few of them.
+We'll cover the most common <em class="emphasis">syslog</em>
+messages here, excluding reports of syntax errors in zone data files.</p><p>
+
+
+Every time you start <em class="filename">named</em>, it sends out a
+message at priority LOG_NOTICE. For a BIND 8 name server, it looks
+like this:</p><p>
+
+
+<blockquote><pre class="code">Jan 10 20:48:32 terminator named[3221]: starting.  named 8.2.3 Tue May 16 09:39:40 
+MDT 2000 ^Icricket@huskymo.boulder.acmebw.com:/usr/local/src/bind-8.2.3/src/bin/
+named</pre></blockquote>
+
+
+For BIND 9, it's significantly abridged:</p><p>
+
+
+<blockquote><pre class="code">Jul 27 16:18:41 terminator named[7045]: starting BIND 9.1.0</pre></blockquote>
+
+
+<a name="INDEX-1148" />
+<a name="INDEX-1149" />This
+message logs the fact that <em class="filename">named</em> started at this
+time and tells you the version of BIND you're running as well
+as who built it and where (for BIND 8). Of course, this is nothing to
+be concerned about. It <em class="emphasis">is</em> a good place to look
+if you're not sure what version of BIND your operating system
+supports. (Older versions of BIND used the message
+"restarted" instead of "starting.")</p><p>
+
+
+Every time you send the name server a <a name="INDEX-1150" />reload command, a BIND 8
+name server sends out this message at priority LOG_NOTICE:</p><p>
+
+
+<blockquote><pre class="code">Jan 10 20:50:16 terminator named[3221]: reloading nameserver</pre></blockquote>
+
+
+BIND 9 name servers log:</p><p>
+
+
+<blockquote><pre class="code">Jul 27 16:27:45 terminator named[7047]: loading configuration from 
+'/etc/named.conf</pre></blockquote>
+
+
+These messages simply tell you that <em class="filename">named</em>
+reloaded its database (as a result of a reload command) at this time.
+Again, this is nothing to be concerned about. This message will most
+likely be of interest when you are tracking down how long a bad
+resource record has been in your zone data or how long a whole zone
+has been missing because of a mistake during an update.</p><p>
+
+
+Another message you may see shortly after your name server starts is:</p><p>
+
+
+<a name="INDEX-1151" /><blockquote><pre class="code">Jan 10 20:50:20 terminator named[3221]: cannot set resource limits on
+                this system</pre></blockquote>
+
+
+This means that your name server thinks your operating system does
+not support the <em class="emphasis">getrlimit(
+)</em><a name="INDEX-1152" />
+<a name="INDEX-1153" /> and
+<em class="emphasis">setrlimit(
+)</em><a name="INDEX-1154" />
+<a name="INDEX-1155" />
+system calls, which are used when you try to define
+<em class="emphasis">coresize</em>, <em class="emphasis">datasize</em>,
+<em class="emphasis">stacksize</em>, or <em class="emphasis">files</em> on a
+BIND 8 or 9 name server. It doesn't matter whether you're
+actually using any of these substatements in your configuration file;
+BIND will print the message anyway. If you are not using these
+substatements, ignore the message. If you are, and you think your
+operating system actually does support <em class="emphasis">getrlimit( )</em><tt class="function"> </tt>and
+<em class="emphasis">setrlimit( )</em>, you'll have
+to recompile BIND with HAVE_GETRUSAGE defined. This message is logged
+at priority LOG_INFO.</p><p>
+
+
+If you run your name server on a host with many network interfaces
+(especially virtual network interfaces), you may see this message
+soon after startup or even after your name server has run well for a
+while:</p><p>
+
+
+<a name="INDEX-1156" /><a name="INDEX-1157" /><a name="INDEX-1158" />
+<blockquote><pre class="code">Jan 10 20:50:31 terminator named[3221]: fcntl(dfd, F_DUPFD, 20): Too
+                many open files
+
+
+Jan 10 20:50:31 terminator named[3221]: fcntl(sfd, F_DUPFD, 20): Too
+                many open files</pre></blockquote>
+
+
+This means that BIND has run out of <a name="INDEX-1159" />file descriptors. BIND uses a fair
+number of file descriptors: two for each network interface it's
+listening on (one for UDP and one for TCP), and one for opening zone
+data files. If that's more than the limit your operating system
+places on processes, BIND won't be able to get any more file
+descriptors and you'll see this message. The priority depends
+on which part of BIND fails to get the file descriptor: the more
+critical the subsystem, the higher the priority.</p><p>
+
+
+The next step is either to get BIND to use fewer file descriptors, or
+to raise the limit the operating system places on the number of file
+descriptors BIND can use:</p><p>
+
+
+<ul><li>If you don't need BIND listening on all your network interfaces
+(particularly the virtual ones), use the <em class="emphasis">listen-on
+</em>substatement to configure BIND to listen only on those
+interfaces it needs to. See <a href="ch10_01.html">Chapter 10, "Advanced Features"</a> for details
+on the syntax of <em class="emphasis">listen-on</em>.</p></li><li>If your operating system supports <em class="emphasis">getrlimit(
+)</em> and <em class="emphasis">setrlimit( )</em> (as
+just described), configure your name server to use a larger number of
+files with the <em class="emphasis">files</em> substatement. See <a href="ch10_01.html">Chapter 10, "Advanced Features"</a> for details on using the
+<em class="emphasis">files</em> substatement.</p></li><li>If your operating system places too restrictive a limit on open
+files, raise that limit before you start <em class="filename">named</em>
+with the <em class="filename">ulimit</em> command.</p></li></ul>
+Every time a BIND 8 name server loads a zone, it sends out a message
+at priority LOG_INFO:</p><p>
+
+
+<a name="INDEX-1160" />
+<blockquote><pre class="code">Jan 10 21:49:50 terminator named[3221]: master zone "movie.edu" (IN)
+                Loaded (serial 1996011000)</pre></blockquote>
+
+
+(BIND 4.9 name servers call it a "primary zone" instead
+of a "master zone.") This tells you when the name server
+loaded the zone, the class of the zone (in this case, IN), and the
+serial number in the zone's SOA record. BIND 9 name servers, as
+of 9.1.0, don't tell you when they load a zone.</p><p>
+
+
+About every hour, a BIND 8 name server sends a snapshot of the
+current
+<a name="INDEX-1161" />statistics at
+priority LOG_INFO:</p><p>
+
+
+<a name="INDEX-1162" />
+<blockquote><pre class="code">Feb 18 14:09:02 terminator named[3565]: USAGE 824681342 824600158
+                CPU=13.01u/3.26s CHILDCPU=9.99u/12.71s
+Feb 18 14:09:02 terminator named[3565]: NSTATS 824681342 824600158
+                A=4 PTR=2
+Feb 18 14:09:02 terminator named[3565]: XSTATS 824681342 824600158
+                RQ=6 RR=2 RIQ=0 RNXD=0 RFwdQ=0 RFwdR=0 RDupQ=0 RDupR=0
+                RFail=0 RFErr=0 RErr=0 RTCP=0 RAXFR=0 RLame=0 Ropts=0
+                SSysQ=2 SAns=6 SFwdQ=0 SFwdR=0 SDupQ=5 SFail=0 SFErr=0
+                SErr=0 RNotNsQ=6 SNaAns=2 SNXD=1</pre></blockquote>
+
+
+(This feature was also present in BIND 4.9 through 4.9.3, and was
+turned off in the 4.9.4 server. BIND 9 doesn't support it as of
+9.1.0.) The first two numbers for each message are times. If you
+subtract the second number from the first number, you'll find
+out how many seconds your <a name="INDEX-1163" />server has been running. (You'd
+think the name server could do that for you.) The CPU entry tells you
+how much time your server has spent in user mode (13.01 seconds) and
+system mode (3.26 seconds). Then it tells you the same statistic for
+child processes. The <a name="INDEX-1164" />NSTATS message lists the types of
+queries your server has received and the counts for each. The
+<a name="INDEX-1165" />XSTATS
+message lists additional statistics. The statistics under NSTATS and
+XSTATS are explained in more detail later in this chapter.</p><p>
+
+
+If BIND Version 4.9.4 or later (but not BIND 9 as of 9.1.0 -- it
+doesn't implement name checking yet) finds a
+<a name="INDEX-1166" />name that doesn't conform to RFC
+952, it logs a <em class="emphasis">syslog</em> error:</p><p>
+
+
+<blockquote><pre class="code">Jul 24 20:56:26 terminator named[1496]: owner name "ID_4.movie.edu IN"
+                                      (primary) is invalid - rejecting</pre></blockquote>
+
+
+This message is logged at level LOG_NOTICE. See <a href="ch04_01.html">Chapter 4, "Setting Up BIND"</a> for the host naming rules.</p><p>
+
+
+Another <em class="emphasis">syslog</em> message, sent at priority
+LOG_INFO, is a warning message about the zone
+data:<a name="INDEX-1167" /></p><p>
+
+
+<blockquote><pre class="code">Jan 10 20:48:38 terminator named[3221]: terminator2 has CNAME
+                and other data (invalid)</pre></blockquote>
+
+
+This message means that there's a problem with your zone data.
+For example, you may have entries like these:</p><p>
+
+
+<blockquote><pre class="code">terminator2  IN  CNAME t2
+terminator2  IN  MX    10 t2
+t2           IN  A     192.249.249.10
+t2           IN  MX    10 t2</pre></blockquote>
+
+
+The MX record for <em class="emphasis">terminator2</em> is incorrect and would cause
+the message just listed. <em class="emphasis">terminator2</em>is an alias for <em class="emphasis">t2</em>, which is the canonical name. As
+described earlier, when a name server looks up a name and finds a
+CNAME, it replaces the original name with the canonical name, and
+then tries looking up the canonical name. Thus, when the server looks
+up the MX data for <em class="emphasis">terminator2</em>, it finds a CNAME record and
+then looks up the MX record for <em class="emphasis">t2</em>. Since the server follows the CNAME
+record for <em class="emphasis">terminator2</em>, it
+never uses the MX record for <em class="emphasis">terminator2</em>; in fact, this record is illegal. In other words, all
+resource records for a host have to use the canonical name;
+it's an error to use an alias in place of the canonical name.</p><p>
+
+
+We realize this is getting repetitive, but BIND 9 doesn't
+detect this error until 9.1.0.</p><p>
+
+
+The following message indicates that a BIND 4 or 8 slave was unable
+to reach any master server when it tried to do a zone
+transfer:<a name="INDEX-1168" /> <a name="INDEX-1169" /> <a name="INDEX-1170" /></p><p>
+
+
+<blockquote><pre class="code">Jan 10 20:52:42 wormhole named[2813]: zoneref: Masters for
+                secondary zone "movie.edu" unreachable</pre></blockquote>
+
+
+BIND 9 slaves say:</p><p>
+
+
+<blockquote><pre class="code">Jul 27 16:50:55 terminator named[7174]: refresh_callback: zone movie.edu/IN: 
+failure for 10.0.0.1#53: timed out</pre></blockquote>
+
+
+This message is sent at priority LOG_NOTICE on BIND 4 or 8, and
+LOG_INFO on BIND 9, and is sent only the first time the zone transfer
+fails. When the zone transfer finally succeeds, a 4.9 or later name
+server tells you that the zone transferred by issuing another
+<em class="emphasis">syslog</em> message. Older servers don't tell
+you when the zone transferred. When this message first appears, you
+don't need to take any immediate action. The name server will
+continue to attempt to transfer the zone according to the retry
+period in the SOA record. After a few days (or half the expire time),
+you might check that the server was able to transfer the zone. On
+servers that don't issue the <em class="emphasis">syslog</em>
+message when the zone transfers, you can verify that the zone
+transferred by checking the timestamp on the
+<a name="INDEX-1171" /> <a name="INDEX-1172" />backup zone data file. When a zone
+transfer succeeds, a new backup file is created. When a name server
+finds a zone is up to date, it "touches" the backup file
+(<em class="emphasis">&agrave; la</em> the Unix <em class="filename">touch</em>
+command). In both cases, the timestamp on the backup file is updated,
+so go to the slave and give the command <tt class="command">ls -l
+/usr/local/named/db*.</tt> This will tell you when the slave
+last synchronized each zone with the master server. We'll cover
+how to troubleshoot slaves failing to transfer zones in <a href="ch14_01.html">Chapter 14, "Troubleshooting DNS and BIND"</a>.</p><p>
+
+
+If you are watching the <em class="emphasis">syslog</em> messages on your
+4.9 or later master name server, you'll see a LOG_INFO
+<em class="emphasis">syslog</em> message when the slave picks up the new
+zone data or when a tool such as <em class="filename">nslookup</em>
+transfers a zone:</p><p>
+
+
+<blockquote><pre class="code">Mar  7 07:30:04 terminator named[3977]: approved AXFR from
+                           [192.249.249.1].2253 for "movie.edu"</pre></blockquote>
+
+
+Once again, BIND 9 doesn't log anything as of 9.1.0.</p><p>
+
+
+If you're using the BIND 4 <em class="emphasis">xfrnets</em>
+configuration file directive or BIND 8
+<em class="emphasis">allow-transfer</em> substatement (explained in <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>) to limit which servers can load zones, you
+may see this message saying <em class="emphasis">unapproved</em> instead
+of <em class="emphasis">approved</em>. A BIND 9 name server reports:</p><p>
+
+
+<a name="INDEX-1173" />
+<blockquote><pre class="code">Jul 27 16:59:26 terminator named[7174]: client 192.249.249.1#1386: 
+zone transfer denied</pre></blockquote>
+
+
+You'd see this <em class="emphasis">syslog</em> message only if you
+capture LOG_INFO <em class="emphasis">syslog</em> messages:</p><p>
+
+
+<a name="INDEX-1174" />
+<blockquote><pre class="code">Jan 10 20:52:42 wormhole named[2813]: Malformed response
+                from 192.1.1.1</pre></blockquote>
+
+
+Most often, this message means that some bug in a name server caused
+it to send an erroneous response packet. The error probably occurred
+on the remote name server (192.1.1.1) rather than the local server
+(<em class="emphasis">wormhole</em>). Diagnosing this
+kind of error involves capturing the response packet in a network
+trace and decoding it. Decoding <a name="INDEX-1175" />DNS packets manually is beyond the
+scope of this book, so we won't go into much detail.
+You'd see this type of error if the response packet said it
+contained several answers in the answer section (like four address
+resource records), yet the answer section contained only a single
+answer. The only course of action is to notify the administrator of
+the offending host via email (assuming you can get the name of the
+host by looking up the address). You would also see this message if
+the underlying network altered (damaged) the <a name="INDEX-1176" />UDP response packets in some
+way. Checksumming UDP packets is optional, so this error might not be
+caught at a lower level.</p><p>
+
+
+A BIND 4.9 or 8 <em class="filename">named</em> logs this message when you
+try to sneak records into your zone data file that belong in another
+zone:</p><p>
+
+
+<a name="INDEX-1177" />
+<blockquote><pre class="code">Jun 13 08:02:03 terminator named[2657]: db.movie.edu:28: data "foo.bar.edu"
+                           outside zone "movie.edu" (ignored)</pre></blockquote>
+
+
+A BIND 9 <em class="filename">named </em>logs:</p><p>
+
+
+<blockquote><pre class="code">Jul 27 17:07:01 terminator named[7174]: dns_master_load: 
+db.movie.edu:28: ignoring out-of-zone data</pre></blockquote>
+
+
+For instance, if we tried to use this zone data:</p><p>
+
+
+<blockquote><pre class="code">robocop       IN A  192.249.249.2
+terminator    IN A  192.249.249.3
+
+; Add this entry to the name server's cache
+foo.bar.edu.  IN A  10.0.7.13</pre></blockquote>
+
+
+we'd be adding data for the <em class="emphasis">bar.edu</em> zone into our <em class="emphasis">movie.edu</em> zone data file. A 4.8.3
+vintage name server would blindly add <em class="emphasis">foo.bar.edu</em> to its cache, and
+wouldn't check that all the data in the
+<em class="filename">db.movie.edu</em> file was in the <em class="emphasis">movie.edu</em> zone. You can't fool a
+name server newer than 4.9, though. This <em class="emphasis">syslog</em>
+message is logged at priority LOG_INFO.</p><p>
+
+
+Earlier in the book, we said that you couldn't use a CNAME in
+the data portion of a resource record. BIND Versions 4.9 and 8 will
+catch this misuse:</p><p>
+
+
+<a name="INDEX-1178" /><blockquote><pre class="code">Jun 13 08:21:04 terminator named[2699]: "movie.edu IN NS" points to a
+                                        CNAME (dh.movie.edu)</pre></blockquote>
+
+
+BIND 9 doesn't catch it as of 9.1.0.</p><p>
+
+
+Here is an example of the offending resource records:</p><p>
+
+
+<blockquote><pre class="code">@                      NS       terminator.movie.edu.
+                       NS       dh.movie.edu.
+terminator.movie.edu.  IN A     192.249.249.3
+diehard.movie.edu.     IN A     192.249.249.4
+dh                     IN CNAME diehard</pre></blockquote>
+
+
+The second NS record should have listed <em class="emphasis">diehard.movie.edu</em> instead of <em class="emphasis">dh.movie.edu</em>. This
+<em class="emphasis">syslog</em> message won't show up immediately
+when you start your name server.</p><p>
+
+
+<a name="ch07-35-fm2xml" /><blockquote><b>TIP: </b>
+You'll only see the <em class="emphasis">syslog</em> message when
+the offending data is looked up. This <em class="emphasis">syslog</em>
+message is logged by a BIND 4.9.3 or BIND 8 server at priority
+LOG_INFO, and by a 4.9.4 to 4.9.7 server at priority LOG_DEBUG.</p><p>
+
+</blockquote>
+
+The following message indicates that your name server may be guarding
+itself against one type of network
+attack:<a name="INDEX-1179" />
+<a name="INDEX-1180" /></p><p>
+
+
+<blockquote><pre class="code">Jun 11 11:40:54 terminator named[131]: Response from unexpected source
+                                        ([204.138.114.3].53)</pre></blockquote>
+
+
+Your name server sent a query to a remote name server, but the
+response that came wasn't returned from any of the addresses
+your name server had listed for the remote name server. The potential
+security breach is this: an intruder causes your name server to query
+a remote name server, and at the same time the intruder sends
+responses (pretending the responses are from the remote name server)
+that the intruder hopes your name server will add to its cache.
+Perhaps he sends along a false PTR record, pointing the IP address of
+one of his hosts to the domain name of a host you trust. Once the
+false PTR record is in your cache, the intruder uses one of the BSD
+"r" commands (e.g., <em class="filename">rlogin</em>) to gain
+access to your system.</p><p>
+
+
+Less paranoid admins will realize that this situation can also happen
+if a parent zone's name server knows about only one of the IP
+addresses of a multihomed name server for a child zone. The parent
+tells your name server the one IP address it knows about, and when
+your server queries the remote name server, the remote name server
+responds from the other IP address. This shouldn't happen if
+BIND is running on the remote name server host, because BIND makes
+every effort to use the same IP address in the response as the query
+was sent to. This <em class="emphasis">syslog</em> message is logged at
+priority LOG_INFO.</p><p>
+
+
+<a name="INDEX-1181" />
+<a name="INDEX-1182" />Here's an interesting
+<em class="emphasis">syslog</em> message:</p><p>
+
+
+<blockquote><pre class="code">Jun 10 07:57:28 terminator named[131]: No root nameservers for
+                class 226</pre></blockquote>
+
+
+The only classes defined to date are: class 1, Internet (IN); class
+3, Chaos (CH); and class 4, Hesiod (HS). What's class 226?
+That's exactly what your name server is saying with this
+<em class="emphasis">syslog</em> message -- something is wrong because
+there's no class 226. What can you do about it? Nothing,
+really. This message doesn't give you enough
+information -- you don't know who the query is from or what
+the query was for. Then again, if the class field is corrupted, the
+domain name in the query may be garbage too. The actual cause of the
+problem could be a broken remote name server or resolver, or a
+corrupted UDP datagram. This <em class="emphasis">syslog</em> message is
+logged at priority LOG_INFO.</p><p>
+
+
+This message might appear if you are backing up some other
+zone:<a name="INDEX-1183" /> <a name="INDEX-1184" />
+<a name="INDEX-1185" /></p><p>
+
+
+<blockquote><pre class="code">Jun 7 20:14:26 wormhole named[29618]: Zone "253.253.192.in-addr.arpa"
+                (class 1) SOA serial# (3345) rcvd from [192.249.249.10]
+                is &lt; ours (563319491)</pre></blockquote>
+
+
+Ah, the pesky admin for <em class="emphasis">253.253.192.in-addr.arpa</em> changed the
+serial number format and neglected to tell you about it. Some thanks
+you get for running a slave for this zone, huh? Drop the admin a note
+to see if this change was intentional or just a typo. If the change
+was intentional or if you don't want to contact the admin, then
+you have to deal with it locally -- kill your slave, remove the
+backup copy of this zone, and restart your server. This procedure
+removes all knowledge your slave had of the old serial number, at
+which point it's quite happy with the new serial number. This
+<em class="emphasis">syslog</em> message is logged at priority LOG_NOTICE.</p><p>
+
+
+By the way, if that pesky admin was running a BIND 8 or 9 name
+server, then he must have missed (or ignored) a message his server
+logged, telling him that he'd rolled the zone's serial
+number back. On a BIND 8 name server, the message looks like:</p><p>
+
+
+<blockquote><pre class="code">Jun 7 19:35:14 terminator named[3221]: WARNING: new serial number &lt; old
+              (zp-&gt;z_serial &lt; serial)</pre></blockquote>
+
+
+On a BIND 9 name server, it looks like:</p><p>
+
+
+<blockquote><pre class="code">Jun 7 19:36:41 terminator named[9832]: dns_zone_load: zone movie.edu/IN: zone 
+serial has gone backwards</pre></blockquote>
+
+
+This message is logged at LOG_NOTICE.</p><p>
+
+
+You might want to remind him of the wisdom of checking
+<em class="emphasis">syslog</em> after making any changes to the name
+server.</p><p>
+
+
+This BIND 8 message will undoubtedly become familiar to
+you:<a name="INDEX-1186" />
+<a name="INDEX-1187" />
+<a name="INDEX-1188" /></p><p>
+
+
+<blockquote><pre class="code">Aug 21 00:59:06 terminator named[12620]: Lame server on 'foo.movie.edu'
+         (in 'MOVIE.EDU'?): [10.0.7.125].53 'NS.HOLLYWOOD.LA.CA.US':
+         learnt (A=10.47.3.62,NS=10.47.3.62)</pre></blockquote>
+
+
+Under BIND 9, it looks like this:</p><p>
+
+
+<blockquote><pre class="code">Jan 15 10:20:16 terminator named[14205]: lame server on 'foo.movie.edu' (in 
+'movie.EDU'?): 10.0.7.125#53</pre></blockquote>
+
+
+"Aye, Captain, she's sucking mud!" There's
+some mud out there in the Internet waters in the form of bad
+delegations. A parent name server is delegating a subdomain to a
+child name server, and the child name server is not authoritative for
+the subdomain. In this case, the <em class="emphasis">edu</em> name server is delegating
+<em class="emphasis">movie.edu</em> to 10.0.7.125, and
+the name server on this host is not authoritative for <em class="emphasis">movie.edu</em>. Unless you know the admin for
+<em class="emphasis">movie.edu</em>, there's
+probably nothing you can do about this. The
+<em class="emphasis">syslog</em> message is logged by a 4.9.3 server at
+priority LOG_WARNING, by a 4.9.4 to 4.9.7 server at priority
+LOG_DEBUG, and by a BIND 8 or 9 server at LOG_INFO.</p><p>
+
+
+If your BIND 4.9 or later name server's configuration file has:</p><p>
+
+
+<a name="INDEX-1189" />
+<blockquote><pre class="code">options query-log</pre></blockquote>
+
+
+or your BIND 8 or 9 configuration file has:</p><p>
+
+
+<blockquote><pre class="code">logging { category queries { default_syslog; }; };</pre></blockquote>
+
+
+you will get a LOG_INFO <em class="emphasis">syslog</em> message for every
+<a name="INDEX-1190" />query your name server receives:</p><p>
+
+
+<blockquote><pre class="code">Feb 20 21:43:25 terminator named[3830]:
+            XX /192.253.253.2/carrie.movie.edu/A
+Feb 20 21:43:32 terminator named[3830]:
+            XX /192.253.253.2/4.253.253.192.in-addr.arpa/PTR</pre></blockquote>
+
+
+BIND 9 name servers support query logging as of 9.1.0. The format has
+changed slightly, though:</p><p>
+
+
+<blockquote><pre class="code">Jan 13 18:32:25 terminator named[13976]: client 192.253.253.2#1702: query: carrie.
+movie.edu IN A
+Jan 13 18:32:42 terminator named[13976]: client 192.253.253.2#1702: query: 4.253.
+253.192.in-addr.arpa IN PTR</pre></blockquote>
+
+
+These messages include the IP address of the host that made the query
+as well as the query itself. On a BIND 8.2.1 or later name server,
+recursive queries are marked with XX+ instead of XX. Make sure you
+have lots of disk space if you log all the queries to a busy name
+server. (On a running server, you can toggle query logging on and off
+with the <tt class="command">querylog</tt><a name="INDEX-1191" /> command.)</p><p>
+
+
+Starting with BIND 8.1.2, you might see this set of
+<em class="emphasis">syslog</em> messages:</p><p>
+
+
+<blockquote><pre class="code">May 19 11:06:08 named[21160]: bind(dfd=20, [10.0.0.1].53):
+                Address already in use
+May 19 11:06:08 named[21160]: deleting interface [10.0.0.1].53
+May 19 11:06:08 named[21160]: bind(dfd=20, [127.0.0.1].53):
+                Address already in use
+May 19 11:06:08 named[21160]: deleting interface [127.0.0.1].53
+May 19 11:06:08 named[21160]: not listening on any interfaces
+May 19 11:06:08 named[21160]: Forwarding source address
+                is [0.0.0.0].1835
+May 19 11:06:08 named[21161]: Ready to answer queries.</pre></blockquote>
+
+
+On BIND 9 name servers, that looks like:</p><p>
+
+
+<blockquote><pre class="code">Jul 27 17:15:58 terminator named[7357]: listening on IPv4 interface lo, 127.0.0.1#53
+Jul 27 17:15:58 terminator named[7357]: binding TCP socket: address in use
+Jul 27 17:15:58 terminator named[7357]: listening on IPv4 interface eth0, 206.168.194.122#53
+Jul 27 17:15:58 terminator named[7357]: binding TCP socket: address in use
+Jul 27 17:15:58 terminator named[7357]: listening on IPv4 interface eth1, 206.168.194.123#53
+Jul 27 17:15:58 terminator named[7357]: binding TCP socket: address in use
+Jul 27 17:15:58 terminator named[7357]: couldn't add command channel 0.0.0.0#953: address in use</pre></blockquote>
+
+
+What has happened is that you had a <a name="INDEX-1192" />name server running and you started up a
+second name server without killing the first one. Unlike what you
+might expect, the second name server continues to run; it just
+isn't listening on any interfaces.<a name="INDEX-1193" /> <a name="INDEX-1194" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-7-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">7.6.2. Understanding the BIND Statistics</h3>
+
+
+<a name="INDEX-1195" /> <a name="INDEX-1196" />
+<a name="INDEX-1197" />Periodically, <a name="INDEX-1198" />you should look over the statistics on
+some of your name servers, if only to see how busy they are.
+We'll now show you an example of the name server statistics and
+discuss what each line means. Name servers handle many queries and
+responses during normal operation, so first we need to show you what
+a typical exchange might look like.</p><p>
+
+
+Reading the explanations for the statistics is hard without a mental
+picture of what goes on during a lookup. To help you understand the
+name server's statistics, <a href="ch07_06.html#dns4-CHP-7-FIG-2">Figure 7-2</a> shows
+what might happen when an application tries to look up a domain name.
+The application, FTP, queries a local name server. The local name
+server had previously looked up data in this zone and knows where the
+remote name servers are. It queries each of the remote name
+servers -- one of them twice -- trying to find the answer. In
+the meantime, the application times out and sends yet another query,
+asking for the same information.</p><p>
+
+
+<a name="dns4-CHP-7-FIG-2" /><div class="figure"><img height="525" alt="Figure 7-2" src="figs/dns4_0702.gif" width="423" /></div><h4 class="objtitle">Figure 7-2. Example query/response exchange</h4>
+
+Keep in mind that even though a name server has sent a query to a
+remote name server, the remote name server may not receive the query
+right away. The query might be delayed or lost by the underlying
+network, or perhaps the remote name server host might be busy with
+another application.</p><p>
+
+
+Notice that a BIND name server is able to detect duplicate queries
+only while it is still trying to answer the original query. The local
+name server detects the duplicate query from the application because
+the local name server is still working on it. But remote name server
+1 does not detect the duplicate query from the local name server
+because it answered the previous query. After the local name server
+receives the first response from remote name server 1, all other
+responses are discarded as duplicates. This dialog required the
+following exchanges:</p><p>
+
+
+<a name="ch07-37-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Exchange</p></th>
+<th>
+Number</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Application to local name server</p></td>
+<td>
+2 queries</p></td>
+</tr>
+
+<tr>
+<td>
+Local name server to application</p></td>
+<td>
+1 response</p></td>
+</tr>
+
+<tr>
+<td>
+Local name server to remote name server 1</p></td>
+<td>
+2 queries</p></td>
+</tr>
+
+<tr>
+<td>
+Remote name server 1 to local name server</p></td>
+<td>
+2 responses</p></td>
+</tr>
+
+<tr>
+<td>
+Local name server to remote name server 2</p></td>
+<td>
+1 query</p></td>
+</tr>
+
+<tr>
+<td>
+Remote name server 2 to local name server</p></td>
+<td>
+1 response</p></td>
+</tr>
+
+<tr>
+<td>
+Local name server to remote name server 3</p></td>
+<td>
+1 query</p></td>
+</tr>
+
+<tr>
+<td>
+Remote name server 3 to local name server</p></td>
+<td>
+0 responses</p></td>
+</tr>
+
+
+</table><p>
+
+These exchanges would make the following contributions to the local
+name server's statistics:</p><p>
+
+
+<a name="ch07-38-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Statistic</p></th>
+<th>
+Cause</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+2 queries received</p></td>
+<td>
+From the application on the local host</p></td>
+</tr>
+
+<tr>
+<td>
+1 duplicate query</p></td>
+<td>
+From the application on the local host</p></td>
+</tr>
+
+<tr>
+<td>
+1 answer sent</p></td>
+<td>
+To the application on the local host</p></td>
+</tr>
+
+<tr>
+<td>
+3 responses received</p></td>
+<td>
+From remote name servers</p></td>
+</tr>
+
+<tr>
+<td>
+2 duplicate responses</p></td>
+<td>
+From remote name servers</p></td>
+</tr>
+
+<tr>
+<td>
+2 A queries</p></td>
+<td>
+Queries for address information</p></td>
+</tr>
+
+
+</table><p>
+
+In our example, the local name server received queries only from an
+application, yet it sent queries to remote name servers. Normally,
+the local name server would also receive queries from remote name
+servers (that is, in addition to asking remote servers for
+information it needs to know, the local server would also be asked by
+remote servers for information they need to know), but we
+didn't show any remote queries for the sake of simplicity.</p><p>
+
+
+<a name="dns4-CHP-7-SECT-6.2.1" /><div class="sect3">
+<h3 class="sect3">7.6.2.1. BIND 4.9 and 8 statistics</h3>
+
+
+Now that you've seen a typical exchange between applications
+and name servers, as well as the statistics it generated, let's
+go over a more extensive example of the statistics. To get the
+statistics from your BIND 8 name server, use
+<em class="filename">ndc</em>:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc stats</b></tt></pre></blockquote>
+
+
+On older BIND 4 name servers without <em class="filename">ndc</em>, send
+<em class="filename">named </em>the ABRT signal:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>kill -ABRT `cat /var/run/named.pid`</b></tt></pre></blockquote>
+
+
+(The process ID is stored in <em class="filename">/etc/named.pid</em> on
+pre-SVR4 filesystems.) Wait a few seconds and look at the file
+<a name="INDEX-1199" /><em class="filename">named.stats</em> in the name
+server's working directory (for BIND 8) or at
+<em class="filename">/var/tmp/named.stats</em> or
+<em class="filename">/usr/tmp/named.stats</em> (for BIND 4). If the
+statistics are not dumped to this file, your server may not have been
+compiled with STATS defined and, thus, may not be collecting
+statistics. Following are the statistics from one of Paul
+Vixie's BIND 4.9.3 name servers. BIND 8 name servers have all
+of the same items listed here except for RnotNsQ, and the items are
+arranged in a different order. BIND 9 name servers, as of 9.1.0, keep
+an entirely different set of statistics, which we'll show you
+in the next section.</p><p>
+
+
+<blockquote><pre class="code">+++ Statistics Dump +++ (800708260) Wed May 17 03:57:40 1995
+746683    time since boot (secs)
+392768    time since reset (secs)
+14        Unknown query types
+268459    A queries
+3044      NS queries
+5680      CNAME queries
+11364     SOA queries
+1008934   PTR queries
+44        HINFO queries
+680367    MX queries
+2369      TXT queries
+40        NSAP queries
+27        AXFR queries
+8336      ANY queries
+++ Name Server Statistics ++
+(Legend)
+      RQ    RR    RIQ   RNXD    RFwdQ
+      RFwdR RDupQ RDupR RFail   RFErr
+      RErr  RTCP  RAXFR RLame   ROpts
+      SSysQ SAns  SFwdQ SFwdR   SDupQ
+      SFail SFErr SErr  RNotNsQ SNaAns
+      SNXD
+(Global)
+   1992938 112600 0 19144 63462 60527 194 347 3420 0  5 2235 27 35289 0
+   14886 1927930 63462 60527 107169  10025 119 0 1785426 805592  35863
+[15.255.72.20]
+   485 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 485 0 0 0  0 0 0 0 485  0
+[15.255.152.2]
+   441 137 0 1 2 108 0 0 0 0  0 0 0 0 0  13 439 85 7 84  0 0 0 0 431  0
+[15.255.152.4]
+   770 89 0 1 4  69 0 0 0 0  0 0 0 0 0  14 766 68 5 7  0 0 0 0 755  0
+...  &lt;lots of entries deleted&gt;</pre></blockquote>
+
+
+If your BIND 8 name server doesn't include any per-IP address
+sections after "(Global)," you'll need to set
+<em class="emphasis">host-statistics</em> to yes in your
+<em class="emphasis">options</em> statement if you want to track per-host
+statistics:</p><p>
+
+
+<blockquote><pre class="code">options {
+	host-statistics yes;
+};</pre></blockquote>
+
+
+However, keeping host statistics requires a fair amount of memory, so
+you may not want to do it routinely unless you're trying to
+build a profile of your name server's activity.</p><p>
+
+
+Let's look at these statistics one line at a time.</p><p>
+
+
+<blockquote><pre class="code">+++ Statistics Dump +++ (800708260) Wed May 17 03:57:40 1995</pre></blockquote>
+
+
+This is when this section of the statistics was dumped. The number in
+parentheses (800708260) is the number of seconds since the Unix
+epoch, which was January 1, 1970. Mercifully, BIND converts that into
+a real date and time for you: May 17, 1995, 3:57:40 a.m.</p><p>
+
+
+<blockquote><pre class="code">746683    time since boot (secs)</pre></blockquote>
+
+
+This is how long the local name server has been running. To convert
+to days, divide by 86400 (60 &times; 60 &times; 24, the number of
+seconds in a day). This server has been running for about 8.5 days.</p><p>
+
+
+<blockquote><pre class="code">392768    time since reset (secs)</pre></blockquote>
+
+
+This is how long the local name server has run since the last reload.
+You'll probably see this number differ from the time since boot
+only if the server is a primary master name server for one or more
+zones. Name servers that are slaves for a zone automatically pick up
+new data with zone transfers and are not usually reloaded. Since
+<em class="emphasis">this</em> server has been reset, it is probably the
+primary master name server for some zone.</p><p>
+
+
+<a name="INDEX-1200" /><blockquote><pre class="code">14        Unknown query types</pre></blockquote>
+
+
+This name server received 14 queries for data of a type it
+didn't recognize. Either someone is experimenting with new
+types, there is a defective implementation somewhere, or Paul needs
+to upgrade his name server.</p><p>
+
+
+<a name="INDEX-1201" /><a name="INDEX-1202" /><a name="INDEX-1203" /><blockquote><pre class="code">268459    A queries
+
+</pre></blockquote>
+
+
+There have been 268459 address lookups. Address queries are normally
+the most common type of query.</p><p>
+
+
+<a name="INDEX-1204" /><a name="INDEX-1205" />
+<blockquote><pre class="code">3044      NS queries
+</pre></blockquote>
+
+
+There have been 3044 name server queries. Internally, name servers
+generate NS queries when they are trying to look up servers for the
+root zone. Externally, applications like <em class="filename">dig</em> and
+<em class="filename">nslookup</em> can also be used to look up NS records.</p><p>
+
+
+<a name="INDEX-1206" /><blockquote><pre class="code">5680      CNAME queries</pre></blockquote>
+
+
+Some versions of <em class="filename">sendmail</em> make CNAME queries in
+order to canonicalize a mail address (replace an alias with the
+canonical name). Other versions of <em class="filename">sendmail </em>use
+ANY queries instead (we'll get to those shortly). Otherwise,
+the CNAME lookups are most likely from <em class="filename">dig</em> or
+<em class="filename">nslookup</em>.</p><p>
+
+
+<a name="INDEX-1207" /><blockquote><pre class="code">11364     SOA queries</pre></blockquote>
+
+
+SOA queries are made by slave name servers to check if their zone
+data is current. If the data is not current, an AXFR query follows to
+cause the zone transfer. Since this set of statistics does show
+<a name="INDEX-1208" />AXFR queries,
+we can conclude that slave name servers load zone data from this
+server.</p><p>
+
+
+<a name="INDEX-1209" /><a name="INDEX-1210" />
+<blockquote><pre class="code">1008934   PTR queries
+</pre></blockquote>
+
+
+The pointer queries map addresses to names. Many kinds of software
+look up IP addresses: <em class="filename">inetd</em>,
+<em class="filename">rlogind</em>, <em class="filename">rshd</em>, network
+management software, and network tracing software.</p><p>
+
+
+<a name="INDEX-1211" /><a name="INDEX-1212" /><blockquote><pre class="code">44        HINFO queries
+</pre></blockquote>
+
+
+The host-information queries are most likely from someone
+interactively looking up HINFO records.</p><p>
+
+
+<a name="INDEX-1213" /><a name="INDEX-1214" /><blockquote><pre class="code">680367    MX queries
+</pre></blockquote>
+
+
+Mailers like <em class="filename">sendmail</em> make mail exchanger
+queries as part of the normal electronic mail delivery process.</p><p>
+
+
+<a name="INDEX-1215" /><a name="INDEX-1216" /><blockquote><pre class="code">2369      TXT queries
+</pre></blockquote>
+
+
+Some application must be making text queries for this number to be
+this large. It might be a tool like <em class="emphasis">Harvest</em>,
+which is an information search and retrieval technology developed at
+the University of Colorado.</p><p>
+
+
+<a name="INDEX-1217" /><blockquote><pre class="code">40        NSAP queries</pre></blockquote>
+
+
+This is a relatively new record type used to map domain names to OSI
+Network Service Access Point addresses.</p><p>
+
+
+<blockquote><pre class="code">27        AXFR queries</pre></blockquote>
+
+
+Slave name servers make AXFR queries to initiate zone transfers.</p><p>
+
+
+<a name="INDEX-1218" /><blockquote><pre class="code">8336      ANY queries</pre></blockquote>
+
+
+ANY queries request records of any type for a name.
+<em class="filename">sendmail </em>is the most common program to use this
+query type. Since <em class="filename">sendmail</em> looks up CNAME, MX,
+and address records for a mail destination, it will make a query for
+ANY record type so that all the resource records are cached right
+away at the local name server.<a name="INDEX-1219" /></p><p>
+
+
+<a name="INDEX-1220" />The rest of the statistics are kept on a
+per-host basis. If you look over the list of hosts your name server
+has exchanged packets with, you'll find out just how garrulous
+your name server is -- you'll see hundreds or even thousands
+of hosts in the list. While the size of the list is impressive, the
+statistics themselves are only somewhat interesting. We'll
+explain <em class="emphasis">all</em> the statistics, even the ones with
+zero counts, although you'll probably find only a handful of
+the statistics useful. To make the statistics easier to read,
+you'll need a tool to expand the statistics because the output
+format is rather compact. We wrote a tool called
+<a name="INDEX-1221" />
+<a name="INDEX-1222" /><em class="filename">bstat</em>
+to do just this. Here's what its output looks like:</p><p>
+
+
+<blockquote><pre class="code">hpcvsop.cv.hp.com
+        485 queries received
+        485 responses sent to this name server
+        485 queries answered from our cache
+relay.hp.com
+        441 queries received
+        137 responses received
+          1 negative response received
+          2 queries for data not in our cache or authoritative data
+        108 responses from this name server passed to the querier
+         13 system queries sent to this name server
+        439 responses sent to this name server
+         85 queries sent to this name server
+          7 responses from other name servers sent to this name server
+         84 duplicate queries sent to this name server
+        431 queries answered from our cache
+hp.com
+        770 queries received
+         89 responses received
+          1 negative response received
+          4 queries for data not in our cache or authoritative data
+         69 responses from this name server passed to the querier
+         14 system queries sent to this name server
+        766 responses sent to this name server
+         68 queries sent to this name server
+          5 responses from other name servers sent to this name server
+          7 duplicate queries sent to this name server
+        755 queries answered from our cache</pre></blockquote>
+
+
+In the raw statistics (not the <em class="filename">bstat</em> output),
+each host's IP address is followed by a
+<a name="INDEX-1223" />
+<a name="INDEX-1224" />table of
+counts. The column heading for this table is the cryptic legend at
+the beginning. The legend is broken into several lines, but the host
+statistics are all on a single line. In the following section,
+we'll explain briefly what each column means as we look at the
+statistics for one of the hosts this name server conversed
+with -- 15.255.152.2 (<em class="emphasis">relay.hp.com</em>). For the sake of our
+explanation, we'll first show you the column heading from the
+legend (e.g., RQ) followed by the count for this column for
+<em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1225" /><blockquote><pre class="code">RQ 441</pre></blockquote>
+
+
+RQ is the count of queries received from <em class="emphasis">relay</em>. These queries were made because
+<em class="emphasis">relay</em> needed information
+about a zone served by this name server.</p><p>
+
+
+<a name="INDEX-1226" /><blockquote><pre class="code">RR 137</pre></blockquote>
+
+
+RR is the count of responses received from <em class="emphasis">relay</em>. These are responses to queries
+made from this name server. Don't try to correlate this number
+to RQ, because they are not related. RQ counts questions
+askedby <em class="emphasis">relay</em>; RR counts answers that <em class="emphasis">relay</em> gave to this name server (because
+this name server asked <em class="emphasis">relay</em>
+for information).</p><p>
+
+
+<a name="INDEX-1227" /><blockquote><pre class="code">RIQ 0</pre></blockquote>
+
+
+RIQ is the count of inverse queries received from <em class="emphasis">relay</em>. Inverse queries were originally
+intended to map addresses to names, but that function is now handled
+by PTR records. Older versions of <em class="filename">nslookup</em> use
+an inverse query on startup, so you may see a nonzero RIQ count.</p><p>
+
+
+<a name="INDEX-1228" /><blockquote><pre class="code">RNXD 1</pre></blockquote>
+
+
+RNXD is the count of "no such domain" answers received
+from <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1229" /><blockquote><pre class="code">RFwdQ 2</pre></blockquote>
+
+
+RFwdQ is the count of queries received (RQ) from <em class="emphasis">relay</em> that needed further processing
+before they could be answered. This count is much higher for hosts
+that configure their resolver (with <em class="filename">resolv.conf
+</em>) to send all queries to your name server.</p><p>
+
+
+<a name="INDEX-1230" /><blockquote><pre class="code">RFwdR 108</pre></blockquote>
+
+
+RFwdR is the count of responses received (RR) from <em class="emphasis">relay</em> that answered the original query
+and were passed back to the application that made the query.</p><p>
+
+
+<a name="INDEX-1231" /><blockquote><pre class="code">RDupQ 0</pre></blockquote>
+
+
+RDupQ is the count of duplicate queries from <em class="emphasis">relay</em>. You'll see duplicates only
+when the resolver is configured (with <em class="filename">resolv.conf
+</em>) to query this name server.</p><p>
+
+
+<a name="INDEX-1232" /><blockquote><pre class="code">RDupR 0</pre></blockquote>
+
+
+RDupR is the count of duplicate responses from <em class="emphasis">relay</em>. A response is a duplicate when
+the name server can no longer find the original query in its list of
+pending queries that caused the response.</p><p>
+
+
+<a name="INDEX-1233" /><blockquote><pre class="code">RFail 0</pre></blockquote>
+
+
+RFail is the count of <a name="INDEX-1234" /> <a name="INDEX-1235" />SERVFAIL responses from <em class="emphasis">relay</em>. A SERVFAIL response indicates
+some sort of server failure. Server failure responses often occur
+because the remote server read a zone data file and found a syntax
+error. Any queries for data in the zone with the erroneous zone data
+file will result in a server failure answer from the remote name
+server. This is probably the most common cause of SERVFAIL responses.
+Server failure responses also occur when the remote name server tries
+to allocate more memory and can't, or when the remote slave
+name server's zone data expires.</p><p>
+
+
+<a name="INDEX-1236" /><blockquote><pre class="code">RFErr 0</pre></blockquote>
+
+
+RFErr is the count of <a name="INDEX-1237" />FORMERR responses from <em class="emphasis">relay</em>. FORMERR means that the remote
+name server said the local name server's query had a format
+error.</p><p>
+
+
+<a name="INDEX-1238" /><blockquote><pre class="code">RErr  0</pre></blockquote>
+
+
+RErr is the count of errors that weren't either SERVFAIL or
+FORMERR.</p><p>
+
+
+<a name="INDEX-1239" /><blockquote><pre class="code">RTCP  0</pre></blockquote>
+
+
+RTCP is the count of queries received on TCP connections from
+<em class="emphasis">relay</em>. (Most queries use
+UDP.)</p><p>
+
+
+<a name="INDEX-1240" /><blockquote><pre class="code">RAXFR 0</pre></blockquote>
+
+
+RAXFR is the count of zone transfers initiated. The
+count indicates that <em class="emphasis">relay</em>
+is not a slave for any zones served by this name server.</p><p>
+
+
+<a name="INDEX-1241" /><blockquote><pre class="code">RLame 0</pre></blockquote>
+
+
+RLame is the count of <a name="INDEX-1242" />lame delegations received. If this
+count is not 0, it means that some zone is delegated to the name
+server at this IP address, and the name server is not authoritative
+for the zone.</p><p>
+
+
+<a name="INDEX-1243" /><blockquote><pre class="code">ROpts 0</pre></blockquote>
+
+
+ROpts is the count of packets received with IP options set.</p><p>
+
+
+<a name="INDEX-1244" /><blockquote><pre class="code">SSysQ 13</pre></blockquote>
+
+
+SSysQ is the count of <a name="INDEX-1245" />
+<a name="INDEX-1246" />system
+queries sent to <em class="emphasis">relay</em>.
+System queries are queries that are <em class="emphasis">initiated</em> by
+the local name server. Most system queries will go to root name
+servers because system queries are used to keep the list of root name
+servers up to date. But system queries are also used to find out the
+address of a name server if the address record timed out before the
+name server record did. Since <em class="emphasis">relay</em> is not a root name server, these
+queries must have been sent for the latter reason.</p><p>
+
+
+<a name="INDEX-1247" /><blockquote><pre class="code">SAns  439</pre></blockquote>
+
+
+SAns is the count of answers sent to <em class="emphasis">relay</em>. This name server answered 439 out
+of the 441 (RQ) queries <em class="emphasis">relay</em> sent to it. I wonder what happened
+to the two queries it didn't answer . . . .</p><p>
+
+
+<a name="INDEX-1248" /><blockquote><pre class="code">SFwdQ 85</pre></blockquote>
+
+
+SFwdQ is the count of queries that were sent (forwarded) to
+<em class="emphasis">relay</em> when the answer was
+not in this name server's zone data or cache.</p><p>
+
+
+<a name="INDEX-1249" /><blockquote><pre class="code">SFwdR 7</pre></blockquote>
+
+
+SFwdR is the count of responses from some name server that were sent
+(forwarded) to <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1250" /><blockquote><pre class="code">SDupQ 84</pre></blockquote>
+
+
+SDupQ is the count of <a name="INDEX-1251" />
+<a name="INDEX-1252" />duplicate
+queries sent to <em class="emphasis">relay</em>.
+It's not as bad as it looks, though. The duplicate count is
+incremented if the query was sent to any other name server first. So
+<em class="emphasis">relay</em> might have answered
+all the queries it received the first time it received them, and the
+query still counted as a duplicate because it was sent to some other
+name server before <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1253" /><blockquote><pre class="code">SFail 0</pre></blockquote>
+
+
+SFail is the count of SERVFAIL responses sent to <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1254" /><blockquote><pre class="code">SFErr 0</pre></blockquote>
+
+
+SFErr is the count of FORMERR responses sent to <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1255" /><blockquote><pre class="code">SErr  0</pre></blockquote>
+
+
+SErr is the count of <em class="emphasis">sendto(
+)</em><a name="INDEX-1256" /> <a name="INDEX-1257" /> system
+calls that failed when the destination was <em class="emphasis">relay</em>.</p><p>
+
+
+<a name="INDEX-1258" /><blockquote><pre class="code">RNotNsQ 0</pre></blockquote>
+
+
+RNotNsQ is the count of queries received that were not from port 53,
+the name server port. Prior to BIND 8, all name server queries came
+from port 53. Any queries from ports other than 53 came from a
+resolver. BIND 8 name servers query from ports other than 53,
+however, which makes this statistic useless since you can no longer
+distinguish resolver queries from name server queries. Hence, BIND 8
+dropped RNotNsQ from its statistics.</p><p>
+
+
+<a name="INDEX-1259" /><blockquote><pre class="code">SNaAns 431</pre></blockquote>
+
+
+SNaAns is the count of nonauthoritative answers sent to <em class="emphasis">relay</em>. Out of the 439 answers (SAns)
+sent to <em class="emphasis">relay</em>, 431 were from
+cached data.</p><p>
+
+
+<a name="INDEX-1260" /><blockquote><pre class="code">SNXD  0</pre></blockquote>
+
+
+SNXD is the count of "no such domain" answers sent to
+<em class="emphasis">relay</em>.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-6.2.2" /><div class="sect3">
+<h3 class="sect3">7.6.2.2. BIND 9 statistics</h3>
+
+
+BIND 9.1.0 is the first version of BIND 9 to keep statistics. You use
+<em class="filename">rndc
+</em><a name="INDEX-1261" />to induce BIND 9 to
+dump its statistics:</p><p>
+
+
+<blockquote><pre class="code"><tt class="userinput"><b>% rndc stats</b></tt></pre></blockquote>
+
+
+The name server dumps statistics, as a BIND 8 name server would, to a
+file called <a name="INDEX-1262" /><em class="filename">named.stats </em>in its
+working directory. However, those statistics look completely
+different from BIND 8's. Here are the contents of the stats
+file from one of our BIND 9 name servers:</p><p>
+
+
+<blockquote><pre class="code">+++ Statistics Dump +++ (979436130)
+success 9
+referral 0
+nxrrset 0
+nxdomain 1
+recursion 1
+failure 1
+--- Statistics Dump --- (979436130)
++++ Statistics Dump +++ (979584113)
+success 651
+referral 10
+nxrrset 11
+nxdomain 17
+recursion 296
+failure 217
+--- Statistics Dump --- (979584113)</pre></blockquote>
+
+
+The name server appends a new statistics block (the section between
+"+++ Statistics Dump +++" and " -- - Statistics
+Dump  -- -") each time it receives a stats command. The
+number in parentheses (979436130) is, as in earlier stats files, the
+number of seconds since the Unix epoch. Unfortunately, BIND
+doesn't convert the value for you, but you can use the date
+command to convert it to something more readable. For example, to
+convert 979584113 seconds since the Unix epoch ( January 1, 1970),
+you could use:</p><p>
+
+
+<blockquote><pre class="code"><tt class="userinput"><b>% date -d '1970-01-01 979584113 sec'</b></tt>
+Mon Jan 15 18:41:53 MST 2001</pre></blockquote>
+
+
+Let's now go through these statistics one line at a time.</p><p>
+
+
+<a name="INDEX-1263" /><blockquote><pre class="code">success 651</pre></blockquote>
+
+
+This is the number of successful queries the name server handled.
+Successful queries are those that didn't result in referrals or
+errors.</p><p>
+
+
+<a name="INDEX-1264" /><blockquote><pre class="code">referral 10</pre></blockquote>
+
+
+This is the number of queries the name server handled that resulted
+in referrals.</p><p>
+
+
+<a name="INDEX-1265" /><blockquote><pre class="code">nxrrset 11</pre></blockquote>
+
+
+This is the number of queries the name server handled that resulted
+in responses saying that the type of record the querier requested
+didn't exist for the domain name it specified.</p><p>
+
+
+<a name="INDEX-1266" /><blockquote><pre class="code">nxdomain 17</pre></blockquote>
+
+
+This is the number of queries the name server handled that resulted
+in responses saying that the domain name the querier specified
+didn't exist.</p><p>
+
+
+<a name="INDEX-1267" /><blockquote><pre class="code">recursion 296</pre></blockquote>
+
+
+This is the number of queries the name server received that required
+recursive processing to answer.</p><p>
+
+
+<a name="INDEX-1268" /><blockquote><pre class="code">failure 217</pre></blockquote>
+
+
+This is the number of queries the name server received that resulted
+in errors other than those covered by <em class="emphasis">nxrrset</em>
+and <em class="emphasis">nxdomain</em>.</p><p>
+
+
+These are obviously not nearly as many statistics as a BIND 8 name
+server keeps, but future versions of BIND 9 will probably record
+more.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-7-SECT-6.2.3" /><div class="sect3">
+<h3 class="sect3">7.6.2.3. Using the BIND statistics</h3>
+
+
+Is your name server "healthy"? How do you know what
+"healthy" operation looks like? From a single snapshot,
+you can't really say whether a name server is healthy. You have
+to watch the
+<a name="INDEX-1269" />statistics
+generated by your server over a period of time to get a feel for what
+sorts of numbers are normal for your configuration. These numbers
+will vary markedly among name servers depending on the mix of
+applications generating lookups, the type of server (primary master,
+slave, caching-only), and the level of the zones in the namespace it
+is serving.</p><p>
+
+
+One thing to watch for in the statistics is how many
+<a name="INDEX-1270" />
+<a name="INDEX-1271" />queries per second your name server
+receives. Take the number of queries received and divide by the
+number of seconds the name server has been running. Paul's BIND
+4.9.3 name server received 1992938 queries in 746683 seconds, or
+approximately 2.7 queries per second -- not a very busy
+server.<a href="#FOOTNOTE-53">[53]</a> If the number you come up with for your
+name server seems out of line, look at which hosts are making all the
+queries and decide if it makes sense for them to be making all those
+queries. At some point you may decide that you need more name servers
+to handle the load. We'll cover that situation in the<a name="INDEX-1272" /> <a name="INDEX-1273" /> <a name="INDEX-1274" /> <a name="INDEX-1275" /> <a name="INDEX-1276" />next chap<a name="INDEX-1277" />ter<a name="INDEX-1278" />.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-53" />[53]Recall that the root name servers, which run
+plain vanilla BIND, can handle thousands of queries per
+second.</p><p>
+
+</blockquote>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.5. Logging in BIND 8 and 9</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8. Growing Your Domain</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch07_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

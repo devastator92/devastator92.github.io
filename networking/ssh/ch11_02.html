@@ -1,0 +1,1401 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>FTP Forwarding (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.2. FTP Forwarding</h2>
+
+
+
+<a name="INDEX-1611" />One of the most frequently asked
+questions about SSH is, "How can I use port forwarding to
+secure FTP?" Unfortunately, the short answer is that you
+usually can't, at least not completely. Port forwarding can
+protect your account password, but usually not the files being
+transferred. Still, protecting your password is a big win, since the
+most egregious problem with FTP is that it reveals your password to
+network snoopers.<a href="#FOOTNOTE-130">[130]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-130" />[130]At least in its usual form. Some
+FTP implementations support more secure authentication methods, such
+as Kerberos. There are even protocol extensions that allow for
+encryption and cryptographic integrity checking of data connections.
+These techniques aren't widely implemented, however, and
+plaintext passwords with unprotected data connections are still the
+norm for FTP servers on the Internet.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch11-14-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Van Dyke's SecureFX (http://www.vandyke.com/)</h4>
+
+
+
+<a name="INDEX-1612" />Van
+<a name="INDEX-1613" /><a name="INDEX-1614" />Dyke
+Technologies, Inc. has a very useful Windows product, specifically
+designed to forward FTP over SSH, data connections and all. It is a
+specialized combination of SSH-2 and FTP clients. It connects to a
+server host via SSH-2, then connects to the FTP server (also running
+on that host) via a "tcpip-direct" channel in the SSH-2
+session. This is the same mechanism used for local port forwarding in
+regular SSH-2 clients, but since this is a specially written
+application, it can talk to the server directly rather than go
+through a loopback connection to a locally forwarded TCP port.</p>
+
+
+
+SecureFX acts as a GUI FTP client. Whenever it needs an FTP data
+connection, it dynamically creates whatever channels or remote
+forwardings are necessary for the data ports (more outbound
+tcpip-direct channels for active FTP, or regular remote forwardings
+for passive mode). It works very smoothly and we recommend the
+product.</p>
+
+
+
+Note that at press time SecureFX runs only on Windows (98, 95, NT
+4.0, and 2000) and requires an SSH-2 server; it doesn't speak
+SSH-1.</p>
+
+
+</td></tr></table><p></blockquote>
+
+This section explains in detail what you can and can't do with
+FTP and SSH, and why. Some difficulties are due to limitations of
+FTP, not only when interacting with SSH, but also in the presence of
+firewalls and network address translation (NAT). We will discuss each
+of these situations, since firewalls and NAT are common nowadays, and
+their presence might be the reason you're trying to forward FTP
+securely. If you are a system administrator responsible for both SSH
+and these networking components, we will try to guide you to a
+general understanding that will help you design and troubleshoot
+entire systems.</p>
+
+
+
+Depending on your network environment, different problems may arise
+when combining SSH with FTP. Since we can't cover every
+possible environment, we describe each problem in isolation,
+illustrating its symptoms and recommending solutions. If you have
+multiple problems occurring simultaneously, the software behavior you
+observe might not match the examples we've given. We recommend
+reading the entire case study once (at least cursorily) before
+experimenting with your system, so you will have an idea of the
+problems you might encounter. Afterward, go ahead and try the
+examples at your computer.</p>
+
+
+
+<a name="ch11-15-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.1. The FTP Protocol</h3>
+
+
+
+To understand the problems between <a name="INDEX-1615" />FTP and
+SSH, you need to understand a bit about the FTP protocol. Most TCP
+services involve a single connection from client to server on a
+known, server-side port. FTP, however, involves multiple connections
+in both directions, mostly to unpredictable port numbers:</p>
+
+
+
+<ul><li>A single <em class="emphasis">control
+connection</em><a name="INDEX-1616" /> for carrying commands from the
+client and responses from the server. It connects on TCP port 21 and
+persists for the entire FTP session.</p></li><li>A number of <em class="emphasis">data
+connections</em><a name="INDEX-1617" /> for transferring files and other
+data, such as directory listings. For each file transfer, a new data
+connection is opened and closed, and each one may be on a different
+port. These data connections may come from the client or the server.</p></li></ul>
+Let's run a typical FTP client and view the control connection.
+We'll use <a name="INDEX-1618" />debug
+mode (<tt class="command">ftp </tt><span class="option">-</span><tt class="command">d</tt> )
+to make visible the FTP protocol commands the client sends on the
+control connection, since they aren't normally displayed. Debug
+mode prints these commands preceded by "---&gt;", for example:</p>
+
+
+
+<blockquote><pre class="code">---&gt; USER res</pre></blockquote>
+
+
+
+You'll also see responses from the server, which the client
+prints by default. These are preceded by a numerical code:</p>
+
+
+
+<blockquote><pre class="code">230 User res logged in.</pre></blockquote>
+
+
+
+Here's a session in which the user res connects to an FTP
+server, logs in, and attempts to change directory twice, once
+successfully and once not:</p>
+
+
+
+<blockquote><pre class="code">$ ftp -d aaor.lionaka.net
+Connected to aaor.lionaka.net.
+220 aaor.lionaka.net FTP server (SunOS 5.7) ready.
+---&gt; SYST
+215 UNIX Type: L8 Version: SUNOS
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp&gt; user res
+---&gt; USER res
+331 Password required for res.
+Password: 
+---&gt; PASS XXXX
+230 User res logged in.
+ftp&gt; cd rep
+---&gt; CWD rep
+250 CWD command successful.
+ftp&gt; cd utopia
+---&gt; CWD utopia
+550 utopia: No such file or directory.
+ftp&gt; quit
+---&gt; QUIT
+221 Goodbye.</pre></blockquote>
+
+
+
+The control connection can be secured by standard port forwarding
+because it is on a known port (21). <a href="ch09_02.html#ch09-59902">Section 9.2, "Port Forwarding"</a> In
+contrast, the destination port numbers for data connections are
+generally not known in advance, so setting up SSH forwarding for
+these connections is far more difficult. There's a second
+standard port number associated with FTP, the
+<em class="emphasis">ftp-data</em> port (20). But this is only the source
+port for data connections coming from the server; nothing ever
+listens on it.</p>
+
+
+
+Surprisingly, the data connections generally go in the opposite
+direction from the control one; that is, the server makes a TCP
+connection back to the client in order to transfer data. The ports on
+which these connections occur can be negotiated dynamically by the
+FTP client and server, and doing so involves sending explicit IP
+address information inside the FTP protocol. These features of usual
+FTP operation can cause difficulties when forwarding SSH connections
+and in other scenarios involving firewalls or NAT.</p>
+
+
+
+An alternative FTP mode, called <em class="emphasis">passive
+mode</em><a name="INDEX-1619" />,
+addresses one of these problems: it reverses the sense of the data
+connections, so that they go from the client to the server. Passive
+mode is a matter of FTP client behavior, and so is determined by a
+client setting. The behavior of setting up data connections from the
+server to the client, which we will call
+<em class="emphasis">active-mode</em><a name="INDEX-1620" /> FTP, is traditionally the default in FTP
+clients, although that's changing. With a command-line client,
+the <em class="emphasis">passive</em> command switches to passive mode.
+The internal command that the client sends the server to tell it to
+enter passive mode is <tt class="literal">PASV</tt><a name="INDEX-1621" />. We discuss specific problems and how
+passive mode solves them, in upcoming sections. <a href="ch11_02.html#ch11-60383">Figure 11-1</a> summarizes the workings of passive and active
+FTP.</p>
+
+
+
+<a name="ch11-60383" /><div class="figure"><img height="296" alt="Figure 11-1" src="figs/ssh_1101.gif" width="484" /></div><h4 class="objtitle">Figure 11-1. Basic FTP operation: control connection and active- versus passive-mode transfers</h4>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-16-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.2. Forwarding the Control Connection</h3>
+
+
+
+<a name="INDEX-1622" />Since the FTP control connection is
+just a single, persistent TCP connection to a well-known port, you
+can forward it through SSH. As usual, the FTP server machine must be
+running an SSH server, and you must have an account on it that you
+may access via SSH (see <a href="ch11_02.html#ch11-93994">Figure 11-2</a>).</p>
+
+
+
+<a name="ch11-93994" /><div class="figure"><img height="234" alt="Figure 11-2" src="figs/ssh_1102.gif" width="438" /></div><h4 class="objtitle">Figure 11-2. Forwarding the control connection</h4>
+
+Suppose you are logged into the machine <em class="emphasis">client</em> and want to connect securely to
+an FTP server on the machine <em class="emphasis">server</em>. To forward the FTP control
+connection, run a port-forwarding command on <em class="emphasis">client</em>:<a href="#FOOTNOTE-131">[131]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-131" />[131]If you're
+using the popular <tt class="command">ncftp</tt> client, run this instead:
+<tt class="command">ncftp ftp://client:2001.</tt></p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">client% ssh -L2001:server:21 server</pre></blockquote>
+
+
+
+Then, to use the forwarded port:</p>
+
+
+
+<blockquote><pre class="code">client% ftp localhost 2001
+Connected to localhost
+220 server FTP server (SunOS 5.7) ready.
+Password: 
+230 User res logged in.
+ftp&gt; passive
+Passive mode on.
+ftp&gt; ls
+<i class="lineannotation">... and so on</i></pre></blockquote>
+
+
+
+There are two important things to notice about the commands we just
+recommended. We will discuss each.</p>
+
+
+
+<ul><li>The target of the forwarding is <em class="emphasis">server</em>, not <em class="emphasis">localhost</em>.</p></li><li>The client uses passive mode.</p></li></ul>
+<a name="ch11-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.2.1. Choosing the forwarding target</h3>
+
+
+
+<a name="INDEX-1623" />We chose <em class="emphasis">server</em> as the target of our forwarding,
+not <em class="emphasis">localhost</em> (i.e., we
+didn't use
+<span class="option">-</span><tt class="command">L2001:localhost:21</tt>). This is
+contrary to our previous advice, which was to use <em class="emphasis">localhost</em> where possible as the
+forwarding target. [<a href="ch09_02.html#ch09-27356">Section 9.2.8, "Choosing the Target Forwarding Address"</a>] Well, that technique
+isn't advisable here. Here's what can happen if you do:</p>
+
+
+
+<blockquote><pre class="code">client% ftp localhost 2001
+Connected to client
+220 client FTP server (SunOS 5.7) ready.
+331 Password required for res.
+Password:
+230 User res logged in.
+ftp&gt; ls
+200 PORT command successful.
+425 Can't build data connection: Cannot assign requested address.
+ftp&gt;</pre></blockquote>
+
+
+
+The problem is a bit obscure but can be revealed by an execution
+trace of the FTP server as it responds to the <tt class="command">ls</tt>
+command. The following output was produced by the Linux
+<tt class="command">strace</tt> command:<a href="#FOOTNOTE-132">[132]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-132" />[132]If you're on
+a Solaris 2 (SunOS 5) system, the corresponding operating
+system-supplied program is called <tt class="command">truss</tt>. There is
+also an <tt class="command">strace </tt>program with Solaris, but it is
+completely unrelated. Solaris 1 (SunOS 4 and earlier) has a
+<tt class="command">trace </tt>command, and BSD has
+<tt class="command">ktrace</tt>.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code">so_socket(2, 2, 0, "", 1)                       = 5
+bind(5, 0x0002D614, 16, 3)                      = 0
+        AF_INET  name = 127.0.0.1  port = 20
+connect(5, 0x0002D5F4, 16, 1)                   Err#126 EADDRNOTAVAIL
+        AF_INET  name = 192.168.10.1  port = 2845
+write(1, " 4 2 5   C a n ' t   b u".., 67)      = 67</pre></blockquote>
+
+
+
+The FTP server is trying to make a TCP connection to the correct
+client address but from the wrong socket: the ftp-data port on its
+loopback address, 127.0.0.1. The loopback interface can talk only to
+other loopback addresses on the same machine. TCP knows this and
+responds with the error "address not available"
+(EADDRNOTAVAIL). The FTP server is being careful to originate the
+data connection from the same address to which the client made the
+control connection. Here, the control connection has been forwarded
+through SSH; so to the FTP server, it appears to come from the local
+host. And because we used the loopback address as the forwarding
+target, the source address of that leg of the forwarded path (from
+<tt class="command">sshd</tt> to <tt class="command">ftpd</tt> ) is also the
+loopback address. To eliminate the problem, use the server's
+nonloopback IP address as the target; this causes the FTP server to
+originate data connections from that address.</p>
+
+
+
+You might try to solve this problem using <a name="INDEX-1624" />passive mode, since then the server
+wouldn't originate any connections. But if you try:</p>
+
+
+
+<blockquote><pre class="code">ftp&gt; passive
+Passive mode on.
+ftp&gt; ls
+227 Entering Passive Mode (127,0,0,1,128,133)
+ftp: connect: Connection refused
+ftp&gt;</pre></blockquote>
+
+
+
+In this case, the failure is a slightly different manifestation of
+the same problem. This time, the server listens for an incoming data
+connection from the client, but again, it thinks the client is local
+so it listens on its loopback address. It sends this socket (address
+127.0.0.1, port 32901) to the client, and the client tries to connect
+to it. But this causes the client to try to connect to port 32901 on
+the client host, not the server! Nothing is listening there, of
+course, so the connection is refused.</p>
+</div>
+
+
+
+
+
+<a name="ch11-18-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.2.2. Using passive mode</h3>
+
+
+
+<a name="INDEX-1625" /><a name="INDEX-1626" />Note that we had to put the client into
+passive mode. You will see later that passive mode is beneficial for
+FTP in general, because it avoids some common firewall and NAT
+problems. Here, however, it's used because of a specific
+FTP/SSH problem; if you didn't, here's what happens:</p>
+
+
+
+<blockquote><pre class="code">$ ftp -d localhost 2001
+Connected to localhost.
+220 server FTP server (SunOS 5.7) ready.
+---&gt; USER res
+331 Password required for res.
+Password:
+---&gt; PASS XXXX
+230 User res logged in.
+ftp&gt; ls
+---&gt; PORT 127,0,0,1,11,50
+200 PORT command successful.
+---&gt; LIST
+425 Can't build data connection: Connection refused.
+ftp&gt;</pre></blockquote>
+
+
+
+This is a mirror image of the problem we saw when localhost was the
+forwarding target, but this time it happens on the client side. The
+client supplies a socket for the server to connect to, and since it
+thinks the server is on the local host, that socket is on the
+loopback address. This causes the server to try connecting to its
+local host instead of the client machine.</p>
+
+
+
+Passive mode can't always be used: the FTP client or server
+might not support it, or server-side firewall/NAT considerations may
+prevent it (you'll see an example of that shortly). If so, you
+can use the
+<tt class="literal">GatewayPorts</tt><a name="INDEX-1627" /> feature of SSH and solve
+this problem as we did the previous one: use the host's real IP
+address instead of the loopback. To wit:</p>
+
+
+
+<blockquote><pre class="code">client% ssh -g -L2001:server:21 server</pre></blockquote>
+
+
+
+Then connect to the client machine by name, rather than to localhost:</p>
+
+
+
+<blockquote><pre class="code">client% ftp client 2001</pre></blockquote>
+
+
+
+This connects to the SSH proxy on the client's nonloopback
+address, causing the FTP client to listen on that address for data
+connections. The <em class="emphasis">-g</em> option has security
+implications, however. [<a href="ch09_02.html#ch09-95066">Section 9.2.1.1, "Local forwarding and GatewayPorts"</a>]</p>
+
+
+
+Of course, as we mentioned earlier, it's often the case that
+active-mode FTP isn't usable. It's perfectly possible
+that your local firewall/NAT setup requires passive mode, but you
+can't use it. In that case, you're just out of luck. Put
+your data on a diskette and contribute to the local bicycle-courier
+economy.</p>
+
+
+
+The various problems we have described, while common, depend on your
+particular Unix flavor and FTP implementation. For example, some FTP
+servers fail even before connecting to a loopback socket; they see
+the client's <tt class="literal">PORT</tt> command and reject it,
+printing "illegal PORT command". If you understand the
+reasons for the various failure modes, however, you will learn to
+recognize them in different guises.</p>
+</div>
+
+
+
+
+
+<a name="ch11-95779" /><div class="sect3">
+<h3 class="sect3">11.2.2.3. The "PASV port theft" problem</h3>
+
+
+
+<a name="INDEX-1628" />Trying to use FTP with SSH can be sort
+of like playing a computer dungeon game: you find yourself in a
+twisty maze of TCP connections, all of which look alike and none of
+which seem to go where you want. Even if you follow all of our advice
+so far, and understand and avoid the pitfalls we've mentioned,
+the connection might still fail:</p>
+
+
+
+<blockquote><pre class="code">ftp&gt; passive
+Passive mode on.
+ftp&gt; ls
+connecting to 192.168.10.1:6670
+Connected to 192.168.10.1 port 6670
+425 Possible PASV port theft, cannot open data connection.
+! Retrieve of folder listing failed</pre></blockquote>
+
+
+
+Assuming you don't decide to give up entirely and move into a
+less irritating career, you may want to know, "What now?"
+The problem here is a security feature of the FTP server,
+specifically the popular
+<tt class="command">wu-ftpd</tt><a name="INDEX-1629" /><a name="INDEX-1630" /> from
+Washington University. (See <a href="http://www.wu-ftpd.org/">http://www.wu-ftpd.org/</a>. This feature might be implemented in
+other FTP servers, but we haven't seen it.) The server accepts
+an incoming data connection from the client, then notices that its
+source address isn't the same as that of the control connection
+(which was forwarded through SSH and thus comes from the server
+host). It concludes that an attack is in progress! The FTP server
+believes someone has been monitoring your FTP control connection,
+seen the server response to the <tt class="literal">PASV</tt> command
+containing the listening socket, and jumped in to connect to it
+before the legitimate client can do so. So the server drops the
+connection and reports the suspected "port theft" (see
+<a href="ch11_02.html#ch11-51543">Figure 11-3</a>).</p>
+
+
+
+<a name="ch11-51543" /><div class="figure"><img height="196" alt="Figure 11-3" src="figs/ssh_1103.gif" width="357" /></div><h4 class="objtitle">Figure 11-3. "PASV port theft"</h4>
+
+There's no way around this problem but to stop the server from
+performing this check. It's a problematic feature to begin
+with, since it prevents not only attacks but also legitimate FTP
+operations. For example, passive-mode operation was originally
+intended to allow an FTP client to effect a file transfer between two
+remote servers directly, rather than first fetching the file to the
+client and then sending it to the second server. This isn't a
+common practice, but it is part of the protocol design, and the
+"port theft" check of <tt class="command">wu-ftpd</tt> prevents
+its use. You can turn it off by recompiling
+<tt class="command">wu-ftpd</tt> without FIGHT_PASV_PORT_RACE (use
+<tt class="command">configure  -- disable-pasvip</tt>). You can also
+leave the check on but allow certain accounts to use alternate IP
+addresses for data connections, with the
+<tt class="command">pasv-allow</tt> and <tt class="command">port-allow</tt>
+configuration statements. See the <tt class="command">ftpaccess </tt>(5)
+manpage for details. Note that these features are relatively recent
+additions to <tt class="command">wu-ftpd</tt> and aren't in earlier
+versions.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-19-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.3. FTP, Firewalls, and Passive Mode</h3>
+
+
+
+<a name="INDEX-1631" /><a name="INDEX-1632" />Recall that in active mode, the FTP
+data connections go in the opposite direction than you might
+expect -- from the server back to the client. This usual mode of
+operation (shown in <a href="ch11_02.html#ch11-53410">Figure 11-4</a>) often develops
+problems in the presence of a firewall. Suppose the client is behind
+a firewall that allows all outbound connections but restricts inbound
+ones. Then the client can establish a control connection to log in
+and issue commands, but data-transfer commands such as
+<tt class="command">ls</tt>, <tt class="command">get</tt>, and
+<tt class="command">put</tt> will fail, because the firewall blocks the
+data connections coming back to the client machine. Simple
+packet-filtering firewalls can't be configured to allow these
+connections, because they appear as separate TCP destinations to
+random ports, with no obvious relation to the established FTP control
+connection.<a href="#FOOTNOTE-133">[133]</a> The failure might happen quickly with the message
+"<a name="INDEX-1633" />connection refused," or the
+connection might hang for a while and eventually fail. This depends
+on whether the firewall explicitly rejects the connection attempt
+with an ICMP or TCP RST message, or just silently drops the packets.
+Note that this problem can occur whether or not SSH is forwarding the
+control connection.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-133" />[133]More sophisticated firewalls can take
+care of this problem. These products are a cross between an
+application-level proxy and a packet filter and are often called
+"transparent proxies" or "stateful packet
+filters." Such a firewall understands the FTP protocol and
+watches for FTP control connections. When it sees a
+<tt class="literal">PORT</tt> command issued by an FTP client, it
+dynamically opens a temporary hole in the firewall, allowing the
+specified FTP data connection back through. This hole disappears
+automatically after a short time and can only be between the socket
+given in the <tt class="literal">PORT</tt> command and the server's
+ftp-data socket. These products often also do NAT and can
+transparently deal with the FTP/NAT problems we describe next.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch11-53410" /><div class="figure"><img height="191" alt="Figure 11-4" src="figs/ssh_1104.gif" width="434" /></div><h4 class="objtitle">Figure 11-4. FTP client behind a firewall</h4>
+
+Passive mode usually solves this problem, reversing the direction of
+data connections so they go from the client to the server.
+Unfortunately, not all FTP client or servers implement passive-mode
+transfers. Command-line FTP clients generally use the
+<tt class="literal">passive</tt> command to toggle passive-mode transfers
+on and off; if it doesn't recognize that command, it probably
+doesn't do passive mode. If the client supports passive mode
+but the server doesn't, you may see a message like
+"<a name="INDEX-1634" />PASV: command
+not understood" from the server. <tt class="literal">PASV</tt> is the
+FTP protocol command that instructs the server to listen for data
+connections. Finally, even if passive mode solves the firewall
+problem, it doesn't help with SSH forwarding, since the ports
+in question are still dynamically chosen.</p>
+
+
+
+Here is an example of the firewall problem, blocking the return data
+connections:</p>
+
+
+
+<blockquote><pre class="code">$ ftp lasciate.ogni.speranza.org
+Connected to lasciate.ogni.speranza.org
+220 ProFTPD 1.2.0pre6 Server (Lasciate FTP Server) <i class="lineannotation">[lasciate.ogni.speranza.org]</i>331 Password required for slade.
+Password:
+230 User slade logged in.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp&gt; ls
+200 PORT command successful.          
+<i class="lineannotation">[...long wait here...]</i>
+425 Can't build data connection: Connection timed out</pre></blockquote>
+
+
+
+Passive mode comes to the rescue:</p>
+
+
+
+<blockquote><pre class="code">ftp&gt; passive
+Passive mode on.
+ftp&gt; ls
+227 Entering Passive Mode (10,25,15,1,12,65)
+150 Opening ASCII mode data connection for file list
+drwxr-x--x  21 slade    web          2048 May  8 23:29 .
+drwxr-xr-x 111 root     wheel       10240 Apr 26 00:09 ..
+-rw-------   1 slade    other         106 May  8 15:22 .cshrc
+-rw-------   1 slade    other       31384 Aug 18  1997 .emacs
+226 Transfer complete.
+ftp&gt;</pre></blockquote>
+
+
+
+Now, in discussing the problem of using FTP through a firewall, we
+didn't mention SSH at all; it is a problem inherent in the FTP
+protocol and firewalls. However, even when forwarding the FTP control
+connection through SSH, this problem still applies, since the
+difficulty is with the data connection, not the control, and those
+don't go through SSH. So this is yet another reason why you
+will normally want to use passive mode with FTP and SSH.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-20-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.4. FTP and Network Address Translation (NAT)</h3>
+
+
+
+<a name="INDEX-1635" />Passive-mode transfers can also
+work around another common problem with FTP: its difficulties with
+network address translation, or NAT. NAT is the practice of
+connecting two networks by a gateway that rewrites the source and
+destination addresses of packets as they pass through. One benefit is
+that you may connect a network to the Internet or change ISPs without
+having to renumber the network (that is, change all your IP
+addresses). It also allows sharing a limited number of routable
+Internet addresses among a larger number of machines on a network
+using private addresses not routed on the Internet. This flavor of
+NAT is often called
+<em class="emphasis">masquerading</em><a name="INDEX-1636" />.</p>
+
+
+
+Suppose your FTP client is on a machine with a private address usable
+only on your local network, and you connect to the Internet through a
+NAT gateway. The client can establish a control connection to an
+external FTP server. However, there will be a problem if the client
+attempts the usual reverse-direction data connections. The client,
+ignorant of the NAT gateway, tells the server (via a
+<tt class="literal">PORT</tt> command) to connect to a socket containing
+the client's private address. Since that address isn't
+usable on the remote side, the server generally responds
+"<a name="INDEX-1637" />no route to host"
+and the connection will fail.<a href="#FOOTNOTE-134">[134]</a> <a href="ch11_02.html#ch11-43602">Figure 11-5</a> illustrates this situation.
+Passive mode gets around this problem as well, since the server never
+has to connect back to the client and so the client's address
+is irrelevant.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-134" />[134]It could be worse, too.
+The server could also use private addressing, and if you're
+unlucky, the client's private address might coincidentally
+match a completely different machine on the server side. It's
+unlikely, though, that a server-side machine would happen to listen
+on the random port picked by your FTP client, so this would probably
+just generate a "connection refused" error.</p>
+
+
+</blockquote>
+
+
+
+<a name="ch11-43602" /><div class="figure"><img height="146" alt="Figure 11-5" src="figs/ssh_1105.gif" width="475" /></div><h4 class="objtitle">Figure 11-5. Client-side NAT prevents active-mode FTP transfers</h4>
+
+So far, we've listed three situations requiring passive-mode
+FTP: control connection forwarding, client inside a firewall, and
+client behind NAT. Given these potential problems with active-mode
+FTP, and that there's no down side to passive mode we know of,
+we recommend always using passive mode FTP if you can.</p>
+
+
+
+<a name="ch11-21-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.4.1. Server-side NAT issues</h3>
+
+
+
+<a name="INDEX-1638" />The NAT problem we just discussed was a
+client-side issue. There is a more difficult problem that can occur
+if the FTP server is behind a NAT gateway, and you're
+forwarding the FTP control connection through SSH.</p>
+
+
+
+First, let's understand the basic problem without SSH in the
+picture. If the server is behind a NAT gateway, then you have the
+mirror-image problem to the one discussed earlier. Before,
+active-mode transfers didn't work because the client supplied
+its internal, non-NAT'd address to the server in the
+<tt class="literal">PORT</tt> command, and this address wasn't
+reachable. In the new situation, passive-mode transfers don't
+work because the server supplies its internal-only address to the
+client in the <tt class="literal">PASV</tt> command response, and that
+address is unreachable to the client (see <a href="ch11_02.html#ch11-17846">Figure 11-6</a>).</p>
+
+
+
+<a name="ch11-17846" /><div class="figure"><img height="159" alt="Figure 11-6" src="figs/ssh_1106.gif" width="480" /></div><h4 class="objtitle">Figure 11-6. Server-side NAT prevents passive-mode FTP transfers</h4>
+
+The earlier answer was to use passive mode; here the simplest answer
+is the reverse: use active mode. Unfortunately, this isn't very
+helpful. If the server is intended for general Net access, it should
+be made useful to the largest number of people. Since client-side NAT
+and firewall setups requiring passive-mode FTP are common, it
+won't do to use a server-side NAT configuration that requires
+active mode instead; this makes access impossible. One approach is to
+use an FTP server with special features designed to address this very
+problem. The <tt class="command">wu-ftpd</tt> server we touched on earlier
+has such a feature. Quoting from the <tt class="command">ftpaccess </tt>(5)
+manpage:</p>
+
+
+
+<blockquote><pre class="code">passive address &lt;externalip&gt; &lt;cidr&gt;
+     Allows control of the address reported in response to
+     a PASV command.  When any control connection matching
+     the &lt;cidr&gt; requests a passive data connection (PASV),
+     the  &lt;externalip&gt;  address  is  reported.  NOTE: this
+     does not change the address the daemon actually lis-
+     tens  on,  only  the  address reported to the client.
+     This feature allows the daemon to  operate  correctly
+     behind IP-renumbering firewalls.
+
+For example:
+ passive address 10.0.1.15   10.0.0.0/8
+ passive address 192.168.1.5 0.0.0.0/0
+
+Clients  connecting  from  the  class-A network 10 will be
+told the passive connection  is  listening  on  IP-address
+10.0.1.15  while all others will be told the connection is
+listening on 192.168.1.5
+
+Multiple passive addresses may be specified to handle com-
+plex, or multi-gatewayed, networks.</pre></blockquote>
+
+
+
+This handles the problem quite neatly, unless you happen to be
+forwarding the FTP control connection through SSH. Site
+administrators arrange for FTP control connections originating from
+outside the server's private network to have external addresses
+reported in the <tt class="literal">PASV</tt> responses. But the forwarded
+control connection appears to come from the server host itself,
+rather than the outside network. Control connections coming from
+inside the private network <em class="emphasis">should</em> get the
+internal address, not the external one. The only way this will work
+is if the FTP server is configured to provide the external address to
+connections coming from itself as well as from the outside. This is
+actually quite workable, as there's little need in practice to
+transmit files by FTP from a machine back to itself. You can use this
+technique to allow control-connection forwarding in the presence of
+server-side NAT or suggest it to the site administrators if you have
+this problem.</p>
+
+
+
+Another way of addressing the server-side NAT problem is to use an
+intelligent NAT gateway of the type mentioned earlier. Such a gateway
+automatically rewrites the FTP control traffic in transit to account
+for address translation. This is an attractive solution in some
+respects, because it is automatic and transparent; there is less
+custom work in setting up the servers behind the gateway, and fewer
+dependencies between the server and network configurations. As it
+happens, though, this solution is actually worse for our purposes
+than the server-level one. This technique relies on the
+gateway's ability to recognize and alter the FTP control
+connection as it passes through. But such manipulation is exactly
+what SSH is designed to prevent! If the control connection is
+forwarded through SSH, the gateway doesn't know there is a
+control connection, because it's embedded as a channel inside
+the SSH session. The control connection isn't a separate TCP
+connection of its own; it's on the SSH port rather than the FTP
+port. The gateway can't read it because it's encrypted,
+and the gateway can't modify it even if the gateway can read
+it, because SSH provides integrity protection. If you're in
+this situation -- the client must use passive-mode FTP, and the
+server is behind a NAT gateway doing FTP control traffic
+rewriting -- you must convince the server administrator to use a
+server-level technique in addition to the gateway, specifically to
+allow forwarding. Otherwise, it's not going to happen, and we
+see trucks filled with tapes in your future, or perhaps HTTP over SSL
+with PUT commands.</p>
+
+
+
+We have now concluded our discussion of forwarding the control
+connection of FTP, securing your login name, password, and FTP
+commands. If that's all you want to do, you are done with this
+case study. We're going to continue, however, and delve into
+the murky depths of data connections. You'll need a technical
+background for this material as we cover minute details and
+little-known modes of FTP. (You might even wonder if we've
+accidentally inserted a portion of an FTP book into the SSH book.)
+Forward, brave reader!</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-22-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.5. All About Data Connections</h3>
+
+
+
+<a name="INDEX-1639" /><a name="INDEX-1640" />Ask most SSH users about
+forwarding the FTP data connection, and they'll respond,
+"Sorry, it's not possible." Well, it
+<em class="emphasis">is</em> possible. The method we've discovered
+is obscure, inconvenient, and not usually worth the effort, but it
+works. Before we can explain it, we must first discuss the three
+major ways that FTP accomplishes file transfers between client and
+server:</p>
+
+
+
+<ul><li>The usual method</p></li><li>Passive-mode transfers</p></li><li>Transfers using the default data ports</p></li></ul>
+We'll just touch briefly on the first two, since we've
+already discussed them; we'll just amplify with a bit more
+detail. Then we'll discuss the third mode, which is the least
+known and the one you need if you really, really want to forward your
+FTP data connections.</p>
+
+
+
+<a name="ch11-23-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.5.1. The usual method of file transfer</h3>
+
+
+
+Most FTP clients attempt data transfers in the following way. After
+establishing the control connection and authenticating, the user
+issues a command to transfer a file. Suppose the command is
+<tt class="literal">get</tt> <tt class="literal">fichier.txt</tt>, which asks to
+transfer the file <em class="filename">fichier.txt</em> from the server to
+the client. In response to this command, the client selects a free
+local TCP socket, call it C, and starts listening on it. It then
+issues a <tt class="literal">PORT</tt> command to the FTP server,
+specifying the socket C. After the server acknowledges this, the
+client issues the command <tt class="literal">RETR</tt>
+<tt class="literal">fichier.txt</tt>, which tells the server to connect to
+the previously given socket (C) and send the contents of that file
+over the new data connection. The client accepts the connection to C,
+reads the data, and writes it into a local file also called
+<em class="filename">fichier.txt</em>. When done, the data connection is
+closed. Here is a transcript of such a session:</p>
+
+
+
+<blockquote><pre class="code">$ ftp -d aaor.lionaka.net
+Connected to aaor.lionaka.net.
+220 aaor.lionaka.net FTP server (SunOS 5.7) ready.
+---&gt; USER res
+331 Password required for res.
+Password:
+---&gt; PASS XXXX
+230 User res logged in.
+---&gt; SYST
+215 UNIX Type: L8 Version: SUNOS
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp&gt; get fichier.txt
+local: fichier.txt remote: fichier.txt
+---&gt; TYPE I
+200 Type set to I.
+---&gt; PORT 219,243,169,50,9,226
+200 PORT command successful.
+---&gt; RETR fichier.txt
+150 Binary data connection for fichier.txt (219.243.169.50,2530) (10876 bytes).
+226 Binary Transfer complete.
+10876 bytes received in 0.013 seconds (7.9e+02 Kbytes/s)
+ftp&gt; quit</pre></blockquote>
+
+
+
+Note the <tt class="literal">PORT</tt> command, <tt class="literal">PORT
+219,243,169,50,9,226</tt>. This says the client is listening on
+IP address 219.243.169.50, port 2530 = (9&lt;&lt;8)+226; the final
+two integers in the comma-separated list are the 16-bit port number
+represented as two 8-bit bytes, most significant byte first. The
+server response beginning with "150" confirms
+establishment of the data connection to that socket. What isn't
+shown is that the source port of that connection is always the
+standard FTP data port, port 20 (remember that FTP servers listen for
+incoming control connections on port 21).</p>
+
+
+
+There are two important points to note about this process:</p>
+
+
+
+<ul><li>The <a name="INDEX-1641" />data connection socket is chosen on the
+fly by the client. This prevents forwarding, since you can't
+know the port number ahead of time to forward it with SSH. You can
+get around this problem by establishing the FTP process "by
+hand" using <tt class="command">telnet</tt>. That is, choose a data
+socket beforehand and forward it with SSH, <tt class="command">telnet</tt>
+to the FTP server yourself, and issue all the necessary FTP protocol
+commands by hand, using your forwarded port in the
+<tt class="literal">PORT</tt> command. But this can hardly be called
+convenient.</p></li><li>Remember that the data connection is made in the <em class="emphasis">reverse
+direction</em> from the control connection; it goes from the
+server back to the client. As we discussed earlier in this chapter,
+the usual workaround is to use passive mode.</p></li></ul>
+</div>
+
+
+
+
+
+<a name="ch11-24-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.5.2. Passive mode in depth</h3>
+
+
+
+<a name="INDEX-1642" />Recall that in a passive-mode
+transfer, the client initiates a connection to the server.
+Specifically, instead of listening on a local socket and issuing a
+<tt class="literal">PORT</tt> command to the server, the client issues a
+<tt class="literal">PASV</tt> command. In response, the server selects a
+socket on its side to listen on and reveals it to the client in the
+response to the <tt class="literal">PASV</tt> command. The client then
+connects to that socket to form the data connection, and issues the
+file-transfer command over the control connection. With command
+line-based clients, the usual way to do passive-mode transfers is to
+use the <tt class="literal">passive</tt> command. Again, an example:</p>
+
+
+
+<blockquote><pre class="code">$ ftp -d aaor.lionaka.net
+Connected to aaor.lionaka.net.
+220 aaor.lionaka.net FTP server (SunOS 5.7) ready.
+---&gt; USER res
+331 Password required for res.
+Password:
+---&gt; PASS XXXX
+230 User res logged in.
+---&gt; SYST
+215 UNIX Type: L8 Version: SUNOS
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp&gt; passive
+Passive mode on.
+ftp&gt; ls
+---&gt; PASV
+227 Entering Passive Mode (219,243,169,52,128,73)
+---&gt; LIST
+150 ASCII data connection for /bin/ls (219.243.169.50,2538) (0 bytes).
+total 360075
+drwxr-xr-x98   res      500         7168 May  5 17:13 .
+dr-xr-xr-x   2 root     root           2 May  5 01:47 ..
+-rw-rw-r--   1 res      500          596 Apr 25  1999 .FVWM2-errors
+-rw-------   1 res      500          332 Mar 24 01:36 .ICEauthority
+-rw-------   1 res      500           50 May  5 01:45 .Xauthority
+-rw-r--r--   1 res      500         1511 Apr 11 00:08 .Xdefaults
+226 ASCII Transfer complete.
+ftp&gt; quit
+---&gt; QUIT
+221 Goodbye.</pre></blockquote>
+
+
+
+Note that after the user gives the <tt class="command">ls</tt> command, the
+client sends <tt class="literal">PASV</tt> instead of
+<tt class="literal">PORT</tt>. The server responds with the socket on which
+it will listen. The client issues the <tt class="literal">LIST</tt> command
+to list the contents of the current remote directory, and connects to
+the remote data socket; the server accepts and confirms the
+connection, then transfers the directory listing over the new
+connection.</p>
+
+
+
+An interesting historical note, which we alluded to earlier, is that
+the <tt class="literal">PASV</tt> command wasn't originally intended
+for this use; it was designed to let an FTP client direct a file
+transfer between two remote servers. The client makes control
+connections to two remote servers, issues a <tt class="literal">PASV</tt>
+command to one causing it to listen on a socket, issues a
+<tt class="literal">PORT</tt> command to the other telling it to connect to
+the other server on that socket, then issues the data-transfer
+command (<tt class="literal">STOR</tt>, <tt class="literal">RETR</tt>, etc.).
+These days, most people don't even know this is possible, and
+will pull a file from one server to the local machine, and transfer
+it again to get it to the second remote machine. It's so
+uncommon that many FTP clients don't support this mode, and
+some servers prevent its use for security reasons. [<a href="ch11_02.html#ch11-95779">Section 11.2.2.3, "The "PASV port theft" problem"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch11-25-fm2xml" /><div class="sect3">
+<h3 class="sect3">11.2.5.3. FTP with the default data ports</h3>
+
+
+
+<a name="INDEX-1643" />The third<a name="INDEX-1644" /> file-transfer mode occurs if the
+client issues neither a <tt class="literal">PORT</tt> nor a
+<tt class="literal">PASV</tt> command. In this case, the server initiates
+the data connection from the well-known ftp-data port (20) to the
+source socket of the control connection, on which the client must be
+listening (these sockets are the "default data ports" for
+the FTP session). The usual way to use this mode is with the FTP
+client command
+<tt class="command">sendport</tt><a name="INDEX-1645" />, which switches on and off the
+client's feature of using a <tt class="literal">PORT</tt> command for
+each data transfer. For this mode, we want it turned off, and it is
+generally on by default. So the sequence of steps is this:</p>
+
+
+
+<ol><li>The client initiates the control connection from local socket C to
+server:21.</p></li><li>The user gives the <tt class="command">sendport</tt><a name="INDEX-1646" />
+command, and then a data-transfer command, such as
+<tt class="command">put</tt> or <tt class="command">ls</tt>. The FTP client
+begins listening on socket C for an incoming TCP connection.</p></li><li>The server determines the socket C at the other end of the control
+connection. It doesn't need the client to send this explicitly
+via the FTP protocol, since it can just ask TCP for it (e.g., with
+the <tt class="literal">getpeername()</tt> sockets API routine). It then
+opens a connection from its ftp-data port to C, and sends or receives
+the requested data over that connection.</p></li></ol>
+Now, this is certainly a simpler way of doing things than using a
+different socket for each data transfer, and so it begs the question
+of why <tt class="literal">PORT</tt> commands are the norm. If you try this
+out, you will discover why. First off, it might fail on the client
+side with the message "<a name="INDEX-1647" />bind: Address already in use".
+And even if it does work, it does so only once. A second
+<tt class="command">ls</tt> elicits another address-related error, this
+time from the server:</p>
+
+
+
+<blockquote><pre class="code">aaor% ftp syrinx.lionaka.net
+Connected to syrinx.lionaka.net.
+220 syrinx.lionaka.net FTP server (Version wu-2.5.0(1) Tue Sep 21 16:48:12 EDT
+331 Password required for res.
+Password:
+230 User res logged in.
+ftp&gt; sendport
+Use of PORT cmds off.
+ftp&gt; ls
+150 Opening ASCII mode data connection for file list.
+keep
+fichier.txt
+226 Transfer complete.
+19 bytes received in 0.017 seconds (1.07 Kbytes/s)
+ftp&gt; ls
+425 Can't build data connection: Cannot assign requested address.
+ftp&gt; quit</pre></blockquote>
+
+
+
+These problems are due to a technicality of the TCP protocol. In this
+scenario, every data connection is between the same two sockets,
+server:ftp-data and C. Since a TCP connection is fully specified by
+the pair of source and destination sockets, these connections are
+indistinguishable as far as TCP is concerned; they are different
+incarnations of the same connection and can't exist at the same
+time. In fact, to guarantee that packets belonging to two different
+incarnations of a connection aren't confused, there's a
+waiting period after one incarnation is closed, during which a new
+incarnation is forbidden. In the jargon of TCP, on the side that
+performed an "active close" of the connection, the
+connection remains in a state called <a name="INDEX-1648" /><a name="INDEX-1649" />TIME_WAIT.
+This state lasts for a period that is supposed to be twice the
+maximum possible lifetime of a packet in the network (or
+"2MSL", for two times the Maximum Segment Lifetime).
+After that, the connection becomes fully closed, and another
+incarnation can occur. The actual value of this timeout varies from
+system to system, but is generally in the range of 30 seconds to 4
+minutes.<a href="#FOOTNOTE-135">[135]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-135" />[135]See <em class="emphasis">TCP/IP Illustrated, Volume 1:
+The Protocols</em>, by W. Richard Stevens (Addison-Wesley), for
+more technical information about the TIME_WAIT state.</p>
+
+
+</blockquote>
+
+
+
+As it happens, some TCP implementations enforce even stronger
+restrictions. Often, a port that is part of a socket in the TIME_WAIT
+state is unavailable for use, even as part of a connection to a
+different remote socket. We have also run into systems that disallow
+listening on a socket that is currently an endpoint of some
+connection, regardless of the connection state. These restrictions
+aren't required by the TCP protocol, but they are common. Such
+systems usually provide a way to avoid the restrictions, such as the
+SO_REUSEADDR option of the Berkeley sockets API. An FTP client
+generally uses this feature, of course, but it doesn't always
+work!</p>
+
+
+
+This address-reuse problem comes up in two places in a default-port
+FTP transfer. The first one is when the client must start listening
+on its default data port, which by definition is currently the local
+endpoint of its control connection. Some systems simply don't
+allow this, even if the program requests address reuse; that's
+why the attempt might fail immediately with the message,
+"address already in use."</p>
+
+
+
+The other place is on a second data transfer. When the first transfer
+is finished, the server closes the data connection, and that
+connection on the server side moves into the TIME_WAIT state. If you
+try another data transfer before the 2MSL period has elapsed, the
+server tries to set up another incarnation of the same connection,
+and it will fail saying "cannot assign requested
+address." This happens regardless of the address reuse setting,
+since the rules of the TCP require it. You can transfer a file again
+within a few minutes, of course, but most computer users aren't
+good at waiting a few seconds, let alone minutes. It is this problem
+that prompts the use of a <tt class="literal">PORT</tt> command for every
+transfer; since one end of the connection is different every time,
+the TIME_WAIT collisions don't occur.</p>
+
+
+
+Because of these problems, the default-port transfer mode isn't
+generally used. It has, however, an important property for us: it is
+the only mode in which the data connection destination port is fixed
+and knowable before the data-transfer command is given. With this
+knowledge, some patience, and fair amount of luck, it is possible to
+forward your FTP data connections through SSH<a name="INDEX-1650" />. <a name="INDEX-1651" /></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-26-fm2xml" /><div class="sect2">
+<h3 class="sect2">11.2.6. Forwarding the Data Connection</h3>
+
+
+
+<a name="INDEX-1652" />With all the foregoing discussion
+in mind, here we simply state the sequence of steps to set up
+data-connection forwarding. The tricky part is that SSH must request
+address reuse from TCP for forwarded ports. SSH2 and OpenSSH do this
+already, but SSH1 can't. It's is an easy source
+modification to make for
+<a name="INDEX-1653" />SSH1, though. In the routine
+<tt class="function">channel_request_local_forwarding</tt> in
+<em class="filename">newchannels.c</em>, add the following code right
+before the call to <tt class="function">bind( )</tt> (in Version 1.2.27,
+this is at line 1438):</p>
+
+
+
+<blockquote><pre class="code">...
+sin.sin_port = htons(port);
+
+<tt class="userinput"><b>{</b></tt>
+<tt class="userinput"><b>  int flag = 1;</b></tt>
+<tt class="userinput"><b>  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *)&amp;flag,</b></tt>
+<tt class="userinput"><b>      sizeof(flag));</b></tt>
+<tt class="userinput"><b>}</b></tt>
+
+/* Bind the socket to the address. */
+if (bind(sock, (struct sockaddr *)&amp;sin, sizeof(sin)) &lt; 0)
+  packet_disconnect("bind: %.100s", strerror(errno));
+...</pre></blockquote>
+
+
+
+Recompile and reinstall <tt class="command">sshd</tt> on the server side.
+If you're not in a position to do that, you can copy your
+modified <tt class="command">ssh</tt> client program to the server, and in
+the upcoming step (3), use <tt class="command">ssh
+</tt><span class="option">-</span><tt class="command">L</tt> from the server to
+the client instead of <tt class="command">ssh
+</tt><span class="option">-</span><tt class="command">R</tt> from client to
+server.</p>
+
+
+
+Another restriction is that the operating system in which the FTP
+client is running must allow a process to listen on a socket already
+in use as the endpoint of an existing connection. Some don't.
+To test this, try an FTP data transfer on the default data ports
+without SSH, just by using <em class="emphasis">ftp</em> as usual but
+giving the <tt class="command">sendport</tt> command before
+<tt class="command">ls</tt>, <tt class="command">get</tt>, or whatever.
+<a name="INDEX-1654" />If you get:</p>
+
+
+
+<blockquote><pre class="code">ftp: bind: Address already in use</pre></blockquote>
+
+
+
+then your operating system probably won't cooperate. There may
+be a way to alter this behavior; check the operating system
+documentation. <a href="ch11_02.html#ch11-87516">Figure 11-7</a> illustrates the following
+steps.</p>
+
+
+
+<a name="ch11-87516" /><div class="figure"><img height="318" alt="Figure 11-7" src="figs/ssh_1107.gif" width="424" /></div><h4 class="objtitle">Figure 11-7. Forwarding the FTP data connection</h4>
+
+<ol><li>Start an SSH connection to forward the control channel as shown
+earlier in this chapter, and connect with the FTP client. Make sure
+that passive mode is off.</p>
+
+<blockquote><pre class="code">client% ssh1 -f -n -L2001:localhost:21 server sleep 10000 &amp;</pre></blockquote>
+
+or for SSH2:</p>
+
+<blockquote><pre class="code">client% ssh2 -f -n -L2001:localhost:21 server</pre></blockquote>
+
+
+Then:</p>
+
+<blockquote><pre class="code">client% ftp localhost 2001
+Connected to localhost
+220 server FTP server (SunOS 5.7) ready.
+Password: 
+230 User res logged in.
+ftp&gt; sendport
+Use of PORT cmds off.
+ftp&gt; passive
+Passive mode on.
+ftp&gt; passive
+Passive mode off.</pre></blockquote>
+
+
+Note that we are using localhost as the forwarding target here,
+despite our earlier advice. That's OK, because there
+won't be any <tt class="literal">PORT</tt> or <tt class="literal">PASV</tt>
+commands with addresses that can be wrong.</p></li>
+
+<li>Now, we need to determine the real and proxy default data ports for
+the FTP client. On the client side, you can do this with
+<tt class="command">netstat</tt>:</p>
+
+<blockquote><pre class="code">client% netstat -n | grep 2001
+tcp        0      0 client:2001 client:3175 ESTABLISHED 
+tcp        0      0 client:3175 client:2001 ESTABLISHED</pre></blockquote>
+
+
+This shows that the source of the control connection from the FTP
+client to SSH is port 3175. You can do the same thing on the server
+side, but this time you need to know what's connected to the
+FTP server port (<tt class="command">netstat
+</tt><span class="option">-</span><tt class="command">n | egrep
+`\&lt;21\&gt;'</tt> ), and there may be many things
+connected to it. If you have a tool like <tt class="command">lsof</tt>,
+it's better to find out the pid of the <tt class="command">ftpd</tt>
+or <tt class="command">sshd</tt> serving your connection and use
+<tt class="command">lsof </tt><span class="option">-</span><tt class="command">p
+&lt;pid&gt;</tt> to find the port number. If not, you can do a
+<tt class="command">netstat</tt> before connecting via FTP and then one
+right afterward, and try to see which is the new connection.
+Let's suppose you're the only one using the FTP server,
+and you get it this way:</p>
+
+<blockquote><pre class="code">server% netstat | grep ftp
+tcp        0      0 server:32714 server:ftp   ESTABLISHED 
+tcp        0      0 server:ftp   server:32714 ESTABLISHED</pre></blockquote>
+
+
+So now, we have the FTP client's default data port (3175), and
+the source port of the forwarded control connection to the FTP server
+(32714), which we'll call the proxy default data port; it is
+what the FTP server thinks is the client's default data
+port.</p></li><li>Now, forward the proxy default
+data port to the real one:</p>
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+client% ssh1 -f -n -R32714:localhost:3175 server sleep 10000 &amp;
+
+# SSH2 only
+client% ssh2 -f -R32714:localhost:3175 server</pre></blockquote>
+
+
+If, as we mentioned earlier, you don't replace
+<tt class="command">sshd</tt> or run a second one, then you'd use the
+modified <tt class="command">ssh</tt> on the server in the other direction,
+like this:</p>
+
+<blockquote><pre class="code">server% ./ssh -f -n -L32714:localhost:3175 client sleep 10000 &amp;</pre></blockquote>
+</li>
+
+
+<li>Now, try a data-transfer command with <em class="emphasis">ftp</em>. If
+all goes well, it should work once, then fail with this message from
+the FTP server:</p>
+
+<blockquote><pre class="code">425 Can't build data connection: Address already in use.</pre></blockquote>
+
+
+(Some FTP servers return that error immediately; others will retry
+several times before giving up, so it may take a while for that error
+to appear.) If you wait for the server's 2MSL timeout period,
+you can do another single data transfer. You can use
+<tt class="command">netstat</tt> to see the problem and track its
+progress:</p>
+
+<blockquote><pre class="code">server% netstat | grep 32714
+127.0.0.1.32714     127.0.0.1.21         32768      0 32768      0 ESTABLISHED
+127.0.0.1.21        127.0.0.1.32714      32768      0 32768      0 ESTABLISHED
+127.0.0.1.20        127.0.0.1.32714      32768      0 32768      0 TIME_WAIT</pre></blockquote>
+
+
+The first two lines show the established control connection on port
+21; the third one shows the old data connection to port 20, now in
+the TIME_WAIT state. When that disappears, you can do another data
+transfer command.</p></li></ol>
+
+And there you have it: you have forwarded an FTP data connection
+through SSH. You have achieved the Holy Grail of FTP with SSH, though
+perhaps you agree with us and Sir Gawain that "it's only
+a model." Still, if you're terribly concerned about your
+data connections, have no other way to transfer files, can afford to
+wait a few minutes between file transfers, and are quite lucky, then
+this will work. It also makes a great parlor trick at geek parties.
+<a name="INDEX-1655" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11. Case Studies</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.3. Pine, IMAP, and SSH</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:14 GMT -->
+</html>

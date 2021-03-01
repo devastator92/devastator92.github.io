@@ -1,0 +1,470 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/appc_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:59 GMT -->
+<head><title>Tunable Parameters (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appb_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="index/index.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Appendix C. Tunable Parameters</h1>
+
+NFS client and server implementations tend to have lots of <a name="INDEX-2760" /> <a name="INDEX-2761" />tunable
+parameters. This appendix summarizes some of the more important ones.
+Except as noted, the parameters are tuned by changing a parameter in
+the kernel, which requires setting a value in a file like
+<em class="emphasis">/etc/system</em> on Solaris 8. Note that while many
+NFS implementations share many of these parameters, the names of the
+parameters and the methods for setting them will vary between
+implementations. <a href="appc_01.html#nfs2-APP-C-TABLE-1">Table C-1</a> and <a href="appc_01.html#nfs2-APP-C-TABLE-2">Table C-2</a> summarize client and server tunables.
+</p>
+
+<a name="nfs2-APP-C-TABLE-1" /><h4 class="objtitle">Table C-1. Client parameters </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Parameter</p>
+</th>
+<th>
+Description</p>
+</th>
+<th>
+Caveats</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+clnt_max_conns</p>
+</td>
+<td>
+This parameter <a name="INDEX-2762" />
+<a name="INDEX-2763" />controls
+the number of connections the client will create between the client
+and a given server. In Solaris, the default is one. The rationale is
+that a single TCP connection ought to be sufficient to use the
+available bandwidth of network channel between the client and server.
+You may find this to not be the case for network media faster than
+the traditional 10Base T (10Mb per second).
+</p>
+
+
+
+Note that this parameter is not in the Solaris
+<em class="emphasis">nfs</em> module, but it is in the kernel RPC module
+<em class="emphasis">rpcmod</em>.
+</p>
+</td>
+<td>
+At the time of this writing, the algorithm used to assign traffic to
+each connection was a simple round robin approach. You may find
+diminishing returns if you set this parameter higher than 2. This
+parameter is highly experimental.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+clnt_idle_timeout
+</p>
+</td>
+<td>
+This parameter <a name="INDEX-2764" />
+<a name="INDEX-2765" />sets
+the number of milliseconds the NFS client will let a connection go
+idle before closing it.
+</p>
+
+
+
+This parameter applies to NFS/TCP connections and is set in the
+Solaris kernel RPC module called <em class="emphasis">rpcmod</em>.
+</p>
+
+
+</td>
+<td>
+Normally this parameter should be a minute below the lowest
+server-side idle timeout among all the servers that you connect your
+client to. Otherwise, you may observe clients sending requests
+simultaneous with the server tearing down connections. This will
+result in an unnecessary sequence of connection tear down, followed
+immediately by connection setup.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+nfs_max_threads
+ (NFS Version 2)</p>
+
+
+
+nfs3_max_threads
+ (NFS Version 3)</p>
+</td>
+<td>
+Sets the number of <a name="INDEX-2766" />
+<a name="INDEX-2767" />background
+read-ahead and write-behind threads on a per NFS-mounted filesystem
+basis, for NFS Version 2 and Version 3.
+</p>
+
+
+
+Read-ahead is a performance win when applications do mostly
+sequential reads. The NFS filesystem can thus anticipate what the
+application wants, and so when it performs the next <em class="emphasis">read(
+)</em> system call, the required data will already be in the
+client's cache.
+</p>
+
+
+
+Write-behind is a performance win, because the NFS client must
+synchronize dirty data to the server before the application closes
+the file. A sequential write pattern is not necessary to leverage the
+benefits of multiple write-behind threads.
+</p>
+</td>
+<td>
+Setting too many of these threads has the following risks:</p>
+
+<ul><li>
+If there are lots of mounted filesystems, consuming kernel memory for
+lots of threads could degrade system performance.
+</p>
+</li></ul>
+<ul><li>
+If the network link or the NFS server is slow, the network can become
+saturated.
+</p>
+</li></ul></td>
+</tr>
+<tr>
+<td>
+nfs3_max_transfer_size
+</p>
+</td>
+<td>
+Controls the <a name="INDEX-2768" />
+<a name="INDEX-2769" />default
+I/O transfer size for NFS Version 3 mounts.
+</p>
+</td>
+<td>
+Given that UDP datagrams are limited to a maximum of 64 KB, adjusting
+this value beyond its default is dangerous. If you do raise it from
+its default (32 KB for Solaris, at the time of this writing), make
+sure that you specify the use of the TCP protocol for all NFS mounts.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+nfs_nra 
+</p>
+
+(NFS Version 2)</p>
+
+
+
+nfs3_nra 
+</p>
+
+(NFS Version 3)</p>
+</td>
+<td>
+Controls the number <a name="INDEX-2770" />
+<a name="INDEX-2771" />of
+blocks the NFS filesystem will read ahead at a time once it detects a
+sequential read pattern.
+</p>
+</td>
+<td>
+This is a parameter that can have diminishing returns if set too
+high. Not only will sequential read performance not improve, but the
+increased memory use by the client will ultimately degrade overall
+performance of the system.
+</p>
+
+
+
+If the read pattern is dominated by random and not sequential reads
+(as might be the case when reading indexed files), setting this
+tunable to 0 (zero) might be a win.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+nfs_shrinkreaddir
+</p>
+</td>
+<td>
+This is a parameter<a name="INDEX-2772" />
+<a name="INDEX-2773" />
+that is for enhancing interoperability. Many NFS implementations were
+based on early source code from Sun Microsystems. This code reads
+directories in buffers that were much smaller (1038 bytes) than the
+maximum transfer size. Later, when Sun changed Solaris NFS clients to
+read directories using maximum transfer sizes, it was found that some
+servers could not cope.
+</p>
+
+
+
+Set this parameter to 1 to force 1038-byte directory read transfers.</p>
+</td>
+<td>
+
+</td>
+</tr>
+<tr>
+<td>
+nfs_write_error_to_cons_only
+</p>
+</td>
+<td>
+Controls whether NFS <a name="INDEX-2774" />
+<a name="INDEX-2775" />write
+errors are logged to the system console only, or to the console and
+<em class="emphasis">syslog</em>. By default, errors are logged to both
+the console and <em class="emphasis">syslog</em>.
+</p>
+</td>
+<td>
+This is a security issue. The <em class="emphasis">syslog</em> setup
+usually logs errors to a file that is globally readable in
+<em class="emphasis">/var/adm</em> directory. Write errors often include
+the file handle of the file on which the error was encountered. If
+the file handle can be easily obtained, it is easier for attackers to
+attack the NFS server, since they can bypass the NFS filesystem to
+mount such attacks.
+</p>
+
+
+</td>
+</tr>
+<tr>
+<td>
+rsize
+</p>
+
+wsize
+</p>
+</td>
+<td>
+These are suboptions <a name="INDEX-2776" />
+<a name="INDEX-2777" />
+<a name="INDEX-2778" />
+<a name="INDEX-2779" />to
+the NFS mount command that change read and write transfer block
+sizes, respectively.
+</p>
+</td>
+<td>
+For NFS Version 2 mounts, the maximum is limited to 8KB, per the NFS
+Version 2 protocol definition.
+</p>
+
+
+
+For NFS Version 3 mounts, the same caveats for the
+<em class="emphasis">nfs3_max_transfer_size</em> parameter apply.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+-t timeout
+</p>
+</td>
+<td>
+This is an option to <a name="INDEX-2780" />
+<a name="INDEX-2781" />the
+<em class="emphasis">automount</em> command that sets the number of
+seconds the automounter will wait before attempting to unmount a
+filesystem. Since unmounting a filesystem often forces the premature
+flushing of buffers and release of performance enhancing caches,
+higher values of this parameter can have very beneficial effects.
+</p>
+
+
+
+If your NFS server performs additional functions, like electronic
+mail, or it allows users to login to run applications, then it is
+likely your NFS server will be a heavy client of the automounter,
+even if the filesystems are local to the NFS server. While you are
+better off making your NFS servers do only NFS service, if you must
+allow the NFS server to do non-NFS things, you are strongly
+encouraged to increase the automounter timeout.
+</p>
+</td>
+<td>
+Lowering the timeout from its default value is almost always a bad
+idea, except when you have lots of unreliable servers or networks. In
+that case, more frequent unmounting of automounted filesystems might
+be a net win.
+</p>
+</td>
+</tr>
+
+</table><p>
+
+
+
+<a name="nfs2-APP-C-TABLE-2" /><h4 class="objtitle">Table C-2. Server Parameters </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Parameter</p>
+</th>
+<th>
+Description</p>
+</th>
+<th>
+Caveats</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+nfs_portmon
+</p>
+</td>
+<td>
+This parameter controls whether the NFS server will allow requests
+with a source port less than 1024.
+</p>
+
+
+
+Many operating systems use the nonstandard notion of privileged port
+numbers, which says that only the superuser can create network
+endpoints bound to a port less than 1024. Many NFS client
+implementations will bind to ports less than 1024, and many NFS
+server implementations will refuse NFS accesses if the port is
+greater than or equal to 1024.
+</p>
+
+
+
+By default, Solaris NFS servers do not care if the client's
+source port is less than 1024. This is because the security benefits
+are minimal (given that it is trivial to bind to ports less than 1024
+on many non-Unix operating systems).
+</p>
+</td>
+<td>
+If you set this parameter to 1 to enable <em class="emphasis">NFS</em>
+port checking, you may find that some NFS clients cannot access your
+server.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+svc_idle_timeout
+</p>
+</td>
+<td>
+This parameter sets the number of milliseconds the NFS server will
+let a connection go idle before closing it.
+</p>
+
+
+
+This parameter applies to NFS/TCP connections and is set in the
+Solaris kernel RPC module called <em class="emphasis">rpcmod</em>.
+</p>
+</td>
+<td>
+Normally this parameter should be a minute beyond the highest
+client-side idle timeout among all the clients that connect to your
+server. Otherwise, you may observe clients sending requests
+simultaneous with the server tearing down connections. This will
+result in an unnecessary sequence of connection teardown, followed
+immediately by connection setup.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+nservers
+</p>
+</td>
+<td>
+This is an integer argument to the <em class="emphasis">nfsd</em> command.
+It defines the number of NFS server threads or processes that will be
+available to service NFS requests.
+</p>
+</td>
+<td>
+On some non-Solaris implementations, setting
+<em class="emphasis">nservers</em> too high can result in bad performance
+due to three effects:
+</p>
+
+<ul><li>
+The number of server threads or processes is allocated up front,
+taking up lots of precious kernel memory that might not be needed if
+the server load is minimal. This is not a problem on Solaris since
+threads are allocated on demand and released when demand ebbs.
+</p>
+</li></ul>
+<ul><li>
+The thundering herd problem exists, which results when there are lots
+of threads, and every time a request arrives, all the idle threads,
+instead of just one idle thread, are dispatched. If the load is
+moderate, many CPU cycles can be wasted, as the majority of the
+threads wake up, find there is nothing to do, and then go back to
+sleep. This is not a problem under Solaris because only one thread at
+a time is dispatched when a request arrives.
+</p>
+</li></ul>
+<ul><li>
+The Robinson Factor<a href="#FOOTNOTE-63">[63]</a>
+is the final effect. Consider the situation when there are threads
+doing NFS work, but some are idle. By the time an idle thread is
+dispatched, an active thread has picked up the request, thus wasting
+a dispatch of the idle thread. This is not <a name="INDEX-2782" /> <a name="INDEX-2783" />a problem with
+Solaris.
+</p>
+</li></ul></td>
+</tr>
+
+</table><p> <a name="FOOTNOTE-63" />[63]The Robinson Factor is named
+after David Robinson, the engineer at Sun Microsystems who observed
+the issue in Sun's NFS server, and fixed it.</p> </blockquote>
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appb_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="index/index.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">B.3. NFS errno values</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">Index</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/appc_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:59 GMT -->
+</html>

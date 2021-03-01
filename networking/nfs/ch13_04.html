@@ -1,0 +1,615 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>NIS tools (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.4. NIS tools</h2>
+
+
+Tools discussed to this point help to dissect the session and
+transport layers under an application such as NIS. The application
+and the utilities that analyze its behavior and performance all rely
+on a well-behaved network. Assuming that the lower layers are in
+place, NIS-oriented tools fine-tune the NIS system and help resolve
+problems that are caused by information in the NIS maps, rather than
+the way in which the maps are accessed. The tools described in this
+section alter client-server bindings, locate NIS servers and
+information for a particular map, and look up keys in maps.</p>
+
+
+<a name="nfs2-CHP-13-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">13.4.1. Key lookup</h3>
+
+
+<em class="emphasis">ypmatch</em> is a <em class="emphasis">grep</em>-like
+command<a name="INDEX-2085" /> <a name="INDEX-2086" />
+<a name="INDEX-2087" />
+<a name="INDEX-2088" />
+for NIS maps. <em class="emphasis">ypmatch</em> finds a single key in an
+NIS map and prints the data associated with that key:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypmatch help-request aliases</b></tt> 
+john.goodman
+ 
+% <tt class="userinput"><b>ypmatch onaga hosts</b></tt> 
+131.40.52.27   onaga</pre></blockquote>
+
+
+This procedure differs from using <em class="emphasis">grep</em> on the
+ASCII source file that produced the map in two ways:</p>
+
+
+<ul><li><em class="emphasis">ypmatch</em> can be run from any client, while the
+NIS map source files may only exist on a server with limited user
+access. Therefore, users who need to parse maps such as the password,
+ipnodes, or hosts files must use NIS-oriented tools to gather their
+data.</p></li><li>The client may be bound to an NIS server with a corrupted map set or
+one that is out-of-date with the NIS master server. In this case, the
+output of <em class="emphasis">ypmatch</em> will not agree with the output
+of <em class="emphasis">grep</em> run on the ASCII source file.</p></li></ul>
+Associated with <em class="emphasis">ypmatch</em> is
+<em class="emphasis">ypcat</em>, which is the equivalent of
+<em class="emphasis">cat</em> for NIS files. It writes the entire map file
+to the standard output:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcat hosts</b></tt> 
+131.40.52.121  vineyard         
+131.40.52.54   hannah           
+131.40.52.132  positive</pre></blockquote>
+
+
+NIS maps are stored as DBM databases, indexed files with fast access
+provided through a hash table. Standard utilities such as
+<em class="emphasis">grep</em> do not produce meaningful results when used
+on DBM data files. To peek into the contents of an NIS map, you must
+use <em class="emphasis">ypmatch</em> or <em class="emphasis">ypcat</em>.
+Output from NIS tools is colored by the underlying DBM index file
+organization, and presents several avenues of confusion:</p>
+
+
+<ul><li>By default, only the value paired with the key in the map is
+displayed, and not the key itself. Some maps retain the key as part
+of the data value because it is needed by applications that retrieve
+the map entry. Library routines that locate a password file entry
+based on UID, for example, return the user's login name as part
+of the password file structure. Other maps such as
+<em class="emphasis">aliases</em> simply store the value associated with
+the key, when applications (such as mail) that reference the NIS map
+already have the key value. The following excerpt from
+<em class="emphasis">ypcat aliases</em> is of little value because there
+are no alias names associated with the alias expansions:</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcat aliases</b></tt>
+dan, lauri, paul, harry, bob
+dave, michael
+michael, jan, stewart, tom</pre></blockquote>
+
+Both <em class="emphasis">ypcat</em> and <em class="emphasis">ypmatch</em> use
+the <em class="emphasis">-k</em> option to print the data value with its
+associated key:</p>
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcat -k aliases</b></tt>
+south-sales     dan, lauri, paul, harry, bob
+engin-managers  dave, michael
+north-engin     michael, jan, stewart, tom</pre></blockquote>
+</li></ul>
+
+<ul><li>Some maps do not associate a data value with a key. The most common
+map of this variety is the <em class="emphasis">ypservers</em> map, which
+simply contains hostnames of NIS servers without any additional
+information. When using <em class="emphasis">ypcat</em> or
+<em class="emphasis">ypmatch</em> with value-less maps, blank lines are
+produced as output:</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcat ypservers</b></tt></pre></blockquote>
+
+unless the <em class="emphasis">-k</em> option is specified:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcat -k ypservers</b></tt>
+&gt;mahimahi
+wahoo
+thud</pre></blockquote>
+</li></ul>
+
+<ul><li>An NIS server implements separate procedures to get the
+"first" and each successive key in a map.
+<em class="emphasis">ypcat</em> uses the "get first key" and
+"get next key" procedures to locate the first key in the
+DBM file and to walk through all keys. The ordering of the keys is
+determined by a linear scan through the DBM index file, rather than
+the order in which the records appear in the plain text file. Because
+keys are encountered in the order in which they are hash chained
+together, <em class="emphasis">ypcat</em> produces a seemingly random
+ordering of the keys. In the hosts file example earlier, the original
+<em class="emphasis">/etc/inet/hosts</em> file was sorted by increasing
+host number in the IP addresses; but the process of hashing the keys
+into the DBM file produced the ordering seen with
+<em class="emphasis">ypcat</em>.</p></li></ul>
+
+
+As a diagnostic tool, <em class="emphasis">ypmatch</em> can be used to
+identify NIS maps that are out of synchronization even after a map
+transfer has been requested or scheduled. It is often used to see if
+a change has taken place. After a new map is built, it is generally
+pushed to other servers using <em class="emphasis">yppush</em>. However,
+NIS map changes may not propagate as quickly as desired. A slave
+server may be down when a map transfer<a name="INDEX-2089" /> <a name="INDEX-2090" /> <a name="INDEX-2091" /> <a name="INDEX-2092" /> occurs, in which case it will not get
+an updated map until the next <em class="emphasis">ypxfr</em> transfer.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-4.2" /><div class="sect2">
+<h3 class="sect2">13.4.2. Displaying and analyzing client bindings</h3>
+
+
+<em class="emphasis">ypwhich</em> provides information about <a name="INDEX-2093" /> <a name="INDEX-2094" /> <a name="INDEX-2095" />
+<a name="INDEX-2096" />a
+client's NIS domain binding, and the availability of master
+servers for various maps in the domain. With no arguments, it returns
+the name of the NIS server to which the client is currently bound by
+<em class="emphasis">ypbind</em>:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypwhich</b></tt> 
+mahimahi</pre></blockquote>
+
+
+If a hostname is passed as a parameter, then
+<em class="emphasis">ypwhich</em> queries the named host for its current
+binding. If <em class="emphasis">ypwhich</em> cannot resolve the hostname
+into an IP address, it reports an error:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypwhich gonzo</b></tt> 
+ypwhich: clnt_create error: RPC: Unknown host</pre></blockquote>
+
+
+An IP address may be used in place of a hostname if you are debugging
+NIS problems, since NIS itself is used to map the hostname into an IP
+address. If NIS operation is not reliable, then explicit IP addresses
+should be used with all of the NIS-oriented debugging tools. For
+example:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypwhich 131.40.52.34</b></tt> 
+wahoo</pre></blockquote>
+
+
+Querying client bindings individually is useful for debugging client
+problems, but it doesn't provide much useful information about
+the use of NIS on the network. <em class="emphasis">ypwhich</em> is better
+suited for answering questions about NIS servers: Are there enough
+servers? Are the clients evenly distributed among the NIS servers?
+There is no client binding information kept by an NIS server  -- 
+the binding is something created by the client and known only to the
+client. The server simply answers requests that are sent to it. To
+determine the distribution of NIS clients to servers, you must poll
+the clients.</p>
+
+
+<em class="emphasis">ypwhich</em>, embedded in a shell script, collects
+NIS client demographics to perform a "census" of server
+usage:</p>
+
+
+<blockquote><pre class="code">#! /bin/sh 
+#       ypcensus - poll for ypservers 
+( for h in `ypcat hosts | awk '{print $2}'` 
+  do 
+        ypwhich $h 
+  done ) | grep -v 'not running' | sort | uniq -c</pre></blockquote>
+
+
+The <em class="emphasis">for</em> expression dumps the
+<em class="emphasis">hosts</em> NIS file, and <em class="emphasis">awk</em>
+extracts the second field  --  the hostname  --  from each
+entry. The loop then queries each host for its NIS server, and then
+the output from the loop is sorted. The entire loop is executed in a
+subshell so that its output is treated as a single stream by the next
+stage of the command pipeline. The <em class="emphasis">grep</em> command
+filters out errors from <em class="emphasis">ypwhich</em>, produced when
+an NIS client has not found a server for its domain. At the end of
+the pipe, <em class="emphasis">uniq -c</em> counts the occurrences of each
+line, producing the census of NIS servers. Sample output from the
+script is:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypcensus</b></tt> 
+ 26 onaga 
+  7 mahimahi 
+  8 thud</pre></blockquote>
+
+
+You may find that the total number of bindings recorded is less than
+the number of clients  --  some clients may not have formed a
+server binding when the script was run. Executing
+<em class="emphasis">ypwhich</em> causes the client to bind to a server,
+so if you "miss" some hosts on the first attempt, execute
+the script again after all clients have been forced to find servers.</p>
+
+
+What does the output indicate? With multiple NIS servers, it is
+possible for the client distribution to load one server more heavily
+than the others. In the previous example, the large number of clients
+bound to server <em class="emphasis">onaga</em> could be caused by several
+things:</p>
+
+
+<ul><li>The NIS server <em class="emphasis">onaga</em> is significantly faster
+than the other NIS servers, so it always replies to
+<em class="emphasis">ypbind</em> requests before other servers.</p></li><li>The servers have about the same CPU speed, so the lopsided binding
+indicates that <em class="emphasis">onaga</em> has the lightest CPU load.
+It generates replies faster than the other servers.</p></li><li><em class="emphasis">onaga</em> may be "closer" to more NIS
+clients on the network, counting delays in network hardware. Network
+topology favors NIS servers that are physically close to the client
+if bridges or repeaters separate clients and potential NIS servers,
+adding packet transmission delays that can overshadow CPU scheduling
+delays on loaded servers.</p></li></ul>
+The few clients bound to <em class="emphasis">mahimahi</em> and
+<em class="emphasis">thud</em> may experience NIS timeouts if these NIS
+servers are heavily loaded. The relatively small number of clients
+bound to these servers may indicate that they aren't the best
+candidates for NIS service because they have a higher CPU load.</p>
+
+
+Results of the binding poll should be compared to desired goals for
+balancing NIS server usage. If one NIS server is much faster than the
+others, you may improve the NIS binding distribution by shifting the
+fast machine's NIS service to one or two machines that are more
+similar to the other NIS servers.</p>
+
+
+To see if you have enough NIS servers, or if your choice of servers
+provides adequate NIS service, watch for broadcasts from NIS clients
+to the <em class="emphasis">yserv</em> port. You can observe network
+broadcasts using a tool like <em class="emphasis">snoop</em> or
+<em class="emphasis">ethereal</em>, both of which watch every packet on
+the network and print those that meet a defined criteria.
+<em class="emphasis">ethereal</em> and <em class="emphasis">snoop</em> are
+introduced in <a href="ch13_05.html#nfs2-CHP-13-SECT-5">Section 13.5, "Network analyzers"</a>. To
+find all <em class="emphasis">ypbind</em> broadcasts, use the following
+<em class="emphasis">snoop</em> command line:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop broadcast port sunrpc</b></tt> 
+        aqua -&gt; 131.40.52.255 NIS C DOMAIN_NONACK mydomain.com
+   semaphore -&gt; 131.40.52.255 NIS C DOMAIN_NONACK mydomain.com</pre></blockquote>
+
+
+<em class="emphasis">ypbind</em> sends its RPC broadcast to the portmapper
+on the <em class="emphasis">sunrpc</em> port (port 111), and the
+portmapper calls the <em class="emphasis">ypserv</em> process indirectly.
+If you see a large number of broadcast calls being made to the
+portmapper, then your NIS clients are rebinding frequently and you
+should add more NIS servers or choose servers that have <a name="INDEX-2097" /> <a name="INDEX-2098" /> <a name="INDEX-2099" /> <a name="INDEX-2100" />a lighter load.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-4.3" /><div class="sect2">
+<h3 class="sect2">13.4.3. Other NIS map information</h3>
+
+
+In addition to providing NIS server <a name="INDEX-2101" /> <a name="INDEX-2102" /> <a name="INDEX-2103" />binding information,
+<em class="emphasis">ypwhich</em> examines the NIS map information: the
+master server for a map, the list of all maps, and map nickname
+translations. Map nicknames are more mnemonic forms of map names used
+in place of the actual DBM filenames in NIS-related utilities; the
+nickname usually has the <em class="emphasis">.byaddr</em> or
+<em class="emphasis">.byname</em> suffix removed. Nicknames exist only
+within the <em class="emphasis">ypmatch</em>, <em class="emphasis">ypcat</em>,
+and <em class="emphasis">ypwhich</em> utilities; they are not part of the
+maps and are not part of the NIS servers. No application will ever
+perform a key lookup in map <em class="emphasis">passwd</em>; it has to
+use <em class="emphasis">passwd.byname</em> or
+<em class="emphasis">passwd.byuid</em>.</p>
+
+
+<em class="emphasis">ypwhich -x</em> prints the table of nicknames:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypwhich -x</b></tt> 
+Use "passwd"           for map "passwd.byname"
+Use "group"            for map "group.byname"
+Use "networks"         for map "networks.byaddr"
+Use "hosts"            for map "hosts.byname"
+Use "protocols"        for map "protocols.bynumber"
+Use "services"         for map "services.byname"
+Use "aliases"          for map "mail.aliases"
+Use "ethers"           for map "ethers.byname"
+Use "ipnodes"          for map "ipnodes.byname"
+Use "project"          for map "project.byname"</pre></blockquote>
+
+
+While map nicknames provide a shorter command-line option for tools
+that take a map name as a parameter, they can also create name
+conflicts with non-standard maps that share commonly used map names.
+For example, a daemon that maps popular internal resource server
+names to IP ports might create an NIS map called
+<em class="emphasis">services</em> advertising its default mappings. This
+map name will not conflict with the NIS map created from
+<em class="emphasis">/etc/inet/services</em> because the latter is
+converted into the map <em class="emphasis">services.byname</em>. Users of
+<em class="emphasis">ypcat</em> and <em class="emphasis">ypmatch</em> may be
+surprised by output that appears to confuse the map names.</p>
+
+
+The following example doesn't work at first because the
+<em class="emphasis">ypmatch</em> utility turns the map name
+<em class="emphasis">services</em> into
+<em class="emphasis">services.byname</em>, using the standard nickname
+translation. NIS completely ignores the map you want. If you use
+<em class="emphasis">ypmatch -t</em>, nickname translation is suppressed
+and you locate the desired map:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypmatch cullinet services</b></tt> 
+Can't match key cullinet in map services.byname.  Reason: no such key in map. 
+% <tt class="userinput"><b>ypmatch -t cullinet services</b></tt> 
+cullinet        6667</pre></blockquote>
+
+
+If you create your own maps, it's best to pick names that do
+not conflict with the standard map nicknames. Finally,
+<em class="emphasis">ypwhich</em> finds the master server for a map, or
+prints the list of all known maps if passed the
+<em class="emphasis">-m</em> option:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ypwhich -m passwd</b></tt> 
+mahimahi 
+% <tt class="userinput"><b>ypwhich -m</b></tt> 
+<i class="lineannotation">excerpt follows </i>
+protocols.byname mahimahi
+passwd.byuid mahimahi
+passwd.byname mahimahi
+hosts.byname mahimahi
+rpc.bynumber mahimahi
+group.bygid mahimahi
+netmasks.byaddr mahimahi
+hosts.byaddr mahimahi
+netgroup mahimahi
+group.byname mahimahi
+mail.aliases mahimahi
+services.byname mahimahi
+netgroup.byhost mahimahi
+protocols.bynumber mahimahi
+ethers.byname mahimahi
+bootparams mahimahi
+ypservers mahimahi</pre></blockquote>
+
+
+<em class="emphasis">ypwhich -m</em> examines the NIS master server name
+embedded in the NIS map DBM file.</p>
+
+
+You can also explode an NIS map using <em class="emphasis">makedbm
+-u</em>, which "undoes" a DBM file. You see the
+data records as well as the two additional records added by DBM
+containing the NIS master name and the map's timestamp. If you
+have concerns about data disappearing from NIS maps, dump the entire
+map (including keys) using <em class="emphasis">makedbm -u</em>:</p>
+
+
+<blockquote><pre class="code">[wahoo]% <tt class="userinput"><b>cd /var/yp/nesales</b></tt> 
+[wahoo]% <tt class="userinput"><b>/usr/etc/yp/makedbm -u  ypservers</b></tt> 
+YP_LAST_MODIFIED 0649548751 
+YP_MASTER_NAME wahoo 
+wahoo wahoo 
+redsox redsox 
+thud thud</pre></blockquote>
+
+
+The map master information is useful if you have changed NIS master
+servers and need to verify that client maps are built correctly
+and<a name="INDEX-2104" />
+<a name="INDEX-2105" />
+<a name="INDEX-2106" />
+synchronized with the new master server.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-4.4" /><div class="sect2">
+<h3 class="sect2">13.4.4. Setting initial client bindings</h3>
+
+
+The <em class="emphasis">ypinit</em> command is used to <a name="INDEX-2107" /> <a name="INDEX-2108" />
+<a name="INDEX-2109" />preconfigure a list of NIS servers to
+contact at startup time. <em class="emphasis">ypinit</em> stores the list
+of NIS servers in the file
+<em class="emphasis">/var/yp/binding/domainname/ypservers</em>, where
+<em class="emphasis">domainname</em> resolves to your NIS domain name.
+Normally, <em class="emphasis">ypinit</em> is run only once after
+installing the system, though it may also be run whenever a new NIS
+server is added to the network or an existing one is decommissioned:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ypinit -c</b></tt>
+
+In order for NIS to operate sucessfully, we have to construct a list of the 
+NIS servers.  Please continue to add the names for YP servers in order of
+preference, one per line.  When you are done with the list, type a &lt;control D&gt;
+or a return on a line by itself.
+	next host to add:  <tt class="userinput"><b>onaga</b></tt>
+	next host to add:  <tt class="userinput"><b>mahimahi</b></tt>
+	next host to add:  <tt class="userinput"><b>131.40.52.126</b></tt>
+	next host to add:  <tt class="userinput"><b>^D</b></tt>
+The current list of yp servers looks like this:
+
+onaga
+mahimahi
+131.40.52.126
+
+Is this correct?  [y/n: y]  <tt class="userinput"><b>y</b></tt></pre></blockquote>
+
+
+Make sure to include the necessary hostname to IP address mappings in
+<em class="emphasis">/etc/inet/ipnodes</em> or
+<em class="emphasis">/etc/inet/hosts</em> before running the
+<em class="emphasis">ypinit</em> command, otherwise
+<em class="emphasis">ypinit</em> will fail. The resulting
+<em class="emphasis">ypservers</em> file:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>cat ypservers</b></tt>
+onaga
+mahimahi
+131.40.52.126</pre></blockquote>
+
+
+Note that it is not necessary to preconfigure an initial list of NIS
+servers, since <em class="emphasis">ypbind</em> will broadcast a request
+on the network to find the available servers if the initial list does
+not exist. <em class="emphasis">ypbind</em> is started by
+<em class="emphasis">/usr/lib/netsvc/yp/ypstart</em> which in turn is
+invoked by the <em class="emphasis">/etc/init.d/rpc</em> startup script:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Excerpt from /usr/lib/netsvc/yp/ypstart:</i>
+if [ -d /var/yp/binding/$domain -a -f /var/yp/binding/$domain/ypservers ]; then
+        /usr/lib/netsvc/yp/ypbind &gt; /dev/null 2&gt;&amp;1
+        echo " ypbind\c"
+elif [ -d /var/yp/binding/$domain ]; then
+        /usr/lib/netsvc/yp/ypbind -broadcast &gt; /dev/null 2&gt;&amp;1
+        echo " ypbind\c"
+fi</pre></blockquote>
+
+
+The next section will explain in more detail when and why you may
+want to bind to specific NIS servers, and how you can modify the
+binding once <em class="emphasis">ypbind</em> has been started.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-4.5" /><div class="sect2">
+<h3 class="sect2">13.4.5. Modifying client bindings </h3>
+
+
+The <em class="emphasis">ypset</em> utility forcefully changes the server
+binding. It is mostly used to dissect tangles of intertwined NIS
+servers and to point a client at a server that is not hearing its
+broadcasts. The normal NIS server search is conducted by
+<em class="emphasis">ypbind</em> through a broadcast request. The first
+server answering the request is bound to the domain, and is probably
+the most lightly loaded or closest server to the requesting host. As
+shown in the previous <em class="emphasis">rpcinfo</em> examples, a
+server's response time, relative to other NIS servers, varies
+over time as its load fluctuates.</p>
+
+
+If the server's load increases so that NIS requests are not
+serviced before the RPC call times out on the client machine, then
+the client's <em class="emphasis">ypbind</em> daemon dissolves the
+current binding and rebroadcasts a request for NIS service. With
+varying server loads and local network traffic conditions, the
+timeout/rebroadcast system effects a dynamic load balancing scheme
+between NIS clients and servers.</p>
+
+
+Neither <em class="emphasis">ypset</em> nor <em class="emphasis">ypinit</em>
+should be used to implement a static load balancing scheme for two
+reasons:</p>
+
+
+<ul><li>The initial <em class="emphasis">ypinit</em> or <em class="emphasis">ypset</em>
+may implement your chosen server allocation, but poor response time
+from this server causes the client to break the binding and perform a
+broadcast-based search. This dynamic rebinding will undo the attempts
+to effect a preferred binding.</p></li><li>Extreme disparity in NIS server usage is indicative of other network
+problems or of excessive server loading imposed by NFS service,
+interactive use, or print spooling.</p></li></ul>
+There are four valid uses of <em class="emphasis">ypinit</em> and
+<em class="emphasis">ypset</em>:</p>
+
+
+<ul><li>Point a client at an NIS server that is isolated from it by a router
+or gateway that does not forward broadcast packets.</p></li><li>Test the services provided by a particular server, if you have
+recently installed or rebuilt the maps on that server.</p></li><li>Force servers to rebind to themselves instead of cross-binding.</p></li><li>Point a client to use a known and trusted server for security
+reasons, instead of using any NIS server on the network.</p></li></ul>
+Again, <em class="emphasis">ypinit</em> is used to set the initial static
+binding at boot time, <em class="emphasis">ypset</em> is used to change
+this binding after boot time. It is recommended to use an IP address
+as the argument to <em class="emphasis">ypset</em> to avoid using the very
+same NIS service that <em class="emphasis">ypbind</em> is having trouble
+starting.</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ypset 131.40.52.28</b></tt> 
+# <tt class="userinput"><b>ypwhich</b></tt> 
+mahimahi</pre></blockquote>
+
+
+Alternatively, you can verify that the
+<em class="emphasis">/etc/inet/ipnodes</em> or
+<em class="emphasis">/etc/inet/hosts</em> file lists the IP address for
+the new NIS server, and that <em class="emphasis">/etc/nsswitch.conf</em>
+is configured to use <em class="emphasis">files</em> before it uses NIS.</p>
+
+
+In some NIS implementations (Solaris and others),
+<em class="emphasis">ypbind</em> no longer allows
+<em class="emphasis">ypset</em> to change its binding unless this
+functionality is explicitly enabled. If the
+<em class="emphasis">-ypset</em> option is used when
+<em class="emphasis">ypbind</em> is started, then
+<em class="emphasis">ypbind</em> accepts requests from any remote machine
+to rebind to a specified server:</p>
+
+
+<blockquote><pre class="code">ypbind -ypset</pre></blockquote>
+
+
+The use of <em class="emphasis">-ypset</em> is a security risk as it
+allows a third party to change the binding to a potentially hostile
+server. Without the <em class="emphasis">-ypset</em> parameter, attempts
+to change the server binding will fail:</p>
+
+
+<blockquote><pre class="code">wahoo# <tt class="userinput"><b>ypset thud</b></tt> 
+ypset: Sorry, ypbind on host localhost has rejected your request.</pre></blockquote>
+
+
+A more restrictive form is:</p>
+
+
+<blockquote><pre class="code">ypbind -ypsetme</pre></blockquote>
+
+
+which only allows root on the local machine to invoke
+<em class="emphasis">ypset</em> to alter the binding. To discourage
+manually changing the binding, the startup <a name="INDEX-2110" /> <a name="INDEX-2111" /> <a name="INDEX-2112" />script does not
+specify either of these options when it invokes
+<em class="emphasis">ypbind</em>.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.3. Remote procedure call tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.5. Network analyzers</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

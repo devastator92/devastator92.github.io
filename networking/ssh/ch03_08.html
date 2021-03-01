@@ -1,0 +1,295 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:02 GMT -->
+<head><title>SSH and File Transfers (scp and sftp) (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch03_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">3.8. SSH and File Transfers (scp and sftp)</h2>
+
+
+
+<a name="INDEX-425" />The first thing to understand about
+SSH and file transfers, is that SSH doesn't do file transfers.</p>
+
+
+
+Ahem.</p>
+
+
+
+Now that we have your attention, what can we possibly mean by that?
+After all, there are entire sections of this book dedicated to
+explaining how to use <a name="INDEX-426" /><tt class="command">scp1</tt>,
+<tt class="command">scp2</tt>, and <a name="INDEX-427" /><tt class="command">sftp</tt> for file
+transfers. What we mean is that there is nothing in the SSH protocol
+about transferring files: an SSH speaker can't ask its partner
+to send or receive a file through the protocol. And the programs we
+just mentioned don't actually implement the SSH protocol
+themselves nor incorporate any security features at all. Instead,
+they actually run the SSH client in a subprocess, in order to connect
+to the remote host and run the other half of the file-transfer
+process there. There is nothing very SSH-specific about these
+programs; they use SSH in much the same way as do other applications
+we cover, such as CVS and Pine.</p>
+
+
+
+The only reason it was necessary to come up with
+<tt class="command">scp1</tt> in the first place was that there was no
+widely used, general-purpose file-transfer protocol available that
+operated over a the single, full-duplex byte stream connection
+provided by the SSH remote program execution. If existing FTP
+implementations could easily be made to operate over SSH, there would
+be no need for <tt class="command">ssh</tt>, but as we'll see, FTP is
+entirely unsuited to this. [<a href="ch11_02.html#ch11-55593">Section 11.2, "FTP Forwarding"</a>] So Tatu
+Yl&ouml;nen wrote <tt class="command">scp1</tt> and made it part of SSH1.
+The protocol it uses (let's call it "SCP1")
+remained entirely undocumented, even when Yl&ouml;nen wrote the first
+RFC documenting the SSH-1 protocol.</p>
+
+
+
+Later, when SSH Communications Security was writing SSH2, they wanted
+to continue to include a file-transfer tool. They stayed with the
+model of layering it on top of SSH proper, but decided to entirely
+reimplement it. Thus, they replaced the "scp1 protocol"
+with the "SFTP protocol," as it is commonly known. The
+SFTP protocol is again simply a way to do bidirectional file
+transfers over a single, reliable, full-duplex byte stream
+connection. It happens to be based on the same packet protocol used
+as the substrate for the SSH Connection Protocol, presumably as a
+matter of convenience. The implementers already had a tool available
+for sending record-oriented messages over a byte pipe, so they reused
+it. SFTP remains an undocumented, proprietary protocol at press time,
+though there is work beginning in the IETF SECSH working group to
+document and standardize it.</p>
+
+
+
+The name SFTP is really unfortunate, because it confuses people on a
+number of levels. Most take it to stand for "Secure FTP."
+First, just as with <tt class="command">scp1</tt>, as a protocol it
+isn't secure at all; the implementation derives its security by
+speaking the protocol over an SSH connection. And second, it has
+nothing whatsoever to do with the FTP protocol. It is a common
+mistake to think you can somehow use SFTP to talk securely to an FTP
+server -- a reasonable enough supposition, given the name.</p>
+
+
+
+Another confusing aspect of file transfer in SSH2, is the
+relationship among the two programs <tt class="command">scp2</tt> and
+<em class="citetitle">sftp</em>, and the SFTP protocol. In SSH1, there is
+a single file-transfer protocol, SCP1, and a single program embodying
+it: <tt class="command">scp1</tt>. In SSH2, there is also a single, new
+file-transfer protocol: SFTP. But there are three separate programs
+implementing it and two different clients. The server side is the
+program
+<tt class="command">sftp-server</tt><a name="INDEX-428" />.
+The two clients are <tt class="command">scp2</tt> and
+<tt class="command">sftp</tt>. <tt class="command">scp2</tt> and
+<tt class="command">sftp</tt> are simply two different front-ends for the
+same process: each runs the SSH2 client in a subprocess to start and
+speak to <tt class="command">sftp-server</tt> on the remote host. They
+merely provide different user interfaces: <tt class="command">scp2</tt> is
+more like the traditional <em class="emphasis">rcp</em>, and
+<tt class="command">sftp</tt> is deliberately similar to an FTP client.</p>
+
+
+
+None of this confusing terminology is made any easier by the fact
+that both SSH1 and SSH2 when installed make symbolic links allowing
+you to use the plain names "scp," "ssh,"
+etc., instead of "scp1" or "ssh2." When we
+speak of the two SSH-related file-transfer protocols, we call them
+the SCP1 and SFTP protocols. SCP1 is sometimes also just called the
+"scp" protocol, which is technically ambiguous but
+usually understood. We suppose you could refer to SFTP as the
+"scp2 protocol," but we've never heard it and
+don't recommend it if you want to keep your <a name="INDEX-429" />sanity.<a href="#FOOTNOTE-36">[36]</a><a name="INDEX-430" /></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-36" />[36]Especially since <tt class="command">scp2 </tt>may run <tt class="command">scp1
+</tt>for SSH1 compatibility! Oy gevalt!</p>
+
+
+</blockquote>
+
+
+
+<a name="ch03-64996" /><div class="sect2">
+<h3 class="sect2">3.8.1. scp1 Details</h3>
+
+
+
+<a name="INDEX-431" />When you run
+<tt class="command">scp1</tt> to copy a file from client to server, it
+invokes <tt class="command">ssh1</tt> like this:</p>
+
+<a name="INDEX-432" /><a name="INDEX-433" />
+
+<blockquote><pre class="code">ssh -x -a -o "FallBackToRsh no" -o "ClearAllForwardings yes" server-host scp ...</pre></blockquote>
+
+
+
+This runs another copy of <tt class="command">scp</tt> on the remote host.
+That copy is invoked with the undocumented switches
+<span class="option">-t</span> and <span class="option">-f</span> (for "to" and
+"from"), putting it into SCP1 server mode. This next
+table shows some examples; <a href="ch03_08.html#ch03-87180">Figure 3-6</a> shows the
+details.</p>
+
+
+
+<a name="ch03-22-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+This client scp command:</p></th>
+<th>
+Runs this remote command:</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">scp foo server:bar</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">scp -t bar</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">scp server:bar foo</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">scp -f bar</pre></blockquote></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">scp *.txt server:dir</pre></blockquote></td>
+<td>
+<blockquote><pre class="code">scp -d -t dir</pre></blockquote></td>
+</tr>
+
+
+
+</table><p>
+
+<a name="ch03-87180" /><div class="figure"><img height="248" alt="Figure 3-6" src="figs/ssh_0306.gif" width="442" /></div><h4 class="objtitle">Figure 3-6. scp1 operation</h4>
+
+If you run <tt class="command">scp1</tt> to copy a file between two remote
+hosts, it simply executes another <tt class="command">scp1</tt> client on
+the source host to copy the file to the target. For example, this
+command:</p>
+
+
+
+<blockquote><pre class="code">scp1 source:music.au target:playme</pre></blockquote>
+
+
+
+runs this in the background:</p>
+
+
+
+<blockquote><pre class="code">ssh1 -x -a <em class="replaceable">... as above ...</em> source scp1 music.au target:playme</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch03-62089" /><div class="sect2">
+<h3 class="sect2">3.8.2.  scp2/sftp Details</h3>
+
+
+
+When you run
+<a name="INDEX-434" /><tt class="command">scp2</tt>
+or <a name="INDEX-435" /><tt class="command">sftp</tt>, they run
+<tt class="command">ssh2</tt> behind the scenes, using this command:</p>
+
+
+
+<blockquote><pre class="code">ssh2 -x -a -o passwordprompt "%U@%H\'s password:"
+           -o "nodelay yes"
+           -o "authenticationnotify yes" 
+           <em class="replaceable">server host</em>
+           -s sftp</pre></blockquote>
+
+
+
+Unlike <tt class="command">scp1</tt>, here the command doesn't vary
+depending on the direction or type of file transfer; all the
+necessary information is carried inside the SFTP protocol.</p>
+
+
+
+Note that they don't start <tt class="command">sftp-server</tt> with
+a remote command, but rather with the SSH2 "subsystem"
+mechanism via the <tt class="command">-s sftp</tt> option. [<a href="ch05_07.html#ch05-86335">Section 5.7, "Subsystems"</a>] This means that the SSH2 server must be
+configured to handle this subsystem, with a line like this in
+<em class="filename">/etc/sshd2_config</em>:</p>
+
+
+
+<blockquote><pre class="code">subsystem-sftp                  /usr/local/sbin/sftp-server</pre></blockquote>
+
+
+
+Assuming the <tt class="command">ssh2</tt> command succeeds,
+<tt class="command">sftp</tt> and <tt class="command">sftp-server</tt> start
+speaking the SFTP protocol over the SSH session, and the user can
+send and retrieve files. <a href="ch03_08.html#ch03-33442">Figure 3-7</a> shows the
+details.</p>
+
+
+
+<a name="ch03-33442" /><div class="figure"><img height="248" alt="Figure 3-7" src="figs/ssh_0307.gif" width="442" /></div><h4 class="objtitle">Figure 3-7. scp2/sftp operation</h4>
+
+Our testing shows roughly a factor-of-four reduction in throughput
+from <tt class="command">scp1</tt> to <tt class="command">scp2</tt>. We observe
+that the SFTP mechanism uses the SSH packet protocol twice, one
+encapsulated inside the other: the SFTP protocol itself uses the
+packet protocol as its basis, and that runs on top of an SSH session.
+While this is certainly inefficient, it seems unlikely to be the
+reason for such a dramatic reduction in performance; perhaps there
+are simply implementation problems that can be fixed, such as bad
+interactions between buffering in different layers of the protocol
+code. We have not dug into the code ourselves to find a reason for
+the slowdown.<a name="INDEX-436" /></p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch03_09.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.7. Randomness</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">3.9. Algorithms Used by SSH</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch03_08.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:03 GMT -->
+</html>

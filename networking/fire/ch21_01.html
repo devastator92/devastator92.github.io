@@ -1,0 +1,811 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:07 GMT -->
+<head><title>Authentication and Auditing Services (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch21_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 21. Authentication and Auditing Services</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch21-20321">What Is Authentication?</a><br />
+<a href="ch21_02.html">Passwords</a><br />
+<a href="ch21_03.html">Authentication Mechanisms</a><br />
+<a href="ch21_04.html">Modular Authentication for Unix </a><br />
+<a href="ch21_05.html">Kerberos</a><br />
+<a href="ch21_06.html">NTLM Domains</a><br />
+<a href="ch21_07.html">Remote Authentication Dial-in User Service (RADIUS)</a><br />
+<a href="ch21_08.html">TACACS and Friends</a><br />
+<a href="ch21_09.html">Auth and identd</a><br /></p><p></div>
+
+
+
+
+
+
+
+Services can get information about how to identify users, and what
+users are allowed to do, from various sources. For instance, they can
+keep local files (this is what Unix web servers do when they use
+"basic" authentication), or they can use the operating
+system's normal methods (this is what Windows NT web servers do
+when they use "Windows NT Challenge/Response"
+authentication). However, there is now a third popular option, a
+centralized authentication service that is independent of the
+specific service and the specific computer the service is running on.
+That service makes up part of something often referred to as an
+<em class="emphasis">AAA server</em>.<a name="INDEX-1940" /></a></p><p>
+
+
+
+
+
+An <a name="INDEX-1941" /></a>
+<a name="INDEX-1942" /></a>AAA
+server (sometimes spoken as "Triple A server") provides
+authentication, authorization, and auditing services:</p><p>
+
+
+
+
+
+<dl>
+<dt><i><em class="emphasis">Authentication</em></i><a name="INDEX-1943" /></a><i></i></dt>
+<dd>The process of obtaining verified, proven identification.
+Authentication determines who somebody or something is.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">Authorization</em></i></dt>
+<dd>The process of determining what somebody can do. Don't confuse
+authentication and authorization. Authentication is a prerequisite
+for authorization (unless everybody is authorized to do something,
+such as anonymous FTP).</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">Auditing</em></i></dt>
+<dd>Provides information on when authentication and authorization was
+granted or denied.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Authentication services attempt to prove identity, to ensure that you
+know what person you are dealing with. This task can be very easy if
+it doesn't matter very much and you are in an environment you
+trust, or very difficult if people may be trying to deceive you. In
+many contexts, you'll accept someone's business card as
+an authentication. If you're suspicious, you may want something
+better, or you may want to check up on the information on the card.
+You might call the phone number on the card, for instance (but the
+person carrying the card certainly can control where that phone
+number goes). If you were really worried, you might get a phone
+number from an external source and call it.</p><p>
+
+
+
+
+
+Similarly, authentication services can be relatively simple when
+they're used on internal, trusted networks but are quite
+complex when they can't assume a basic level of trust. What
+happens if you're trying to verify that business card, but the
+person carrying it actually controls your telephone system, so no
+matter what number you call, that person can answer the telephone?
+That's effectively the situation you face when you're
+trying to authenticate somebody over an untrusted network connection.</p><p>
+
+
+
+
+
+Normal Unix password systems, and older Microsoft systems, use
+authentication methods equivalent to simply accepting business cards
+and trusting what they say. They use reusable tokens, and any time
+you give one out, somebody might be storing it away to use later
+while pretending to be you. Strong authentication services go to
+considerable lengths to ensure that what is transmitted over the
+network cannot be used to impersonate you at some point in the
+future.</p><p>
+
+
+
+
+
+Some services that are also sometimes used for authentication have
+been covered earlier in this book. For information on NIS and LDAP,
+see <a href="ch20_01.html">Chapter 20, "Naming and Directory Services"</a>.</p><p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch21-20321" /></a>
+<h2 class="sect1">21.1. What Is Authentication?</h2>
+
+
+
+
+
+<a name="INDEX-1944" /></a><a name="INDEX-1945" /></a>Usually, people think of authentication in
+terms of passwords. Although passwords are frequently used for
+authentication, there are actually a variety of authentication
+mechanisms. These mechanisms can generally be categorized as
+verifying one or more of the following:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Something you are</i></dt>
+<dd>This is the field of biometrics, including techniques such as
+fingerprint scans, retina scans, voiceprint analysis, and so on.</p><p></dd>
+
+
+
+
+
+<dt><i>Something you know</i></dt>
+<dd>This is a traditional password system.</p><p></dd>
+
+
+
+
+
+<dt><i>Something you have</i></dt>
+<dd>This includes mechanisms such as challenge-response lists, one-time
+pads, smart cards, and so on.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Some systems combine these approaches. For example, a smart card that
+requires the user to enter a personal identification number (PIN) to
+unlock it is a combination of something you have (the card) and
+something you know (the PIN). In theory, it is considered a good idea
+to combine at least two mechanisms because people can steal either
+one: the thing you have is susceptible to ordinary theft, and the
+thing you know is compromised by sniffing if it passes over the
+Internet; but it's rare for somebody to be able to get both at
+once. Automatic teller machines use this combination. However, ATMs
+also demonstrate the flaw in the theory: when you are authenticating
+(standing at the ATM), you reveal what you have (your card) and what
+you know (your PIN) simultaneously, making yourself vulnerable to a
+thief who watches you use the machine to capture your PIN, then
+steals your card as you leave, or to a fraudulent ATM machine, which
+can pick up your PIN and your card at the same time.</p><p>
+
+
+
+
+
+<a name="ch21-20353" /></a><div class="sect2">
+<h3 class="sect2">21.1.1. Something You Are</h3>
+
+
+
+
+
+<a name="INDEX-1946" /></a>
+<a name="INDEX-1947" /></a><a name="INDEX-1948" /></a>Many types of biometric systems
+are in use or under development today; they test such diverse
+personal characteristics as your voice, your fingerprint or
+handprint, your retina, your signature, and your typing patterns.
+Biometric systems are extremely attractive because they get around
+the problems associated with using things that can be stolen or
+revealed. (Even the horror movie scenario of hacking off
+somebody's thumb to use in the fingerprint scanner is taken
+into account; most scanners insist that a pulse be present.)
+Unfortunately, biometric systems are not practical for normal
+Internet applications.</p><p>
+
+
+
+
+
+ost computers do not come with devices capable of reading
+fingerprints, much less retinas. Voiceprint technology is more
+tempting; it's not unusual for machines these days to have
+microphones. But it's not universal, either, and you
+can't guarantee that every machine you'll want to log in
+from has the high quality microphone, free disk space, and available
+network bandwidth required for this approach. Finally, if the
+biometric information has to be communicated from where you are to
+where it can be checked, you run the risk of an attacker's
+capturing it and replaying it later, unless you have some way of
+encrypting or otherwise protecting it.</p><p>
+
+
+
+
+
+<a name="INDEX-1949" /></a>Even if every machine had all the
+capabilities it needed, reliable voiceprint identification is
+surprisingly hard to accomplish. Many people wish to use their
+computers even when they have head colds, which throw off many
+voice-recognition systems. You can't use a fixed phrase as a
+password, or you would be vulnerable to a literal playback attack
+involving a tape recorder. (These problems have been addressed in
+dedicated systems, but no authentication systems widely available for
+general-purpose computers can deal with them, and it's not at
+all trivial to develop one.) You can't use a different phrase
+every time because voiceprint comparison on arbitrary text is not a
+real-time operation  --  unless you have a spare supercomputer
+lying around to do it. Almost everybody wants to log in with a delay
+measured in seconds, at worst; getting back to the user with an
+answer in a few hours is not going to work.</p><p>
+
+
+
+
+
+<a name="INDEX-1950" /></a>Keystroke timing, used to
+characterize someone's typing pattern, is a surprisingly
+reliable biometric identification system and requires no special
+hardware. The computer provides a phrase to type and then times the
+gaps between characters as you type it. On a phrase of reasonable
+length, people type in an identifiable pattern, and imitating it is
+much harder than it looks. Like voiceprints, keystroke timings may
+change for environmental reasons; in the case of keystroke timings,
+colds aren't a problem, but people have great difficulty
+authenticating while drunk (which is not necessarily a disadvantage,
+of course). The genuine disadvantage is that keystroke timings can be
+gathered only at the machine to which the keyboard is attached. That
+means that use of this method across the Internet requires modified
+clients. In addition, some people, mostly poor typists, have trouble
+ever authenticating because their typing patterns are inconsistent.</p><p>
+
+
+
+
+
+Biometric solutions are slowly improving over time; the cost of the
+add-on hardware is dropping, and the effectiveness of the software is
+increasing. However, manufacturers have been promising that
+biometrics are going to be universally accepted Real Soon Now for
+many years, and there is no sign that they are likely to overcome the
+hurdles any time soon. If you have special security needs that
+warrant adding hardware to every machine that people may need to
+authenticate from, a biometric solution may be appropriate, but for
+most sites, biometrics are still in the distant future.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-20367" /></a><div class="sect2">
+<h3 class="sect2">21.1.2. Something You Know</h3>
+
+
+
+
+
+<a name="INDEX-1951" /></a>If
+the long-lost heiress to a fortune turns up in a novel, you can bet
+that fingerprints aren't going to be available to do biometric
+authentication. Instead, the claimant is probably going to try to
+prove that she is who she says she is because she knows the name of
+the stuffed animal she slept with at age three. This is
+authentication by knowledge, just like the traditional Unix password
+system. (And, just like traditional Unix passwords, the
+claimant's answers can be faked if she's a good guesser
+and gets enough tries.)</p><p>
+
+
+
+
+
+Authentication that depends on something you know relies on that
+something's being both hard to guess and secret. In order for
+you to authenticate reliably, you have to know the secret reliably,
+too. This isn't as easy as it sounds. Most people are bad at
+making up and remembering unguessable things, and they're worse
+at keeping secrets. If you use short keys, it's easy to guess
+them; if you use long keys, it's hard to remember them. If you
+write them down, you're basically converting to a different
+type of authentication; now, it's something you have.</p><p>
+
+
+
+
+
+System administrators who unblushingly tell their users never to
+write down passwords probably have a few stashed in their wallets
+anyway; this is a combination of "what you know" and
+"what you have". "What you know" is how to
+read your own handwriting, and which slip of paper contains the
+passwords, rather than last week's lunch order. "What you
+have" is the slip of paper itself.</p><p>
+
+
+
+
+
+Despite all of the risks of "what you know" systems, it
+is still practical to use them as long as you aren't revealing
+the secret to everybody in the near vicinity every time you
+authenticate. There is a reason why passwords are so popular:
+they're fast, they're cheap, and, in practice, people
+don't forget them or lose the pieces of paper all that often.
+However, it is absolutely impractical to pass them across the
+Internet in any form that can be used safely.</p><p>
+
+
+
+
+
+Is there any way to use a "what you know" system safely
+on the Internet? Yes -- use passwords but make sure that they are
+nonreusable (one-time) passwords.</p><p>
+
+
+
+
+
+<a name="INDEX-1952" /></a><a name="INDEX-1953" /></a>There are two ways to make
+traditional, memorized passwords nonreusable. One is to include an
+<em class="emphasis">encrypted timestamp</em>  --  this is the method
+that Kerberos uses. As long as you can't modify the timestamp
+without knowing the password, it prevents playback. Unfortunately, it
+requires two things:</p><p>
+
+
+
+
+
+<ul><li>Special client software that knows how to timestamp the password.</p><p></li><li>Synchronized time between the client and the server. If the server
+and the client have different times, the password will be either
+invalid already or not yet valid when it arrives.</p><p></li></ul>
+<a name="INDEX-1954" /></a>The other way to make traditional,
+memorized passwords nonreusable is to use a
+<em class="emphasis">challenge-response system</em>. With such a system,
+the password you give depends on a prompt that the server gives you.
+Challenge-response is the traditional method for identifying yourself
+at a speakeasy, entering a military camp, or meeting fellow spies in
+art museums. It may seem to be an impractical approach, because in
+order to be reasonably safe from playback attacks, you need a wide
+variety of challenges, each with a separate response. If you have
+trouble remembering one password, you certainly aren't going to
+remember 47 of them.</p><p>
+
+
+
+
+
+In fact, however, challenge-response systems for computers are
+designed so that instead of memorizing the response to each
+challenge, you memorize a rule for converting the challenge into a
+response. This concept has yet to become popular as a pure
+"what you know" option because it's difficult to
+apply to a large number of people. A rule like "reverse the
+first three letters, capitalize the fourth, delete the fifth, and
+uppercase the rest of them" is easy to program, but it's
+not necessarily easy to represent so that you can have a different
+rule for each user. Even if you can remember your own rule,
+you're apt to follow along the challenge with a finger,
+muttering the rule to yourself while you try to implement it; someone
+watching over your shoulder can pretty easily determine the rule.</p><p>
+
+
+
+
+
+Some systems that present standard password prompts to the user then
+use challenge-response systems internally. This is what Windows NT
+challenge-response authentication does; the user gets a standard
+password prompt and provides a fixed password, but the dialog between
+the server and the client uses a challenge-response system.</p><p>
+
+
+
+
+
+Both Windows NT challenge/response and Kerberos are vulnerable to
+password-guessing attacks. If you use this type of system across the
+Internet, you will need to have both passwords that are hard to guess
+and good auditing systems to catch attempts to guess them. On most
+operating systems, including Windows NT and most versions of Unix,
+you will need additional software to force users to pick good
+passwords.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-20394" /></a><div class="sect2">
+<h3 class="sect2">21.1.3. Something You Have</h3>
+
+
+
+
+
+In practice, the most successful authentication systems for Internet
+use today are based on the third type of authentication:
+"something you have". What you have may be a printed list
+of single-use passwords or an electronic card; it's usually,
+but not always, combined with "something you know".</p><p>
+
+
+
+
+
+The use of electronic cards makes it practical to use
+challenge-response or time-based encryption. For challenge-response,
+you encode in the card itself the rule that converts the challenge to
+the response. For time-based encryption, you encode in the card both
+the time source and the encryption smarts. Either way, you can do
+authentication without needing modified clients or users with trick
+memories.</p><p>
+
+
+
+
+
+<a name="INDEX-1955" /></a>Using
+printed lists of passwords is generally referred to as using
+<em class="emphasis">one-time passwords</em>. This confuses people because
+all nonreusable passwords are good only one time, by definition.
+Printed password lists are called that because they resemble a spy
+device called a <em class="emphasis">one-time pad</em> that consists of a
+pad of paper with different instructions on each page. You encrypt
+one message with each page, so that the opposite side doesn't
+get multiple chances to break the code.<a href="#FOOTNOTE-131">[131]</a><a name="INDEX-1956" /></a></p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-131" /></a>[131]In fact,
+printed one-time password lists resemble one-time pads so closely
+that it's inadvisable to bring one to the attention of a
+customs agent when travelling internationally.</p><p>
+
+
+
+
+</blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch20_07.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch21_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">20.7. Information Lookup Services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">21.2. Passwords</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:50:09 GMT -->
+</html>

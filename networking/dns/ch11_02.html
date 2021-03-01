@@ -1,0 +1,1012 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+<head><title>Securing Your Name Server (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.2. Securing Your Name Server</h2>
+
+
+<a name="INDEX-1831" />BIND
+4.9 introduced several important security features that help you
+protect your name server. BIND 8 and 9 continued the tradition by
+adding several more. These features are particularly important if
+your name server is running on the Internet, but they're also
+useful on purely internal name servers.</p><p>
+
+
+We'll start by discussing measures you should take on all name
+servers for which security is important. Then we'll describe a
+model in which your name servers are split into two communities, one
+for serving only resolvers and one for answering other name
+servers' queries.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">11.2.1. BIND Version</h3>
+
+
+<a name="INDEX-1832" />One of
+the most important ways you can enhance the security of your name
+server is to run a recent version of BIND. All versions of BIND
+before 8.2.3 are susceptible to at least a few known attacks. Check
+the ISC's list of vulnerabilities in various BIND versions at
+<a name="INDEX-1833" />
+<a name="INDEX-1834" /> <a name="INDEX-1835" /><a href="http://www.isc.org/products/BIND/bind-security.html">http://www.isc.org/products/BIND/bind-security.html</a>
+for updates.</p><p>
+
+
+But don't stop there: new attacks are being thought up all the
+time, so you'll have to do your best to keep abreast of
+BIND's vulnerabilities and the latest "safe"
+version of BIND. One good way to do that is to read the
+<a name="INDEX-1836" /><em class="emphasis">comp.protocols.dns.bind</em>
+newsgroup regularly.</p><p>
+
+
+There's another aspect of BIND's version relevant to
+security: if a <a name="INDEX-1837" />hacker can easily find out which version of
+BIND you're running, he may be able to tailor his attacks to
+that version of BIND. And, wouldn't you know it, since about
+BIND 4.9, BIND name servers have replied to a certain query with
+their version. If you look up TXT records in the CHAOSNET class
+attached to the domain name <em class="emphasis">version.bind</em>, BIND graciously returns something like this:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>dig txt chaos version.bind.</b></tt>
+
+; &lt;&lt;&gt;&gt; DiG 9.1.0 &lt;&lt;&gt;&gt; txt chaos version.bind.
+;; global options:  printcmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 34772
+;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;version.bind.                  CH      TXT
+
+;; ANSWER SECTION:
+version.bind.           0       CH      TXT     "9.1.0"</pre></blockquote>
+
+
+To address this, BIND Versions 8.2 and later let you tailor your name
+server's response to the <em class="emphasis">version.bind</em> query:</p><p>
+
+
+<blockquote><pre class="code">options {
+	version "None of your business";
+};</pre></blockquote>
+
+
+Of course, receiving a response like "None of your
+business" will tip off the alert hacker to the fact that
+you're likely running BIND 8.2 or better, but that still leaves
+a number of possibilities.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">11.2.2. Restricting Queries</h3>
+
+
+<a name="INDEX-1838" /> <a name="INDEX-1839" />Before
+BIND 4.9, administrators had no way to control who could look up
+names on their name servers. That makes a certain amount of sense;
+the original idea behind DNS was to make information easily available
+all over the Internet.</p><p>
+
+
+The neighborhood is not such a friendly place anymore, though. In
+particular, people who run Internet firewalls may have a legitimate
+need to hide certain parts of their namespace from most of the world
+while making it available to a limited audience.</p><p>
+
+
+The BIND 8 and 9 <a name="INDEX-1840" /><em class="emphasis">allow-query</em>
+substatement lets you apply an IP address-based access control list
+to queries. The access control list can apply to queries for data in
+a particular zone or to any queries received by the name server. In
+particular, the access control list specifies which IP addresses are
+allowed to send queries to the server.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-2.2.1" /><div class="sect3">
+<h3 class="sect3">11.2.2.1. Restricting all queries</h3>
+
+
+The global form of the <em class="emphasis">allow-query</em> substatement
+looks like this:</p><p>
+
+
+<a name="INDEX-1841" /><blockquote><pre class="code">options {
+      allow-query { address_match_list; };
+};</pre></blockquote>
+
+
+So to restrict our name server to answering queries from the three
+main Movie U. networks, we'd use:</p><p>
+
+
+<blockquote><pre class="code">options {
+      allow-query { 192.249.249/24; 192.253.253/24; 192.253.254/24; };
+};</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-2.2.2" /><div class="sect3">
+<h3 class="sect3">11.2.2.2. Restricting queries in a particular zone</h3>
+
+
+BIND 8 and 9 also allow you to apply an access control list to a
+particular zone. In this case, just use <em class="emphasis">allow-query
+</em>as a substatement to the <em class="emphasis">zone
+</em>statement for the zone you want to protect:</p><p>
+
+
+<blockquote><pre class="code">acl "HP-NET" { 15/8; };
+
+zone "hp.com" {
+      type slave;
+      file "bak.hp.com";
+      masters { 15.255.152.2; };
+      allow-query { "HP-NET"; };
+};</pre></blockquote>
+
+
+Any kind of authoritative name server, master or slave, can apply an
+access control list to the zone. Zone-specific access control lists
+take precedence over a global ACL for queries in that zone. The
+zone-specific access control list may even be more permissive than
+the global ACL. If there's no zone-specific access control list
+defined, any global ACL will apply.</p><p>
+
+
+In BIND 4.9, this functionality is provided by the <em class="emphasis">secure_zone</em><a name="INDEX-1842" /> record. Not only does it limit queries
+for individual resource records, it limits zone transfers, too. (In
+BIND 8 and 9, restricting zone transfers is done separately.)
+However, BIND 4.9 name servers have no mechanism for restricting who
+can send your server queries for data in zones your server
+is <em class="emphasis">not</em> authoritative for; the
+<em class="emphasis">secure_zone</em> mechanism works only with
+authoritative zones.</p><p>
+
+
+To use <em class="emphasis">secure_zone</em>, include one or more special
+<a name="INDEX-1843" />TXT records in your zone data on
+the primary master name server. Conveniently, these records are
+transferred to the zone's slave servers automatically. Of
+course, only BIND 4.9 slaves will understand them.</p><p>
+
+
+The TXT records are special because they're attached to the
+pseudo-domain name <em class="emphasis">secure_zone</em>, and the resource
+record-specific data has a special format, too:</p><p>
+
+
+<blockquote><pre class="code">address:mask</pre></blockquote>
+
+
+or:</p><p>
+
+
+<blockquote><pre class="code">address:H</pre></blockquote>
+
+
+In the first form, <em class="emphasis">address</em> is the dotted-octet
+form of the IP network to which you want to allow access to the data
+in this zone. The <em class="emphasis">mask</em> is the netmask for that
+network. If you want to allow all of 15/8 access to your zone data,
+use 15.0.0.0:255.0.0.0. If you want to allow only the range of IP
+addresses from 15.254.0.0 to 15.255.255.255 access to your zone data,
+use 15.254.0.0:255.254.0.0.</p><p>
+
+
+The second form specifies the address of a particular host
+you'd like to allow access to your zone data. The
+<em class="emphasis">H</em> is equivalent to the mask 255.255.255.255; in
+other words, each bit in the 32-bit address is checked. Therefore,
+15.255.152.4:H gives the host with the IP address 15.255.152.4 the
+ability to look up data in the zone.</p><p>
+
+
+If we want to restrict queries for information in <em class="emphasis">movie.edu</em> to hosts on Movie U.'s networks, but our name servers run BIND 4.9 instead of BIND 8 or 9, we could add the following lines to <em class="filename">db.movie.edu </em>on the <em class="emphasis">movie.edu</em> primary master:</p><p>
+
+
+<blockquote><pre class="code">secure_zone    IN    TXT    "192.249.249.0:255.255.255.0"
+secure_zone    IN    TXT    "192.253.253.0:255.255.255.0"
+secure_zone    IN    TXT    "192.253.254.0:255.255.255.0"
+secure_zone    IN    TXT    "127.0.0.1:H"</pre></blockquote>
+
+
+Notice that we included the loopback address (127.0.0.1) in our
+access control list. That's so a resolver running on the same
+host as a name server can query the local name server.</p><p>
+
+
+If you forget the <em class="emphasis">:H</em>, you'll see the
+following <em class="emphasis">syslog</em> message:</p><p>
+
+
+<blockquote><pre class="code">Aug 17 20:58:22 terminator named[2509]: build_secure_netlist
+       (movie.edu): addr (127.0.0.1) is not in mask (0xff000000)</pre></blockquote>
+
+
+Also, note that the <em class="emphasis">secure_zone</em> records here apply only to the zone they're in -- that is, <em class="emphasis">movie.edu</em>. If you wanted to prevent unauthorized queries for data in other zones on this server, you'd have to add <em class="emphasis">secure_zone</em> records to those zones on
+their primary master name servers, too.<a name="INDEX-1844" /> <a name="INDEX-1845" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">11.2.3. Preventing Unauthorized Zone Transfers</h3>
+
+
+<a name="INDEX-1846" /> <a name="INDEX-1847" />Arguably
+even more important than controlling who can query your name server
+is ensuring that only your real slave name servers can transfer zones
+from your name server. Users on remote hosts that can query your name
+server's zone data can only look up records (e.g., addresses)
+for domain names they already know, one at a time. Users who can
+start zone transfers from your server can list all of the records in
+your zones. It's the difference between letting random folks
+call your company's switchboard and ask for John Q.
+Cubicle's phone number and sending them a copy of your
+corporate phone directory.</p><p>
+
+
+BIND 8 and 9's <em class="emphasis">allow-transfer</em> substatement
+and 4.9's<a name="INDEX-1848" /><a name="INDEX-1849" /><a name="INDEX-1850" /> <em class="emphasis">xfrnets</em>
+directive let administrators apply an access control list to zone
+transfers. <em class="emphasis">allow-transfer</em> restricts transfers of
+a particular zone when used as a <em class="emphasis">zone</em>
+substatement, and restricts all zone transfers when used as an
+<em class="emphasis">options</em> substatement. It takes an address match
+list as an argument.</p><p>
+
+
+The slave servers for our <em class="emphasis">movie.edu</em> zone have the IP addresses 192.249.249.1 and 192.253.253.1 (<em class="emphasis">wormhole.movie.edu</em>) and 192.249.249.9 and 192.253.253.9 (<em class="emphasis">zardoz.movie.edu</em>). The following <em class="emphasis">zone</em> statement:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+      type master;
+      file "db.movie.edu";
+      allow-transfer { 192.249.249.1; 192.253.253.1; 192.249.249.9; 192.253.253.9; };
+};</pre></blockquote>
+
+
+allows only those slaves to transfer <em class="emphasis">movie.edu</em> from the primary master name server. Note that because the default for BIND 8 or 9 is to allow zone transfer requests from any IP address, and because hackers can
+just as easily transfer the zone from your slaves, you should
+probably also have a <em class="emphasis">zone</em> statement like this on
+your slaves:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+      type slave;
+      masters { 192.249.249.3; };
+      file "bak.movie.edu";
+      allow-transfer { none; };
+};</pre></blockquote>
+
+
+BIND 8 and 9 also let you apply a global access control list to zone
+transfers. This applies to any zones that don't have their own
+explicit access control lists defined as <em class="emphasis">zone
+</em>substatements. For example, we might want to limit all
+zone transfers to our internal IP addresses:</p><p>
+
+
+<blockquote><pre class="code">options {
+      allow-transfer { 192.249.249/24; 192.253.253/24; 192.253.254/24; };
+};</pre></blockquote>
+
+
+The BIND 4.9 <em class="emphasis">xfrnets</em> directive also applies an
+access control list to all zone transfers. <em class="emphasis">xfrnets
+</em>takes as its arguments the networks or IP addresses
+you'd like to allow to transfer zones from your name server.
+Networks are specified by the dotted-octet form of the network
+number. For example:</p><p>
+
+
+<blockquote><pre class="code">xfrnets 15.0.0.0 128.32.0.0</pre></blockquote>
+
+
+allows only hosts on the network 15/8 or the network 128.32/16 to
+transfer zones from this name server. Unlike the <em class="emphasis">secure_zone</em> TXT record, this restriction applies to any zones the server is authoritative for.</p><p>
+
+
+If you want to specify just a part of a network, down to a single IP
+address, you can add a<a name="INDEX-1851" /> network mask.
+<em class="emphasis">network&amp;netmask</em> is the syntax for including
+a network mask. Note that spaces aren't allowed between the
+network and the ampersand or between the ampersand and the netmask.</p><p>
+
+
+To pare down the addresses allowed to transfer zones in the previous
+example to just the IP address 15.255.152.4 and the subnet
+128.32.1/24, use the <em class="emphasis">xfrnets</em> directive:</p><p>
+
+
+<blockquote><pre class="code">xfrnets 15.255.152.4&amp;255.255.255.255 128.32.1.0&amp;255.255.255.0</pre></blockquote>
+
+
+Finally, as we mentioned earlier in the chapter, those newfangled
+BIND 8.2 and later name servers let you restrict zone transfers to
+slave name servers that include a correct transaction signature with
+their request. On the master name server, you need to define the key
+in a key statement and then specify the key in the address match
+list:</p><p>
+
+
+<blockquote><pre class="code">key terminator-wormhole. {
+	algorithm hmac-md5;
+	secret "UNd5xYLjz0FPkoqWRymtgI+paxW927LU/gTrDyulJRI=";
+};
+
+zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	allow-transfer { key terminator-wormhole.; };
+};</pre></blockquote>
+
+
+On the slave's end, you need to configure the slave to sign
+zone transfer requests with the same key:</p><p>
+
+
+<blockquote><pre class="code">key terminator-wormhole. {
+	algorithm hmac-md5;
+	secret "UNd5xYLjz0FPkoqWRymtgI+paxW927LU/gTrDyulJRI=";
+};
+
+server 192.249.249.3 {
+	keys { terminator-wormhole.; };  // sign all requests to 192.249.249.3
+                                     // with this key
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+};</pre></blockquote>
+
+
+For a primary master name server accessible from the Internet, you
+probably want to limit zone transfers to just your slave name
+servers. You probably don't need to worry about name servers
+inside your firewall, unless you're worried about your own
+employees listing your zone data.<a name="INDEX-1852" /> <a name="INDEX-1853" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">11.2.4. Running BIND with Least Privilege</h3>
+
+
+<a name="INDEX-1854" /> <a name="INDEX-1855" />Running a network server such
+as BIND as the <a name="INDEX-1856" />root user can be dangerous -- and BIND
+normally runs as root. If a hacker finds a vulnerability in the name
+server through which he can read or write files, he'll have
+unfettered access to the filesystem. If he can exploit a flaw that
+allows him to execute commands, he'll execute them as root.</p><p>
+
+
+BIND 8.1.2 and later include code that allows you to change the user
+and group the name server runs as. This allows you to run the name
+server with what's known as <em class="emphasis">least
+privilege</em> : the minimal set of rights it needs to do its
+job. That way, if someone breaks into your host through the name
+server, at least that person won't have root privileges.</p><p>
+
+
+<a name="INDEX-1857" />BIND 8.1.2 and later also include an
+option that allows you to <em class="emphasis">chroot( )</em> the name
+server: to change its view of the filesystem so that its root
+directory is actually a particular directory on your host's
+filesystem. This effectively traps your name server in this
+directory, along with any attackers who successfully compromise your
+name server's security.</p><p>
+
+
+The command-line options that implement these features are:</p><p>
+
+
+<dl>
+<dt><i><em class="emphasis">-u</em></i></dt>
+<dd>Specifies the username or user ID the name server changes to after
+starting, e.g., <em class="emphasis">named -u bin</em>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-g</i></dt>
+<dd>Specifies the group or group ID the name server changes to after
+starting, e.g., <em class="emphasis">named -g other</em>. If you specify
+<span class="option">-u</span> without <span class="option">-g</span>, the name server uses
+the user's primary group. BIND 9 name servers always change to
+the user's primary group, so they don't support
+-<span class="option">g</span>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>-t</i></dt>
+<dd>Specifies the directory for the name server to <em class="emphasis">chroot(
+)</em> to.</p></dd>
+
+</dl>
+
+
+If you opt to use the <span class="option">-u</span> and <span class="option">-g</span>
+options, you'll have to decide what user and group to use. Your
+best bet is to create a new user and group for the name server to run
+as, such as <em class="emphasis">named</em>. Since the name server reads
+<em class="filename">named.conf</em> before giving up root privileges, you
+don't have to change that file's permissions. However,
+you may have to change the permissions and ownership of your zone
+data files so that the user the name server runs as can read them. If
+you use dynamic update, you'll have to make the zone data files
+for dynamically updated zones writable by the name server.</p><p>
+
+
+If your name server is configured to log to files (instead of to
+<em class="emphasis">syslog</em>), make sure that those files exist and
+are writable by the name server before starting the server.</p><p>
+
+
+The <span class="option">-t</span> option takes a little more specialized
+configuration. In particular, you need to make sure that all the
+files <em class="filename">named</em> uses are present in the directory
+you're restricting the server to. Here's a procedure to
+follow to set up your <em class="emphasis">chroot</em> ed environment,
+which we'll assume lives under <em class="filename">/var/named
+</em>:<a href="#FOOTNOTE-83">[83]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-83" />[83]This procedure is based on Red Hat Linux
+6.2, so if you use a different operating system, your mileage may
+vary.</p><p>
+
+</blockquote>
+
+
+<ol><li>Create the <em class="filename">/var/named</em> directory, if it
+doesn't exist. Create <em class="filename">dev</em>,
+<em class="filename">etc</em>, <em class="filename">lib</em>,
+<em class="filename">usr</em>, and<em class="filename"> var
+</em>subdirectories. Within <em class="filename">usr</em>, create an
+<em class="filename">sbin</em> subdirectory. Within
+<em class="filename">var</em>, create subdirectories named
+<em class="filename">named</em> and <em class="filename">run</em>:</p><p>
+<blockquote><pre class="code"># <tt class="userinput"><b>mkdir /var/named</b></tt>
+# <tt class="userinput"><b>cd /var/named</b></tt>
+# <tt class="userinput"><b>mkdir -p dev etc lib usr/sbin var/named var/run</b></tt></pre></blockquote>
+</li>
+
+<li>Copy <em class="filename">named.conf</em> to
+<em class="filename">/var/named/etc/named.conf</em>:</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>cp /etc/named.conf etc</b></tt></pre></blockquote>
+</li>
+
+<li>If you're running BIND 8, copy the <em class="filename">named-xfer
+</em>binary to the <em class="filename">usr/sbin/</em> or
+<em class="filename">etc </em>subdirectory (depending on whether you found
+it in <em class="filename">/usr/sbin</em> or
+<em class="filename">/etc</em>).</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>cp /usr/sbin/named-xfer usr/sbin</b></tt></pre></blockquote>
+
+Alternately, you can put it wherever you like under
+<em class="filename">/var/named</em> and use the
+<em class="filename">named-xfer</em> substatement to tell
+<em class="filename">named</em> where to find it. Just remember to strip
+<em class="filename">/var/named</em> off of the pathname, since when
+<em class="filename">named</em> reads <em class="filename">named.conf</em>,
+<em class="filename">/var/named</em> will look like the root of the
+filesystem. (If you're running BIND 9, skip this step because
+BIND 9 doesn't use <em class="filename">named-xfer</em>.)</p></li>
+
+<li>Create <em class="filename">dev/null</em> in the <em class="emphasis">chroot
+</em>ed environment:</p><p>
+<blockquote><pre class="code"># <tt class="userinput"><b>mknod dev/null c 1 3</b></tt></pre></blockquote>
+</li>
+
+<li>If you're running BIND 8, copy the standard, shared C library
+and the loader to the <em class="filename">lib</em> subdirectory:</p><p>
+<blockquote><pre class="code"># <tt class="userinput"><b>cp /lib/libc.so.6 /lib/ld-2.1.3.so
+lib</b></tt>
+# <tt class="userinput"><b>ln -s lib/ld-2.1.3.so lib/ld-linux.so.2</b></tt></pre></blockquote>
+
+The pathnames may vary on your operating system. BIND 9 name servers
+are self-contained.</p></li>
+
+<li>Edit your startup files to start <em class="filename">syslogd</em> with an
+additional option and option argument: <em class="filename">-a
+/var/named/dev/log</em>. On many modern versions of Unix,
+<em class="filename">syslogd</em> is started from
+<em class="filename">/etc/rc.d/init.d/syslog</em>. When
+<em class="filename">syslogd</em> restarts next, it will create
+<em class="filename">/var/named/dev/log</em>, and
+<em class="filename">named</em> will log to it.</p><p>
+
+
+If your <em class="filename">syslogd</em> doesn't support the
+-<span class="option">a</span> option, use the <em class="emphasis">logging</em>
+statement described in <a href="ch07_01.html">Chapter 7, "Maintaining BIND"</a>, to log to files
+in the <em class="emphasis">chroot</em> ed directory.</p></li>
+
+<li>If you're running BIND 8 and use the -<span class="option">u</span> or
+-<span class="option">g</span> options, create <em class="filename">passwd</em> and
+<em class="filename">group</em> files in the <em class="filename">etc</em>
+subdirectory to map the arguments of -<span class="option">u</span> and
+-<span class="option">g</span> to their numeric values (or just use numeric
+values as arguments):</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>echo "named:x:42:42:named:/:" &gt;
+etc/passwd # echo "named::42" &gt; etc/group</b></tt></pre></blockquote>
+
+Then add the entries to the system's
+<em class="filename">/etc/passwd</em> and <em class="filename">/etc/group</em>
+files. If you're running BIND 9, you can
+<em class="emphasis">just</em> add the entries to the system's
+<em class="filename">/etc/passwd</em> and <em class="filename">/etc/group</em>
+files, since BIND 9 name servers read the information they need
+before calling <em class="emphasis">chroot( )</em>.</p></li><li>Finally, edit your startup files to start <em class="filename">named</em>
+with the -<span class="option">t</span> option and option argument: <em class="filename">-t
+/var/named</em>. Similarly to <em class="filename">syslogd</em>,
+many modern versions of Unix start <em class="filename">named</em> from
+<em class="filename">/etc/rc.d/init.d/named</em>.</p></li></ol>
+
+
+If you're hooked on using <em class="filename">ndc</em> to control
+your BIND 8 name server, you can continue to do so as long as you
+specify the pathname to the Unix domain socket as the argument to
+<em class="filename">ndc </em>'s -<span class="option">c</span> option:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ndc -c /var/named/var/run/ndc reload</b></tt></pre></blockquote>
+
+
+<em class="filename">rndc</em> will continue to work as before with your
+BIND 9 name server since it just talks to the server via<a name="INDEX-1858" /> port
+953.<a name="INDEX-1859" />
+<a name="INDEX-1860" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">11.2.5. Split-Function Name Servers</h3>
+
+
+<a name="INDEX-1861" />Name
+servers really have two major roles: answering iterative queries from
+remote name servers and answering recursive queries from local
+resolvers. If we separate these roles, dedicating one set of name
+servers to answering iterative queries and another to answering
+recursive queries, we can more effectively secure those name servers.</p><p>
+
+
+<a name="dns4-CHP-11-SECT-2.5.1" /><div class="sect3">
+<h3 class="sect3">11.2.5.1. "Delegated" name server configuration</h3>
+
+
+Some of your name servers answer nonrecursive
+<a name="INDEX-1862" />queries from other name servers on
+the Internet because these name servers appear in NS records
+delegating your zones to them. We'll call these name servers
+<a name="INDEX-1863" />"delegated" name servers.</p><p>
+
+
+There are special measures you can take to secure your delegated name
+servers. But first, you should make sure that these name servers
+don't receive any recursive queries (that is, you don't
+have any resolvers configured to use these servers and no name
+servers use them as forwarders). Some of the precautions we'll
+take -- like making the server respond nonrecursively even to
+recursive queries -- preclude your resolvers from using these
+servers. If you do have resolvers using your delegated name servers,
+consider establishing another class of name servers to serve just
+your resolvers or using the <a href="ch11_02.html#dns4-CHP-11-SECT-2.6">Section 11.2.6, "Two Name Servers in One"</a>
+configuration, both described later in this chapter.</p><p>
+
+
+Once you know your name server only answers queries from other name
+servers, you can turn off recursion. This eliminates a major vector
+of attack: the most common spoofing attacks involve inducing the
+target name server to query name servers under the hacker's
+control by sending the target a recursive query for a domain name in
+a zone served by the hacker's servers. To turn off recursion,
+use the following <a name="INDEX-1864" />statement on a BIND 8 or 9 name server:</p><p>
+
+
+<blockquote><pre class="code">options {
+     recursion no;
+};</pre></blockquote>
+
+
+or, on a BIND 4.9 server, use:</p><p>
+
+
+<a name="INDEX-1865" /><blockquote><pre class="code">options no-recursion</pre></blockquote>
+
+
+You should also restrict zone transfers of your zones to known slave
+servers, as described in <a href="ch11_02.html#dns4-CHP-11-SECT-2.3">Section 11.2.3, "Preventing Unauthorized Zone Transfers"</a> earlier in this chapter. Finally, you
+might also want to turn off glue fetching. Some name servers will
+automatically try to resolve the domain names of any name servers in
+NS records; to prevent this from happening and keep your name server
+from sending any queries of its own, use this on a BIND 8 name server
+(BIND 9 name servers have <a name="INDEX-1866" />glue fetching turned off by
+default)<a name="INDEX-1867" />:</p><p>
+
+
+<a name="INDEX-1868" /><blockquote><pre class="code">options {
+      fetch-glue no;
+};</pre></blockquote>
+
+
+or, on a BIND 4.9 server, use:</p><p>
+
+
+<blockquote><pre class="code">options no-fetch-glue</pre></blockquote>
+</div>
+
+
+
+<a name="dns4-CHP-11-SECT-2.5.2" /><div class="sect3">
+<h3 class="sect3">11.2.5.2. "Resolving" name server configuration</h3>
+
+
+We'll <a name="INDEX-1869" />call a name server that serves one or
+more <a name="INDEX-1870" />
+<a name="INDEX-1871" />resolvers or that is configured as another
+name server's forwarder a <a name="INDEX-1872" />"resolving" name server.
+Unlike a delegated name server, a resolving name server can't
+refuse recursive queries. Consequently, we have to configure it a
+little differently to secure it. Since we know our name server should
+receive queries only from our own resolvers, we can configure it to
+deny queries from any but our resolvers' IP addresses.</p><p>
+
+
+Only BIND 8 and 9 allow us to restrict which IP addresses can send
+our name server arbitrary queries. (BIND 4.9 name servers let us
+restrict which IP addresses can send the server queries in
+authoritative zones, via the <em class="emphasis">secure_zone</em> TXT record, but we're
+actually more worried about recursive queries in others'
+zones.) This <em class="emphasis">allow-query</em> substatement restricts
+queries to just our internal network:</p><p>
+
+
+<blockquote><pre class="code">options {
+	allow-query { 192.249.249/24; 192.253.253/24; 192.253.254/24; };
+};</pre></blockquote>
+
+
+With this configuration, the only resolvers that can send our name
+server recursive queries and induce them to query other name servers
+are our own internal resolvers, which are presumably relatively
+benevolent.</p><p>
+
+
+There's one other option we can use to make our resolving name
+server a little more secure --  <em class="emphasis">use-id-pool</em>:</p><p>
+
+
+<blockquote><pre class="code">options {
+	use-id-pool yes;
+};</pre></blockquote>
+
+
+<em class="emphasis">use-id-pool</em> was introduced in BIND 8.2. It tells
+our name server to take special care to use random message IDs in
+queries. Normally, the message IDs aren't random enough to
+prevent brute-force attacks that try to guess the IDs our name server
+has outstanding in order to spoof a response.</p><p>
+
+
+The ID pool code became a standard part of BIND 9, so you don't
+need to specify it on a BIND 9 name server.<a name="INDEX-1873" /></p><p>
+</div>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-2.6" /><div class="sect2">
+<h3 class="sect2">11.2.6. Two Name Servers in One</h3>
+
+
+<a name="INDEX-1874" />What if you have only one name server to
+advertise your zones and serve your resolvers, and you can't
+afford the additional expense of buying another computer to run a
+second name server on? There are still a few options open to you. Two
+are single-server solutions that take advantage of the flexibility of
+BIND 8 and 9. One of these configurations allows anyone to query the
+name server for information in zones it's authoritative for,
+but only our internal resolvers can query the name server for other
+information. While this doesn't prevent remote resolvers from
+sending our name server recursive queries, those queries have to be
+in its authoritative zones so they won't induce our name server
+to send additional queries.</p><p>
+
+
+<a name="INDEX-1875" />Here's a
+<em class="filename">named.conf</em> file to do that:</p><p>
+
+
+<blockquote><pre class="code">acl "internal" {
+	192.249.249/24; 192.253.253/24; 192.253.254/24;
+};
+
+acl "slaves" {
+	192.249.249.1; 192.253.253.1; 192.249.249.9; 192.253.253.9;
+};
+
+options {
+	directory "/var/named";
+	allow-query { "internal"; };
+	use-id-pool yes;
+};
+
+zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	allow-query { any; };
+	allow-transfer { "slaves"; };
+};
+
+zone "249.249.192.in-addr.arpa" {
+	type master;
+	file "db.192.249.249";
+	allow-query { any; };
+	allow-transfer { "slaves"; };
+};</pre></blockquote>
+
+
+Here, the more permissive zone-specific access control lists apply to
+queries in the name server's authoritative zones, but the more
+restrictive global access control list applies to all other queries.</p><p>
+
+
+If we were running BIND 8.2.1 or newer, we could simplify this
+configuration somewhat using the <em class="emphasis">allow-recursion
+</em>substatement:</p><p>
+
+
+<blockquote><pre class="code">acl "internal" {
+	192.249.249/24; 192.253.253/24; 192.253.254/24;
+};
+
+acl "slaves" {
+	192.249.249.1; 192.253.253.1; 192.249.249.9; 192.253.253.9;
+};
+
+options {
+	directory "/var/named";
+	allow-recursion { "internal"; };
+	use-id-pool yes;
+};
+
+zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	allow-transfer { "slaves"; };
+};
+
+zone "249.249.192.in-addr.arpa" {
+	type master;
+	file "db.192.249.249";
+	allow-transfer { "slaves"; };
+};</pre></blockquote>
+
+
+We don't need the <em class="emphasis">allow-query</em>
+substatements anymore: although the name server may receive queries
+from outside our internal network, it'll treat those queries as
+nonrecursive, regardless of whether they are or not. Consequently,
+external queries won't induce our name server to send any
+queries. This configuration also doesn't suffer from a gotcha
+the previous setup is susceptible to: if your name server is
+authoritative for a parent zone, it may receive queries from remote
+name servers resolving domain names in a subdomain of the zone. The
+<em class="emphasis">allow-query</em> solution will refuse those
+legitimatequeries, but the
+<em class="emphasis">allow-recursion</em> solution won't.</p><p>
+
+
+Another option is to run two <em class="filename">named</em> processes on
+a single host. One is configured as a delegated name server, another
+as a resolving name server. Since we have no way of telling remote
+servers or configuring resolvers to query one of our name servers on
+a port other than 53, the default DNS port, we have to run these
+servers on different IP addresses.</p><p>
+
+
+Of course, if your host already has more than one network interface,
+that's no problem. Even if it has only one, the operating
+system may support IP address aliases. These allow you to attach more
+than one IP address to a single network interface. One
+<em class="filename">named</em> process can listen on each. Finally, if
+the operating system doesn't support IP aliases, you can still
+bind one <em class="filename">named </em>against the network
+interface's IP address and one against the loopback address.
+Only the local host will be able to send queries to the instance of
+<em class="filename">named</em> listening on the loopback address, but
+that's fine if the local host's resolver is the only one
+you need to serve.</p><p>
+
+
+First, here's the <em class="filename">named.conf </em>file for the
+delegated name server, listening on the network interface's IP
+address:</p><p>
+
+
+<blockquote><pre class="code">acl "slaves" {
+	192.249.249.1; 192.253.253.1; 192.249.249.9; 192;253.253.9; };
+};
+
+options {
+	directory "/var/named-delegated";
+	recursion no;
+	fetch-glue no;
+	listen-on { 192.249.249.3; };
+	pid-file "/var/run/named.delegated.pid";
+};
+
+zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	allow-transfer { "slaves"; };
+};
+
+zone "249.249.192.in-addr.arpa" {
+	type master;
+	file "db.192.249.249";
+	allow-transfer { "slaves"; };
+};
+
+zone "." {
+	type hint;
+	file "db.cache";
+};</pre></blockquote>
+
+
+Next, here's the <em class="filename">named.conf </em>file for the
+resolving name server, listening on the loopback address:</p><p>
+
+
+<a name="INDEX-1876" /><blockquote><pre class="code">options {
+	directory "/var/named-resolving";
+	listen-on { 127.0.0.1; };
+	pid-file "/var/run/named.resolving.pid";
+	use-id-pool yes;
+};
+
+zone "." {
+	type hint;
+	file "db.cache";
+};</pre></blockquote>
+
+
+Note that we didn't need an access control list for the
+resolving name server, since it's only listening on the
+loopback address and can't receive queries from other hosts.
+(If our resolving name server were listening on an IP alias or a
+second network interface, we could use <em class="emphasis">allow-query
+</em>to prevent others from using our name server.) We turn
+recursion off on the delegated name server, but we must leave it on
+on the resolving name server. We also give each name server its own
+PID file and its own directory so that the servers don't try to
+use the same default filename for their PID files, debug files, and
+statistics files.</p><p>
+
+
+To use the resolving name server listening on the loopback address,
+the local host's <em class="filename">resolv.conf </em>file must
+include the following:</p><p>
+
+
+<blockquote><pre class="code">nameserver 127.0.0.1</pre></blockquote>
+
+
+as the first <em class="emphasis">nameserver</em> directive.</p><p>
+
+
+If you're running BIND 9, you can even consolidate the two name
+server configurations into one using
+<a name="INDEX-1877" />views:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+};
+
+acl "internal" {
+	192.249.249/24; 192.253.253/24; 192.253.254/24;
+};
+
+view "internal" {
+	match-clients { "internal"; };
+	recursion yes;
+
+	zone "movie.edu" {
+		type master;
+		file "db.movie.edu";
+	};
+
+	zone "249.249.192.in-addr.arpa" {
+		type master;
+		file "db.192.249.249";
+	};
+
+	zone "." {
+		type hint;
+		file "db.cache";
+	};
+};
+
+view "external" {
+	match-clients { any; };
+	recursion no;
+
+	zone "movie.edu" {
+		type master;
+		file "db.movie.edu";
+	};
+
+	zone "249.249.192.in-addr.arpa" {
+		type master;
+		file "db.192.249.249";
+	};
+
+	zone "." {
+		type hint;
+		file "db.cache";
+	};
+};</pre></blockquote>
+
+
+It's a fairly simple configuration: two views, internal and
+external. The internal view, which applies only to our internal
+network, has recursion on. The external view, which applies to
+everyone else, has recursion off. The zones
+<em class="emphasis">movie.edu</em> and
+<em class="emphasis">249.249.192.in-addr.arpa</em> are defined identically
+in both zones. You could do a lot more with it -- define different
+versions of the zones internally and externally, for
+example -- but we'll hold off on that until the
+next<a name="INDEX-1878" />
+section.<a name="INDEX-1879" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11. Security</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.3. DNS and Internet Firewalls</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:30 GMT -->
+</html>

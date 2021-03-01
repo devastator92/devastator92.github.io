@@ -1,0 +1,1734 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch18_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:36 GMT -->
+<head><title>Remote Graphical Interfaces (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch19_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">18.3. Remote Graphical Interfaces</h2>
+
+
+
+
+
+The programs discussed in the previous sections give you text-based
+access to a machine, but these days, you're likely to want
+access to graphics as well. That's a different, and much more
+recent, problem with different solutions.</p><p>
+
+
+
+
+
+<a name="ch18-24-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.1. X11 Window System</h3>
+
+
+
+
+
+<a name="ch18-25-fm2xml" /><blockquote><b>TIP:</b> 
+ost window systems supplied by Unix vendors are either based on or
+very similar to X11  --  from a firewalls point of view, most of
+the considerations are the same  --  so this discussion of X11
+applies to other window systems as well.</p><p>
+
+
+
+
+</blockquote>
+
+<a name="INDEX-1776" /> <a name="INDEX-1777" />The X11 Window System poses a number of
+problems for a firewall system.</p><p>
+
+
+
+
+
+<a name="INDEX-1778" />The first problem with X11 is that the
+client/server relationship is backwards from most other protocols.
+The X11 "server" is the display/mouse/keyboard unit, and
+the "clients" are the application programs driving
+windows or interacting with the mouse and keyboard on that server.
+Thus, the server is typically inside the firewall (sitting on the
+user's desk), and the clients are outside (running on whatever
+remote computers the user has accessed). <a href="ch18_03.html#ch18-19189">Figure 18-3</a>
+shows an X server and client.</p><p>
+
+
+
+
+
+<a name="ch18-19189" /><div class="figure"><img height="170" alt="Figure 18-3" src="figs/fire2.1803.gif" width="407" /></div><h4 class="objtitle">Figure 18-3. X Windows server and clients </h4>
+
+<a name="INDEX-1779" />X11 servers have
+certain capabilities that make them a very tempting target for
+attackers. There are a number of things an attacker can do with
+access to an X11 server, including:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Getting screen dumps</i></dt>
+<dd>Obtaining a copy of whatever information is being displayed on the
+screen at any given time.</p><p></dd>
+
+
+
+
+
+<dt><i>Reading keystrokes</i></dt>
+<dd>For example, reading a user's password as it is typed at the
+keyboard.</p><p></dd>
+
+
+
+
+
+<dt><i>Injecting keystrokes as if they were typed by the user</i></dt>
+<dd>This potentially allows the attacker to do all kinds of mean and
+nasty things, especially in a window where the user happens to be
+running a root shell.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Clients can do all of these things without doing anything
+that's visible to the user, which makes it difficult to detect
+if such a client is connected.</p><p>
+
+
+
+
+
+X11 has two security mechanisms; the first and original is called the
+<em class="emphasis">xhost</em> mechanism. This mechanism allows the user
+to tell the server which remote IP addresses the server should accept
+connections from. Users are supposed to authorize only specific hosts
+where they intend to run X11 clients. There are two problems with
+this:</p><p>
+
+
+
+
+
+<ul><li>Users tend to forget to preauthorize the host before starting the
+clients, which are then refused access. After this happens a few
+times, many users disable the control altogether. For example, they
+issue an <em class="emphasis">xhost +</em> command to allow connections
+from any and all hosts in the name of convenience (so they can easily
+run programs on remote systems), without giving any thought to the
+security implications of their actions.</p><p></li><li>There's no way for the <em class="emphasis">xhost</em> mechanism to
+determine whether or not any given connection from one of those
+machines is legitimate; any user on one of the allowed machines can
+run an X11 client and connect to the X11 server.</p><p></li></ul>
+The second form of authentication, which is commonly referred to as
+the <em class="emphasis">magic cookie</em> security mechanism, relies on a
+secret shared between the server and legitimate clients; clients are
+allowed to access the server only if they can prove they know the
+secret. The required cookie is generated when the X server starts up.
+It is unpredictable, and it is different each time the server or a
+managed user session starts. The cookies for each server a user has
+access to are stored in a file and can be manipulated with the
+<em class="emphasis">xauth</em> program; for the Unix operating system,
+the file will be located in the user's home directory under the
+name "<em class="emphasis">.Xauthority"</em>.</p><p>
+
+
+
+
+
+There are two security problems with the normal version of cookie
+authentication (which is known as "MIT-MAGIC-COOKIE-1").
+First, the cookie is passed unprotected from the client to the
+server. Anybody who is snooping on the network can intercept the
+cookie and use it to start new connections. Second, no mechanism is
+provided to get the cookie to the client machine in the first place
+or to secure it once it gets there. It is not uncommon for sites to
+share the cookie (either intentionally or unintentionally) between
+machines with NFS. This transfers it in cleartext yet again.</p><p>
+
+
+
+
+
+The first problem can be dealt with by using a mechanism called
+"XDM-AUTHORIZATION-1", which uses the magic cookie as a
+key to encrypt other data and passes that data, instead of the cookie
+itself, across the network. Unfortunately, this still doesn't
+solve the problem of getting the cookie on both the client and the
+server securely. Furthermore, not all X servers and clients support
+this mechanism.</p><p>
+
+
+
+
+
+A small number of servers and clients support other authentication
+mechanisms. For instance, some of them use Secure RPC or Kerberos to
+identify users. These mechanisms avoid the problems with cookies.</p><p>
+
+
+
+
+
+<a name="INDEX-1780" />SSH tunneling of X avoids some of the
+problems involved in using cookies with special handling of the
+authentication cookie. The SSH client generates a new authentication
+cookie and sends it to the SSH server. The SSH server uses this
+cookie and pretends to be an X server, setting an appropriate DISPLAY
+variable before running any commands. When an X client connects to
+the fake X server, the connection is forwarded back to the SSH
+client, which substitutes the real authentication cookie and makes a
+connection to the real X server. This means that the real X server
+authentication cookie is never copied and left on a remote system.
+Because the cookie sent to the SSH server is not the real cookie,
+remote X applications can be started only for the duration of the SSH
+session. We do recommend that you enable this SSH client feature only
+when you will need to run remote X applications. The default setting
+for this feature can normally be made either globally or using
+individual user configuration files. The documentation for the
+version of SSH you are using will contain instructions on how to do
+this.</p><p>
+
+
+
+
+
+<a name="ch18-26-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.1.1. Additional servers</h3>
+
+
+
+
+
+Several additional protocols are often run in conjunction with X11,
+including the X Display Manager Control Protocol (XDMCP) and the X
+font server (which does not have an acronym).</p><p>
+
+
+
+
+
+Some X hosts are designed or configured to act as the modern
+equivalent of dumb terminals on time sharing systems. These
+limited-function hosts (commonly called <em class="emphasis">X
+displays</em> or <em class="emphasis">X terminals</em>) are not
+full-fledged workstations, which provide services (such as login) and
+run applications locally; rather, they are simply input/output
+devices for services provided by other systems on the network. XDMCP
+provides a standard way for these X terminals to find and use login
+services provided by servers elsewhere on the local area network.
+When it starts or restarts, an X terminal tries to find an XDMCP
+server, either by using broadcast or by sending unicast packets to a
+preconfigured list of servers. One or more XDMCP servers will respond
+to this request, letting the X terminal know which server or servers
+can provide login services for that X terminal. An XDMCP server may
+generate broadcast requests on behalf of an X terminal and return the
+list of responding servers.</p><p>
+
+
+
+
+
+The XDMCP protocol is commonly implemented under Unix by a service
+called <em class="emphasis">xdm</em> (the X display manager), which will
+either provide a graphical login screen or run a chooser that allows
+one of a list of hosts be selected. Access control is performed using
+hostnames or IP addresses. <em class="emphasis">xdm</em> is often used to
+manage the login process on machines that are not providing services
+for remote displays and may be present and willing to accept network
+connections on any machine running X.</p><p>
+
+
+
+
+
+XDMCP has many vulnerabilities. First, it exchanges authentication
+information and can be used to attack the X server host. Second, it
+will generate broadcast traffic based on requests and can be used to
+magnify incoming traffic for denial of service attacks. In addition,
+there have been buffer overflow problems with
+<em class="emphasis">xdm</em>. XDMCP should never be allowed through a
+firewall. If an X-based graphical display is needed for a bastion
+host, the display manager service should be configured to refuse
+external connections and manage only a local display.</p><p>
+
+
+
+
+
+The X font server is designed to provide a centralized font storage
+service for X displays. (Fonts can take up a large amount of disk
+space, which may not be available on all X devices.) The X font
+server protocol allows a server to indicate alternative font servers
+if it is too busy. This redirect capability can specify arbitrary
+port numbers, allowing a hostile server to redirect a client to any
+host and port combination. The X font server protocol should never be
+allowed through a firewall. If an X-based graphical display is needed
+for a bastion host, then the fonts should be directly installed, and
+the X font server should be disabled.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-16427" /><div class="sect3">
+<h3 class="sect3">18.3.1.2. Packet filtering characteristics of X11</h3>
+
+
+
+
+
+X11 uses TCP port 6000 for the first server on a machine. This choice
+of ports presents another problem for packet filtering systems: the
+X11 ports are in the middle of the "above 1023" range of
+ports that most applications use for random client-side ports. Thus,
+any packet filtering scheme that allows in packets to ports above
+1023 (in order to allow packets from remote servers to local clients)
+needs to be very careful not to allow in connections to X11 servers.
+It can do this either by totally blocking access to the range of
+ports used by these servers (which can be a tricky proposition
+because of the possibility of multiple servers per machine, as we
+discuss later in this chapter) or by using start-of-connection
+filtering (looking at the TCP ACK bit) to disallow inbound TCP
+connections to any ports.</p><p>
+
+
+
+
+
+Some machines run multiple X11 servers. The first server is at port
+6000, the second at 6001, and so on. On a Unix system, the DISPLAY
+environment variable tells clients what X11 server to contact. This
+variable is of the form <em class="emphasis">hostname:n</em>, which tells
+clients to contact the server on port 6000+<em class="emphasis">n</em> on
+machine <em class="emphasis">hostname</em>.</p><p>
+
+
+
+
+
+Sometimes, such machines actually have multiple
+display/keyboard/mouse setups, but more often the multiple servers
+are <em class="emphasis">virtual</em> servers. There are several reasons
+for a machine to run a virtual X11 server. For instance, X11 is a
+very verbose, high-bandwidth protocol; it doesn't run well over
+dial-up links. One of the solutions that's been adopted (for
+example, by NCD's XRemote package) is to run a virtual X11
+server on a well-connected machine (for example, linked by Ethernet
+to the machines the client programs are running on) and then to speak
+some other, more frugal protocol over the slow link between this
+virtual server and the real X terminal. SSH also uses a virtual X11
+server to do X11 tunneling. This mechanism is illustrated in <a href="ch18_03.html#ch18-83502">Figure 18-4</a> (SSH's virtual X11 server is usually at
+6011 to allow for machine running multiple displays at lower
+numbers).</p><p>
+
+
+
+
+
+<a name="ch18-83502" /><div class="figure"><img height="205" alt="Figure 18-4" src="figs/fire2.1804.gif" width="486" /></div><h4 class="objtitle">Figure 18-4. X11 virtual servers and SSH tunneling </h4>
+
+Every machine running X11 will have a server at port 6000. A few will
+have servers at 6000 and 6001 or 6011. Only a very few machines
+(mostly those running virtual servers) will have more than that.</p><p>
+
+
+
+
+
+Thus, to block access to all these servers, assuming that you
+can't do start-of-connection filtering, you need to block
+access to ports 6000 through 6000+<em class="emphasis">n</em>, where
+<em class="emphasis">n</em> is some undetermined number. Ports 6000 to
+6063 are officially registered for X Windows, so that's one
+reasonable guess for <em class="emphasis">n</em>, although at most sites
+that's a larger block than you really need. Another possible
+guess is the one used by SSH when it looks for a free port to put a
+fake server on; it skips 6000-6010, assuming that it will miss most
+real servers that way (however, it will then pessimistically search
+up to 6999 to find a free port, so you can look at it as setting
+<em class="emphasis">n</em> to 10 or to 999). You don't want to make
+<em class="emphasis">n</em> too small because that might expose some of
+the virtual X11 servers to attack. On the other hand, you don't
+want to make it too big either, because you're blocking ports
+in the range of random ports that could be used by other application
+clients. You don't want to keep another protocol's client
+(e.g., Telnet or FTP) from working simply because it happened to pick
+as its random client port a port blocked to prevent X11 access.</p><p>
+
+
+
+
+
+You do have one thing going for you: the way most operating systems
+allocate such random ports. Generally, when a client application asks
+the operating system to allocate a random port for its use, the
+kernel allocates the next available port after the last one allocated
+(wrapping around to the beginning of the port number space when
+necessary). If a client happens to grab a port blocked because of
+X11, the client will fail. If the user tries to run the client again
+a few times, the client will get a new port each time and will
+eventually succeed when the port allocated moves beyond the blocked
+range.</p><p>
+
+
+
+
+
+A common approach (again, assuming that you can't do
+start-of-connection filtering to block external connections to
+internal servers) is to block, say, four ports (ports 6000 through
+6003) on all hosts, and more ports on hosts where you know or suspect
+people will run lots of virtual X11 servers (e.g., the hosts people
+dial in to from their X terminals at home). A more straightforward
+approach is to use proxying to direct connections to a bastion host
+that is not running a window system. It can make outbound connections
+on any port without worrying about hitting the blocked range because
+it doesn't need a blocked range.</p><p>
+
+
+
+
+
+Some vendors provide modified or enhanced X11 servers with somewhat
+different characteristics; for example, Sun's OpenWindows
+server listens at both port 6000 (for X11) and port 2000 (for
+Sun's older NeWS window system protocol), with second servers
+at ports 6001 and 2001, and so on.</p><p>
+
+
+
+
+
+XDMCP uses UDP port 177 and, if the service is configured to do so,
+will respond to broadcast requests. The X font server uses TCP port
+7100.</p><p>
+
+
+
+
+
+<a name="ch18-27-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+6000+<em class="emphasis">n</em></p><p></td>
+<td>
+<a href="#FOOTNOTE-87">[87]</a></p><p>
+</td>
+<td>
+Incoming X11 connection to <em class="emphasis">n</em>th server, client to
+server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+6000+<em class="emphasis">n</em></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming X11 connection to <em class="emphasis">n</em>th server, server to
+client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int<a href="#FOOTNOTE-88">[88]</a></p><p>
+</td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+177</p><p></td>
+<td>
+<a href="#FOOTNOTE-89">[89]</a></p><p>
+</td>
+<td>
+Incoming XDMCP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+177</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-89">[89]</a></td>
+<td>
+XDMCP reply</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+7100<a href="#FOOTNOTE-90">[90]</a></p><p>
+</td>
+<td><a href="#FOOTNOTE-87">[87]</a></td>
+<td>
+Incoming request to X font server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+7100<a href="#FOOTNOTE-90">[90]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Reply from internal X font server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+6000+<em class="emphasis">n</em></p><p></td>
+<td><a href="#FOOTNOTE-87">[87]</a></td>
+<td>
+Outgoing X11 connection to <em class="emphasis">n</em>th server, client to
+server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+6000+<em class="emphasis">n</em></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing X11 connection to <em class="emphasis">n</em>th server, server to
+client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext<a href="#FOOTNOTE-88">[88]</a></p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+177</p><p></td>
+<td><a href="#FOOTNOTE-89">[89]</a></td>
+<td>
+Outgoing XDMCP</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+177</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-89">[89]</a></td>
+<td>
+XDMCP reply</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+7100</p><p></td>
+<td><a href="#FOOTNOTE-87">[87]</a></td>
+<td>
+Outgoing request to X font server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+7100<a href="#FOOTNOTE-90">[90]</a></p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Reply from external X font server</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-87" />[87]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-88" />[88]XDMCP may have a broadcast address as a
+destination.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-89" />[89]UDP has no ACK equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-90" />[90]The server may redirect the client to a
+different port and/or host.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-28-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.1.3. Proxying characteristics of X11</h3>
+
+
+
+
+
+X11 does not work well with generic proxy systems because it requires
+high performance and makes connections inbound instead of outbound.
+Dedicated X11 proxies are available, most of which are designed to
+provide added features, instead of added security. The most effective
+way to proxy X11 is to use SSH tunneling, which allows you to make
+the connection outbound and provides encryption and authentication.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-29-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.1.4. Network address translation characteristics of X11</h3>
+
+
+
+
+
+X11 itself does not use embedded IP addresses and will work without
+difficulty with network address translation systems. However, the
+reversed nature of X11 means that connections will usually be made
+from the outside to the inside. Since the network address translation
+system cannot set up translations automatically in this situation,
+you will need to have some sort of predefined translation in place to
+use X11 through a network address translation system.</p><p>
+
+
+
+
+
+In addition, the data that's used for the XDM-AUTHORIZATION-1
+authentication mechanism normally includes the client's IP
+address. If you are using this form of authentication through a
+network address translation system, you will need to specially
+configure the client and server to use hostnames instead of
+addresses.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-16570" /><div class="sect3">
+<h3 class="sect3">18.3.1.5. Summary of recommendations for XII</h3>
+
+
+
+
+
+<ul><li>Do not allow clients on the Internet to connect to X11 servers on
+your internal network.</p><p></li><li>Use SSH to allow clients on the Internet to connect to your local
+display.</p><p></li><li>If you cannot use SSH, use an X11 proxy server (such as the one in
+the TIS FWTK) running on a bastion host.</p><p></li><li>Do not run an unrestricted XDMCP server on a bastion host.</p></li><li>Do not allow XDMCP through a firewall.</p></li><li><p>Do not run an X font service on a bastion host. If you need X,
+install the fonts locally.<a name="INDEX-1781" /> <a name="INDEX-1782" /></p><p></li></ul>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-30-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.2. Remote Graphic Interfaces for Microsoft Operating Systems</h3>
+
+
+
+
+
+<a name="INDEX-1783" /> <a name="INDEX-1784" />A wide variety of programs provide remote
+access to machines running Windows operating systems (to name a few
+at random, LapLink, RemotelyPossible, and pcANYWHERE). While most of
+these programs were originally designed to work with modems, many of
+them now work over networks as well, and those that do almost always
+support TCP/IP. Most of them use proprietary protocols; for details
+on port usage of such programs, you will need to contact the vendor
+of the particular program you are interested in using.</p><p>
+
+
+
+
+
+<a name="INDEX-1785" />The
+security concerns with all of these programs are the same and fall
+into the following categories:</p><p>
+
+
+
+
+
+<ul><li>Are remote and local users of the machine kept separate? Can the
+local user control what remote users can do, and are remote users
+protected from interference by local users who are at the physical
+machine at the same time?</p><p></li><li>Is there secure and strong authentication of the remote user?</p></li><li>Is data subject to interception between the remote user and the
+machine?</p><p></li><li>What capabilities does the remote user have? Can a remote user reboot
+the machine or transfer files from it?</p><p></li></ul>
+A remote user will have the same access to your network as does the
+computer he or she is attached to. You can therefore make a trade-off
+between the security of the protocol you are using and the capability
+of the machine people are accessing with it; the more secure the
+protocol is, the more access you can grant the machine. However, many
+of these programs use a single reusable password and an unencrypted
+connection to give a remote user complete access to the computer;
+allowing this to pass through your firewall is effectively equivalent
+to simply attaching the computer to the Internet and is extremely
+unlikely to be an acceptable option.</p><p>
+
+
+
+
+
+<a name="INDEX-1786" />Remote control programs
+are one of the most common security problems in Microsoft-based
+networks. It doesn't matter how good the security of a machine
+is if you put an unprotected remote control program on it. At best, a
+remote control program will give a remote user the complete control
+that a local user has; at worst, it may give a remote user
+administrative control with more capabilities than a normal local
+user. This is much more dangerous than any other service you are
+likely to run and should be protected appropriately.</p><p>
+
+
+
+
+
+You should closely evaluate the security claims made by these
+programs. In particular, many of them provide improved security
+either on authentication, or on the data stream, but not both. This
+is basically pointless; an attacker who can authenticate
+doesn't need to eavesdrop, and vice versa. In addition, some of
+their "security enhancements" on authentication are
+extremely minimal.</p><p>
+
+
+
+
+
+For instance, many packages claim that using normal Windows domain
+authentication is a security improvement. It certainly makes
+administration more convenient and may slightly enhance security
+(since an administrator can enforce the use of relatively good
+passwords), but it is not a major advance in network security over
+having an equivalent-length local password. It may be no advance at
+all, since the domain authentication is going to occur on the local
+area network, between the computer and its domain controller; the
+password and username information has to get to the computer via
+whatever protocol the remote access program is using, which may be
+reusable or even unencrypted.</p><p>
+
+
+
+
+
+Note that even if passwords are passed across the network in a
+nonreusable form, they may be quite simply guessable -- if you
+elect to allow this sort of access, you should be sure you are using
+strong passwords and that the program logs failures so that you can
+detect password-guessing attacks.<a name="INDEX-1787" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.3. Independent Computing Architecture (ICA) </h3>
+
+
+
+
+
+<a name="INDEX-1788" /> <a name="INDEX-1789" />ICA<a href="#FOOTNOTE-91">[91]</a> is a
+protocol developed by Citrix for remote display of Windows clients.
+It is the most widespread of the Windows remote access protocols, and
+clients are available for a number of platforms, including Unix and
+acintoshes. There is also a Java-based client that will allow any
+Java device (for instance, most web browsers) to be an ICA display.
+ICA is available over a wide range of lower-level protocols, not just
+TCP/IP (this is one of its advantages over competing protocols). We
+will discuss only the TCP/IP implementation in this section.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-91" />[91]This protocol
+is also known as Intelligent Console Architecture and Intelligent
+Console Access; Citrix appears to have repeatedly changed opinions
+about the best way to expand the acronym.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+ICA uses an obscured connection for user authentication. Although
+passwords are disguised, they are not strongly protected; programs
+that read passwords from an ICA authentication negotiation are
+readily available. A variant called Secure ICA actually uses
+encryption for authentication and is capable of using an encrypted
+connection for the data stream as well. It uses RC5 encryption with
+Diffie-Hellman key exchange, using a 128-bit key for the
+authentication. (For more information about encryption algorithms and
+the implications of key length, see <a href="appc_01.html">Appendix C, "Cryptography"</a>.)
+Due to previous U.S. export restrictions, non-U.S. versions use a
+weaker 40-bit key on the data stream; U.S. versions may use 40-bit,
+56-bit, or 128-bit encryption on the data stream. (Changes in the
+U.S. export restrictions will probably remove the distinction from
+future versions.) Packets from the server to the client consists of
+partial screen updates that are useful only if you have an entire
+data stream. Data going from the client to the server includes
+keystroke information that it would be relatively easy to reassemble
+into a usable form. However, doing so would still require an amount
+of time and effort to break the 40-bit key U.S. export version and
+likely be worthwhile only to a determined or highly motivated
+attacker.</p><p>
+
+
+
+
+
+any security issues of remote access are outside the control of the
+protocol itself. For instance, although ICA uses an encrypted
+connection for authentication, it is up to the particular server
+software to do the authentication (and therefore to control how long
+passwords can or must be) and to do any authentication logging.</p><p>
+
+
+
+
+
+<a name="ch18-32-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.3.1. Packet filtering characteristics of ICA</h3>
+
+
+
+
+
+There are two ICA protocols: one for client connections and one for
+browsing (looking for ICA servers). In TCP/IP, client connections are
+based at TCP port 1494; browsing is done via UDP broadcast to port
+1604. Browsing is not critical to ICA functioning. If it is disabled,
+users will have to type machine names, instead of selecting them from
+a list (the list, when available, sometimes provides useful
+information about the relative load on the servers).</p><p>
+
+
+
+
+
+<a name="ch18-33-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1494</p><p></td>
+<td>
+<a href="#FOOTNOTE-92">[92]</a></p><p>
+</td>
+<td>
+Incoming ICA connection, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1494</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming ICA connection, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int bcast<a href="#FOOTNOTE-93">[93]</a></p><p>
+</td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1604</p><p></td>
+<td>
+<a href="#FOOTNOTE-94">[94]</a></p><p>
+</td>
+<td>
+ICA browse request, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+1604</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-94">[94]</a></td>
+<td>
+ICA browse response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+1494</p><p></td>
+<td><a href="#FOOTNOTE-92">[92]</a></td>
+<td>
+Outgoing ICA connection, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1494</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing ICA connection, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext bcast<a href="#FOOTNOTE-93">[93]</a></p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1024</p><p></td>
+<td>
+1604</p><p></td>
+<td><a href="#FOOTNOTE-94">[94]</a></td>
+<td>
+ICA browse request, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+1604</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-94">[94]</a></td>
+<td>
+ICA browse response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-92" />[92]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-93" />[93]It is extremely unlikely that packets of
+this type will pass through intermediate routers, even if you choose
+to allow them through your routers.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-94" />[94]UDP has no ACK equivalent.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-34-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.3.2. Proxying characteristics of ICA</h3>
+
+
+
+
+
+As of this writing, Citrix did not know of any available dedicated
+proxies for ICA. However, the important part of ICA is a
+straightforward TCP connection, which can easily be proxied by any
+generic proxy system. Many commercial proxy systems provide
+instructions for proxying ICA.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-35-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.3.3. Network address translation characteristics of ICA</h3>
+
+
+
+
+
+ICA does not use embedded IP addresses and will work transparently
+through a network address translation system. However, the browsing
+system will attempt to communicate IP addresses. On recent clients
+and servers, you should be able to configure a static mapping,
+configure the server to know about the mapping as an alternate
+address, and configure the client to use the alternate address for
+connections.<a name="INDEX-1790" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-36-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.4. Microsoft Terminal Server and Terminal Services</h3>
+
+
+
+
+
+<a name="INDEX-1791" />Microsoft's Terminal Server is a
+separate edition of Windows NT 4 but is simply a service in Windows
+2000. This reflects changes in the underlying operating system to
+support multi-user operation. These changes were partly developed by
+Citrix but are now part of Microsoft's operating system
+development (this history is reflected in frequent rumors about
+Citrix, Microsoft, Terminal Server, and ICA, many of them incorrect).</p><p>
+
+
+
+
+
+<a name="INDEX-1792" /> <a name="INDEX-1793" />By default, Terminal
+Services uses a Microsoft-developed protocol called the Remote
+Desktop Protocol (RDP), which is an extension of the International
+Telecommunications Union T.120 standard. (T.120 is discussed further
+in <a href="ch19_01.html">Chapter 19, "Real-Time Conferencing Services"</a>.) It is also possible to buy ICA
+support from Citrix and add it to Terminal Server. ICA support
+provides some useful features that RDP does not; most notably, RDP
+support is available only on Windows platforms, while ICA is
+available for a wide range of operating systems.</p><p>
+
+
+
+
+
+<a name="INDEX-1794" />RDP
+provides three levels of encryption: low, medium, and high.
+"Low" encryption encrypts only data sent from the client
+to the server, using 40-bit RC4. This includes the authentication
+data. "Medium" encryption encrypts all data but uses
+40-bit RC4; "high" encryption encrypts all data using
+128-bit RC4.</p><p>
+
+
+
+
+
+<a name="ch18-37-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.4.1. Packet filtering characteristics of RDP</h3>
+
+
+
+
+
+RDP uses a straightforward TCP connection on port 3389.</p><p>
+
+
+
+
+
+<a name="ch18-38-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+3389</p><p></td>
+<td>
+<a href="#FOOTNOTE-95">[95]</a></p><p>
+</td>
+<td>
+Incoming RDP connection, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+3389</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Incoming RDP connection, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+3389</p><p></td>
+<td><a href="#FOOTNOTE-95">[95]</a></td>
+<td>
+Outgoing RDP connection, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+3389</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Outgoing RDP connection, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<a name="FOOTNOTE-95" />[95]ACK is not set on the first packet of this type
+(establishing connection) but will be set on the rest.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-39-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.4.2. Proxying characteristics of RDP</h3>
+
+
+
+
+
+As of this writing, we do not know of any available dedicated proxies
+for RDP. However, RDP uses a straightforward TCP connection, which
+can easily be proxied by any generic proxy system.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-40-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.4.3. Network address translation characteristics of RDP</h3>
+
+
+
+
+
+RDP does not use embedded IP addresses and will work transparently
+through a network address translation system.<a name="INDEX-1795" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-41-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.5. BO2K</h3>
+
+
+
+
+
+<a name="INDEX-1796" />BO2K is a controversial remote access
+tool. In its favor, it's a freely available tool with a variety
+of available extensions, including a wide range of encryption and
+communications methods that allow it to work securely across the
+Internet. However, it's written and distributed by people who
+break into computers and is often installed by means of a Trojan
+horse. It is designed to be concealed from the local user, even
+somebody with administrator privileges on the local machine (this is
+an advantage both for attackers trying to hide from system
+administrators and for system administrators trying to hide from
+attackers).</p><p>
+
+
+
+
+
+Because BO2K provides a system for adding extensions, it's hard
+to make absolute statements about its capabilities; people add new
+capabilities frequently.</p><p>
+
+
+
+
+
+BO2K provides the remote user with full Administrator access to the
+machine, and it can't be configured to provide more limited
+access. This makes it a dubious choice as a general-purpose remote
+access tool for users. On the other hand, it does provide some
+authentication of the remote user. The BO2K server, which runs on the
+machine to be controlled, has an embedded encryption password, and
+you must know that password in order to be able to control it. The
+password is recoverable from the server if you have access to the
+server binary, so you should protect the server binary the same way
+you would protect other files that can provide attackers with
+Administrator access.</p><p>
+
+
+
+
+
+<a name="ch18-42-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.5.1. Packet filtering characteristics of BO2K</h3>
+
+
+
+
+
+BO2K supports UDP or TCP for communications, and a plug-in is
+available to support communication over ICMP. It can use any port
+number. By default, it tends to use UDP over port 31337, but this is
+extremely easy to reconfigure. In general, it's unwise to make
+any assumptions about what ports BO2K will use. If you are installing
+it for your own use, you can of course select whatever ports and
+protocols suit you.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-43-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.5.2. Proxying characteristics of BO2K</h3>
+
+
+
+
+
+As of this writing, there are no proxy-aware plug-ins for BO2K.
+Because the BO2K server runs on the machine to be controlled,
+connections are frequently made with the server inside the firewall
+and the client outside; this is a direction where proxy servers are
+not generally used.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch18-44-fm2xml" /><div class="sect3">
+<h3 class="sect3">18.3.5.3. Network address translation characteristics of BO2K</h3>
+
+
+
+
+
+BO2K does not use embedded IP addresses and should work through
+network address translation systems without problems. On the other
+hand, the server runs on the machine to be controlled. If that
+machine is on the inside of the network address translation system,
+you will need to set up a static translation for it. Transactions
+will be initiated from the client, and inbound traffic cannot set up
+a dynamic translation.<a name="INDEX-1797" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch18-45-fm2xml" /><div class="sect2">
+<h3 class="sect2">18.3.6. Summary of Recommendations for Windows Remote Access</h3>
+
+
+
+
+
+<ul><li>In general, these protocols are highly insecure. Allowing them to
+pass through your firewall effectively opens the machines running the
+servers to the Internet (and running them with a modem effectively
+opens the machine to anybody who happens to call the phone number).
+Consider using virtual private networking or dial-up networking as a
+remote access method instead (see <a href="ch20_01.html">Chapter 20, "Naming and Directory Services"</a>, for
+more information about these options).<a name="INDEX-1798" /><a name="INDEX-1799" /> <a name="INDEX-1800" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch18_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch19_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">18.2. Remote Command Execution</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">19. Real-Time Conferencing Services</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch18_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:37 GMT -->
+</html>

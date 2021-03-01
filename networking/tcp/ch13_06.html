@@ -1,0 +1,1136 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+<head><title>Checking Name Service  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch13_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">13.6. Checking Name Service </h2>
+
+<p>Name server <a name="INDEX-2920" />
+<a name="INDEX-2921" />
+<a name="INDEX-2922" />problems are indicated when the
+"unknown host" error message is returned by the
+user's application. Name server problems can usually be
+diagnosed with <tt class="literal">nslookup</tt> or <tt class="literal">dig</tt>.
+<tt class="literal">nslookup</tt> is discussed in detail in <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a>; <tt class="literal">dig</tt> is an alternative tool
+with similar functionality and is discussed in this chapter. Before
+looking at <tt class="literal">dig</tt>, let's take another look at
+<tt class="literal">nslookup</tt><a name="INDEX-2923" /> and see how it is used to troubleshoot
+name service.
+</p>
+
+<p>The three features of <tt class="literal">nslookup</tt> covered in <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a> are particularly important for troubleshooting
+remote name server problems. These features are its ability to:
+</p>
+
+<ul><li>
+<p>Locate the authoritative servers for the remote domain using the NS
+query
+</p>
+</li><li>
+<p>Obtain all records about the remote host using the ANY query</p>
+</li><li>
+<p>Browse all entries in the remote zone using
+<tt class="literal">nslookup</tt>'s <tt class="literal">ls</tt> and
+<tt class="literal">view</tt> commands
+</p>
+</li></ul>
+<p>When troubleshooting a remote server problem, directly query the
+authoritative servers returned by the NS query. Don't rely on
+information returned by non-authoritative servers. If the problems
+that have been reported are intermittent, query all of the
+authoritative servers in turn and compare their answers. Intermittent
+name server problems are sometimes caused by the remote servers
+returning different answers to the same query.
+</p>
+
+<p>The ANY query returns all records about a host, thus giving the
+broadest range of troubleshooting information. Simply knowing what
+information is (and isn't) available can solve a lot of
+problems. For example, if the query returns an MX record but no A
+record, it is easy to understand why the user couldn't
+<tt class="literal">telnet</tt> to that host! Many hosts are accessible to
+mail that are not accessible by other network services. In this case,
+the user is confused and is trying to use the remote host in an
+inappropriate manner.
+</p>
+
+<p>If you are unable to locate any information about the hostname that
+the user gave you, perhaps the hostname is incorrect. Given that the
+hostname you have is wrong, looking for the correct name is like
+trying to find a needle in a haystack. However,
+<tt class="literal">nslookup</tt> can help. Use
+<tt class="literal">nslookup</tt>'s <tt class="literal">ls</tt> command to
+dump the remote zone file, and redirect the listing to a file. Then
+use <tt class="literal">nslookup</tt>'s <tt class="literal">view</tt>
+command to browse through the file, looking for names similar to the
+one the user supplied. Many problems are caused by a mistaken
+hostname.
+</p>
+
+<p>All of the <tt class="literal">nslookup</tt> features and commands
+mentioned here are used in <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a>. However,
+some examples using these commands to solve real name server problems
+will be helpful. The three examples that follow are based on actual
+trouble reports.<a href="#FOOTNOTE-150">[150]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-150" /><p>[150]The host and server names are
+fictitious, but the problems were real.</p> </blockquote>
+
+<a name="tcp3-CHP-13-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">13.6.1. Some Systems Work, Others Don't </h3>
+
+<p>A user reported <a name="INDEX-2924" />
+<a name="INDEX-2925" />
+<a name="INDEX-2926" />that she could resolve a certain
+hostname from her workstation, but could not resolve the same
+hostname from the central system. However, the central system could
+resolve other hostnames. We ran several tests and found that we could
+resolve the hostname on some systems and not on others. There seemed
+to be no predictable pattern to the failure. So we used
+<tt class="literal">nslookup</tt> to check the remote servers:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">nslookup</b> 
+Default Server:  crab.wrotethebook.com 
+Address:  172.16.12.1 
+ 
+&gt; <b class="emphasis-bold">set type=NS</b> 
+&gt; <b class="emphasis-bold">foo.edu.</b> 
+Server:  crab.wrotethebook.com 
+Address:  172.16.12.1 
+ 
+foo.edu        nameserver = gerbil.foo.edu 
+foo.edu        nameserver = red.big.com 
+foo.edu        nameserver = shrew.foo.edu 
+gerbil.foo.edu   inet address = 198.97.99.2 
+red.big.com   inet address = 184.6.16.2 
+shrew.foo.edu    inet address = 198.97.99.1 
+&gt; <b class="emphasis-bold">set type=ANY</b> 
+&gt; <b class="emphasis-bold">server gerbil.foo.edu</b> 
+Default Server:  gerbil.foo.edu 
+Address:  198.97.99.2 
+ 
+&gt; <b class="emphasis-bold">hamster.foo.edu</b> 
+Server:  gerbil.foo.edu 
+Address:  198.97.99.2 
+ 
+hamster.foo.edu        inet address = 198.97.99.8 
+&gt; <b class="emphasis-bold">server red.big.com</b> 
+Default Server:  red.big.com 
+Address:  184.6.16.2 
+&gt; <b class="emphasis-bold">hamster.foo.edu</b> 
+Server:  red.big.com 
+Address:  184.6.16.2 
+ *** red.big.com can't find hamster.foo.edu: Non-existent domain</pre></blockquote>
+
+<p>This sample <tt class="literal">nslookup</tt> session contains several
+steps. The first step is to locate the authoritative servers for the
+hostname in question (<em class="emphasis">hamster.foo.edu</em>). We set
+the query type to NS to get the name server records, and query for
+the domain (<em class="emphasis">foo.edu</em>) in which the hostname is
+found. This returns three names of authoritative servers:
+<em class="emphasis">gerbil.foo.edu</em>,
+<em class="emphasis">red.big.com</em>, and
+<em class="emphasis">shrew.foo.edu</em>.
+</p>
+
+<p>Next, we set the query type to ANY to look for any records related to
+the hostname in question. Then we set the server to the first server
+in the list, <em class="emphasis">gerbil.foo.edu</em>, and query for
+<em class="emphasis">hamster.foo.edu</em>. This returns an address record.
+So server <em class="emphasis">gerbil.foo.edu</em> works fine. We repeat
+the test using <em class="emphasis">red.big.com</em> as the server, and it
+fails. No records are returned.
+</p>
+
+<p>The next step is to get SOA records from each server and see if they
+are the same:
+</p>
+
+<blockquote><pre class="code">&gt; <b class="emphasis-bold">set type=SOA</b> 
+&gt; <b class="emphasis-bold">foo.edu.</b> 
+Server:  red.big.com 
+Address:  184.6.16.2 
+ 
+foo.edu        origin = gerbil.foo.edu 
+   mail addr = amanda.gerbil.foo.edu 
+   serial=10164, refresh=43200, retry=3600, expire=3600000, 
+   min=2592000 
+&gt; <b class="emphasis-bold">server gerbil.foo.edu</b> 
+Default Server:  gerbil.foo.edu 
+Address:  198.97.99.2 
+ 
+&gt; <b class="emphasis-bold">foo.edu.</b> 
+Server:  gerbil.foo.edu 
+Address:  198.97.99.2 
+ 
+foo.edu        origin = gerbil.foo.edu 
+   mail addr = amanda.gerbil.foo.edu 
+   serial=10164, refresh=43200, retry=3600, expire=3600000, 
+   min=2592000 
+ &gt; <b class="emphasis-bold">exit</b></pre></blockquote>
+
+<p>If the SOA records have different serial numbers, perhaps the zone
+file, and therefore the hostname, has not yet been downloaded to the
+slave server. If the serial numbers are the same and the data is
+different, as in this case, there is a definite problem. Contact the
+remote domain administrator and notify her of the problem. The
+administrator's mailing address is shown in the "mail
+addr" field of the SOA record. In our example, we would send
+mail to <em class="emphasis">amanda@gerbil.foo.edu</em> reporting the
+problem.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">13.6.2. The Data Is Here and the Server Can't Find It! </h3>
+
+<p>This problem <a name="INDEX-2927" />
+<a name="INDEX-2928" />
+<a name="INDEX-2929" />was
+reported by the administrator of one of our slave name servers. The
+administrator reported that his server could not resolve a certain
+hostname in a domain for which his server was a slave server. The
+master server was, however, able to resolve the name. The
+administrator dumped his cache (more on dumping the server cache in
+the next section), and he could see in the dump that his server had
+the correct entry for the host. But his server still would not
+resolve that hostname to an IP address!
+</p>
+
+<p>The problem was replicated on several other slave servers. The master
+server would resolve the name; the slave servers wouldn't. All
+servers had the same SOA serial number, and a dump of the cache on
+each server showed that they all had the correct address records for
+the hostname in question. So why wouldn't they resolve the
+hostname to an address?
+</p>
+
+<p>Visualizing the difference between the way master and slave servers
+load their data made us suspicious of the zone file transfer. Master
+servers load the data directly from local disk files. Slave servers
+transfer the data from the master server via a zone file transfer.
+Perhaps the <a name="INDEX-2930" />zone
+files were getting corrupted. We displayed the zone file on one of
+the slave servers, and it showed the following data:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">cat /usr/etc/events.wrotethebook.com.hosts</b> 
+PCpma      IN   A       172.16.64.159 
+           IN   HINFO   "pc" "n3/800eventsnutscom" 
+PCrkc      IN   A       172.16.64.155 
+           IN   HINFO   "pc" "n3/800eventsnutscom" 
+PCafc      IN   A       172.16.64.189 
+           IN   HINFO   "pc" "n3/800eventsnutscom" 
+accu       IN   A       172.16.65.27 
+cmgds1     IN   A       172.16.130.40 
+cmg        IN   A       172.16.130.30 
+PCgns      IN   A       172.16.64.167 
+           IN   HINFO   "pc" "(3/800eventsnutscom" 
+gw         IN   A       172.16.65.254 
+zephyr     IN   A       172.16.64.188 
+           IN   HINFO   "Sun" "sparcstation" 
+ejw        IN   A       172.16.65.17 
+PCecp      IN   A       172.16.64.193
+           IN   HINFO   "pc" "n Lsparcstationstcom"</pre></blockquote>
+
+<p>Notice the odd display in the last field of the HINFO statement for
+each PC.<a href="#FOOTNOTE-151">[151]</a></p><blockquote class="footnote"> <a name="FOOTNOTE-151" /><p>[151]See <a href="appc_01.html">Appendix C, "A named Reference"</a> for a
+detailed description of the HINFO statement.</p> </blockquote> 
+
+<p>This
+data might have been corrupted in the transfer or it might be bad on
+the master server. We used <tt class="literal">nslookup</tt> to check that:
+</p>
+
+<blockquote><pre class="code"><b class="emphasis-bold">% nslookup</b> 
+Default Server:  crab.wrotethebook.com 
+Address:  172.16.12.1 
+ 
+&gt; <b class="emphasis-bold">server 24seven.events.wrotethebook.com</b> 
+Default Server:  24seven.events.wrotethebook.com 
+Address:  172.16.6.1 
+ 
+&gt; <b class="emphasis-bold">set query=HINFO</b> 
+&gt; <b class="emphasis-bold">PCwlg.events.wrotethebook.com</b> 
+Server:  24seven.events.wrotethebook.com 
+Address:  172.16.6.1 
+ 
+PCwlg.events.wrotethebook.com     CPU=pc  OS=ov 
+packet size error (0xf7fff590 != 0xf7fff528)
+&gt; <b class="emphasis-bold">exit</b></pre></blockquote>
+
+<p>In this <tt class="literal">nslookup</tt> example, we set the server to
+<em class="emphasis">24seven.events.wrotethebook.com</em>, which is the
+master server for <em class="emphasis">events.wrotethebook.com</em>. Next
+we queried for the HINFO record for one of the hosts that appeared to
+have a corrupted record. The "packet size error" message
+clearly indicates that <tt class="literal">nslookup</tt> was even having
+trouble retrieving the HINFO record directly from the master server.
+We contacted the administrator of the master server and told him
+about the problem, pointing out the records that appeared to be in
+error. He discovered that he had forgotten to put an operating system
+entry on some of the HINFO records. He corrected this, and it fixed
+<a name="INDEX-2931" />the problem.
+</p>
+
+</div>
+<a name="tcp3-CHP-13-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">13.6.3. Cache Corruption </h3>
+
+<p>The previous problem <a name="INDEX-2932" />
+<a name="INDEX-2933" />
+<a name="INDEX-2934" />was
+<a name="INDEX-2935" />caused by the name server
+cache being corrupted by bad data. Cache corruption can occur even if
+your system is not a slave server. All servers cache answers. If
+those answers are corrupted, entries in the cache may become
+corrupted. Dumping the cache can help diagnose these types of
+problems.
+</p>
+
+<p>For example, a user reported intermittent name server failures. She
+had no trouble with any hostnames within the local domain or with
+some names outside the local domain, but names in several different
+remote domains would not resolve. <tt class="literal">nslookup</tt> tests
+produced no solid clues, so the name server cache was dumped and
+examined for problems. The root server entries were corrupted, so
+<tt class="literal">named</tt> was reloaded to clear the cache and reread
+the <em class="emphasis">named.ca</em> file. Here's how it was done.
+</p>
+
+<p>The <tt class="literal">ndc</tt>
+<tt class="literal">dumpdb</tt><a name="INDEX-2936" /> command or the SIGINT signal causes
+<tt class="literal">named</tt> to dump the name server cache to the file
+<em class="emphasis">/var/tmp/named_dump.db</em>. The following example
+uses the signal:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">kill -INT 'cat /etc/named.pid'</b></pre></blockquote>
+
+<p>The process ID of <tt class="literal">named</tt> can be obtained from
+<em class="emphasis">/etc/named.pid</em>, as in the example above, because
+<tt class="literal">named</tt> writes its process ID in that file during
+startup.<a href="#FOOTNOTE-152">[152]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-152" /><p>[152]On our Linux system the process ID is
+written to <em class="emphasis">/var/run/named.pid</em>.</p>
+</blockquote>
+
+<p>Once <tt class="literal">named</tt> writes its cache to the file, we can
+examine the file to see if the names and addresses servers are
+correct. The <em class="emphasis">named_dump.db</em> file is composed of
+three sections: the zone table section, the Cache &amp; Data section,
+and the Hints section.
+</p>
+
+<a name="tcp3-CHP-13-SECT-6.3.1" /><div class="sect3">
+<h3 class="sect3">13.6.3.1. The zone table section</h3>
+
+<p>The first section of the <a name="INDEX-2937" />
+<a name="INDEX-2938" />
+<a name="INDEX-2939" />dump
+file is the zone table, which shows the zones loaded when the server
+started. The zone table from the master server for zones
+<em class="emphasis">wrotethebook.com</em> and
+<em class="emphasis">16.172.in-addr.arpa</em> would show the following:
+</p>
+
+<blockquote><pre class="code">; Dumped at Tue Jul 17 16:08:18 2001
+;; ++zone table++
+; . (type 6, class 0, source Nil)
+;       time=0, lastupdate=0, serial=0,
+;       refresh=0, retry=0, expire=0, minimum=0
+;       ftime=0, xaddrcnt=0, state=0000, pid=0
+; . (type 3, class 1, source named.ca)
+;       time=0, lastupdate=965723221, serial=0,
+;       refresh=0, retry=0, expire=0, minimum=4294967295
+;       ftime=965723221, xaddrcnt=0, state=0040, pid=0
+; 0.0.127.in-addr.arpa (type 1, class 1, source named.local)
+;       time=0, lastupdate=0, serial=1997022700,
+;       refresh=0, retry=14400, expire=3600000, minimum=86400
+;       ftime=965723221, xaddrcnt=0, state=0041, pid=0
+; wrotethebook.com (type 1, class 1, source wrotethebook.com.hosts)
+;       time=0, lastupdate=0, serial=2001070501,
+;       refresh=0, retry=1800, expire=604800, minimum=900
+;       ftime=982967703, xaddrcnt=0, state=0041, pid=0
+; 16.172.in-addr.arpa (type 1, class 1, source 172.16.rev)
+;       time=0, lastupdate=0, serial=2001071602,
+;       refresh=0, retry=1800, expire=604800, minimum=900
+;       ftime=982968091, xaddrcnt=0, state=0041, pid=0
+;; --zone table--</pre></blockquote>
+
+<p>The section begins by displaying the date and time that the dump was
+taken. Labels at the start and end of the section delimit the zone
+table. As indicated by the fact that each line begins with a
+semicolon, all of these lines are comments meant to provide
+information to the system administrator. None of these are real
+database entries used by DNS. From the example above, you can tell
+that this server has a <tt class="literal">zone</tt> statement in its
+<em class="emphasis">named.conf</em> file for the following domains:
+</p>
+
+<dl>
+<dt><i>. (dot)</i></dt>
+<dd>
+<p>The root domain that was loaded from a source file called
+<em class="emphasis">named.ca</em>. This is the hints file described in
+<a href="ch08_01.html">Chapter 8, "Configuring DNS"</a>.
+</p>
+</dd>
+
+
+<dt><i>0.0.127.in-addr.arpa</i></dt>
+<dd>
+<p>The loopback domain that was loaded from the source file
+<em class="emphasis">named.local</em>.
+</p>
+</dd>
+
+
+<dt><i>wrotethebook.com</i></dt>
+<dd>
+<p>The <em class="emphasis">wrotethebook.com</em> domain that was loaded from
+the <em class="emphasis">wrotethebook.com.hosts</em> source file.
+</p>
+</dd>
+
+
+<dt><i>16.172.in-addr.arpa</i></dt>
+<dd>
+<p>The reverse domain <em class="emphasis">16.172.in-addr.arpa</em> that was
+loaded from the <em class="emphasis">172.16.rev</em> source file.
+</p>
+</dd>
+
+</dl>
+
+<p>The values from the SOA record of each zone are also printed. In the
+sample shown above, every zone except the root (.) has an SOA record.
+</p>
+
+<p>The zone table section identifies every zone for which the server has
+authority. It tells you where the server obtained the information
+about the zone, and it tells you what defaults are set for the zone
+by the SOA record. If a zone is missing or is loading from the wrong
+source, correct the <tt class="literal">zone</tt> statement in the
+<em class="emphasis">named.conf</em> file.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-13-SECT-6.3.2" /><div class="sect3">
+<h3 class="sect3">13.6.3.2. The Cache &amp; Data section</h3>
+
+<p>The second <a name="INDEX-2940" /> <a name="INDEX-2941" />section of the dump file is by far the
+longest. This is the section that contains all of the DNS information
+known to the server. Because of the section's length, the Cache
+&amp; Data information shown below is just an excerpt:
+</p>
+
+<blockquote><pre class="code">; Note: Cr=(auth,answer,addtnl,cache) tag only shown for non-auth RR's
+; Note: NT=milliseconds for any A RR which we've used as a nameserver
+; --- Cache &amp; Data ---
+$ORIGIN .
+.    513482    IN    NS    H.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    C.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    G.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    F.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    B.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    J.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    K.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    L.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    M.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    I.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    E.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    D.ROOT-SERVERS.NET.    ;Cr=auth
+    513482    IN    NS    A.ROOT-SERVERS.NET.    ;Cr=auth
+<em class="emphasis">... Many Lines Deleted ...</em>
+
+$ORIGIN ROOT-SERVERS.NET.
+K    599882    IN    A    193.0.14.129    ;NT=9 Cr=answer
+A    599882    IN    A    198.41.0.4    ;NT=10 Cr=answer
+L    599882    IN    A    198.32.64.12    ;NT=5 Cr=answer
+    599882    IN    A    202.12.27.33    ;NT=15 Cr=answer
+B    599882    IN    A    128.9.0.107    ;NT=5 Cr=answer
+C    599882    IN    A    192.33.4.12    ;NT=165 Cr=answer
+D    599882    IN    A    128.8.10.90    ;NT=12 Cr=answer
+E    599882    IN    A    192.203.230.10    ;NT=6 Cr=answer
+F    599882    IN    A    192.5.5.241    ;NT=1021 Cr=answer
+G    599882    IN    A    192.112.36.4 ;NT=1023 Cr=answer
+H    599882    IN    A    128.63.2.53    ;NT=6 Cr=answer
+I    599882    IN    A    192.36.148.17    ;NT=7 Cr=answer
+J    599882    IN    A    198.41.0.10    ;NT=6 Cr=answer
+<em class="emphasis">... Many Lines Deleted ...</em>
+
+$ORIGIN com.
+foobirds 86400 IN RP admin.foobirds.org. hotline.foobirds.org. ;Cl=2
+    86400    IN    MX    10 wren.foobirds.org.    ;Cl=2
+    86400    IN    MX    20 parrot.foobirds.org.    ;Cl=2
+    86400    IN    NS    wren.foobirds.org.    ;Cl=2
+    86400    IN    NS    parrot.foobirds.org.    ;Cl=2
+    86400    IN    SOA    wren.foobirds.org. admin.wren.foobirds.org. (
+             2000020501 21600 1800 604800 900 )    ;Cl=2
+$ORIGIN foobirds.org.
+ducks    86400    IN    NS    ruddy.ducks.foobirds.org.    ;Cl=2
+         86400    IN    NS    wren.foobirds.org.    ;Cl=2
+         86400    IN    NS    bear.mammals.org.    ;Cl=2
+news     86400    IN    CNAME    parrot.foobirds.org.    ;Cl=2
+robin    86400    IN    RP    admin.foobirds.org. hotline.foobirds.org.    ;Cl=2
+         86400    IN    MX    5 wren.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.2    ;Cl=2
+puffin   86400    IN    RP    admin.foobirds.org. hotline.foobirds.org.    ;Cl=2
+         86400    IN    MX    5 wren.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.17    ;Cl=2
+wren     86400    IN    RP    admin.foobirds.org. hotline.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.1    ;Cl=2
+parrot   86400    IN    RP    logan.parrot.foobirds.org. logan.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.3    ;Cl=2
+logan    86400    IN    TXT    "Logan Little (301)555-2021"    ;Cl=2
+crow     86400    IN    RP    doris.crow.foobirds.org.foobirds.org. crowRP.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.5    ;Cl=2
+localhost   86400    IN    A    127.0.0.1    ;Cl=2
+terns    86400    IN    NS    sooty.terns.foobirds.org.    ;Cl=2
+         86400    IN    NS    arctic.terns.foobirds.org.    ;Cl=2
+www      86400    IN    CNAME    wren.foobirds.org.    ;Cl=2
+hotline  86400    IN    TXT    "Support hotline (301)555-2000"    ;Cl=2
+bob      86400    IN    CNAME    robin.foobirds.org.    ;Cl=2
+redbreast    86400    IN    CNAME    robin.foobirds.org.    ;Cl=2
+hawkRP   86400    IN    TXT    "Clark Smart (301)555-2099"    ;Cl=2
+kestrel   86400    IN    RP    clark.foobirds.org.foobirds.org. hawkRP.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.20    ;Cl=2
+crowRP   86400    IN    TXT    "Doris Nathan (301)555-2078"    ;Cl=2
+kestral  86400    IN    CNAME    kestrel.foobirds.org.    ;Cl=2
+hawk     86400    IN    RP    clark.foobirds.org.foobirds.org. hawkRP.foobirds.org.    ;Cl=2
+         86400    IN    A    172.16.5.4    ;Cl=2
+foobirds-net    86400    IN    PTR    0.0.16.172.in-addr.arpa.    ;Cl=2
+$ORIGIN terns.foobirds.org.
+arctic   86400    IN    A    172.16.30.251    ;Cl=2
+sooty    86400    IN    A    172.16.30.250    ;Cl=2
+$ORIGIN 172.in-addr.arpa.
+16       86400    IN    NS    wren.foobirds.org.    ;Cl=4
+         86400    IN    SOA    wren.foobirds.org. admin.wren.foobirds.org. (
+        2000021602 21600 1800 604800 900 )    ;Cl=4
+$ORIGIN 6.16.172.in-addr.arpa.
+1    86400    IN    PTR    arctic.terns.foobirds.org.    ;Cl=4
+$ORIGIN 12.16.172.in-addr.arpa.
+3    86400    IN    PTR    wren.foobirds.org.    ;Cl=4
+$ORIGIN 5.16.172.in-addr.arpa.
+20   86400    IN    PTR    kestrel.foobirds.org.    ;Cl=4
+4    86400    IN    PTR    hawk.foobirds.org.    ;Cl=4
+2    86400    IN    PTR    robin.foobirds.org.    ;Cl=4
+17   86400    IN    PTR    puffin.foobirds.org.    ;Cl=4
+5    86400    IN    PTR    crow.foobirds.org.    ;Cl=4
+3    86400    IN    PTR    parrot.foobirds.org.    ;Cl=4
+$ORIGIN 0.127.in-addr.arpa.
+0    86400    IN    NS    localhost.    ;Cl=5
+     86400    IN    SOA    localhost. root.localhost. (
+        1997022700 28800 14400 3600000 86400 )    ;Cl=5
+$ORIGIN 0.0.127.in-addr.arpa.
+1    86400    IN    PTR    localhost.    ;Cl=5</pre></blockquote>
+
+<p>The example is long even though the dump was taken shortly after the
+server started, and many lines have been deleted from the listing.
+The bulk of the data shown is information loaded from the local zone
+files, but a dump file also contains a good deal of cached
+information. Large chunks of the cache are the result of information
+provided in the authority and additional sections of the query
+responses. At least as much data enters the cache in this manner as
+enters as a result of specific answers to queries. The large number
+of NS entries and the A records for those NS entries make this clear.
+</p>
+
+<p>The Cache &amp; Data section is segmented by $ORIGIN directives. All
+of the other lines in this section are clearly identifiable DNS
+resource records. But some additional information is appended to the
+end of each record as a comment. Three comments that the server
+commonly adds to a record include the following:
+</p>
+
+<dl>
+<dt><b><tt class="literal">Cl</tt></b></dt>
+<dd>
+<p>Identifies the number of fields in the current origin. Therefore,
+when the origin is <em class="emphasis">0.0.127.in-addr.arpa</em>, the Cl
+value is 5, and when the origin is
+<em class="emphasis">wrotethebook.com</em>, the Cl value is 2. The root
+(.) is assigned a Cl value of 0.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">Nt</tt></b></dt>
+<dd>
+<p>The round trip time for queries to the specified name server. This
+comment is added only to the address records of name servers. The
+round trip time helps <tt class="literal">named</tt> select the best server
+for a given query.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">Cr</tt></b></dt>
+<dd>
+<p>The "credibility" tag identifies the authority level of
+the source of cached information. BIND has three authority levels:
+</p>
+
+<dl>
+<dt><b><tt class="literal">auth</tt></b></dt>
+<dd>
+<p>An authoritative answer.</p>
+</dd>
+
+
+<dt><b><tt class="literal">answer</tt></b></dt>
+<dd>
+<p>An answer from a non-authoritative source.</p>
+</dd>
+
+
+<dt><b><tt class="literal">addtnl</tt></b></dt>
+<dd>
+<p>A record learned from the authority or additional section of a query
+response.
+</p>
+</dd>
+
+</dl>
+</dd>
+
+</dl>
+
+<p>The Cr value is used by <tt class="literal">named</tt> when a record is
+received that already exists in the name server's cache. If the
+record received has a higher credibility rating than the record in
+the cache, the new record replaces the cached record. If the new
+record has a lower credibility rating than the record in the cache,
+the cached record is retained. Of the Cr values,
+<tt class="literal">auth</tt> is the most credible and
+<tt class="literal">addtnl</tt> is the least credible.
+</p>
+
+<p>The comments at the end of a record are not the only comments that
+you might see in the Cache &amp; Data section of a dump file.
+Negative cached information also appears in the dump as a comment.
+There are no examples of this in our sample dump file, but if there
+were, you would see a normal resource record that starts with a
+semicolon. In other words, the negative cached information appears as
+a resource record that has been commented out of the file.
+Additionally, the tag NXDOMAIN is written near the end of the record.
+</p>
+
+<p>Examine the Cache &amp; Data section to discover if the data you
+entered in your zone file has been loaded as you expect. Also use
+this section to see if the information you have loaded from a remote
+server is what you expect. Local data can be corrected locally.
+Incorrect data from a remote server may require coordination with the
+administrator of a remote <a name="INDEX-2942" /> <a name="INDEX-2943" />domain.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-13-SECT-6.3.3" /><div class="sect3">
+<h3 class="sect3">13.6.3.3. The Hints section</h3>
+
+<p>The last <a name="INDEX-2944" />
+<a name="INDEX-2945" />section in the dump file is the Hints
+section. This section contains the list of root name servers loaded
+from the hints file. (Defining and using the hints file is discussed
+in <a href="ch08_01.html">Chapter 8, "Configuring DNS"</a>.) This hints file is used only when
+the name server starts. Once the server starts, one of the root
+servers is queried for an authoritative list of root servers. It is
+the authoritative list obtained from the root server that you see in
+the Cache &amp; Data section following the $ORIGIN . statement.
+</p>
+
+<p>The Hints section from our sample system is shown below. Notice that
+all of the name servers in the Hints section have an Nt number
+assigned. <tt class="literal">named</tt> queries each server to establish a
+round trip time to select the best root server to use.
+</p>
+
+<blockquote><pre class="code">; --- Hints ---
+$ORIGIN .
+.   3600000    IN    NS    A.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    B.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    C.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    D.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    E.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    F.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    G.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    H.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    I.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    J.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    K.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    L.ROOT-SERVERS.NET.    ;Cl=0
+    3600000    IN    NS    M.ROOT-SERVERS.NET.    ;Cl=0
+$ORIGIN ROOT-SERVERS.NET.
+K    3600000    IN    A    193.0.14.129    ;NT=2 Cl=0
+L    3600000    IN    A    198.32.64.12    ;NT=5 Cl=0
+A    3600000    IN    A    198.41.0.4      ;NT=6 Cl=0
+    3600000    IN    A    202.12.27.33    ;NT=10 Cl=0
+B    3600000    IN    A    128.9.0.107     ;NT=134 Cl=0
+C    3600000    IN    A    192.33.4.12     ;NT=8 Cl=0
+D    3600000    IN    A    128.8.10.90     ;NT=24 Cl=0
+E    3600000    IN    A    192.203.230.10  ;NT=2 Cl=0
+F    3600000    IN    A    192.5.5.241     ;NT=22 Cl=0
+G    3600000    IN    A    192.112.36.4    ;NT=2 Cl=0
+H    3600000    IN    A    128.63.2.53     ;NT=22 Cl=0
+I    3600000    IN    A    192.36.148.17   ;NT=2 Cl=0
+J    3600000    IN    A    198.41.0.10     ;Cl=0</pre></blockquote>
+
+<p>The purpose of dumping the DNS cache is to examine what data is
+stored internally by DNS and how it is stored. Examining the
+authoritative information that you provide to the server in the zone
+files will give you insight into how that data is being stored.
+Examining the other data in the cache shows you how your users use
+DNS. Learning how DNS is normally used can help identify when usage
+patterns change.
+</p>
+
+<p>If you see problems in the dump file, force <tt class="literal">named</tt>
+to reload its cache with the <tt class="literal">ndc reload</tt> command
+(on BIND 9, use <tt class="literal">rndc</tt> <tt class="literal">reload</tt>),
+or with the SIGHUP signal as shown below:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">kill -HUP 'cat /etc/named.pid'</b></pre></blockquote>
+
+<p>This clears the cache and reloads the valid root server entries from
+your <em class="emphasis">named.ca</em> file.
+</p>
+
+<p>If you know which system is corrupting your cache, instruct your
+system to ignore updates from the culprit by using a
+<tt class="literal">server</tt> statement in the
+<em class="emphasis">/etc/named.conf</em> file with the
+<tt class="literal">bogus</tt> option set to <tt class="literal">yes</tt>. The
+<tt class="literal">server</tt> statement lists the IP address of a name
+server. Setting <tt class="literal">bogus</tt> to <tt class="literal">yes</tt> in
+the <tt class="literal">server</tt> statement tells
+<tt class="literal">named</tt> that information from that server cannot be
+trusted. For example, the previous section described a problem where
+<em class="emphasis">24seven.events.wrotethebook.com</em> (172.16.16.1)
+was causing cache corruption with improperly formatted HINFO records.
+The following entry in the <em class="emphasis">named.conf</em> file would
+reject answers from
+<em class="emphasis">24seven.events.wrotethebook.com</em> and thus prevent
+the cache corruption:
+</p>
+
+<blockquote><pre class="code"> server 172.16.16.1 {
+    bogus yes;
+};</pre></blockquote>
+
+<p>Setting <tt class="literal">bogus</tt> to <tt class="literal">yes</tt> is only a
+temporary measure, designed to keep things running while the remote
+domain administrator has a chance to diagnose and repair the problem.
+Once the remote system is fixed, remove the <tt class="literal">server</tt>
+statement <a name="INDEX-2946" /> <a name="INDEX-2947" />from
+<em class="emphasis">named.conf</em>. 
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-13-SECT-6.4" /><div class="sect2">
+<h3 class="sect2">13.6.4. dig: An Alternative to nslookup </h3>
+
+<p>An <a name="INDEX-2948" /> <a name="INDEX-2949" /> <a name="INDEX-2950" />alternative to
+<tt class="literal">nslookup</tt> for making name service queries is
+<tt class="literal">dig</tt>. <tt class="literal">dig</tt> queries are usually
+entered as single-line commands, while <tt class="literal">nslookup</tt> is
+usually run as an interactive session. But the <tt class="literal">dig</tt>
+command performs essentially the same function as
+<tt class="literal">nslookup</tt>. Which you use is mostly a matter of
+personal choice. They both work well.
+</p>
+
+<p>As an example, we'll use <tt class="literal">dig</tt> to ask the root
+server <em class="emphasis">b.root-servers.net</em> for the NS records for
+the <em class="emphasis">mit.edu</em> domain. To do this, enter the
+following command:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">dig @b.root-servers.net mit.edu ns</b></pre></blockquote>
+
+<p>In this example, <em class="emphasis">@b.root-servers.net</em> is the
+server that is being queried. The server can be identified by name or
+IP address. If you're troubleshooting a problem in a remote
+domain, specify an authoritative server for that domain. In this
+example we're asking for the names of servers for a top-level
+domain (<em class="emphasis">mit.edu</em>), so we ask a root server.
+</p>
+
+<p>If you don't specify a server explicitly,
+<tt class="literal">dig</tt> uses the local name server or the name server
+defined in the <em class="emphasis">/etc/resolv.conf</em> file. (<a href="ch08_01.html">Chapter 8, "Configuring DNS"</a> describes <em class="emphasis">resolv.conf</em>.)
+Optionally, you can set the environment variable LOCALRES to the name
+of an alternate <em class="emphasis">resolv.conf</em> file. This alternate
+file will then be used in place of
+<em class="emphasis">/etc/resolv.conf</em> for <tt class="literal">dig</tt>
+queries. Setting the LOCALRES variable will affect only
+<tt class="literal">dig</tt>. Other programs that use name service will
+continue to use <em class="emphasis">/etc/resolv.conf</em>.
+</p>
+
+<p>The last item on our sample command line is <em class="emphasis">ns</em>.
+This is the query type. A <a name="INDEX-2951" />query type is a value that requests a
+specific type of DNS information. It is similar to the value used in
+<tt class="literal">nslookup</tt>'s <tt class="literal">set</tt>
+<tt class="literal">type</tt> command. <a href="ch13_06.html#tcp3-CHP-13-TABLE-1">Table 13-1</a> shows
+the possible <tt class="literal">dig</tt> query types and their meanings.
+</p>
+
+<a name="tcp3-CHP-13-TABLE-1" /><h4 class="objtitle">Table 13-1. dig query types </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Query type</p>
+</th>
+<th>
+<p>DNS record requested</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>a</p>
+</td>
+<td>
+<p>Address records</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>any</p>
+</td>
+<td>
+<p>Any type of record</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>mx</p>
+</td>
+<td>
+<p>Mail Exchange records</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>ns</p>
+</td>
+<td>
+<p>Name Server records</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>soa</p>
+</td>
+<td>
+<p>Start of Authority records</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>hinfo</p>
+</td>
+<td>
+<p>Host Info records</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>axfr</p>
+</td>
+<td>
+<p>All records in the zone</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>txt</p>
+</td>
+<td>
+<p>Text records</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>Notice that the function of <tt class="literal">nslookup</tt>'s
+<tt class="literal">ls</tt> command is performed by the
+<tt class="literal">dig</tt> query type <tt class="literal">axfr</tt>.
+</p>
+
+<p><tt class="literal">dig</tt> also has an option that is useful for locating
+a hostname when you have only an IP address. If you have only the
+<a name="INDEX-2952" />IP address of a host, you may want to
+find out the hostname because numeric addresses are more prone to
+typos. Having the hostname can reduce the user's problems. The
+<em class="emphasis">in-addr.arpa</em> domain converts addresses to
+hostnames, and <tt class="literal">dig</tt> provides a simple way to enter
+<em class="emphasis">in-addr.arpa</em> domain queries. Using the
+<tt class="literal">-x</tt> option, you can query for a number-to-name
+conversion without having to manually reverse the numbers and add
+"in-addr.arpa." For example, to query for the hostname of
+IP address 18.72.0.3, simply enter:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">dig -x 18.72.0.3</b> 
+ 
+; &lt;&lt;&gt;&gt; DiG 2.2 &lt;&lt;&gt;&gt; -x  
+;; res options: init recurs defnam dnsrch 
+;; got answer: 
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 4
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 3, ADDITIONAL: 3
+;; QUERY SECTION:
+;;      3.0.72.18.in-addr.arpa, type = ANY, class = IN
+
+;; ANSWER SECTION:
+3.0.72.18.in-addr.arpa.  6H IN PTR  BITSY.MIT.EDU.
+
+;; AUTHORITY SECTION:
+18.in-addr.arpa.        6H IN NS        W20NS.MIT.EDU.
+18.in-addr.arpa.        6H IN NS        BITSY.MIT.EDU.
+18.in-addr.arpa.        6H IN NS        STRAWB.MIT.EDU.
+
+;; ADDITIONAL SECTION:
+W20NS.MIT.EDU.          6H IN A         18.70.0.160
+BITSY.MIT.EDU.          6H IN A         18.72.0.3
+STRAWB.MIT.EDU.         6H IN A         18.71.0.151
+
+;; Total query time: 367 msec
+;; FROM: wren.foobirds.org to SERVER: default -- 0.0.0.0
+;; WHEN: Thu Jul 19 16:00:39 2001
+;; MSG SIZE  sent: 40  rcvd: 170 </pre></blockquote>
+
+<p>The answer to our query is BITSY.MIT.EDU, but <tt class="literal">dig</tt>
+displays lots of other output. For the purposes of this specific
+query, the only important information is the answer.<a href="#FOOTNOTE-153">[153]</a>
+However, the additional information displayed by
+<tt class="literal">dig</tt> is useful for gaining an insight into the
+format of a DNS response packet and for learning where the various
+pieces of DNS information come from.
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-153" /><p>[153]To see a single-line answer to this query, pipe
+<tt class="literal">dig</tt>'s output to <tt class="literal">grep</tt>;
+e.g., <tt class="literal">dig -x 18.72.0.3</tt> <tt class="literal">|</tt>
+<tt class="literal">grep</tt> <tt class="literal">PTR</tt>.</p> </blockquote>
+
+<p>The format of the DNS message is defined in <a name="INDEX-2953" />RFC 1035, <em class="emphasis">Domain Names -
+Implementation and Specification</em>. The RFC defines a
+standard message format composed of up to five parts:
+</p>
+
+<dl>
+<a name="INDEX-2954" /><dt><i>Header</i></dt>
+<dd>
+<p>Provides administrative information about the message, including
+information about what is contained in subsequent sections of the
+message.
+</p>
+</dd>
+
+
+<a name="INDEX-2955" /><dt><i>Question</i></dt>
+<dd>
+<p>Defines the question being asked by a query. When the question
+section is returned in a response, it is used to help determine which
+question the response is answering.
+</p>
+</dd>
+
+
+<a name="INDEX-2956" /><dt><i>Answer</i></dt>
+<dd>
+<p>The part of a response that contains the answer to the specific
+question sent in the query.
+</p>
+</dd>
+
+
+<a name="INDEX-2957" /><dt><i>Authority</i></dt>
+<dd>
+<p>Contains pointers to the authoritative servers for the domain being
+queried.
+</p>
+</dd>
+
+
+<a name="INDEX-2958" /><dt><i>Additional</i></dt>
+<dd>
+<p>Contains other resource records that provide additional, important
+information that supports the answer. This is not the answer to the
+query, but it helps in interpreting or utilizing the answer.
+</p>
+</dd>
+
+</dl>
+
+<p>The core of the output of the <tt class="literal">dig</tt> command is found
+in the various sections from the DNS response packet. The header data
+from the example above is:
+</p>
+
+<blockquote><pre class="code">;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 4
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 3, ADDITIONAL: 3 </pre></blockquote>
+
+<p><tt class="literal">dig</tt> does not display the header data in the order
+in which it occurs in the header section, but it is easy to map the
+dig display to the header described in RFC 1035. The various values
+displayed in the example and their meanings are listed here:
+</p>
+
+<dl>
+<dt><b><tt class="literal">opcode: QUERY</tt></b></dt>
+<dd>
+<p>Indicates that this is a standard query.</p>
+</dd>
+
+
+<dt><b><tt class="literal">status: NOERROR</tt></b></dt>
+<dd>
+<p>Indicates that no error code was found in the RCODE field of the
+header, which means that the RCODE field contains a 0.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">id: 6</tt></b></dt>
+<dd>
+<p>Indicates that the identifier used for this message was the number 6.</p>
+</dd>
+
+
+<dt><b><tt class="literal">flags: qr aa rd ra</tt></b></dt>
+<dd>
+<p><tt class="literal">flags</tt> groups together all of the one-bit fields
+from the header. In this case it covers four different fields in the
+header section and gives us information about three others. This flag
+group means that QR is set to 1, indicating this is a response. AA is
+set to 1 because this answer came from an authoritative server. RD is
+set to 1 to indicate that recursion was requested by the query. RA is
+set to 1, indicating that recursion is available on the server. TC is
+not listed, meaning it is set to 0 and that the response was not
+truncated. AD and CD are also set to 0 because DNSSEC is not in use.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">QUERY: 1, ANSWER: 1, AUTHORITY: 3, ADDITIONAL: 3</tt></b></dt>
+<dd>
+<p>These represent the header fields QDCOUNT, ANCOUNT, NSCOUNT, and
+ARCOUNT, which indicate the number of resource records in the
+remaining sections of the response. This display says that there is
+one entry in the question section, one resource record in the answer
+section, three records in the authority section, and three records in
+the additional section.
+</p>
+</dd>
+
+</dl>
+
+<p>The sample <tt class="literal">dig</tt> command displays the following
+query data:
+</p>
+
+<blockquote><pre class="code">;; QUERY SECTION:
+;;      3.0.72.18.in-addr.arpa, type = ANY, class = IN</pre></blockquote>
+
+<p>The three fields of this query are clearly shown. The class field is
+IN because this is a query for Internet records. The query is asking
+for any record (<tt class="literal">type = any</tt>) associated with
+<em class="emphasis">3.0.72.18.in-addr.arpa</em>. Notice how
+<tt class="literal">dig</tt> reversed the address and created the proper
+reverse domain name for this query.
+</p>
+
+<p>Next, the <tt class="literal">dig</tt> command displays the answer,
+authority, and additional sections:
+</p>
+
+<blockquote><pre class="code">;; ANSWER SECTION:
+3.0.72.18.in-addr.arpa.  6H IN PTR  BITSY.MIT.EDU.
+
+;; AUTHORITY SECTION:
+18.in-addr.arpa.        6H IN NS        W20NS.MIT.EDU.
+18.in-addr.arpa.        6H IN NS        BITSY.MIT.EDU.
+18.in-addr.arpa.        6H IN NS        STRAWB.MIT.EDU.
+
+;; ADDITIONAL SECTION:
+W20NS.MIT.EDU.          6H IN A         18.70.0.160
+BITSY.MIT.EDU.          6H IN A         18.72.0.3
+STRAWB.MIT.EDU.         6H IN A         18.71.0.151</pre></blockquote>
+
+<p>The answer is just what you would expect: the PTR record for
+<em class="emphasis">3.0.72.18.in-addr.arpa</em>. The record tells us that
+the hostname for the address 18.72.0.3 is
+<em class="emphasis">bitsy.mit.edu</em>.
+</p>
+
+<p>The authority section lists the servers that are authoritative for
+the <em class="emphasis">18.in-addr.arpa</em> domain. There are three NS
+records, each providing the name of an authoritative server. From
+this, we know that <em class="emphasis">w20ns.mit.edu</em>,
+<em class="emphasis">bitsy.mit.edu,</em> and
+<em class="emphasis">strawb.mit.edu</em> are authoritative for the reverse
+domain <em class="emphasis">18.in-addr.arpa</em>.
+</p>
+
+<p>The additional section completes the message by providing the address
+of each of the authoritative servers. The addresses are important
+because if the local server wants to send future queries directly to
+these authoritative servers, it needs to know the servers'
+addresses. In this case, the addresses are 18.70.0.160, 18.72.0.3,
+and 18.71.0.151.
+</p>
+
+<p>In addition to the DNS response, <tt class="literal">dig</tt> provides
+status information in the first three lines and the last four lines
+of the display. The first line echoes the <tt class="literal">dig</tt>
+command-line options (<tt class="literal">-x</tt> in the example). The
+second line displays the resolver library settings, and the third
+line states whether or not an answer was found for the query. The
+last four lines show the query response time, the name and address of
+the server that answered the query, when the query was received, and
+the size of the query and response packets. All of this can be
+helpful information when debugging a DNS problem.
+</p>
+
+<p><tt class="literal">dig</tt> is useful because the format of the DNS
+message is clearly shown in the <tt class="literal">dig</tt> output.
+<tt class="literal">dig</tt> is included with Linux, but it is not found on
+all Unix systems. Don't worry if you don't have it on
+your system. <tt class="literal">nslookup</tt> can be used to attack the
+same problems as <tt class="literal">dig</tt>. <tt class="literal">nslookup</tt>
+and <tt class="literal">dig</tt> both test DNS very <a name="INDEX-2959" /> <a name="INDEX-2960" /> <a name="INDEX-2961" />effectively.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13.5. Checking Routing </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.7. Analyzing Protocol Problems </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch13_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:36 GMT -->
+</html>

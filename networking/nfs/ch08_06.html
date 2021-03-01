@@ -1,0 +1,377 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Troubleshooting (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch08_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.6. Troubleshooting</h2>
+
+When diskless clients refuse to boot, they do so<a name="INDEX-1321" />
+<a name="INDEX-1322" /> rather emphatically. Shuffling
+machines and hostnames to accommodate changes in personnel increases
+the likelihood that a diskless machine will refuse to boot. Start
+debugging by verifying that hostnames, IP addresses, and Ethernet
+addresses are all properly registered on boot and NIS servers. The
+point at which the boot fails usually indicates where to look next
+for the problem: machines that cannot even locate a boot block may be
+getting the wrong boot information, while machines that boot but
+cannot enter single-user mode may be missing their
+<em class="emphasis">/usr</em> filesystems.
+</p>
+
+<a name="nfs2-CHP-8-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">8.6.1. Missing and inconsistent client information</h3>
+
+There are a few pieces of missing host <a name="INDEX-1323" /> <a name="INDEX-1324" />information that are easily
+tracked down. If a client tries to boot but gets no RARP response,
+check that the NIS <em class="emphasis">ethers</em> map or the
+<em class="emphasis">/etc/ethers</em> files on the boot servers contain an
+entry for the client with the proper MAC address. A client reports
+RARP failures by complaining that it cannot get its IP address.
+</p>
+
+Diskless clients that boot part-way but hang after mounting their
+root filesystems may have <em class="emphasis">/etc/hosts</em> files that
+do not agree with the NIS <em class="emphasis">ethers</em> or
+<em class="emphasis">hosts</em> maps. It's also possible that the
+client booted using one name and IP address combination, but chose to
+use a different name while going through the single-user boot
+process. Check the boot scripts to be sure that the client is using
+the proper hostname, and also check that its local
+<em class="emphasis">/etc/hosts</em> file agrees with the NIS maps.
+</p>
+
+Other less obvious failures may be due <a name="INDEX-1325" /> <a name="INDEX-1326" />to confusion with the
+<em class="emphasis">bootparams</em> map and the
+<em class="emphasis">bootparamd</em> daemon. Since the diskless client
+broadcasts a request for boot parameters, any host running
+<em class="emphasis">bootparamd</em> can answer it, and that server may
+have an incorrect <em class="emphasis">/etc/bootparams</em> file, or it
+may have bound to an NIS server with an out-of-date map.
+</p>
+
+Sometimes when you correct information, things still do not work. The
+culprit could be caching. Solaris has a name service cached daemon,
+<em class="emphasis">/usr/sbin/nscd</em>, which, if running, acts as a
+frontend for some databases maintained in <em class="emphasis">/etc</em>
+or NIS. The <em class="emphasis">nscd</em> daemon could return stale
+information and also stale negative information, such as a failed
+lookup of an IP address in the <em class="emphasis">hosts</em> file or
+map. You can re-invoke <em class="emphasis">nscd</em> with the
+<em class="emphasis">-i</em> option to invalidate the cache. See the
+manpage for more<a name="INDEX-1327" /> <a name="INDEX-1328" /> details.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">8.6.2. Checking boot parameters</h3>
+
+The <em class="emphasis">bootparamd</em> daemon returns a fairly large
+<a name="INDEX-1329" />
+<a name="INDEX-1330" />bundle
+of values to a diskless client. In addition to the pathnames used for
+root and swap filesystems, the diskless client gets the name of its
+boot server and a default route. Depending on how the
+<em class="emphasis">/etc/nsswitch.conf</em> is set up, the boot server
+takes values from a local <em class="emphasis">/etc/bootparams</em>, so
+ensure that local file copies match NIS maps if they are used.
+Changing the map on the NIS master server will not help a diskless
+client if its boot server uses only a local copy of the boot
+parameters file.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">8.6.3. Debugging rarpd and bootparamd</h3>
+
+You can debug boot parameter problems<a name="INDEX-1331" />
+<a name="INDEX-1332" />
+<a name="INDEX-1333" />
+<a name="INDEX-1334" /> <a name="INDEX-1335" /> <a name="INDEX-1336" /> by enabling debugging on the boot
+server. Both <em class="emphasis">rarpd</em> and
+<em class="emphasis">bootparamd</em> accept a debug option.
+</p>
+
+By enabling debugging in <em class="emphasis">rarpd</em> on the server,
+you can see what requests for what Ethernet address the client is
+making, and if rarpd can map it to an IP address. You can turn on
+<em class="emphasis">rarpd</em> debugging by killing it on the server and
+starting it again with the <em class="emphasis">-d</em> option:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ps -eaf | grep rarpd</b></tt>   
+    root   274     1  0   Apr 16 ?        0:00 /usr/sbin/in.rarpd -a
+    root  5890  5825  0 01:02:18 pts/0    0:00 grep rarpd
+# <tt class="userinput"><b>kill 274</b></tt>
+# <tt class="userinput"><b>/usr/sbin/in.rarpd -d -a</b></tt>
+/usr/sbin/in.rarpd:[1]  device hme0 ethernetaddress 8:0:20:a0:16:63
+/usr/sbin/in.rarpd:[1]  device hme0 address 130.141.14.8
+/usr/sbin/in.rarpd:[1]  device hme0 subnet mask 255.255.255.0
+/usr/sbin/in.rarpd:[5]  starting rarp service on device hme0 address 8:0:20:a0:16:63
+/usr/sbin/in.rarpd:[5]  RARP_REQUEST for 8:0:20:a0:65:8f
+/usr/sbin/in.rarpd:[5]  trying physical netnum 130.141.14.0 mask ffffff00
+/usr/sbin/in.rarpd:[5]  good lookup, maps to 130.141.14.9
+/usr/sbin/in.rarpd:[5]  immediate reply sent</pre></blockquote>
+
+Keep in mind that when starting a daemon with the
+<em class="emphasis">-d</em> option, it usually stays in the foreground,
+so you won't get a shell prompt unless you explicitly place it
+in the background by appending an ampersand (&amp;) to command
+invocation.
+</p>
+
+The two things to look out for when debugging
+<em class="emphasis">rarpd</em> are:
+</p>
+
+<ul><li>
+Does <em class="emphasis">rarpd</em> register a RARP_REQUEST? If it
+doesn't, this could indicate a physical network problem, or the
+server is not on the same physical network as the client.
+</p>
+</li><li>
+Can <em class="emphasis">rarpd</em> map the client's Ethernet
+address back to an IP address? If not, this could indicate a bad
+<em class="emphasis">ethers</em> map, a bad
+<em class="emphasis">/etc/ethers</em> file, or an
+<em class="emphasis">/etc/nsswitch.conf</em> file that is not pointing at
+the right place.
+</p>
+</li></ul>
+By enabling debug mode in <em class="emphasis">bootparamd</em> on the
+server, you can see the hostname, addresses, and pathnames given to
+the diskless client. You can turn on <em class="emphasis">bootparamd</em>
+debugging by killing it on the server and starting it again with the
+<em class="emphasis">-d</em> option:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>ps -eaf | grep bootparamd</b></tt> 
+    root   276     1  0   Apr 16 ?        0:00 /usr/sbin/rpc.bootparamd
+    root  5878  5825  0 00:33:27 pts/0    0:00 grep bootparamd
+ 
+# <tt class="userinput"><b>kill 276</b></tt> 
+# <tt class="userinput"><b>rpc.bootparamd -d</b></tt> 
+in debug mode.
+msg 1:  group =  260   mib_id =     0   length = 128
+msg 2:  group =  261   mib_id =     0   length = 132
+msg 3:  group = 1025   mib_id =     0   length = 36
+msg 4:  group = 1026   mib_id =     0   length = 64
+msg 5:  group =  260   mib_id =    20   length = 144
+msg 6:  group =  260   mib_id =   100   length = 88
+msg 7:  group = 1026   mib_id =     1   length = 0
+msg 8:  group = 1026   mib_id =     2   length = 0
+msg 9:  group =  260   mib_id =    21   length = 2464
+msg 10:  group =  260   mib_id =    22   length = 360
+mibget getmsg(  ) 11 returned EOD (level 0, name 0)
+interface_addr = 130.141.14.8.
+interface_mask = 255.255.255.0
+22 records for ipRouteEntryTable
+Whoami returning name = honeymoon, router address = 130.141.14.253
+getfile_1: file is "honeymoon" 130.141.14.8 "/export/root/honeymoon"</pre></blockquote>
+
+The messages that start with msg are the results of asking the IP
+layer for Simple Network Management Protocol (SNMP) Management
+Information Base (MIB) information. The
+<em class="emphasis">bootparamd</em> daemon makes this inquiry to find the
+IP address of the best router for the diskless client. The messages
+that say group = 260 are the ones of interest for this purpose. Of
+those messages, the ones with a mib_id of 0 or 20 are of interest.
+Normally both kinds of messages will appear. If not, that may
+indicate a problem with the server's network configuration. But
+if there are no problems, we can expect the debug output to show a
+router address for the client.
+</p>
+
+The getfile_1 message is simply reporting that it knows where the
+client's root filesystem is. Note the IP address is the same as
+the server's interface, which means that the NFS server for the
+client is the same as the <em class="emphasis">bootparamd</em> server.
+</p>
+
+If the server shows strange boot parameters passed to the client,
+check that the server's <em class="emphasis">/etc/bootparams</em>
+file is correct, and that the boot server's NIS server has
+up-to-date maps.
+</p>
+
+If the boot parameters received by the client are incorrect, check
+that the server answering the request for them has current
+information. Because requests are broadcast to
+<em class="emphasis">bootparamd</em>, the server that can reply in the
+shortest time supplies the information. If the client refuses to boot
+at all, complaining of:
+</p>
+
+<blockquote><pre class="code">null domain name 
+invalid domain name 
+invalid boot parameters</pre></blockquote>
+
+or similar problems, verify that the host answering its broadcasts is
+using the same boot protocol and configuration files. See <a href="ch15_03.html#nfs2-CHP-15-SECT-3">Section 15.3, "Boot parameter confusion"</a> for an example of invalid boot parameters.
+</p>
+
+Also ensure that the boot server exports the client's root and
+swap filesystems with the proper <em class="emphasis">root</em> mapping
+and access restrictions. In <em class="emphasis">/etc/dfs/dfstab</em>,
+both the root and swap filesystems should have the options:
+</p>
+
+<blockquote><pre class="code">rw=client,root=client</pre></blockquote>
+
+to limit access to the diskless client and to allow the superuser to
+write to the filesystems. If the swap filesystem is not exported so
+that <em class="emphasis">root</em> can write to it, the diskless client
+will not be able to start the <em class="emphasis">init</em> process to
+begin the <a name="INDEX-1337" /> <a name="INDEX-1338" /> <a name="INDEX-1339" /> <a name="INDEX-1340" /> <a name="INDEX-1341" /> <a name="INDEX-1342" />single-user boot.
+</p>
+
+</div>
+<a name="nfs2-CHP-8-SECT-6.4" /><div class="sect2">
+<h3 class="sect2">8.6.4. Missing /usr</h3>
+
+After setting the host and domain <a name="INDEX-1343" />names and configuring
+network interfaces in the boot process, a machine mounts its
+<em class="emphasis">/usr</em> filesystem. If there are problems with
+<em class="emphasis">/usr</em>, the boot process either hangs or fails at
+the first reference to the <em class="emphasis">/usr</em> filesystem. The
+two most common problems are not being able to locate the NFS server
+for <em class="emphasis">/usr</em> and attempting to mount the wrong
+<em class="emphasis">/usr</em>.
+</p>
+
+NIS cannot be started until after <em class="emphasis">/usr</em> is
+mounted, since client-side daemons like <em class="emphasis">ypbind</em>
+live in <em class="emphasis">/usr</em>. Generally,
+<em class="emphasis">/usr</em> is mounted from the boot server, so a
+diskless client needs its own name and its server's hostname in
+its <em class="emphasis">/etc/hosts</em>. If <em class="emphasis">/usr</em> is
+not mounted from the root/swap filesystem server, the
+<em class="emphasis">/usr</em> server's hostname must appear in the
+local hosts file as well. You may need as many as four different
+entries in the "runt" <em class="emphasis">/etc/hosts</em>
+file on a diskless client: its hostname, a localhost entry, the boot
+server's name, and the name of the <em class="emphasis">/usr</em>
+server.
+</p>
+
+Heterogeneous client/server environments create another set of
+problems. Clients of different architectures need their own
+<em class="emphasis">/usr</em> filesystems with executables built for the
+client's CPU, not the server's. The most obvious problem
+is when the client mounts the wrong <em class="emphasis">/usr</em>. If the
+executables on it were built for a different CPU, then the first
+attempt to invoke one of them produces a fairly descriptive error.
+However, if the <em class="emphasis">/usr/platform</em> directory is for
+the correct CPU architecture but doesn't contain the right
+kernel architecture (for example, Sun's
+<em class="emphasis">sun4u</em> and <em class="emphasis">sun4m</em> variants),
+then the client boots, but certain Unix utilities will not work.
+Processes that read the kernel or user address spaces, such as
+<em class="emphasis">crash</em>, are the most likely to break.
+</p>
+
+If you suspect that you're mounting the wrong
+<em class="emphasis">/usr</em>, first check the client's
+<em class="emphasis">/etc/vfstab</em> file to see where it gets
+<em class="emphasis">/usr</em> :
+</p>
+
+<blockquote><pre class="code">wahoo:/export/root/honeymoon                 - /         nfs - - rw
+wahoo:/export/swap/honeymoon                 - /dev/swap nfs - - -
+wahoo:/export/exec/Solaris_2.7_sparc.all/usr - /usr      nfs - - ro</pre></blockquote>
+
+In this example, we would check
+<em class="emphasis">/export/exec/Solaris_2.7_sparc.all/usr</em> on the
+server <em class="emphasis">wahoo</em>. The directories in
+<em class="emphasis">/export/exec</em> have names with this format:
+<em class="emphasis">Solaris_&lt;release&gt;_&lt;architecture&gt;</em>. If
+the client and the server are of the same CPU architecture and are
+running the same release of the operating system, the
+<em class="emphasis">usr</em> subdirectory in
+<em class="emphasis">/export/exec/Solaris_&lt;release&gt;_&lt;architecture&gt;</em>
+is a symbolic link to the server's <em class="emphasis">/usr</em>
+directory.
+</p>
+
+If the client and server do not have the same release and CPU
+architectures, the directories in <em class="emphasis">/export/exec</em>
+contain complete operating system releases.
+</p>
+
+Three things can go wrong with this link-and-directory scheme:</p>
+
+<ul><li>
+The links <em class="emphasis">/export/exec/*/usr</em> point to the wrong
+place. This is possible if you changed the architecture of the server
+but restored <em class="emphasis">/export</em> from a backup tape. Make
+sure that <em class="emphasis">Solaris_2.7_sparc.all/usr</em> links point
+to <em class="emphasis">/usr</em> only if the server is a SPARC running
+Solaris 7. You'll get "exec format" errors if you
+mount a <em class="emphasis">/usr</em> of the wrong architecture on the
+client.
+</p>
+</li><li>
+The <em class="emphasis">/export/exec/*</em> directories referenced by the
+clients don't exist. This is possible if you added a client of
+a new, different CPU architecture but did not install the appropriate
+operating system software for it. If you try to mount a directory
+that doesn't exist, you should see "cannot mount
+root" errors on the client.
+</p>
+</li><li>
+The client may have the wrong mount point listed in its
+<em class="emphasis">/etc/vfstab</em> file. If you did not specify the
+architecture of the client correctly when using the AdminSuite
+software, the client's <em class="emphasis">vfstab</em> file is
+likely to contain the wrong mount information.
+</p>
+</li></ul>
+If you are unsure of how a mount and link combination will work,
+experiment on another diskless client having the same architecture.
+For example, mount
+<em class="emphasis">/export/exec/Solaris_2.7_sparc.all/usr</em> on
+<em class="emphasis">/mnt</em>, and then try a sample command to be sure
+you've mounted the right one:
+</p>
+
+<blockquote><pre class="code">client# <tt class="userinput"><b>mount wahoo:/export/exec/Solaris_2.7_sparc.all/usr /mnt</b></tt> 
+client# <tt class="userinput"><b>cd /var</b></tt> 
+client# <tt class="userinput"><b>/mnt/bin/ls</b></tt> 
+4lib        dict        krb5        oasys       sbin        ucblib
+5bin        dist        kvm         old         share       vmsys
+X           dt          lib         openwin     snadm       xpg4
+adm         games       lost+found  platform    spool
+aset        include     mail        preserve    src
+bin         java        man         proc        tmp
+ccs         java1.1     net         pub         ucb
+demo        kernel      news        sadm        ucbinclude</pre></blockquote>
+
+If commands are executed properly, then you <a name="INDEX-1344" />should be able to
+mount <em class="emphasis">/usr</em> safely on the diskless client in
+<a name="INDEX-1345" />
+<a name="INDEX-1346" />question.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.5. Changing a client's name</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.7. Configuration options</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch08_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

@@ -1,0 +1,1059 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+<head><title>Network File System (NFS) (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch17_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">17.3. Network File System (NFS)</h2>
+
+
+
+
+
+<a name="INDEX-1657" /><a name="INDEX-1658" />
+<a name="INDEX-1659" />The NFS protocol is designed to allow
+systems to access files across the network on a remote system, as
+conveniently as if the files were on directly attached disks. The NFS
+protocol itself was designed to be <em class="emphasis">stateless</em> for
+both server implementation simplicity and robustness. A stateless
+protocol is one where each transaction is handled separately; the
+server doesn't need to keep information about what clients have
+done previously. Being stateless allows an NFS server to reboot while
+clients are making requests and, once it returns to service, continue
+serving files to clients as if nothing had happened.</p><p>
+
+
+
+
+
+This may seem like a fairly simple concept, but it's quite
+difficult to make a protocol stateless when it deals with file
+access. A number of important features of most filesystems are
+inherently based on state. For instance, being able to maintain file
+locking requires keeping track of what process has locked the file.
+This design decision has had a major impact on security and the
+proliferation of system administrator jokes based upon the kernel
+message "NFS server not responding".</p><p>
+
+
+
+
+
+achines may be NFS servers (exporting their disks for access by
+other machines), NFS clients (accessing disks exported by NFS
+servers), or both. Almost every Unix implementation uses NFS as the
+primary way to share files, and NFS client applications are available
+for most other popular operating systems. (NFS server applications
+for non-Unix machines are more rare.)</p><p>
+
+
+
+
+
+Two versions of NFS are currently in widespread use. NFS version 2 is
+the protocol people are usually referring to when they just mention
+the term <em class="emphasis">NFS</em>. It is usually run over UDP
+(although the specification allows the use of TCP, most
+implementations do not implement it). NFS version 3, frequently
+written as <em class="emphasis">NFSv3</em>, is a newer version with
+several improvements, including support for larger files, and almost
+every implementation allows it to be run over TCP as well as UDP.
+From a security standpoint, there is little to distinguish between
+the two versions, so we use the term <em class="emphasis">NFS</em> to
+apply to both versions unless otherwise noted.</p><p>
+
+
+
+
+
+The NFS protocol itself is quite a straightforward RPC protocol, and
+all implementations and versions use a fixed port number (normally
+port 2049). A fixed port number is used so that an NFS client does
+not have to perform a portmapper query when a NFS server is
+restarted. However, in order to operate correctly, NFS relies upon a
+number of other services for initially mounting the filesystem, for
+file locking and for recovery after a system crash. These additional
+services are also based upon RPC but do not always use the same port
+numbers. This means that portmapper requests are needed to locate the
+services. For more information about RPC see <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+Some vendors also support a version of NFS based on Secure RPC, which
+addresses many of the problems with authentication, providing better
+authentication both of the client machine and of the user. Secure RPC
+has several problems that also apply to NFS implemented on top of it:</p><p>
+
+
+
+
+
+<ul><li>It is not widely supported; it is available almost exclusively on
+Suns.</p><p></li><li>The process of exchanging keys between machines is difficult.</p></li><li>It doesn't perform as well as standard RPC. (NFS is
+particularly performance-sensitive.)</p><p></li><li>The sizes of the public keys are too small.</p></li></ul>
+Secure RPC is discussed further in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>.</p><p>
+
+
+
+
+
+<a name="ch17-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.1. NFS Authentication</h3>
+
+
+
+
+
+<a name="INDEX-1660" />NFS was originally
+designed to be used within local networks for file sharing, and
+although it can be tuned to work over a network that has delays, it
+is unsafe to allow across a firewall for various reasons. NFS's
+main security problems are:</p><p>
+
+
+
+
+
+<ul><li>The NFS server relies on the IP address to authenticate client hosts,
+making it vulnerable to address forgery.</p><p></li><li>The NFS server relies on the client to authenticate the user, making
+it vulnerable to any user who has compromised a client machine.</p><p></li><li>The NFS server doesn't recheck the client authentication on
+every request. The server assumes that if the client uses a valid
+file handle, the client is authorized to access that filesystem. An
+attacker with a forged or captured file handle can access the
+filesystem just as easily as a legitimate client can.</p><p></li></ul>
+The primary problem with NFS is its weak authentication of requests.
+Access to a given NFS-exported filesystem is all or nothing; either a
+given client machine is trusted to access the filesystem, or it
+isn't. If the server trusts a given client machine, the server
+believes whatever the client tells it about who is trying to access
+which files. It then uses that information for authorization
+according to the standard Unix file protection mechanisms (i.e.,
+user, group, and other permissions).</p><p>
+
+
+
+
+
+<a name="INDEX-1661" />The server's
+trust in the client is established when the client mounts the
+filesystem from the server. To mount a filesystem a client sends a
+mount request containing the name of the filesystem to the
+<em class="emphasis">mountd</em> RPC service on the server and asks for
+permission to mount it. The <em class="emphasis">mountd</em> service
+checks whether or not the client is allowed to access that
+filesystem, using the source IP address of the request to identify
+the client. If the access is allowable, the
+<em class="emphasis">mountd</em> service gives the client a <em class="emphasis">file
+handle</em> (basically a magic set of credentials for the
+client), which the client then uses for all access to the filesystem.</p><p>
+
+
+
+
+
+Once the client has mounted the filesystem (and received a file
+handle from the server), the client sends a request using the NFS
+protocol to the server each time it wants to act on a file on that
+filesystem. The request describes the action the client wants to take
+and includes the file handle obtained from the server, so the server
+assumes that the client is authorized to request that action. Some
+NFS servers will log error messages when requests are received with
+invalid file handles, but many of them simply ignore them, which
+helps attackers who are trying to guess file handles. If you have the
+choice, choose an NFS server that will log requests with invalid file
+handles (this may not be the default configuration even on servers
+which support logging; check to make certain that you not only have
+the capability, but have actually enabled it).</p><p>
+
+
+
+
+
+This system has at least three problems. First, there are
+difficulties with the initial authentication. In addition to the
+usual problems with using forgeable source IP addresses for
+authentication, there is another way for attackers to authenticate
+illicitly. The RPC port location service offers a forwarding service
+where a client can send a request to a service via the location
+server. This request will show up to <em class="emphasis">mountd</em> as
+if it had been issued by the location service, which is running on
+the server. If <em class="emphasis">mountd</em> permits the server to
+mount its own filesystems, then an attacker can send a mount request
+using the forwarding feature in order to obtain a valid file handle.
+To deal with this, either the server should deny itself access, or
+the forwarding feature of the port location service should be
+disabled (and the best option is to do both).</p><p>
+
+
+
+
+
+The second problem with <em class="emphasis">mountd</em> authentication
+has to do with the use of the file handle as an authentication token.
+If an attacker can determine a valid file handle without help from
+<em class="emphasis">mountd</em>, the attacker can then use it without
+further authentication. Simply guessing randomly isn't going to
+work; NFS version 2 uses 32-byte file handles, and NFS version 3 uses
+variable-length file handles up to 64 bytes long. But attackers
+don't have to guess randomly because NFS implementations
+typically impose a structure to the file handles. Only a component of
+the file handle data is random, and that's the only part the
+attacker has to guess. Implementations vary on how much random data
+there is; early implementations are particularly bad about it, using
+file handles that are based on the time the filesystem was created,
+which is often easy to guess.</p><p>
+
+
+
+
+
+odern implementations of NFS have addressed this problem, and
+patches are available for many older implementations. If you run NFS
+on a system where security is important, you should consult your
+vendor's documentation to make sure that you have an NFS server
+with reasonable randomness in the file handle generation, and that
+you have followed any special instructions for setting up filesystems
+(some file handle generation schemes require special initialization
+for filesystems to ensure unguessable file handles).</p><p>
+
+
+
+
+
+The third problem with file handles is that they're difficult
+to get rid of. An NFS server is required to be stateless; all it can
+do is look at a file handle and determine whether or not that file
+handle is any good. On most implementations, once a client has a file
+handle, the only way to keep the client from using it is to change
+the method for generating file handles so that all previous file
+handles are invalid, requiring every client to remount the filesystem
+and probably generating mass trauma.</p><p>
+
+
+
+
+
+Well-behaved clients don't save file handles and will contact
+<em class="emphasis">mountd</em> for a new file handle each time they
+mount a filesystem. This still means that a well-behaved client that
+already has a filesystem mounted can continue to use it if you change
+its access permissions, but it does give you some measure of control.
+Eventually, the client will have to remount the filesystem (and you
+may be able to force it to do so if you have some sort of access to
+it). Nothing requires an attacker to be this well behaved; a hostile
+client can simply save the file handle and reuse it without requiring
+<em class="emphasis">mountd</em> 's assistance. In general, the only
+way to change the validity of file handles and prevent this is to
+change the filesystem on the server (for instance, by changing where
+it is mounted on the server). Vendor documentation will usually tell
+you what operations change file handles (mostly to prevent you from
+accidentally changing file handles and interrupting operations on
+clients).<a name="INDEX-1662" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-11-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.2. NFS and root</h3>
+
+
+
+
+
+Under NFS, root may be treated differently from normal users. Some
+Unix NFS servers always treat root the same way they treat normal
+users: the client's root user gets the same access that the
+server's root user would have. Some of them always translate
+the client's root user to a UID known as "nobody"
+that is never used as a regular user; thus, this user will have only
+the permissions granted to the world. This "nobody" UID
+may be either the highest possible UID or a UID that translates to -1
+(which might be written as -1, or as the highest possible UID plus
+1). Just for additional complication, "nobody" is
+sometimes -2 instead of -1, and for some unknown reason, System V
+release 4 defines the highest possible UID as 60,000. On some Unix
+machines, more than one of these numbers (-1, -2, 60000, 60001,
+65535, and 65536) are listed in the password file as
+"nobody". Most Unix NFS servers allow you to choose
+whether you wish to allow root access or translate it to
+"nobody" via an option in the
+<em class="emphasis">/etc/exports</em> file. Non-Unix servers normally
+treat root as if it were any other user, but because that user is
+unlikely to have special privileges on the server, it isn't a
+problem.</p><p>
+
+
+
+
+
+Translating root to "nobody" is an extremely minor
+security improvement. Anybody who is capable of being root on the
+client is capable of pretending to be any user whatsoever on the
+client, and can therefore see and do anything any user can do. The
+translation hides only those files on the server restricted to access
+by root itself. You will still probably want to use translation
+wherever you can for the minimal protection it does give you, but you
+should not feel that it makes it safe to export filesystems to
+possibly hostile clients.</p><p>
+
+
+
+
+
+Better protection for the server is available by exporting the
+filesystem read-only. If the filesystem is exported purely read-only
+(no host is allowed to write it) you can be reasonably certain the
+data cannot be modified via NFS. If you allow any host to write it,
+you're vulnerable to forgery.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-12-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.3. NFS Client Vulnerabilities</h3>
+
+
+
+
+
+<a name="INDEX-1663" />
+<a name="INDEX-1664" />NFS clients
+may also be in danger from NFS servers. For example, an NFS-mounted
+filesystem may contain <em class="emphasis">setuid</em> programs; users on
+the client would be able to use those programs to become root. Device
+entries on an NFS-mounted partition are considered to apply to the
+client's devices, not the server's devices. Somebody with
+an account on an NFS client and root permission on an NFS server can
+use this to get unlimited, if inconvenient, read-write access to all
+data on the client.</p><p>
+
+
+
+
+
+Some NFS clients provide options to <em class="emphasis">mount</em> that
+can be used to disable devices and <em class="emphasis">setuid/setgid</em>
+on mounted filesystems. If <em class="emphasis">mount</em> is not
+available to users other than root, or if it always uses these
+options for users other than root, this will protect the client from
+the server. If these options are not available, even if only root can
+mount filesystems, you should consider mounting an NFS filesystem to
+be equivalent to granting the server machine root access to the
+client.</p><p>
+
+
+
+
+
+NFS clients may also be vulnerable to less obvious forms of attack
+from NFS servers. Mounting a filesystem is a privileged operation, so
+NFS clients run as root. A hostile server may be able to exploit
+buffer overflow errors in the NFS client, causing it to run arbitrary
+programs. In general, this is not transparent to the user (it
+interferes with the ability to use whatever filesystem the client was
+trying to get to), and it requires an attacker with a high level of
+control over the server machine. In traditional fixed NFS server
+environments, it's not a major threat. On the other hand, the
+use of automounters, which are discussed in a later section, can make
+it an effective attack.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-13-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.4. File Locking with NFS</h3>
+
+
+
+
+
+<a name="INDEX-1665" /> <a name="INDEX-1666" /> <a name="INDEX-1667" />File locking allows one process to
+prevent other processes from accessing a file in specific ways. It is
+most often used to keep multiple processes from writing overlapping
+changes to a file, but it can also be used for other reasons (for
+instance, it may be advisable to keep other processes from even
+reading a file while it is being changed). NFS provides a voluntary
+file-locking mechanism. By default, there are no locks associated
+with a file, and any process can do anything with it. A process that
+wants a lock must explicitly ask for it.</p><p>
+
+
+
+
+
+File locks are a form of state; when you request a lock on a file,
+you change the state of the file, and that state has to be kept track
+of both by the server (so that it can enforce the lock) and the
+client (so that it can release the lock when it is no longer needed).
+This is problematic for NFS because it's a stateless protocol.</p><p>
+
+
+
+
+
+There are therefore two parts to the problem of implementing locking
+in NFS. First, you have to add the ability to keep any kind of state
+across server and client restarts, and then you have to track the
+locks themselves.</p><p>
+
+
+
+
+
+It's easy enough for any program to keep state internally;
+it's not even all that difficult for a server to save that
+state so that when the server restarts, it can pick up where it left
+off. However, that's not good enough for NFS locking because
+the state that is important also includes the programs that had
+requested the locks, and NFS clients will almost never regain this
+state when they restart. If a machine crashes while you are in the
+middle of editing a file, the editor is unlikely to resume where it
+left off. If the editor had a lock on the file you were editing,
+something needs to free that lock so that you can restart your
+editing session. If the editor itself crashes, this task is handled
+by other programs on the machine. If the entire machine crashes,
+however, there has to be some other mechanism that will handle the
+situation.</p><p>
+
+
+
+
+
+<a name="INDEX-1668" />The problem of dealing
+with restarts is solved using an ancillary protocol called
+<em class="emphasis">statd</em>, which is responsible for tracking and
+reporting restarts on behalf of other protocols.
+<em class="emphasis">statd</em> handles two types of requests: programs on
+the local machine can ask <em class="emphasis">statd</em> to notify them
+when specific remote machines restart, and remote machines can ask
+<em class="emphasis">statd</em> to notify them when the local machine
+restarts. It's also possible to cancel these requests, and when
+things shut down cleanly, they will cancel all outstanding requests.
+<em class="emphasis">statd</em> keeps track of requests in files, so that
+its state is preserved across restarts. <em class="emphasis">statd</em> is
+voluntary in that it relies on the remote systems to honor requests
+for notification when they restart -- for scalability reasons
+<em class="emphasis">statd</em> does not poll for status. When
+<em class="emphasis">statd</em> starts, it checks its files and notifies
+all remote machines that have requested notification.</p><p>
+
+
+
+
+
+<em class="emphasis">statd</em> is built on top of RPC and uses UDP. It is
+particularly problematic for firewalls because it involves traffic
+initiated by the server. NFS clients will request restart
+notification from NFS servers. The original request for notification
+will go from the client to the server, but if the server reboots, the
+notification will come from the server to the client and will not
+normally be permitted.</p><p>
+
+
+
+
+
+<a name="INDEX-1669" />Locking itself is
+implemented using <em class="emphasis">lockd. lockd</em> in turn<em class="emphasis">
+</em>relies heavily on <em class="emphasis">statd</em> to
+reestablish locking after a restart as it does not store any
+persistent state. When a client wishes to lock a file on an NFS
+filesystem, it contacts the remote <em class="emphasis">lockd</em> in
+order to lock the file and requests its own
+<em class="emphasis">statd</em> to monitor the server. When both the
+<em class="emphasis">lockd</em> and <em class="emphasis">statd</em> response
+are received, the client assumes that the file is locked. When it
+receives the <em class="emphasis">lockd</em> request, the server asks the
+server <em class="emphasis">statd</em> to monitor the client. At this
+point, one of the following can occur:</p><p>
+
+
+
+
+
+<ul><li>The client releases the lock.</p><p></li><li>The server restarts.</p></li><li><p>The client restarts.</p></li></ul>
+When the client releases the lock, the client sends an unlock request
+to the server <em class="emphasis">lockd</em>.</p><p>
+
+
+
+
+
+After a server restart, the server <em class="emphasis">statd</em>
+notifies all remote clients using locking of the event, which causes
+them to resubmit all lock requests. This can have unexpected results
+if more than one client was attempting to lock the same file. After a
+server restart, you can lose a lock. If the purpose of the lock was
+to prevent another system from making changes while a critical update
+was occurring, then this will usually result in loss of data or file
+corruption. More correct locking semantics would suggest that the
+original client should regain the lock so that it could proceed with
+the critical update. This is one reason why NFS file locking cannot
+be relied upon.</p><p>
+
+
+
+
+
+After a client restart, <em class="emphasis">statd</em> notifies all
+servers of the event. This causes them to immediately release any
+locks the client may have been holding before the restart. If the
+purpose of the lock was to prevent another system from making changes
+while a critical update was occurring, then this will usually result
+in loss of data or file corruption. More correct locking semantics
+would leave the file locked so that a cleanup process could check the
+consistency of the file before allowing another client to make
+changes. This is another reason why NFS file locking cannot be relied
+upon.</p><p>
+
+
+
+
+
+<em class="emphasis">lockd,</em> like <em class="emphasis">statd</em>, is built
+on top of RPC and uses UDP, which makes it extremely difficult to
+safely pass through a firewall. Some stateful and proxy firewall
+systems can handle RPC, and so it may be possible to use NFS file
+locking across this type of firewall. You will need to be very
+careful; some systems will allow everything but the server-to-client
+restart notifications, in which case locking will appear to work, but
+lock consistency will be lost as soon as the server restarts. If file
+locking is not needed, then it is possible to run some systems
+without either <em class="emphasis">statd</em> or
+<em class="emphasis">lockd</em>. However, any application programs that
+try to use file locking on NFS filesystems are likely to fail in bad
+ways that are likely to involve loss or corruption of data (which
+presumably would not occur in the unlikely event that
+<em class="emphasis">lockd</em> and <em class="emphasis">statd</em> were
+working correctly).<a name="INDEX-1670" /> <a name="INDEX-1671" /> <a name="INDEX-1672" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-14-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.5. Automounting</h3>
+
+
+
+
+
+<a name="INDEX-1673" />
+<a name="INDEX-1674" />Originally, NFS filesystems were
+mounted by machines at boot time, which has some significant
+disadvantages. It means that at boot time, a machine has to decide
+what server it's going to get particular files from, and the
+only way to change that decision is to reboot. It also has to mount
+all the filesystems it might ever need. On a multi-user system, where
+different users want different files, this results in a lot of wasted
+communication as machines mount filesystems that they don't
+actually need. It can also result in major annoyances as machines
+wait around for crashed file servers, sometimes pointlessly.</p><p>
+
+
+
+
+
+The solution to this problem is to use an
+<em class="filename">automounter</em>, a program that mounts filesystems
+when there is some reason to and unmounts them when they are no
+longer in use. Most automounters will also allow you to configure
+things so that a given filesystem is available on multiple machines,
+and clients use the most appropriate copy.</p><p>
+
+
+
+
+
+Intuitively, automounters seem as if they ought to be free from
+network vulnerabilities. After all, they provide services only to the
+local host. They ought to have only the vulnerabilities that other
+NFS clients have, and those are relatively minimal.</p><p>
+
+
+
+
+
+Unfortunately, this is not the case. Automounters have two additional
+kinds of vulnerabilities. First, and most obviously, automounters
+often use other services to get lists of NFS servers. (For instance,
+many of them will use NIS maps for this purpose.) They will have all
+the vulnerabilities associated with those services, and if those
+services are insecure, it may be easy for an attacker to direct an
+automounter system to a hostile server. It may also be possible to
+attack the automounter directly with the information about which
+servers to use; for instance, if the automounter itself has buffer
+overflow problems, feeding it an overlength server name may give an
+attacker the ability to run arbitrary commands.</p><p>
+
+
+
+
+
+The more major source of vulnerabilities comes from the way
+automounters are implemented. For technical reasons, the most
+effective way for an automounter to work is for it to claim to be an
+NFS server. Client programs that want to access filesystems speak to
+this fake server, which then acts as a client to the genuine servers.
+This fake server needs to accept requests only from clients on the
+local machine, but the fact that it is an NFS server opens it up to a
+number of attacks. For instance, the attack that depends on
+forwarding requests through the port location service is particularly
+effective against automounters, which must accept local requests.</p><p>
+
+
+
+
+
+If you are using an automounter on a client, you should be aware that
+it could be vulnerable to NFS server, RPC server, and other network
+application vulnerabilities.<a name="INDEX-1675" /> <a name="INDEX-1676" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-16251" /><div class="sect2">
+<h3 class="sect2">17.3.6. Packet Filtering Characteristics of NFS</h3>
+
+
+
+
+
+NFS is an RPC-based service. As mentioned in <a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>, it's very difficult to handle RPC-based
+services with a packet filtering system because the servers normally
+don't use predictable port numbers. NFS is an exception to this
+rule, however. Although it is RPC-based, it uses port 2049 reliably,
+and as of NFS3, this standard is official.<a href="#FOOTNOTE-72">[72]</a> In order to attempt to enforce some
+minor amount of authentication, many but not all implementations of
+NFS use privileged ports as client source ports.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-72" />[72]Ironically, the version 2 protocol incorrectly predicts that
+while 2049 is an unofficial standard, "later versions of the
+protocol use the `Portmapping' facility of RPC".
+Later versions of the protocol in fact just made 2049
+official.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+NFS is provided over both TCP and UDP. Some clients and servers
+prefer TCP, and others prefer UDP. TCP-based NFS is relatively new,
+and not all clients or servers support it. Those that do often behave
+differently over TCP than over UDP. If a particular client-server
+combination behaves badly over one protocol, try it over the other.</p><p>
+
+
+
+
+
+<a name="INDEX-1677" />
+<a name="INDEX-1678" />In order to make use
+of NFS across a firewall, you will also need to make the portmapper
+and <em class="emphasis">mountd</em> available; the portmapper is at port
+111. <em class="emphasis">mountd</em> is an RPC protocol at a randomly
+chosen port number managed by the portmapper. As discussed earlier,
+you may need <em class="emphasis">lockd</em> and
+<em class="emphasis">statd</em> as well, and in that case, you will need
+to allow <em class="emphasis">statd</em> in both directions.
+<em class="emphasis">lockd</em> and <em class="emphasis">statd</em> are also
+RPC protocols at randomly chosen port numbers managed by the
+portmapper. See <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a> for more information
+about packet filtering and RPC.</p><p>
+
+
+
+
+
+<a name="ch17-15-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+111</p><p></td>
+<td>
+<a href="#FOOTNOTE-73">[73]</a></p><p>
+</td>
+<td>
+External NFS client to internal server, portmapper requests</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+111</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes<a href="#FOOTNOTE-74">[74]</a></p><p>
+</td>
+<td>
+Internal NFS server to external client, portmapper responses</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-75">[75]</a></p><p>
+</td>
+<td>
+2049</p><p></td>
+<td><a href="#FOOTNOTE-73">[73]</a></td>
+<td>
+External NFS client to internal server, NFS requests</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+2049</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-75">[75]</a></p><p></td>
+<td>
+Yes<a href="#FOOTNOTE-74">[74]</a></p><p></td>
+<td>
+Internal NFS server to external client, NFS responses</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+111</p><p></td>
+<td><a href="#FOOTNOTE-73">[73]</a></td>
+<td>
+Internal NFS client to external server, portmapper requests</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+111</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes<a href="#FOOTNOTE-74">[74]</a></p><p></td>
+<td>
+External NFS server to internal client, portmapper responses</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-75">[75]</a></p><p></td>
+<td>
+2049</p><p></td>
+<td><a href="#FOOTNOTE-73">[73]</a></td>
+<td>
+Internal NFS client to external server, NFS requests</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP/UDP</p><p></td>
+<td>
+2049</p><p></td>
+<td>
+&lt;1024<a href="#FOOTNOTE-75">[75]</a></p><p></td>
+<td>
+Yes<a href="#FOOTNOTE-74">[74]</a></p><p></td>
+<td>
+External NFS server to internal client, NFS responses</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-73" />[73]ACK is not set on the first TCP packet (establishing
+connection) but will be set on the rest. UDP has no ACK
+equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-74" />[74]TCP only; UDP has no ACK equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-75" />[75]Some implementations may use ports &gt;1023
+instead.</p><p>
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-16280" /><div class="sect2">
+<h3 class="sect2">17.3.7. Proxying Characteristics of NFS</h3>
+
+
+
+
+
+RPC-based protocols are almost as unpleasant to proxy as they are to
+allow with packet filtering; they cannot be handled adequately with
+generic proxies. NFS is particularly difficult, because of the large
+number of protocols involved and the server-initiated transactions
+that are required to support locking. Some RPC-knowledgeable
+transparent proxy systems do support NFS, but it would be unwise to
+use them for critical or high-volume applications. NFS is
+particularly problematic for proxying because it is data-intense,
+exchanging large volumes of data in situations where delay is very
+noticeable to the user. A host doing NFS proxying is going to need to
+deal with multiple connections transferring large packets at high
+speeds.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch17-16-fm2xml" /><div class="sect2">
+<h3 class="sect2">17.3.8. Network Address Translation Characteristics of NFS</h3>
+
+
+
+
+
+Although the NFS protocol itself does not contain embedded IP
+addresses and could function with address translation, you will have
+problems with <em class="emphasis">mountd</em> as it uses IP addresses for
+authentication. Some implementations of NFS use a
+<em class="emphasis">mountd</em> that issues different NFS file handles
+for each client, and the NFS server checks both the IP address and
+file handle for consistency; this is likely to fail if you are using
+address translation. If you have to run NFS through a translation
+system, use TCP to reduce the load on the translation system as far
+as possible.<a name="INDEX-1679" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch17_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">17.2. Trivial File Transfer Protocol </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">17.4. File Sharing for Microsoft Networks </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch17_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+</html>

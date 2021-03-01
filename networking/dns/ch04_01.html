@@ -1,0 +1,220 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:16 GMT -->
+<head><title>Setting Up BIND (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 4. Setting Up BIND</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-4-SECT-1">Our Zone</a><br />
+<a href="ch04_02.html">Setting Up Zone Data</a><br />
+<a href="ch04_03.html">Setting Up a BIND Configuration File</a><br />
+<a href="ch04_04.html">Abbreviations</a><br />
+<a href="ch04_05.html">Host Name Checking (BIND 4.9.4 and Later Versions)</a><br />
+<a href="ch04_06.html">Tools</a><br />
+<a href="ch04_07.html">Running a Primary Master Name Server</a><br />
+<a href="ch04_08.html">Running a Slave Name Server</a><br />
+<a href="ch04_09.html">Adding More Zones</a><br />
+<a href="ch04_10.html">What Next?</a><br /><p></p></div>
+
+
+
+<em>"It seems very pretty," she said when she had finished
+it, "but it's rather hard to understand!" (You see
+she didn't like to confess, even to herself, that she
+couldn't make it out at all.) "Somehow it seems to fill
+my head with ideas -- only I don't exactly know what they
+are!"</em></p><p>
+
+
+<a name="INDEX-388" /></a>If you
+have been diligently reading each chapter of this book, you're
+probably anxious to get a name server running. This chapter is for
+you. Let's set up a couple of name servers. Others of you may
+have read the table of contents and skipped directly to this chapter.
+(Shame on you!) If you are one of those people, be aware that we may
+use concepts from earlier chapters and expect you to understand them
+already.</p><p>
+
+
+There are several factors that influence how you should set up your
+name servers. The biggest is what sort of access you have to the
+<a name="INDEX-389" /></a>Internet: complete access (e.g., you can
+FTP to ftp.uu.net), limited
+access (restricted by a security firewall), or no access at all. This
+chapter assumes you have complete access. We'll discuss the
+other cases in <a href="ch11_01.html">Chapter 11, "Security"</a>.</p><p>
+
+
+In this chapter, we set up two name servers for a few fictitious
+zones as an example for you to follow in setting up your own zones.
+We cover the topics in this chapter in enough detail to get your
+first two name servers running. Subsequent chapters fill in the holes
+and go into greater depth. If you already have your name servers
+running, skim through this chapter to familiarize yourself with the
+terms we use or just to verify that you didn't miss something
+when you set up your servers.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-4-SECT-1" /></a>
+<h2 class="sect1">4.1. Our Zone</h2>
+
+
+<a name="INDEX-390" /></a>Our fictitious zone serves a college. Movie
+University studies all aspects of the film industry and researches
+novel ways to distribute films. One of our most promising projects
+involves research into using IP as a film distribution medium. After
+visiting our registrar's web site, we have decided on the
+domain name <em class="emphasis">movie.edu</em>. A
+recent grant has enabled us to connect to the Internet.</p><p>
+
+
+Movie U. currently has two Ethernets, and we have plans to add
+another network or two. The Ethernets have network numbers
+192.249.249/24 and 192.253.253/24. A portion of our host table
+contains the following entries:</p><p>
+
+
+<blockquote><pre class="code">127.0.0.1      localhost
+
+# These are our killer machines
+
+192.249.249.2  robocop.movie.edu robocop
+192.249.249.3  terminator.movie.edu terminator bigt
+192.249.249.4  diehard.movie.edu diehard dh
+
+# These machines are in horror(ible) shape and will be replaced
+# soon.
+
+192.253.253.2  misery.movie.edu misery
+192.253.253.3  shining.movie.edu shining
+192.253.253.4  carrie.movie.edu carrie
+
+# A wormhole is a fictitious phenomenon that instantly transports
+# space travelers over long distances and is not known to be
+# stable.  The only difference between wormholes and routers is
+# that routers don't transport packets as instantly--especially
+# ours.
+
+192.249.249.1  wormhole.movie.edu wormhole wh wh249
+192.253.253.1  wormhole.movie.edu wormhole wh wh253</pre></blockquote>
+
+
+And the network is pictured in <a href="ch04_01.html#dns4-CHP-4-FIG-1">Figure 4-1</a>.</p><p>
+
+
+<a name="dns4-CHP-4-FIG-1" /></a><div class="figure"><img height="295" alt="Figure 4-1" src="figs/dns4_0401.gif" width="420" /></div><h4 class="objtitle">Figure 4-1. The Movie University network</h4>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.2. Choosing a Domain Name</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.2. Setting Up Zone Data</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:19 GMT -->
+</html>

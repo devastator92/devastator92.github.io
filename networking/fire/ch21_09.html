@@ -1,0 +1,360 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+<head><title>Auth and identd (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch22_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">21.9. Auth and identd</h2>
+
+
+
+
+
+<a name="INDEX-2024" /> <a name="INDEX-2025" />Auth<em class="emphasis">
+</em>is a protocol used to identify a remote user that
+generated a connection. The protocol is also sometimes referred to as
+<em class="emphasis">identd</em>, which is the name of a popular Unix
+daemon that implements it. Auth is used with protocols that do not
+identify a remote user that is generating a connection. When you make
+a connection with one of these protocols, the server you're
+talking to makes a connection back to your Auth<em class="emphasis">
+</em>server to get the information. For instance, HTTP requests
+don't include information about the user that made the request,
+so HTTP servers may use Auth to try to get that information to make
+log files more useful. SMTP and IRC requests do include information
+about the user, but that information is directly controlled by the
+user, who might be lying, so SMTP and IRC servers often use
+Auth to attempt to get more trustworthy
+information. Both attackers and network administrators also use Auth
+for more general information-gathering purposes.</p><p>
+
+
+
+
+
+Auth is really useful only if you can trust the remote server. If the
+people who're trying to lie to you control the Auth<em class="emphasis">
+</em>server, you're not going to get good information out
+of it. This means that Auth information may be interesting, but
+it's rarely trustworthy.</p><p>
+
+
+
+
+
+Furthermore, the information that normal Auth<em class="emphasis">
+</em>servers give out is information that's useful to
+attackers. The standard implementations of Auth<em class="emphasis">
+</em>simply give out usernames, and you don't want
+attackers to know what usernames are valid at your site. Some
+versions of <em class="emphasis">identd</em> and other Auth servers give
+out a unique per-user value that is not the username. This is useful
+to HTTP servers (all they want to know is how many different people
+are talking to them) and can be useful in tracking back attacks (if
+you log the value, an administrator at the attacking site can connect
+it to a username). It can be annoying for SMTP and IRC, which will
+normally display the value for human beings to look at.</p><p>
+
+
+
+
+
+<a name="ch21-31-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.9.1. Packet Filtering Characteristics of Auth</h3>
+
+
+
+
+
+Auth is a TCP-based service. Servers use port
+113. Clients use ports above 1023.</p><p>
+
+
+
+
+
+<a name="ch21-32-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+113</p><p></td>
+<td>
+<a href="#FOOTNOTE-145">[145]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>
+Query, external client to internal server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+113</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, internal server to external client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+113</p><p></td>
+<td><a href="#FOOTNOTE-145">[145]</a></td>
+<td>
+Query, internal client to external server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+113</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Response, external server to internal client</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<a name="FOOTNOTE-145" />[145]ACK is not set on the first packet of this
+type (establishing connection) but will be set on the rest.</p><p>
+
+
+
+
+</blockquote>
+
+We do not recommend discarding packets to port 113. If you choose not
+to permit this protocol, we suggest that you reject the packets with
+an error response or reset the connection. If you drop packets, you
+will experience delays when connecting to sites that insist on
+performing Auth lookups, and this may significantly slow down your
+electronic mail in particular. See <a href="ch08_01.html">Chapter 8, "Packet Filtering"</a>, for
+more information about ways of responding to packets that you do not
+wish to accept.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-33-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.9.2. Proxying Characteristics of Auth</h3>
+
+
+
+
+
+A number of Auth proxy servers are available, mostly designed to let
+people use IRC servers that require Auth without giving away too much
+information. They are not traditional proxy servers; instead of
+proxying for internal clients, allowing them to make outbound Auth
+queries, they proxy for external clients, allowing them to make
+inbound Auth queries. Furthermore, they rarely complete the proxying
+process by forwarding the queries to the internal host, but reply to
+the queries immediately, usually with randomly chosen information.</p><p>
+
+
+
+
+
+For instance, Microsoft Proxy Server includes a service called
+"Identd Simulation service" that responds to Auth queries
+with randomly chosen identifiers. This sort of service is preferable
+to genuine proxying of Auth queries, which would leak information you
+probably do not want external hosts to have.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-34-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.9.3. Network Address Translation Characteristics of Auth</h3>
+
+
+
+
+
+Auth does not use embedded IP addresses, but it
+does contain port numbers. Auth will work transparently through
+network address translation systems, as long as they are changing
+only the host address and not the port number. On the other hand,
+Auth connections usually go in the opposite direction from the
+connections that caused them. That is, an outgoing SMTP or IRC
+connection will result in an inbound Auth connection; if the network
+address translation system is mapping ports instead of entire hosts,
+there will be no mapping for that inbound translation. You may
+therefore need to do special mappings to get Auth to work. For
+instance, you may want to direct all inbound Auth connections,
+regardless of their original destination, to an Auth proxy.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-35-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.9.4. Summary of Recommendations for Auth</h3>
+
+
+
+
+
+<ul><li>Do not allow Auth through your firewall, but answer Auth queries with
+ICMP errors or TCP resets rather than simply dropping them, in order
+to speed up connections to servers that use Auth.</p><p></li><li>If you decide to run an Auth server, choose one that does not return
+valid usernames.</p><p></li><li>If you make Auth queries, don't trust the answers.<a name="INDEX-2026" /> <a name="INDEX-2027" /></p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch22_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">21.8. TACACS and Friends</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">22. Administrative Services</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+</html>

@@ -1,0 +1,234 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:57 GMT -->
+<head><title>Configuring DNS (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+
+<h1 class="chapter">Chapter 8. Configuring DNS</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <p> <a href="#tcp3-CHP-8-SECT-1">BIND: Unix Name Service </a><br />
+<a href="ch08_02.html">Configuring the Resolver </a><br />
+<a href="ch08_03.html">Configuring named </a><br />
+<a href="ch08_04.html">Using nslookup </a><br />
+<a href="ch08_05.html">Summary </a><br /></p></div>
+
+
+<p>Congratulations! You have installed TCP/IP in the kernel, configured
+the network interface, and configured routing. At this point, you
+have completed all of the configuration tasks required to run TCP/IP
+on a Unix system. While none of the remaining tasks is
+<em class="emphasis">required</em> for TCP/IP software to operate, they
+are necessary for making the network more friendly and useful. In the
+next two chapters, we look at how to configure basic TCP/IP network
+services. Perhaps the most important of these is name service.
+</p>
+
+<p>It is, as the name implies, a service -- specifically, a service
+intended to make the network more user-friendly. Computers are
+perfectly happy with IP addresses, but people prefer names. The
+importance of name service is indicated by the amount of coverage it
+has in this book. <a href="ch03_01.html">Chapter 3, "Network Services"</a> discusses
+<em class="emphasis">why</em> name service is needed; this chapter covers
+<em class="emphasis">how</em> it is configured; and <a href="appc_01.html">Appendix C, "A named Reference"</a> covers the <em class="emphasis">details</em> of the
+name server configuration commands. This chapter provides sufficient
+information to show you how to configure the BIND software to run on
+your system.<a href="#FOOTNOTE-82">[82]</a> But if you want to know more about why
+something is done or details on how to do it, don't hesitate to
+refer to <a href="ch03_01.html">Chapter 3, "Network Services"</a> and <a href="appc_01.html">Appendix C, "A named Reference"</a>.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-82" /></a><p>[82]BIND 8 is the version of domain name
+software that comes with most versions of Linux and with Solaris 8. A
+newer version of DNS software -- BIND 9 -- is also available.
+BIND 8 and BIND 9 use essentially the same configuration file syntax.
+The examples presented here should work with both BIND 8 and BIND
+9.</p> </blockquote>
+
+
+<div class="sect1"><a name="tcp3-CHP-8-SECT-1" /></a>
+<h2 class="sect1">8.1. BIND: Unix Name Service </h2>
+
+<p>In Unix, DNS is <a name="INDEX-1563" /></a>
+<a name="INDEX-1564" /></a>
+<a name="INDEX-1565" /></a>implemented<a name="INDEX-1566" /></a> by the
+<em class="emphasis">Berkeley Internet Name Domain</em> (BIND) software.
+BIND is a client/server software system. The client side of BIND is
+called the <em class="emphasis">resolver</em>. It generates the queries
+for domain name information and sends them to the server. The DNS
+server software answers the resolver's queries. The server side
+of BIND is a daemon called
+<tt class="literal">named</tt><a name="INDEX-1567" /></a> (pronounced "name"
+"d").
+</p>
+
+<p>This chapter covers three basic BIND configuration tasks:</p>
+
+<ul><li>
+<p>Configuring the BIND resolver</p>
+</li><li>
+<p>Configuring the BIND name server (<tt class="literal">named</tt>)</p>
+</li><li>
+<p>Constructing the name server database files, called the
+<em class="emphasis">zone files</em>
+</p>
+</li></ul>
+<p>A <em class="emphasis">zone</em>
+<a name="INDEX-1568" /></a>is a piece of the
+<a name="INDEX-1569" /></a>domain
+namespace over which a name server holds authority. A zone cannot
+contain a domain that is delegated to another server. Here we use
+"zone" to refer to the DNS database file, while the term
+"domain" is used in more general contexts. In this book,
+a domain is part of the domain hierarchy identified by a domain name.
+A zone is a collection of domain information contained in a DNS
+database file. The file that contains the domain information is
+called a zone file.
+</p>
+
+<p><a name="INDEX-1570" /></a>RFC 1033, the
+<em class="emphasis">Domain Administrators Operations Guide</em>, defines
+the basic set of standard records used to construct zone files. Many
+RFCs propose new DNS records that are not widely implemented. In this
+chapter and in <a href="appc_01.html">Appendix C, "A named Reference"</a>, we stick to the basic
+resource records that you are most likely to use. We'll use
+these records to construct the zone files used in this chapter. But
+how, or even if, you need to construct zone files on your system is
+controlled by the type of BIND configuration you decide to use.
+</p>
+
+<a name="tcp3-CHP-8-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">8.1.1. BIND Configurations </h3>
+
+<p>BIND configurations <a name="INDEX-1571" /></a>
+<a name="INDEX-1572" /></a>
+<a name="INDEX-1573" /></a>are
+described by the type of service the software is configured to
+provide. The four levels of service that can be defined in a BIND
+configuration are <em class="emphasis">resolver-only systems</em>,
+<em class="emphasis">caching-only servers</em>, <em class="emphasis">master
+servers</em>, and <em class="emphasis">slave servers</em>.
+</p>
+
+<p>The <a name="INDEX-1574" /></a>resolver is
+the code that asks name servers for domain information. On Unix
+systems, it is implemented as a library rather than as a separate
+client program. Some systems, called resolver-only systems, use only
+the resolver; they don't run a name server. Resolver-only
+systems are very easy to configure: you just need to set up the
+<em class="emphasis">/etc/resolv.conf</em><a name="INDEX-1575" /></a> file.
+</p>
+
+<p>The three other BIND configurations all require that the local system
+run the <tt class="literal">named</tt> server software. They are:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Master</em></i></dt>
+<dd>
+<p>The <a name="INDEX-1576" /></a>
+<a name="INDEX-1577" /></a>
+<a name="INDEX-1578" /></a>
+<a name="INDEX-1579" /></a>master name server is the authoritative
+source for all information about a specific zone. It loads the domain
+information from a locally maintained disk file that is built by the
+domain administrator. This file (the zone file) contains the most
+accurate information about a piece of the domain hierarchy over which
+this name server has authority. The master server is an authoritative
+server because it can answer any query about its zone with full
+authority.
+</p>
+
+<p>Configuring a master server requires creating a complete set of
+configuration files: zone files for the forward-mapping zone and the
+reverse-mapping zone, the conf file, the root hints file, and the
+loopback file. No other configuration requires creating this complete
+set of files.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Slave</em></i></dt>
+<dd>
+<p>A slave <a name="INDEX-1580" /></a>
+<a name="INDEX-1581" /></a>
+<a name="INDEX-1582" /></a>
+<a name="INDEX-1583" /></a>server
+transfers a complete set of zone information from the master server.
+The zone data is transferred from the master server and stored on the
+slave server as a local disk file. This transfer is aptly called a
+<em class="emphasis">zone transfer</em><a name="INDEX-1584" /></a>. A slave server keeps a complete copy
+of all zone information and can answer queries about that zone with
+authority. Therefore, a slave server is also considered an
+authoritative server.
+</p>
+
+
+<p>Configuring a slave server does not require creating local zone files
+because the zone files are downloaded from the master server.
+However, other files (a boot file, a cache file, and a loopback file)
+are required.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Caching-only</em></i></dt>
+<dd>
+<p>A caching-only <a name="INDEX-1585" /></a>
+<a name="INDEX-1586" /></a>
+<a name="INDEX-1587" /></a>
+<a name="INDEX-1588" /></a>server
+runs the name server software but keeps no zone files. It learns the
+answer to every name server query from some remote server. Once it
+learns an answer, the server caches the answer and uses it to answer
+future queries for the same information. All name servers use cached
+information in this manner, but a caching-only server depends on this
+technique for all of its name server information. It is not
+considered an authoritative server because all of the information it
+provides is secondhand. Only a boot file and a cache file are
+required for a caching-only configuration, but the most common
+configuration also includes a loopback file. This is probably the
+most common name server configuration, and apart from the
+resolver-only configuration, it is the easiest to configure.
+</p>
+</dd>
+
+</dl>
+
+<p>A name server may use any one of these configurations or, as is often
+the case, it may combine elements of more than one type of
+configuration. However, all systems run the resolver, so let's
+begin by examining the configuration of the client side of the DNS
+software.
+</p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch07_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">7.8. Summary </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.2. Configuring the Resolver </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch08_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:58 GMT -->
+</html>

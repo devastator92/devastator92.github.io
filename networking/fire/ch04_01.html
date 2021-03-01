@@ -1,0 +1,647 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:25 GMT -->
+<head><title>Packets and Protocols  (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="part2.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 4. Packets and Protocols </h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#INDEX-264">What Does a Packet Look Like?</a><br />
+<a href="ch04_02.html">IP</a><br />
+<a href="ch04_03.html">Protocols Above IP</a><br />
+<a href="ch04_04.html">Protocols Below IP</a><br />
+<a href="ch04_05.html">Application Layer Protocols</a><br />
+<a href="ch04_06.html">IP Version 6</a><br />
+<a href="ch04_07.html">Non-IP Protocols</a><br />
+<a href="ch04_08.html">Attacks Based on Low-Level Protocol Details</a><br /></p><p></div>
+
+
+
+
+
+
+
+In order to understand firewall technology, you need to understand
+something about the underlying objects that firewalls deal with:
+packets and protocols. We provide a brief introduction to high-level
+IP<a href="#FOOTNOTE-6">[6]</a> networking concepts (a necessity for understanding
+firewalls) here, but if you're not already familiar with the
+topic, you will probably want to consult a more general reference on
+TCP/IP (for instance, <em class="emphasis">TCP/IP</em><em class="citetitle"> Network
+Administration</em>, by Craig Hunt, published by
+O'Reilly and Associates).</p><p><blockquote class="footnote">
+<a name="FOOTNOTE-6" /></a>[6]Unless otherwise noted, we are discussing IP
+version 4, which is the version currently in common use.</p><p>
+</blockquote>
+
+
+
+
+
+<a name="INDEX-262" /></a>To transfer
+information across a network, the information has to be broken up
+into small pieces, each of which is sent separately. Breaking the
+information into pieces allows many systems to share the network,
+each sending pieces in turn. In IP networking, those small pieces of
+data are called <em class="emphasis">packets</em>. All data transfer
+across IP networks happens in the form of packets.</p><p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="sect1"><a name="ch04-4256" /></a>
+<a name="INDEX-263" /></a>
+<a name="INDEX-264" /></a><a name="INDEX-265" /></a><a name="INDEX-266" /></a><a name="INDEX-267" /></a><h2 class="sect1">4.1. What Does a Packet Look Like?</h2>
+
+
+
+
+
+<a name="INDEX-268" /></a>To
+understand packet filtering, you first have to understand packets and
+how they are layered to build up the TCP/IP protocol stack, which is:</p><p>
+
+
+
+
+
+<ul><li>Application layer (e.g., FTP, Telnet, HTTP)</p><p></li><li>Transport layer (TCP or UDP)<p></p></li><li><p>Internet layer (IP)</p></li><li><p>Network access layer (e.g., Ethernet, FDDI, ATM)</p></li></ul>
+Packets are constructed in such a way that layers for each protocol
+used for a particular connection are wrapped around the packets, like
+the layers of skin on an onion.</p><p>
+
+
+
+
+
+<a name="INDEX-269" /></a><a name="INDEX-270" /></a>At each layer (except perhaps at the
+application layer), a packet has two parts: the header and the body.
+The header contains protocol information relevant to that layer,
+while the body contains the data for that layer, which often consists
+of a whole packet from the next layer in the stack. Each layer treats
+the information it gets from the layer above it as data, and applies
+its own header to this data. At each layer, the packet contains all
+of the information passed from the higher layer; nothing is lost.
+This process of preserving the data while attaching a new header is
+known as<em class="emphasis">
+encapsulation</em>.<a name="INDEX-271" /></a></p><p>
+
+
+
+
+
+At the application layer, the packet consists simply of the data to
+be transferred (for example, part of a file being transferred during
+an FTP session). As it moves to the transport layer, the Transmission
+Control Protocol (TCP) or the User Datagram Protocol (UDP) preserves
+the data from the previous layer and attaches a header to it. At the
+next layer, the Internet layer, IP considers the entire packet
+(consisting now of the TCP or UDP header and the data) to be data and
+now attaches its own IP header. Finally, at the network access layer,
+Ethernet or another network protocol considers the entire IP packet
+passed to it to be data and attaches its own header. <a href="ch04_01.html#ch04-61518">Figure 4-1</a> shows how this works.</p><p>
+
+
+
+
+
+<a name="ch04-61518" /></a><div class="figure"><img height="239" alt="Figure 4-1" src="figs/fire2.0401.gif" width="457" /></div><h4 class="objtitle">Figure 4-1. Data encapsulation</h4>
+
+At the other side of the connection, this process is reversed. As the
+data is passed up from one layer to the next higher layer, each
+header (each skin of the onion) is stripped off by its respective
+layer. For example, the Internet layer removes the IP header before
+passing the encapsulated data up to the transport layer (TCP or UDP).</p><p>
+
+
+
+
+
+In trying to understand packet filtering, the most important
+information from our point of view is in the headers of the various
+layers. The following sections look at several examples of different
+types of packets and show the contents of each of the headers that
+packet filtering routers will be examining. We assume a certain
+knowledge of TCP/IP fundamentals and concentrate on discussing the
+particular issues related to packet filtering.</p><p>
+
+
+
+
+
+In the following discussion, we start with a simple example
+demonstrating TCP/IP over Ethernet. From there, we go on to discuss
+IP's packet filtering characteristics, then protocols above IP
+(such as TCP, UDP, and ICMP), protocols below IP (such as Ethernet),
+and finally non-IP protocols (such as NetBEUI, AppleTalk, and
+IPX).<a name="INDEX-272" /></a></p><p>
+
+
+
+
+
+<a name="ch04-4322" /></a><div class="sect2">
+<h3 class="sect2">4.1.1. TCP/IP/Ethernet Example</h3>
+
+
+
+
+
+<a name="INDEX-273" /></a>Let's
+consider an example of a TCP/IP packet (for example, one that is part
+of a Telnet connection) on an Ethernet.<a href="#FOOTNOTE-7">[7]</a> We're interested in four layers
+here: the Ethernet layer, the IP layer, the TCP layer, and the data
+layer. In this section, we'll consider them from bottom to top
+and look at the contents of the headers that the packet filtering
+routers will be examining.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-7" /></a>[7]Ethernet is
+the most popular networking protocol currently at the link layer;
+10-base T and 100-base T networks are almost always Ethernet
+networks.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="ch04-4332" /></a><div class="sect3">
+<h3 class="sect3">4.1.1.1. Ethernet layer</h3>
+
+
+
+
+<a name="INDEX-274" /></a>
+
+At the Ethernet layer, the packet consists of two parts: the Ethernet
+header and the Ethernet body. In general, you won't be able to
+do packet filtering based on information in the Ethernet header. In
+some situations, you may be interested in Ethernet address
+information. The Ethernet address is also known as the MAC (Media
+Access Control) address. Basically, the header tells you:</p><p>
+
+
+
+
+
+<dl>
+<dt><i><em class="emphasis">What kind of packet this is</em></i></dt>
+<dd>We'll assume in this example that it is an IP packet, as
+opposed to an AppleTalk packet, a Novell packet, a DECNET packet, or
+some other kind of packet.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The Ethernet address of the machine that put the packet onto this particular Ethernet network segment</em></i></dt>
+<dd>The original source machine, if it's attached to this segment;
+otherwise, the last router in the path from the source machine to
+here.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The Ethernet address of the packet's destination on this particular Ethernet network segment</em></i></dt>
+<dd>Perhaps the destination machine, if it's attached to this
+segment; otherwise, the next router in the path from here to the
+destination machine. Occasionally it's a broadcast address
+indicating that all machines should read the packet, or a multicast
+address indicating that a group of subscribing machines should read
+the packet.</p><p></dd>
+
+</dl>
+
+
+
+
+
+Because we are considering IP packets in this example, we know that
+the Ethernet body contains an IP packet.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch04-4353" /></a><div class="sect3">
+<h3 class="sect3">4.1.1.2. IP layer</h3>
+
+
+
+
+
+<a name="INDEX-275" /></a>At the IP layer, the IP packet is made
+up of two parts: the IP header and the IP body, as shown in <a href="ch04_01.html#ch04-55537">Figure 4-2</a>. From a packet filtering point of view, the IP
+header contains four interesting pieces of information:</p><p>
+
+
+
+
+
+<dl>
+<dt><i><em class="emphasis">The</em> IP <em class="emphasis">source address</em></i></dt>
+<dd>Four bytes long and typically written as something like 172.16.244.34.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The</em> IP <em class="emphasis">destination address</em></i></dt>
+<dd>Just like the IP source address.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The</em> IP <em class="emphasis">protocol type</em></i></dt>
+<dd>Identifies the IP body as a TCP packet, as opposed to a UDP packet,
+an ICMP (Internet Control Message Protocol) packet, or some other
+type of packet.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The</em> IP <em class="emphasis">options field</em></i></dt>
+<dd>Almost always empty; where options like the IP source route and the
+IP security options would be specified if they were used for a given
+packet (see the discussion in <a href="ch04_02.html#ch04-4472">Section 4.2.2, "IP Options"</a>, later in this
+chapter).</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch04-55537" /></a><div class="figure"><img height="206" alt="Figure 4-2" src="figs/fire2.0402.gif" width="411" /></div><h4 class="objtitle">Figure 4-2. IP header and body</h4>
+
+ost networks have a limit on the maximum length of a packet, which
+is much shorter than the limit imposed by IP. In order to deal with
+this conflict,
+<a name="INDEX-276" /></a><a name="INDEX-277" /></a>IP may divide a packet that is too large
+to cross a given network into a series of smaller packets called
+<em class="emphasis">fragments</em>. Fragmenting a packet doesn't
+change its structure at the IP layer (the IP headers are duplicated
+into each fragment), but it may mean that the body contains only a
+part of a packet at the next layer. (See the discussion in <a href="ch04_02.html#ch04-4492">Section 4.2.3, "IP Fragmentation"</a>, later in this chapter.)</p><p>
+
+
+
+
+
+The IP body in this example contains an unfragmented TCP packet,
+although it could just as well contain the first fragment of a
+fragmented TCP packet.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch04-4410" /></a><div class="sect3">
+<h3 class="sect3">4.1.1.3. TCP layer</h3>
+
+
+
+
+
+At the TCP layer, the packet again contains two parts: the TCP header
+and the TCP body. From a packet filtering point of view, the TCP
+header contains three interesting pieces of information:</p><p>
+
+
+
+
+
+<dl>
+<dt><i><em class="emphasis">The</em> TCP <em class="emphasis">source port</em></i></dt>
+<dd>A two-byte number that specifies what client or server process the
+packet is coming from on the source machine.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The</em> TCP <em class="emphasis">destination port</em></i></dt>
+<dd>A two-byte number that specifies what client or server process the
+packet is going to on the destination machine.</p><p></dd>
+
+
+
+
+
+<dt><i><em class="emphasis">The</em> TCP <em class="emphasis">flags field</em></i></dt>
+<dd><a name="INDEX-278" /></a>This field contains various flags that are
+used to indicate special kinds of packets, particularly during the
+process of setting up and tearing down TCP connections. These flags
+are discussed further in the sections that follow.</p><p></dd>
+
+</dl>
+
+
+
+
+
+The TCP body contains the actual "data" being transmitted
+ --  for example, for Telnet the keystrokes or screen displays
+that are part of a Telnet session, or for FTP the data being
+transferred or commands being issued as part of an FTP
+session.<a name="INDEX-279" /></a></p><p>
+</div>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="part2.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">II. Building Firewalls</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.2. IP</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:49:27 GMT -->
+</html>

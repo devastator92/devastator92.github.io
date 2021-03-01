@@ -1,0 +1,1887 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:58 GMT -->
+<head><title>Local Network Services (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+
+<h1 class="chapter">Chapter 9. Local Network Services</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+  <p> <a href="#tcp3-CHP-9-SECT-1">The Network File System </a><br />
+<a href="ch09_02.html">Sharing Unix Printers </a><br />
+<a href="ch09_03.html">Using Samba to Share Resources with Windows</a><br />
+<a href="ch09_04.html">Network Information Service </a><br />
+<a href="ch09_05.html">DHCP </a><br />
+<a href="ch09_06.html">Managing Distributed Servers </a><br />
+<a href="ch09_07.html">Post Office Servers </a><br />
+<a href="ch09_08.html">Summary </a><br /></p></div>
+
+<p>Now our attention turns to configuring local network servers. As with
+name service, these servers are not strictly required for the network
+to operate, but they provide services that are central to the
+network's purpose.
+</p>
+
+<p>There are many network services -- many more than can be covered
+in this chapter. Here we concentrate on servers that provide
+essential services for local clients. The services covered in this
+chapter are:
+</p>
+
+<ul><li>
+<p>The Network File System (NFS)</p>
+</li><li>
+<p>The Line Printer Daemon (LPD) and the Line Printer (LP) service</p>
+</li><li>
+<p>Windows file and print services (Samba)</p>
+</li><li>
+<p>The Network Information Service (NIS)</p>
+</li><li>
+<p>Dynamic Host Configuration Protocol (DHCP)</p>
+</li><li>
+<p>The Post Office Protocol (POP)</p>
+</li><li>
+<p>Internet Message Access Protocol (IMAP)</p>
+</li></ul>
+<p>All of these software packages are designed to provide service to
+systems within your organization and are not intended to service
+outsiders. Essential services that are as important to external users
+as they are to in-house users, such as email, web service, and name
+service, are covered in separate chapters.
+</p>
+
+<p>We begin our discussion of local network services with NFS, which is
+the server that provides file sharing on Unix networks.
+</p>
+
+
+<div class="sect1"><a name="tcp3-CHP-9-SECT-1" /></a>
+<h2 class="sect1">9.1. The Network File System </h2>
+
+<p>The Network <a name="INDEX-1738" /></a>
+<a name="INDEX-1739" /></a>
+<a name="INDEX-1740" /></a>
+<a name="INDEX-1741" /></a>File
+System (NFS) allows directories and files to be shared across a
+network. It was originally developed by Sun Microsystems but is now
+supported by virtually all Unix and many non-Unix operating systems.
+Through NFS, users and programs can access files located on remote
+systems as if they were local files. In a perfect NFS environment,
+the user neither knows nor cares where files are actually stored.
+</p>
+
+<p>NFS has several benefits: </p>
+
+<ul><li>
+<p>It reduces local disk storage requirements because a server can store
+a single copy of a directory that is fully accessible to everyone on
+the network.
+</p>
+</li><li>
+<p>It simplifies central support tasks -- files can be updated
+centrally yet be available throughout the network.
+</p>
+</li><li>
+<p>It allows users to use familiar Unix commands to manipulate remote
+files instead of learning new commands. There is no need to use
+<tt class="literal">ftp</tt> or <tt class="literal">rcp</tt> to copy a file
+between hosts on the network; <tt class="literal">cp</tt> works fine.
+</p>
+</li></ul>
+<p>There are two sides to NFS: a client side and a server side. The
+<a name="INDEX-1742" /></a>
+<a name="INDEX-1743" /></a>client
+is the system that uses the remote directories as if they were part
+of its local filesystem. The server is the system that makes the
+directories available for use. Attaching a remote directory to the
+local filesystem (a client function) is called
+<em class="emphasis">mounting</em><a name="INDEX-1744" /></a> a directory. Offering a directory
+for remote access (a server function) is called
+<em class="emphasis">sharing</em> or
+<em class="emphasis">exporting</em><a name="INDEX-1745" /></a> a
+directory.<a href="#FOOTNOTE-98">[98]</a> Frequently, a
+system runs both the client and the server NFS software. In this
+section we'll look at how to configure a system to export and
+mount directories using NFS.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-98" /></a><p>[98]Solaris uses the term
+<em class="emphasis">sharing</em>. Most other systems use the term
+<em class="emphasis">exporting</em>.</p> </blockquote>
+
+<p>If you're responsible for an NFS server for a large site, you
+should take care in planning and implementing the NFS environment.
+This chapter describes how NFS is configured to run on a client and a
+server, but you may want more details to design an optimal NFS
+environment. For a comprehensive treatment, see <em class="emphasis">Managing
+NFS and NIS</em> by Hal Stern (O'Reilly &amp;
+Associates).
+</p>
+
+<a name="tcp3-CHP-9-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">9.1.1. NFS Daemons </h3>
+
+<p>The Network File System is <a name="INDEX-1746" /></a>
+<a name="INDEX-1747" /></a>
+<a name="INDEX-1748" /></a>
+<a name="INDEX-1749" /></a>run
+by several daemons, some performing client functions and some
+performing server functions. Before we discuss the NFS configuration,
+let's look at the function of the daemons that run NFS on a
+Solaris 8 system:
+</p>
+
+<dl>
+<dt><b><tt class="literal">nfsd [</tt><em class="replaceable">nservers</em><tt class="literal">]</tt></b></dt>
+<dd>
+<p>The NFS daemon, <tt class="literal">nfsd</tt><a name="INDEX-1750" /></a>, runs on NFS servers. This daemon
+services the client's NFS requests. The
+<em class="replaceable">nservers</em> option specifies how many daemons
+should be started.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">mountd</tt></b></dt>
+<dd>
+<p>The NFS mount daemon,
+<tt class="literal">mountd</tt><a name="INDEX-1751" /></a>, processes the clients' mount
+requests. NFS servers run the mount daemon.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">nfslogd</tt></b></dt>
+<dd>
+<p>The NFS logging daemon, <a name="INDEX-1752" /></a><tt class="literal">nfslogd</tt>, logs
+activity for exported filesystems. NFS servers run the logging
+daemon.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">rquotad</tt></b></dt>
+<dd>
+<p>The remote quota server,
+<tt class="literal">rquotad</tt><a name="INDEX-1753" /></a>, provides information about user quotas
+on remote filesystems that is then displayed by the
+<tt class="literal">quota</tt> command. The remote quota server is run on
+both clients and servers.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">lockd</tt></b></dt>
+<dd>
+<p>The lock daemon, <tt class="literal">lockd</tt><a name="INDEX-1754" /></a>, handles file lock requests. Both
+clients and servers run the lock daemon. Clients request file locks,
+and servers grant them.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">statd</tt></b></dt>
+<dd>
+<p>The network status monitor daemon,
+<tt class="literal">statd</tt><a name="INDEX-1755" /></a>, is required by
+<tt class="literal">lockd</tt> to provide monitoring services. In
+particular, it allows locks to be reset properly after a crash. Both
+clients and servers run <tt class="literal">statd</tt>.
+</p>
+</dd>
+
+</dl>
+
+<p>On a <a name="INDEX-1756" /></a>Solaris 8 system, the daemons
+necessary to run NFS are found in the
+<em class="emphasis">/usr/lib/</em><a name="INDEX-1757" /></a><em class="emphasis">nfs</em> directory.
+Most of these daemons are started at boot time by two scripts located
+in the <em class="emphasis">/etc/init.d</em> directory,
+<em class="emphasis">nfs.client</em><a name="INDEX-1758" /></a> and
+<em class="emphasis">nfs.server</em><a name="INDEX-1759" /></a>. The <em class="emphasis">nfs.client</em>
+script starts the <tt class="literal">statd</tt> and
+<tt class="literal">lockd</tt> programs.<a href="#FOOTNOTE-99">[99]</a> </p><blockquote class="footnote"> <a name="FOOTNOTE-99" /></a><p>[99]Alternatively, the
+prefix <em class="emphasis">rpc</em>. may be used on the daemon names. For
+example, the Slackware Linux system uses the filename
+<em class="emphasis">rpc.nfsd</em> for the NFS daemon. Check your
+system's documentation.</p> </blockquote>
+
+<p>NFS server systems
+run those two daemons, plus the NFS server daemon
+(<tt class="literal">nfsd</tt>), the NFS logging daemon
+(<tt class="literal">nfslogd</tt>), and the mount server daemon
+(<tt class="literal">mountd</tt>). On Solaris systems, the
+<em class="emphasis">nfs.server</em> script starts
+<tt class="literal">mountd</tt>, <tt class="literal">nfslogd</tt>, and 16 copies
+of <tt class="literal">nfsd</tt>. Solaris systems do not normally start
+<tt class="literal">rquotad</tt> at boot time. Instead,
+<tt class="literal">rquotad</tt> is started by <tt class="literal">inetd</tt>, as
+this <tt class="literal">grep</tt> of the
+<em class="filename">/etc/inetd.conf</em> file shows:
+</p>
+
+<blockquote><pre class="code">$ <b class="emphasis-bold">grep rquotad /etc/inetd.conf</b>
+rquotad/1   tli   rpc/datagram_v  wait root /usr/lib/nfs/rquotad  rquotad</pre></blockquote>
+
+<p>Each system has its own technique for starting these daemons. If some
+of the daemons aren't starting, ensure your startup scripts and
+your <em class="filename">inetd.conf</em><a name="INDEX-1760" /></a> file are correct.
+</p>
+
+</div>
+<a name="tcp3-CHP-9-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">9.1.2. Sharing Unix Filesystems </h3>
+
+<p>The first step <a name="INDEX-1761" /></a>
+<a name="INDEX-1762" /></a>
+<a name="INDEX-1763" /></a>
+<a name="INDEX-1764" /></a>in
+configuring a server is deciding which filesystems will be shared and
+what restrictions will be placed on them. Only filesystems that
+provide a benefit to the client should be shared. Before you share a
+filesystem, think about what purpose it will serve. Some common
+reasons for sharing filesystems are:
+</p>
+
+<ul><li>
+<p>To provide disk space to diskless clients</p>
+</li><li>
+<p>To prevent unnecessary duplication of the same data on multiple
+systems
+</p>
+</li><li>
+<p>To provide centrally supported programs and data</p>
+</li><li>
+<p>To share data among users in a group</p>
+</li></ul>
+<p>Once you've selected the filesystems you'll share, you
+must configure them for sharing using the appropriate commands for
+your system. The following section emphasizes the way this is done on
+Solaris systems. It is very different on Linux systems, which are
+covered later. Check your system's documentation to find out
+exactly how it implements NFS file sharing.
+</p>
+
+<a name="tcp3-CHP-9-SECT-1.2.1" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.1. The share command </h3>
+
+<p>On <a name="INDEX-1765" /></a>Solaris systems, directories are
+exported using the <tt class="literal">share</tt> command.
+</p>
+
+<p>A simplified syntax for the <tt class="literal">share</tt> command is:</p>
+
+<blockquote><pre class="code"> <tt class="userinput"><b>share -F nfs </b></tt>[-o <em class="replaceable">options</em>] <em class="replaceable">pathname</em></pre></blockquote>
+
+<p>where <em class="replaceable">pathname</em> is the path of the
+directory the server is offering to share with its clients, and
+<em class="replaceable">options</em> are <a name="INDEX-1766" /></a>the access
+controls for that directory. The options are:
+</p>
+
+<dl>
+<dt><b><tt class="literal">rw</tt></b></dt>
+<dd>
+<p>The <tt class="literal">rw</tt><a name="INDEX-1767" /></a>
+option grants <a name="INDEX-1768" /></a> <a name="INDEX-1769" /></a>read and write access to the
+shared filesystem. It can be specified in the form
+<tt class="literal">rw=</tt><em class="replaceable">accesslist</em> to
+identify the systems that are granted this access. When used in this
+way, only the systems identified in the list are given access to the
+filesystem. If the access list is not provided with the
+<tt class="literal">rw</tt> option, all hosts are given read/write access
+to the filesystem.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">ro</tt></b></dt>
+<dd>
+<p>This <a name="INDEX-1770" /></a>option limits access to read-only. It
+also can be specified with an access list, e.g.,
+<tt class="literal">ro=</tt><em class="replaceable">accesslist</em>. When the
+access list is included, only the systems on the list have access and
+that access is limited to read-only. If the access list is not
+provided with the <tt class="literal">ro</tt> option, all hosts are given
+read-only access to the filesystem, which is the default if no
+options are specified.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">aclok</tt></b></dt>
+<dd>
+<p>This <a name="INDEX-1771" /></a>option grants full access
+<a name="INDEX-1772" /></a>to all clients, which could open up a
+security hole. This option is documented on the Solaris system, but
+it should never be used. It is intended to provide backward
+compatibility with a version of NFS that no longer exists.
+</p>
+</dd>
+
+
+<a name="INDEX-1773" /></a><dt><b><tt class="literal">anon=</tt><em class="replaceable">uid</em></b></dt>
+<dd>
+<p>Defines the <a name="INDEX-1774" /></a>UID used
+for users who do not provide a valid user ID.
+</p>
+</dd>
+
+
+<a name="INDEX-1775" /></a><dt><b><tt class="literal">index=</tt><em class="replaceable">file</em></b></dt>
+<dd>
+<p>Tells NFS to use a web-style index file instead of a directory
+listing for this filesystem.
+</p>
+</dd>
+
+
+<a name="INDEX-1776" /></a><dt><b><tt class="literal">log[=</tt><em class="replaceable">tag</em><tt class="literal">]</tt></b></dt>
+<dd>
+<p>Enable logging. If an optional tag is <a name="INDEX-1777" /></a>specified, it must match a tag defined
+in the <em class="emphasis">/etc/nfs/nfslog.conf</em> file.
+</p>
+</dd>
+
+
+<a name="INDEX-1778" /></a><dt><b><tt class="literal">nosub</tt></b></dt>
+<dd>
+<p>Do not allow clients to mount <a name="INDEX-1779" /></a>subdirectories. The default is
+<tt class="literal">sub</tt>, which allows subdirectories to be mounted.
+</p>
+</dd>
+
+
+<a name="INDEX-1780" /></a><dt><b><tt class="literal">nosuid</tt></b></dt>
+<dd>
+<p>Do not allow clients to create <a name="INDEX-1781" /></a>setuid or
+<a name="INDEX-1782" /></a>setgid files on this filesystem. The default
+is <tt class="literal">suid</tt>, which allows clients to create setuid and
+setgid files.
+</p>
+</dd>
+
+
+<a name="INDEX-1783" /></a><dt><b><tt class="literal">public</tt></b></dt>
+<dd>
+<p>Use the public file handle for this filesystem.</p>
+</dd>
+
+
+<dt><b><tt class="literal">root=</tt><em class="replaceable">accesslist</em></b></dt>
+<dd>
+<p>This option allows the root users from the systems specified by the
+access list to have <a name="INDEX-1784" /></a>root access to the filesystem.
+</p>
+</dd>
+
+
+<a name="INDEX-1785" /></a><dt><b><tt class="literal">sec=</tt><em class="replaceable">type</em></b></dt>
+<dd>
+<p>Defines the type of
+<a name="INDEX-1786" /></a>authentication used for accessing this
+filesystem. <em class="replaceable">type</em> is a colon-separated list
+of NFS security modes. For access to be successful, the client must
+support at least one of the security modes identified in the
+<em class="replaceable">type</em> list. The possible
+<em class="replaceable">type</em> values are:
+</p>
+
+<dl>
+<a name="INDEX-1787" /></a><dt><b><tt class="literal">sys</tt></b></dt>
+<dd>
+<p>Use clear-text user IDs and group IDs to control access to the
+filesystem. This is the same as traditional Unix file permissions,
+which are granted based on UID and GID, with the exception that the
+UID and GID are passed over the network and the server must trust the
+remote source.
+</p>
+</dd>
+
+
+<a name="INDEX-1788" /></a><dt><b><tt class="literal">dh</tt></b></dt>
+<dd>
+<p>Use Diffie-Hellman public key cryptography for authentication.</p>
+</dd>
+
+
+<a name="INDEX-1789" /></a><dt><b><tt class="literal">krb4</tt></b></dt>
+<dd>
+<p>Use the Kerberos Version 4 for authentication.</p>
+</dd>
+
+
+<a name="INDEX-1790" /></a><dt><b><tt class="literal">none</tt></b></dt>
+<dd>
+<p>Do not use authentication. When no authentication is used, all users
+access the filesystem as user <em class="emphasis">nobody</em>.
+</p>
+</dd>
+
+</dl>
+</dd>
+
+
+<a name="INDEX-1791" /></a><dt><b><tt class="literal">window=</tt><em class="replaceable">seconds</em></b></dt>
+<dd>
+<p>Defines the maximum lifetime in seconds that the NFS server will
+permit for a <tt class="literal">dh</tt> or <tt class="literal">krb4</tt>
+authentication. The server rejects any security credentials that have
+a longer lifetime value. <em class="replaceable">seconds</em> defaults
+to 30000.
+</p>
+</dd>
+
+</dl>
+
+<p>A few of the options contain an access list. The access list is a
+colon-separated list that identifies computers by individual
+hostnames, individual IP addresses, or by the domain, network, or NIS
+netgroup to which the hosts belong. The syntax of these list elements
+is:
+</p>
+
+<dl>
+<a name="INDEX-1792" /></a><dt><i><em class="replaceable">hostname</em></i></dt>
+<dd>
+<p>This is any <a name="INDEX-1793" /></a>hostname that resolves to an IP
+address. It can be a fully qualified name or just the hostname as
+long as the name as written will resolve to an IP address. If the
+hostname can be found in the local host table, the short name can be
+used. If the name must be resolved by DNS, the fully qualified
+hostname, with its domain name attached, should be specified.
+However, fully qualified names should not be used if your system does
+not use DNS, i.e., if your system relies exclusively on NIS.
+</p>
+</dd>
+
+
+<a name="INDEX-1794" /></a><dt><i><em class="replaceable">address</em></i></dt>
+<dd>
+<p>An IP address <a name="INDEX-1795" /></a>
+<a name="INDEX-1796" /></a>in dotted decimal format can be used.
+</p>
+</dd>
+
+
+<a name="INDEX-1797" /></a><dt><i><em class="replaceable">netgroup</em></i></dt>
+<dd>
+<p>If an NIS netgroup name is used, the option applies to every system
+within that netgroup. Netgroup names look identical to unqualified
+hostnames and are easy to confuse with hostnames. Netgroup names
+should only be used if your system uses NIS.
+</p>
+</dd>
+
+
+<a name="INDEX-1798" /></a><dt><b><tt class="literal">.</tt><em class="replaceable">domain</em></b></dt>
+<dd>
+<p>A domain name is used to apply the option to every system within that
+domain. When a domain name is used, it is preceded by a dot
+(<tt class="literal">.</tt>). Thus .<em class="emphasis">wrotethebook.com</em>
+applies to every system in the <em class="emphasis">wrotethebook.com</em>
+domain. Domain names should be used only if your server uses DNS.
+</p>
+</dd>
+
+
+<a name="INDEX-1799" /></a><dt><b><tt class="literal">@</tt><em class="replaceable">network</em><tt class="literal">[/</tt><em class="replaceable">prefix</em><tt class="literal">]</tt></b></dt>
+<dd>
+<p>A network address is used to apply an option to every system within
+the network. When a network address is used, it must be preceded by
+an at-sign (<tt class="literal">@</tt>). An optional network prefix can be
+used with the address to clearly define the network mask.
+</p>
+</dd>
+
+</dl>
+
+<p>The <tt class="literal">rw</tt> and <tt class="literal">ro</tt> options can be
+combined to grant different levels of access to different clients.
+For example:
+</p>
+
+<blockquote><pre class="code">share -F nfs -o rw=crab:horseshoe ro  /usr/man
+share -F nfs -o rw=rodent:crab:horseshoe:jerboas  /export/home/research</pre></blockquote>
+
+<p>The first <tt class="literal">share</tt> command grants read and write
+access to <em class="emphasis">crab</em> and <em class="emphasis">rodent,</em>
+and read-only access to all other clients. On the other hand, the
+second <tt class="literal">share</tt> command grants read/write access to
+<em class="emphasis">rodent</em>, <em class="emphasis">crab</em>,
+<em class="emphasis">horseshoe</em>, and <em class="emphasis">jerboas</em>, and
+no access of any kind to any other client.
+</p>
+
+<p>The <tt class="literal">share</tt><a name="INDEX-1800" /></a><a name="INDEX-1801" /></a> command does not survive
+a boot. Put the <tt class="literal">share</tt> commands in the
+<em class="emphasis">/etc/dfs/dfstab</em> file to make sure that the
+filesystems continue to be offered to your clients even if the system
+reboots. Here is a sample <em class="emphasis">dfstab</em> file containing
+our two <tt class="literal">share</tt> commands:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">cat /etc/dfs/dfstab</b> 
+#   place share(1M) commands here for automatic execution 
+#   on entering init state 3. 
+# 
+#   share [-F fstype] [ -o options] [-d "&lt;text&gt;"] &lt;pathname&gt; [resource] 
+#   .e.g., 
+#   share  -F nfs  -o rw=engineering  -d "home dirs"  /export/home2 
+share -F nfs -o rw=crab:horseshoe ro  /usr/man
+share -F nfs -o rw=rodent:crab:horseshoe:jerboas  /export/home/research</pre></blockquote>
+
+<p>The <tt class="literal">share</tt> command, the <em class="emphasis">dfstab</em>
+file, and even the terminology "share" are
+Solaris-specific. Most Unix systems say that they are
+<em class="emphasis">exporting</em> files, instead of
+<em class="emphasis">sharing</em> files, when they are offering files to
+NFS clients. Furthermore, they do not use the
+<tt class="literal">share</tt> command or the <em class="emphasis">dfstab</em>
+file; instead, they offer filesystems through the
+<em class="emphasis">/etc/exports</em> file. Linux is an example of such a
+<a name="INDEX-1802" /></a>system. 
+</p>
+
+</div>
+
+<a name="tcp3-CHP-9-SECT-1.2.2" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.2. The /etc/exports file </h3>
+
+<p>The <em class="emphasis">/etc/exports</em> file <a name="INDEX-1803" /></a> <a name="INDEX-1804" /></a>
+<a name="INDEX-1805" /></a> <a name="INDEX-1806" /></a>is the NFS server configuration
+file for Linux systems. It controls which files and directories are
+exported, which hosts can access them, and what kinds of access are
+allowed. A sample <em class="emphasis">/etc/exports</em> file might
+contain these entries:
+</p>
+
+<blockquote><pre class="code">/usr/man        crab(rw) horseshoe(rw)  (ro) 
+/usr/local      (ro)
+/home/research  rodent(rw) crab(rw) horseshoe(rw) jerboas(rw)</pre></blockquote>
+
+<p>This sample file says that:</p>
+
+<ul><li>
+<p><em class="emphasis">/usr/man</em> can be mounted by any client, but it
+can be written to only by <em class="emphasis">crab</em> and
+<em class="emphasis">horseshoe</em>. Other clients have read-only access.
+</p>
+</li><li>
+<p><em class="emphasis">/usr/local</em> can be mounted by any client, with
+read-only access.
+</p>
+</li><li>
+<p><em class="emphasis">/home/research</em> can be mounted only by the hosts
+<em class="emphasis">rodent</em>, <em class="emphasis">crab</em>,
+<em class="emphasis">horseshoe</em>, and <em class="emphasis">jerboas</em>.
+These four hosts have read/write access.
+</p>
+</li></ul>
+<p>The options used in each of the entries in the
+<em class="emphasis">/etc/exports</em> file determine what kinds of access
+are allowed. The information derived from the sample file is based on
+the options specified on each line in the file. The general format of
+the entries is as follows:
+</p>
+
+<blockquote><pre class="code"> <em class="replaceable">directory</em> [<em class="replaceable">host</em>(<em class="replaceable">option</em>)]...</pre></blockquote>
+
+<p><em class="replaceable">directory</em> names the directory or file that
+is available for export. The <em class="replaceable">host</em> is the
+name of the client granted access to the exported directory, while
+the <em class="replaceable">option</em> specifies the type of access
+being granted.
+</p>
+
+<p>In the sample <em class="emphasis">/etc/exports</em> file shown above, the
+<em class="replaceable">host</em> value is either the name of a single
+client or it is blank. When a single hostname is used, access is
+granted to the individual client. If no hostvalue is specified, the directory is exported to everyone.
+Like Solaris, Linux also accepts values for domains, networks, and
+netgroups, although the syntax is slightly different. Valid
+<a name="INDEX-1807" /></a>host values are:
+</p>
+
+<ul><li>
+<p>Individual hostnames such as <em class="emphasis">crab</em> or
+<em class="emphasis">crab.wrotethebook.com</em>.
+</p>
+</li><li>
+<p>Domain wildcards such as <em class="emphasis">*wrotethebook.com</em> for
+every host in the <em class="emphasis">wrotethebook.com</em> domain.
+</p>
+</li><li>
+<p>IP address/address mask pairs such as 172.16.12.0/255.255.255.0 for
+every host with an address that begins with 172.16.12.
+</p>
+</li><li>
+<p>Net groups such as <em class="emphasis">@group1</em>. </p>
+</li></ul>
+<p>Notice that in <a name="INDEX-1808" /></a>
+<a name="INDEX-1809" /></a>Linux, domain names begin with an
+asterisk (<tt class="literal">*</tt>), instead of the dot used in Solaris.
+Also note that the at-sign begins a netgroup name, whereas in Solaris
+the at-sign is used at the beginning of a network address.
+</p>
+
+<p>The options used in the sample <em class="emphasis">/etc/exports</em> file
+are:
+</p>
+
+<dl>
+<dt><b><tt class="literal">ro</tt></b></dt>
+<dd>
+<p>Read-only <a name="INDEX-1810" /></a>prevents NFS clients from writing to this
+directory. Attempts by clients to write to a read-only directory fail
+with the message "Read-only filesystem" or
+"Permission denied." If <tt class="literal">ro</tt> is
+specified without a client hostname, all clients are granted
+read-only access.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">rw</tt></b></dt>
+<dd>
+<p>Read/write <a name="INDEX-1811" /></a>permits clients to read and write to this
+directory. When specified without hostname, all clients are granted
+read/write access. If a hostname is specified, only the named host is
+given read/write permission.
+</p>
+</dd>
+
+</dl>
+
+<p>Although specific hosts are granted read/write access to some of
+these directories, the access granted to individual users of those
+systems is controlled by standard Unix user, group, and world file
+permissions based on the user's user ID (UID)
+<a name="INDEX-1812" /></a>and group <a name="INDEX-1813" /></a>ID (GID).
+NFS trusts that a remote host has authenticated its users and
+assigned them valid UIDs and GIDs. Exporting files grants the client
+system's users the same access to the files they would have if
+they directly logged into the server. This assumes, of course, that
+both the client and the server have assigned exactly the same UIDs
+and GIDs to the same users, which is not always the case. If both the
+client and the server assign the same UID to a given user, for
+example, if Craig is assigned 501 on both systems, then both systems
+properly identify Craig and grant him appropriate access to his
+files. On the other hand, if the client assigns Craig a UID of 501
+and the server has assigned that UID to Michael, the server will
+grant Craig access to Michael's files as if Craig owned those
+files. NFS provides several tools to deal with the problems that
+arise because of mismatched UIDs and GIDs.
+</p>
+
+<p>One obvious problem is dealing with the root account. It is very
+unlikely that you want people with root access to your clients to
+also have <a name="INDEX-1814" /></a>root access to your server. By default,
+NFS prevents this with the
+<tt class="literal">root_squash</tt><a name="INDEX-1815" /></a> setting, which maps requests
+that contain the root UID and GID to the <em class="emphasis">nobody</em>
+UID and GID. Thus if someone is logged into a client as root, they
+are only granted world permissions on the server. You can undo this
+with the <tt class="literal">no_root_squash</tt> setting, but
+<tt class="literal">no_root_squash</tt> opens a potential security hole.
+</p>
+
+<p>Map other UIDs and GIDs to <em class="emphasis">nobody</em> with the
+<tt class="literal">squash_uids</tt><a name="INDEX-1816" /></a>, <tt class="literal">squash_gids</tt>,
+and <tt class="literal">all_squash</tt> options.
+<tt class="literal">all_squash</tt> maps every user of a client system to
+the user <em class="emphasis">nobody</em>. <tt class="literal">squash_uids</tt>
+and <tt class="literal">squash_gids</tt> map specific UIDs and GIDs. For
+example:
+</p>
+
+<blockquote><pre class="code">/pub           (ro,all_squash)
+/usr/local/pub (squash_uids=0-50,squash_gids=0-50)</pre></blockquote>
+
+<p>The first entry exports the <em class="emphasis">/pub</em> directory with
+read-only access to every client. It limits every user of those
+clients to the world permissions granted to
+<em class="emphasis">nobody</em>, meaning that the only files the users
+can read are those that have world read permission.
+</p>
+
+<p>The second entry exports <em class="emphasis">/usr/local/pub</em> to every
+client with default read/write permission. The
+<tt class="literal">squash_uid</tt> and <tt class="literal">squash_gid</tt>
+options in the example show that a range of UIDs and GIDs can be
+specified in some options.<a href="#FOOTNOTE-100">[100]</a> A single UID or GID can be defined
+with these options, but it is frequently useful to affect a range of
+values with a single command. In the example we prevent users from
+accessing the directory with a UID or GID that is 50 or less. These
+low numbers are usually assigned to non-user accounts. For example,
+on our Linux system, UID 10 is assigned to <em class="emphasis">uucp</em>.
+Attempting to write a file as <em class="emphasis">uucp</em> would cause
+the file to be written with the owner mapped to
+<em class="emphasis">nobody</em>. Thus the user <em class="emphasis">uucp</em>
+would be able to write to the <em class="emphasis">/usr/local/pub</em>
+directory only if that directory had world write permission.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-100" /></a><p>[100]Of the eight options
+discussed in this section, three, <tt class="literal">squash_uid</tt>,
+<tt class="literal">squash_gid</tt>, and <tt class="literal">map_static</tt>, map
+a range of UIDs and GIDs. These three options are not available in
+the kernel-level NFS (<tt class="literal">knfsd</tt>) used on some Linux
+systems. Mapping for <tt class="literal">knfsd</tt> must be done with the
+other options.</p> </blockquote>
+
+<p>It is also possible to <a name="INDEX-1817" /></a>map every user from a
+client to a specific user ID or group ID. The
+<tt class="literal">anonuid</tt> and <tt class="literal">anongid</tt> options
+provide this capability. These options are most useful when the
+client has only one user and does not assign that user a
+<a name="INDEX-1818" /></a> <a name="INDEX-1819" /></a>UID
+or GID, for example, in the case of a Microsoft Windows PC running
+NFS. PCs generally have only one user and they don't use UIDs
+or GIDs. To map the user of a PC to a valid user ID and group ID,
+enter a line like this in the <em class="emphasis">/etc/exports</em> file:
+</p>
+
+<blockquote><pre class="code">/home/alana  giant(all_squash,anonuid=1001,anongid=1001)</pre></blockquote>
+
+<p>In this example, the hostname of Alana's PC is
+<em class="emphasis">giant</em>. The entry grants that client read/write
+access to the directory <em class="emphasis">/home/alana</em>. The
+<tt class="literal">all_squash</tt> option maps every request from that
+client to a specific UID, but this time, instead of
+<em class="emphasis">nobody</em>, it maps to the UID and the GID defined
+by the <tt class="literal">anonuid</tt> and <tt class="literal">anongid</tt>
+options. Of course, for this to work correctly, 1001:1001 should be
+the UID and GID pair assigned to <em class="emphasis">alana</em> in the
+<em class="emphasis">/etc/passwd</em> file.
+</p>
+
+<p>A single mapping is sufficient for a PC, but it might not handle all
+of the mapping needed for a Unix client. Unix clients assign their
+users UIDs and GIDs. Problems occur if those differ from the UIDs and
+GIDs assigned to those same users on the NFS server. Use the
+<tt class="literal">map_static</tt> option to point to a file that maps the
+UIDs and GIDs for a specific client. For example:
+</p>
+
+<blockquote><pre class="code">/export/oscon oscon(map_static=/etc/nfs/oscon.map)</pre></blockquote>
+
+<p>This entry says that the <em class="emphasis">/export/oscon</em> directory
+is exported to the client <em class="emphasis">oscon</em> with read/write
+permission. The <tt class="literal">map_static</tt> option points to a file
+on the server named <em class="emphasis">/etc/nfs/oscon.map</em> that maps
+the UIDs and GIDs used on <em class="emphasis">oscon</em> to those used on
+the server. The <em class="emphasis">oscon.map</em> file might contain the
+following entries:
+</p>
+
+<blockquote><pre class="code"># UID/GID mapping for client oscon
+# remote    local    comment
+uid 0-50    -    #squash these
+gid 0-50    -    #squash these
+uid 100-200    1000    #map 100-200 to 1000-1100
+gid 100-200    1000    #map 100-200 to 1000-1100
+uid 501    2001    #map individual user
+gid 501    2001    #map individual user</pre></blockquote>
+
+<p>The first two lines map the UIDs and GIDs from 0 to 50 to the user
+<em class="emphasis">nobody</em>. The next two lines map all of the client
+UIDs and GIDs in the range of 100 to 200 to corresponding numbers in
+the range of 1000 to 1100 on the server. In other words, 105 on the
+client maps to 1005 on the server. This is the most common type of
+entry. On most systems, existing UIDs and GIDs have been assigned
+sequentially. Often, several systems have assigned the UIDs and GIDs
+sequentially from 101 to different users in a completely
+uncoordinated manner. This entry maps the users on
+<em class="emphasis">oscon</em> to UIDs and GIDs starting at 1000. Another
+file might map the 100 to 200 entries of another client to UIDs and
+GIDs starting at 2000. A third file might map yet another client to
+3000. This type of entry allows the server to coordinate UIDs and
+GIDs where no coordination exists. The last two lines map an
+individual user's UID and GID. This is less commonly required,
+but it is <a name="INDEX-1820" /></a> <a name="INDEX-1821" /></a> <a name="INDEX-1822" /></a> <a name="INDEX-1823" /></a>possible. 
+</p>
+
+</div>
+
+<a name="tcp3-CHP-9-SECT-1.2.3" /></a><div class="sect3">
+<h3 class="sect3">9.1.2.3. The exportfs command</h3>
+
+<p>After defining the <a name="INDEX-1824" /></a> <a name="INDEX-1825" /></a>directories in the
+<em class="emphasis">/etc/exports</em> file, run the
+<tt class="literal">exportfs</tt> command to process the
+<em class="emphasis">exports</em> file and to build
+<em class="emphasis">/var/lib/nfs/xtab</em>. The <em class="emphasis">xtab</em>
+file contains information about the currently exported directories,
+and it is the file that <tt class="literal">mountd</tt> reads when
+processing client mount requests. To process all of the entries in
+the <em class="emphasis">/etc/exports</em> file, run
+<tt class="literal">exportfs</tt> with the <a name="INDEX-1826" /></a><tt class="literal">-a</tt>
+command-line option:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">exportfs -a</b></pre></blockquote>
+
+<p>This command, which exports everything in the
+<em class="emphasis">exports</em> file, is normally run during the boot
+from a startup script. To force changes in the
+<em class="emphasis">/etc/exports</em> file to take effect without
+rebooting the system, use the <tt class="literal">-r</tt> argument:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">exportfs -r</b></pre></blockquote>
+
+<p>The <tt class="literal">-r</tt> switch synchronizes <a name="INDEX-1827" /></a>the contents of the
+<em class="emphasis">exports</em> file and the <em class="emphasis">xtab</em>
+file. Items that have been added to the <em class="emphasis">exports</em>
+file are added to the <em class="emphasis">xtab</em> file, and items that
+have been deleted are removed from <em class="emphasis">xtab</em>.
+</p>
+
+<p>The <tt class="literal">exportfs</tt> command can export a directory that
+is not listed in the <em class="emphasis">/etc/exports</em> file. For
+example, to <a name="INDEX-1828" /></a>temporarily export
+<em class="emphasis">/usr/local</em> to the client
+<em class="emphasis">fox</em> with read/write permission, enter this
+command:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">exportfs fox:/usr/local -o rw</b></pre></blockquote>
+
+<p>After the client has completed its work with the temporarily exported
+filesystem, the directory is removed from the export list with the
+<a name="INDEX-1829" /></a><tt class="literal">-u</tt> option, as shown:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">exportfs -u fox:/usr/local</b></pre></blockquote>
+
+<p>The -<tt class="literal">u</tt> option can be combined with the
+-<tt class="literal">a</tt> option to completely shut down all exports
+without terminating the NFS daemon:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">exportfs -ua</b></pre></blockquote>
+
+<p>Once the server exports or shares the appropriate filesystems, the
+clients can mount and use those filesystems. The next section looks
+at how an NFS client system is configured.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-9-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">9.1.3. Mounting Remote Filesystems </h3>
+
+<p><a name="INDEX-1830" /></a> <a name="INDEX-1831" /></a> <a name="INDEX-1832" /></a> <a name="INDEX-1833" /></a><a name="INDEX-1834" /></a>Some
+basic information is required before you can decide which NFS
+directories to mount on your system. You need to know which servers
+are connected to your network and which directories are available
+from those servers. A directory cannot be mounted unless it is first
+exported by a server.
+</p>
+
+<p>Your network administrator is a good source for this information. The
+administrator can tell you what systems are providing NFS service,
+what directories they are exporting, and what these directories
+contain. If you are the administrator of an NFS server, you should
+develop this type of information for your users. See <a href="ch04_01.html">Chapter 4, "Getting Started"</a> for advice on planning and distributing
+network information.
+</p>
+
+<p>On Solaris and Linux systems, you can also obtain information about
+the shared directories directly from the servers by using the
+<tt class="literal">showmount</tt><a name="INDEX-1835" /></a> command. The NFS servers are usually
+the same centrally supported systems that provide other services such
+as mail and DNS. Select a likely server and query it with the command
+<tt class="literal">showmount -e</tt> <em class="replaceable">hostname</em>.
+In response to this command, the server lists the directories that it
+exports and the conditions applied to their export.
+</p>
+
+<p>For example, a <tt class="literal">showmount -e</tt> query to
+<em class="emphasis">jerboas</em> produces the following output:
+</p>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">showmount -e jerboas</b> 
+export list for jerboas: 
+/usr/man           (everyone) 
+/home/research     rodent,crab,limulus,horseshoe
+/usr/local         (everyone)</pre></blockquote>
+
+<p>The export list shows the NFS directories exported by
+<em class="emphasis">jerboas</em> as well as who is allowed to access
+those directories. From this list,
+<em class="emphasis">rodent</em>'s administrator may decide to mount
+any of the directories offered by <em class="emphasis">jerboas</em>. Our
+imaginary administrator decides to:
+</p>
+
+<ol><li>
+<p>Mount <em class="emphasis">/usr/man</em> from <em class="emphasis">jerboas</em>
+instead of maintaining the manpages locally.
+</p>
+</li><li>
+<p>Mount <em class="emphasis">/home/research</em> to more easily share files
+with other systems in the research group.
+</p>
+</li><li>
+<p>Mount the centrally maintained programs in
+<em class="emphasis">/usr/local</em>.
+</p>
+</li></ol>
+<p>These selections represent some of the most common motivations for
+mounting NFS directories:
+</p>
+
+<ul><li>
+<p>Saving disk space</p>
+</li><li>
+<p>Sharing files with other systems</p>
+</li><li>
+<p>Maintaining common files centrally</p>
+</li></ul>
+<p>The extent to which you use NFS is a personal choice. Some people
+prefer the greater personal control you get from keeping files
+locally, while others prefer the convenience offered by NFS. Your
+site may have guidelines for how NFS should be used, which
+directories should be mounted, and which files should be centrally
+maintained. Check with your network administrator if you're
+unsure about how NFS is used at your site.
+</p>
+
+<a name="tcp3-CHP-9-SECT-1.3.1" /></a><div class="sect3">
+<h3 class="sect3">9.1.3.1. The mount command </h3>
+
+<p>A client <a name="INDEX-1836" /></a>
+<a name="INDEX-1837" /></a>
+<a name="INDEX-1838" /></a>must mount a shared directory before
+using it. "Mounting" the directory attaches it to the
+client's filesystem hierarchy. Only directories offered by the
+servers can be mounted, but any part of the offered directory, such
+as a subdirectory or a file, can be mounted.
+</p>
+
+<p>NFS directories are mounted using the <tt class="literal">mount</tt>
+command. The general structure of the <tt class="literal">mount</tt>
+command is:
+</p>
+
+<blockquote><pre class="code"> mount <em class="replaceable">hostname</em>:<em class="replaceable">remote-directory local-directory</em></pre></blockquote>
+
+<p>The <em class="replaceable">hostname</em> identifies an NFS server, and
+the <em class="replaceable">remote-directory</em> identifies all or
+part of a directory offered by that server. The
+<tt class="literal">mount</tt> command attaches that remote directory to
+the client's filesystem using the directory name provided for
+<em class="replaceable">local-directory</em>. The client's local
+directory, called the mount point, must be created before
+<tt class="literal">mount</tt> is executed. Once the mount is completed,
+files located in the remote directory can be accessed through the
+local directory exactly as if they were local files.
+</p>
+
+<p>For example, assume that
+<em class="emphasis">jerboas.wrotethebook.com</em> is an NFS server and
+that it shares the files shown in the previous section. Further
+assume that the administrator of <em class="emphasis">rodent</em> wants to
+access the <em class="emphasis">/home/research</em> directory. The
+administrator simply creates a local
+<em class="emphasis">/home/research</em> directory and mounts the remote
+<em class="emphasis">/home/research</em> directory offered by
+<em class="emphasis">jerboas</em> on this newly created mount point:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">mkdir /home/research</b>
+# <b class="emphasis-bold">mount jerboas:/home/research /home/research</b></pre></blockquote>
+
+<p>In this example, the local system knows to mount an NFS filesystem
+because the remote directory is preceded by a hostname and NFS is the
+default network filesystem for this client. NFS is the most common
+default network filesystem. If your client system does not default to
+NFS, specify NFS directly on the <tt class="literal">mount</tt> command
+line. On a <a name="INDEX-1839" /></a>Solaris 8 system, the
+<tt class="literal">-F</tt> switch is used to identify the filesystem type:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">mount -F nfs jerboas:/home/research /home/research</b></pre></blockquote>
+
+<p>On a <a name="INDEX-1840" /></a>Linux system the
+<tt class="literal">-t</tt> switch is used:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">mount -t nfs jerboas:/home/research /home/research</b></pre></blockquote>
+
+<p>Once a remote directory is mounted, it stays attached to the local
+filesystem until it is explicitly dismounted or the local system
+reboots. To dismount a directory, use the <tt class="literal">umount</tt>
+command. On the <tt class="literal">umount</tt> command line, specify
+either the local or remote name of the directory that is to be
+dismounted. For example, the administrator of
+<em class="emphasis">rodent</em> can dismount the remote
+<em class="emphasis">jerboas:/home/research</em> filesystem from the local
+<em class="emphasis">/home/research</em> mount point, with either:
+</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">umount /home/research</b></pre></blockquote>
+
+<p>or:</p>
+
+<blockquote><pre class="code"># <b class="emphasis-bold">umount jerboas:/home/research</b></pre></blockquote>
+
+<p>Booting also <a name="INDEX-1841" /></a>dismounts NFS directories.
+Because systems frequently wish to mount the same filesystems every
+time they boot, Unix provides a system for automatically remounting
+after a boot.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-9-SECT-1.3.2" /></a><div class="sect3">
+<h3 class="sect3">9.1.3.2. The vfstab and fstab files </h3>
+
+<p>Unix systems use the information provided in a special table to
+remount all types of filesystems, including NFS directories, after a
+system reboot. The table is a critical part of providing users
+consistent access to software and files, so care should be taken
+whenever it is modified. Two different files with two different
+formats are used for this purpose by the different flavors of Unix.
+Linux and BSD systems use the
+<em class="emphasis">/etc/fstab</em><a name="INDEX-1842" /></a> <a name="INDEX-1843" /></a>
+<a name="INDEX-1844" /></a> file, and Solaris, our System V
+example, uses the <em class="emphasis">/etc/vfstab</em> file.
+</p>
+
+<p>The format of the NFS entries in the Solaris
+<em class="emphasis">vfstab</em> file is:
+</p>
+
+<blockquote><pre class="code"><em class="replaceable">filesystem</em> - <em class="replaceable">mountpoint</em> nfs - yes <em class="replaceable">options</em></pre></blockquote>
+
+<p>The various fields in the entry must appear in the order shown and be
+separated by whitespace. The items not in italics (both dashes and
+the words <tt class="literal">nfs</tt> and <tt class="literal">yes</tt>) are
+keywords that must appear exactly as shown.
+<em class="replaceable">filesystem</em> is the name of the directory
+offered by the server, <em class="replaceable">mountpoint</em> is the
+pathname of the local mount point, and
+<em class="replaceable">options</em> are the mount options discussed
+below. A sample NFS <em class="emphasis">vfstab</em> entry is:
+</p>
+
+<blockquote><pre class="code">jerboas:/home/research  -  /home/research  nfs  -  yes  rw,soft</pre></blockquote>
+
+<p>This entry mounts the NFS filesystem
+<em class="emphasis">jerboas:/home/research</em> on the local mount point
+<em class="emphasis">/home/research</em>. The filesystem is mounted with
+the <tt class="literal">rw</tt> and <tt class="literal">soft</tt> options set. We
+previously discussed the commonly used read/write
+(<tt class="literal">rw</tt>) and read-only (<tt class="literal">ro</tt>)
+options, and there are many more NFS options. The NFS mount
+<a name="INDEX-1845" /></a>
+<a name="INDEX-1846" /></a> <a name="INDEX-1847" /></a>
+<a name="INDEX-1848" /></a>options available on Solaris systems
+are:
+</p>
+
+<dl>
+<dt><b><tt class="literal">remount</tt></b></dt>
+<dd>
+<p>If the filesystem is already mounted read-only, remount the
+filesystem as read/write.
+</p>
+</dd>
+
+
+<a name="INDEX-1849" /></a><dt><b><tt class="literal">soft</tt></b></dt>
+<dd>
+<p>If the server fails to respond, return an error and don't retry
+the request.
+</p>
+</dd>
+
+
+<a name="INDEX-1850" /></a><dt><b><tt class="literal">timeo=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the number of seconds to wait for a timeout before issuing an
+error.
+</p>
+</dd>
+
+
+<a name="INDEX-1851" /></a><dt><b><tt class="literal">hard</tt></b></dt>
+<dd>
+<p>If the server fails to respond, retry until it does respond. This is
+the default.
+</p>
+</dd>
+
+
+<a name="INDEX-1852" /></a><dt><b><tt class="literal">bg</tt></b></dt>
+<dd>
+<p>Do the retries in background mode, which allows the boot to proceed.</p>
+</dd>
+
+
+<a name="INDEX-1853" /></a><dt><b><tt class="literal">fg</tt></b></dt>
+<dd>
+<p>Do the retries in foreground mode. This option could hang the boot
+process while the mount is being retried. For this reason,
+<tt class="literal">fg</tt> is used primarily for debugging.
+</p>
+</dd>
+
+
+<a name="INDEX-1854" /></a><dt><b><tt class="literal">intr</tt></b></dt>
+<dd>
+<p>Allow a keyboard interrupt to kill a process that is hung waiting for
+the server to respond. Hard-mounted filesystems can become hung
+because the client retries forever, even if the server is down. This
+is a default.
+</p>
+</dd>
+
+
+<a name="INDEX-1855" /></a><dt><b><tt class="literal">nointr</tt></b></dt>
+<dd>
+<p>Don't allow keyboard interrupts. In general, this is a bad idea.</p>
+</dd>
+
+
+<a name="INDEX-1856" /></a><dt><b><tt class="literal">nosuid</tt></b></dt>
+<dd>
+<p>Do not allow an executable stored on the mounted filesystem to run
+<tt class="literal">setuid</tt>. This improves security but may limit
+utility.
+</p>
+</dd>
+
+
+<a name="INDEX-1857" /></a><dt><b><tt class="literal">acdirmax=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Cache directory attributes for no more than
+<em class="replaceable">n</em> seconds. The default is to hold cache
+values for a maximum of 60 seconds. Repeated requests for filesystem
+attributes is one of the leading contributors to NFS traffic. Caching
+this information helps to reduce the traffic.
+</p>
+</dd>
+
+
+<a name="INDEX-1858" /></a><dt><b><tt class="literal">acdirmin=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Cache directory attributes for at least <em class="replaceable">n</em>
+seconds. The default is 30 seconds.
+</p>
+</dd>
+
+
+<a name="INDEX-1859" /></a><dt><b><tt class="literal">acregmax=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Cache file attributes for no more than <em class="replaceable">n</em>
+seconds. The default is 60 seconds.
+</p>
+</dd>
+
+
+<a name="INDEX-1860" /></a><dt><b><tt class="literal">acregmin=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Cache file attributes for at least <em class="replaceable">n</em>
+seconds. The default is 3 seconds.
+</p>
+</dd>
+
+
+<a name="INDEX-1861" /></a><dt><b><tt class="literal">actimeo=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Sets a single value for <tt class="literal">acdirmax</tt>,
+<tt class="literal">acdirmin</tt>, <tt class="literal">acregmax</tt>, and
+<tt class="literal">acregmin</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-1862" /></a><dt><b><tt class="literal">grpid</tt></b></dt>
+<dd>
+<p>Use the group ID of the parent directory when creating new files. If
+this option is not set, the effective GID of the calling process is
+used.
+</p>
+</dd>
+
+
+<a name="INDEX-1863" /></a><dt><b><tt class="literal">noac</tt></b></dt>
+<dd>
+<p>Do not cache information. The default is to use caching, which can be
+specified with the <tt class="literal">ac</tt> option.
+</p>
+</dd>
+
+
+<a name="INDEX-1864" /></a><dt><b><tt class="literal">port=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Identifies the IP port number used by the server.</p>
+</dd>
+
+
+<a name="INDEX-1865" /></a><dt><b><tt class="literal">posix</tt></b></dt>
+<dd>
+<p>Use POSIX standards for the filesystem. POSIX is a wide-ranging Unix
+interoperability standard that includes many standards for
+filesystems, such as the maximum length of filenames and how file
+locks are set.
+</p>
+</dd>
+
+
+<a name="INDEX-1866" /></a><dt><b><tt class="literal">proto=</tt><em class="replaceable">protocol</em></b></dt>
+<dd>
+<p>Specifies the transport protocol that will be used by NFS.</p>
+</dd>
+
+
+<a name="INDEX-1867" /></a><dt><b><tt class="literal">public</tt></b></dt>
+<dd>
+<p>Use the public file handle when connecting to the NFS server.</p>
+</dd>
+
+
+<a name="INDEX-1868" /></a><dt><b><tt class="literal">quota</tt> </b></dt>
+<dd>
+<p>Use <tt class="literal">quota</tt> to enforce user quotas on this
+filesystem.
+</p>
+</dd>
+
+
+<a name="INDEX-1869" /></a><dt><b><tt class="literal">noquota</tt></b></dt>
+<dd>
+<p>Do not use <tt class="literal">quota</tt> to enforce user quotas on this
+filesystem.
+</p>
+</dd>
+
+
+<a name="INDEX-1870" /></a><dt><b><tt class="literal">retrans=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the number of times NFS will retransmit when a connectionless
+transport protocol is used.
+</p>
+</dd>
+
+
+<a name="INDEX-1871" /></a><dt><b><tt class="literal">retry=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the number of times a mount attempt will be retried. The
+default is to retry 10,000 times.
+</p>
+</dd>
+
+
+<a name="INDEX-1872" /></a><dt><b><tt class="literal">rsize=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the size of the read buffer as <em class="replaceable">n</em>
+bytes. The default for NFS version 3 is 32,768 bytes.
+</p>
+</dd>
+
+
+<a name="INDEX-1873" /></a><dt><b><tt class="literal">sec=</tt><em class="replaceable">type</em></b></dt>
+<dd>
+<p>Specifies the type of security used for NFS transactions. The type
+values supported on the Solaris 8 <tt class="literal">mount</tt> command
+are the same as those listed for the <tt class="literal">share</tt>
+command: <tt class="literal">sys</tt>, <tt class="literal">dh</tt>,
+<tt class="literal">krb4</tt>, or <tt class="literal">none</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-1874" /></a><dt><b><tt class="literal">wsize=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Sets the size of the write buffer to <em class="replaceable">n</em>
+bytes. The default is 32768 bytes for NFS version 3.
+</p>
+</dd>
+
+
+<a name="INDEX-1875" /></a><dt><b><tt class="literal">vers=</tt><em class="replaceable">version</em></b></dt>
+<dd>
+<p>Specifies the version of NFS that should be used for this mount. By
+default, the system automatically selects the latest version
+supported by both the client and the server.
+</p>
+</dd>
+
+</dl>
+
+<p>On the Solaris system, the filesystems defined in the
+<em class="emphasis">vfstab</em> file are mounted by a
+<tt class="literal">mountall</tt><a name="INDEX-1876" /></a>
+<a name="INDEX-1877" /></a> <a name="INDEX-1878" /></a>
+command located in a startup file. On Linux systems, the startup file
+contains a <tt class="literal">mount</tt> command with the
+<tt class="literal">-a</tt> flag set, which causes Linux to mount all
+filesystems listed in <em class="emphasis">fstab</em>.<a href="#FOOTNOTE-101">[101]</a></p><blockquote class="footnote"> <a name="FOOTNOTE-101" /></a><p>[101]Red
+Hat Linux uses a special script,
+<em class="emphasis">/etc/init.d/netfs</em>, just for mounting all of the
+different networked filesystems, which include NFS.</p>
+</blockquote>
+
+<p>The format of NFS entries in the
+<em class="emphasis">/etc/fstab</em> file is:
+</p>
+
+<blockquote><pre class="code"> <em class="replaceable">filesystem mountpoint</em> nfs <em class="replaceable">options</em></pre></blockquote>
+
+<p>The fields must appear in the order shown and must be separated by
+whitespace. The keyword <tt class="literal">nfs</tt> is required for NFS
+filesystems. <em class="replaceable">filesystem</em> is the name of the
+directory being mounted. <em class="replaceable">mountpoint</em> is the
+pathname of the local mount point. <em class="replaceable">options</em>
+are any of the Linux mount options.
+</p>
+
+<p>Linux uses most of the same NFS mount options as Solaris.
+<tt class="literal">rsize</tt>, <tt class="literal">wsize</tt>,
+<tt class="literal">timeo</tt>, <tt class="literal">retrans</tt>,
+<tt class="literal">acregmin</tt>, <tt class="literal">acregmax</tt>,
+<tt class="literal">acdirmin</tt>, <tt class="literal">acdirmax</tt>,
+<tt class="literal">actimeo</tt>, <tt class="literal">retry</tt>,
+<tt class="literal">port</tt>, <tt class="literal">bg</tt>,
+<tt class="literal">fg</tt>, <tt class="literal">soft</tt>,
+<tt class="literal">hard</tt>, <tt class="literal">intr</tt>,
+<tt class="literal">nointr</tt>, <tt class="literal">ac</tt>,
+<tt class="literal">noac</tt>, and <tt class="literal">posix</tt> are all options
+that Linux has in common with Solaris. In addition to these, Linux
+uses:
+</p>
+
+<dl>
+<a name="INDEX-1879" /></a><dt><b><tt class="literal">mountport=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the port to be used by <tt class="literal">mountd</tt>.</p>
+</dd>
+
+
+<a name="INDEX-1880" /></a><dt><b><tt class="literal">mounthost=</tt><em class="replaceable">name</em></b></dt>
+<dd>
+<p>Identifies the server running <tt class="literal">mountd</tt>.</p>
+</dd>
+
+
+<a name="INDEX-1881" /></a><dt><b><tt class="literal">mountprog=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the RPC program number used by <tt class="literal">mountd</tt> on
+the remote host.
+</p>
+</dd>
+
+
+<a name="INDEX-1882" /></a><dt><b><tt class="literal">mountvers=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the RPC version number used by <tt class="literal">mountd</tt> on
+the remote host.
+</p>
+</dd>
+
+
+<a name="INDEX-1883" /></a><dt><b><tt class="literal">nfsprog=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the RPC program number used by <tt class="literal">nfsd</tt> on the
+remote host.
+</p>
+</dd>
+
+
+<a name="INDEX-1884" /></a><dt><b><tt class="literal">nfsvers=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the RPC version number used by <tt class="literal">nfsd</tt> on the
+remote host.
+</p>
+</dd>
+
+
+<a name="INDEX-1885" /></a><dt><b><tt class="literal">namlen=</tt><em class="replaceable">n</em></b></dt>
+<dd>
+<p>Defines the maximum length of the filenames supported by the remote
+server.
+</p>
+</dd>
+
+
+<a name="INDEX-1886" /></a><dt><b><tt class="literal">nocto</tt></b></dt>
+<dd>
+<p>Do not retrieve attributes when creating a file. The default is to
+retrieve the attributes, which can be specified with the
+<tt class="literal">cto</tt> option.
+</p>
+</dd>
+
+
+<a name="INDEX-1887" /></a><dt><b><tt class="literal">tcp</tt></b></dt>
+<dd>
+<p>Specifies that NFS should use TCP as its transport protocol.</p>
+</dd>
+
+
+<a name="INDEX-1888" /></a><dt><b><tt class="literal">udp</tt></b></dt>
+<dd>
+<p>Specifies that NFS should use UDP as its transport protocol.</p>
+</dd>
+
+
+<a name="INDEX-1889" /></a><dt><b><tt class="literal">nolock</tt></b></dt>
+<dd>
+<p>Prevents the system from starting <tt class="literal">lockd</tt>. The
+default is to run <tt class="literal">lockd</tt>, which can be requested
+with the <tt class="literal">lock</tt> option.
+</p>
+</dd>
+
+</dl>
+
+<p>Finally, there are several options that are not specific to NFS and
+can be used on the <tt class="literal">mount</tt> command for any type of
+filesystem. <a href="ch09_01.html#tcp3-CHP-9-TABLE-1">Table 9-1</a> lists the common
+<a name="INDEX-1890" /></a>
+<a name="INDEX-1891" /></a><tt class="literal">mount</tt> options used
+on Linux systems.
+</p>
+
+<a name="tcp3-CHP-9-TABLE-1" /></a><h4 class="objtitle">Table 9-1. Common mount options </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Option</p>
+</th>
+<th>
+<p>Function</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>async</p>
+</td>
+<td>
+<p>Use asynchronous file I/O, which acknowledges writes as soon as they
+are received to improve performance.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>auto</p>
+</td>
+<td>
+<p>Mount when the -a option is used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>dev</p>
+</td>
+<td>
+<p>Allow character and block special devices on the filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>exec</p>
+</td>
+<td>
+<p>Permit execution of files from the filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>noauto</p>
+</td>
+<td>
+<p>Don't mount with the -a option.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>nodev</p>
+</td>
+<td>
+<p>Don't allow character and block special devices on the
+filesystem.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>noexec</p>
+</td>
+<td>
+<p>Don't allow execution of files from the filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>nosuid</p>
+</td>
+<td>
+<p>Don't allow programs stored on the filesystem to run setuid or
+setgid.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>nouser</p>
+</td>
+<td>
+<p>Only root can mount the filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>remount</p>
+</td>
+<td>
+<p>Remount a mounted filesystem with new options.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>ro</p>
+</td>
+<td>
+<p>Mount the filesystem read-only.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>rw</p>
+</td>
+<td>
+<p>Mount the filesystem read/write.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>suid</p>
+</td>
+<td>
+<p>Allow programs to run setuid or setgid.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>sync</p>
+</td>
+<td>
+<p>Use synchronous filesystem I/O, which acknowledges writes only after
+they are written to disk to improve reliability.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>user</p>
+</td>
+<td>
+<p>Permit ordinary users to mount the filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>atime</p>
+</td>
+<td>
+<p>Update inode access time for every access.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>noatime</p>
+</td>
+<td>
+<p>Do not update inode access time.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>defaults</p>
+</td>
+<td>
+<p>Set the rw, suid, dev, exec, auto, nouser, and async options.</p>
+</td>
+</tr>
+
+</table><p>
+
+<p>A <tt class="literal">grep</tt> of <em class="emphasis">fstab</em> shows sample
+NFS entries.<a href="#FOOTNOTE-102">[102]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-102" /></a><p>[102]<tt class="literal">grep</tt> is used because
+the <em class="emphasis">fstab</em> file contains other information not
+related to NFS.</p> </blockquote>
+
+<blockquote><pre class="code">% <b class="emphasis-bold">grep nfs /etc/fstab</b> 
+jerboas:/usr/spool/mail   /usr/spool/mail   nfs rw     0 0 
+jerboas:/usr/man          /usr/man          nfs rw     0 0
+jerboas:/home/research    /home/research    nfs rw     0 0</pre></blockquote>
+
+<p>The <tt class="literal">grep</tt> shows that there are three NFS
+filesystems contained in the <em class="emphasis">/etc/fstab</em> file.
+The <tt class="literal">mount -a</tt> command in the boot script remounts
+these three directories every time the system boots.
+</p>
+
+<p>The <em class="emphasis">vfstab</em> and <em class="emphasis">fstab</em> files
+are the most common methods used for mounting filesystems at boot
+time. There is another technique that automatically mounts NFS
+filesystems, but only when they are actually needed. It is called
+automounter.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-9-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">9.1.4. NFS Automounter </h3>
+
+<p>An <em class="emphasis">automounter</em> <a name="INDEX-1892" /></a>
+<a name="INDEX-1893" /></a>is a
+feature available on most NFS clients. Two varieties of automounters
+are in widespread use: autofs and amd. The Automounter Filesystem
+(autofs) is the automounter implementation that comes with Solaris
+and Linux, and it is the implementation we cover in this section.
+<a name="INDEX-1894" /></a>Automounter
+Daemon (<a name="INDEX-1895" /></a>amd) is
+available for many Unix versions and is included with Linux but not
+with Solaris. To find out more about amd, see <em class="emphasis">Linux NFS and
+Automounter Administration</em> written by Erez Zadok, the amd
+maintainer. In this section, automounter and automounter daemon refer
+to the version of autofs that comes with Solaris 8.
+</p>
+
+<p>The automounter <a name="INDEX-1896" /></a> <a name="INDEX-1897" /></a>
+<a name="INDEX-1898" /></a>configuration
+files are called
+<a name="INDEX-1899" /></a><em class="emphasis">maps</em>. Three
+basic map types are used to define the automounter filesystem:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">Master map</em></i></dt>
+<dd>
+<p>The configuration <a name="INDEX-1900" /></a>file read by
+<tt class="literal">automount</tt>. It lists all of the other maps that are
+used to define the autofs filesystem.
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Direct map</em></i></dt>
+<dd>
+<p>A configuration <a name="INDEX-1901" /></a>file that lists the mount points,
+pathnames, and options of filesystems that are to be mounted by the
+automounter daemon (<tt class="literal">automountd</tt>).
+</p>
+</dd>
+
+
+<dt><i><em class="emphasis">Indirect map</em></i></dt>
+<dd>
+<p>A configuration <a name="INDEX-1902" /></a>file that contains pathnames and
+"relative" mount points. The mount points are relative to
+a directory path declared in the master map. How indirect maps are
+used will become clear in the examples.
+</p>
+</dd>
+
+</dl>
+
+<p>On Solaris systems the automounter daemon
+(<tt class="literal">automountd</tt>) and the <tt class="literal">automount</tt>
+command are started by the
+<em class="emphasis">/etc/init.d/autofs</em><a name="INDEX-1903" /></a> script. The script is run with the
+<tt class="literal">start</tt> option to start automounter, i.e.,
+<tt class="literal">autofs start</tt>. It is run with the
+<tt class="literal">stop</tt> option to shut down automounter.
+<tt class="literal">automount</tt> and <tt class="literal">automountd</tt> are
+two distinct, separate programs. <tt class="literal">automountd</tt> runs
+as a daemon and dynamically mounts filesystems when they are needed.
+<tt class="literal">automount</tt> processes the
+<em class="emphasis">auto_master</em> file to determine the filesystems
+that can be dynamically mounted.
+</p>
+
+<p>To use automounter, first configure the
+<em class="emphasis">/etc/auto_master</em> file. Entries in the
+<em class="emphasis">auto_master</em> file have this format:
+</p>
+
+<blockquote><pre class="code">mount-point     map-name        options</pre></blockquote>
+
+<p>The Solaris system comes with a default
+<em class="emphasis">auto_master</em><a name="INDEX-1904" /></a>
+<a name="INDEX-1905" /></a> file preconfigured. Customize the file
+for your configuration. Comment out the
+<tt class="literal">+auto_master</tt> entry unless you run NIS+ or NIS and
+your servers offer a centrally maintained <em class="emphasis">auto_master</em>
+map. Also ignore the <tt class="literal">/xfn</tt> entry, which
+is for creating a federated (composite) name service. Add an entry
+for your direct map. In the example, this is called
+<tt class="literal">auto_direct</tt>. Here is
+<em class="emphasis">/etc/auto_master</em> after our modifications:
+</p>
+
+<blockquote><pre class="code"># Master map for automounter 
+# 
+#+auto_master 
+#/xfn           -xfn 
+/net            -hosts          -nosuid 
+/home           auto_home
+/-              auto_direct</pre></blockquote>
+
+<p>All lines that begin with a <a name="INDEX-1906" /></a>
+<a name="INDEX-1907" /></a>
+<a name="INDEX-1908" /></a>sharp sign (#) are
+comments, including the <tt class="literal">+auto_master</tt> and
+<tt class="literal">/xfn</tt> lines we commented out. The first real entry
+in the file specifies that the shared filesystems offered by every
+NFS server listed in the <em class="emphasis">/etc/hosts</em> file are
+automatically mounted under the <em class="emphasis">/net</em> directory.
+A subdirectory is created for each server under
+<em class="emphasis">/net</em> using the server's hostname. For
+example, assume that <em class="emphasis">jerboas</em> is listed in the
+<em class="emphasis">hosts</em> file and that it exports the
+<em class="emphasis">/usr/local</em> directory. This
+<tt class="literal">auto_master</tt> entry automatically makes that remote
+directory available on the local host as
+<em class="emphasis">/net/jerboas/usr/local</em>.
+</p>
+
+<p>The second entry automatically mounts the home directories listed in
+the <em class="emphasis">/etc/auto_home</em> map under the
+<em class="emphasis">/home</em> directory. A default
+<em class="emphasis">/etc/auto_home</em> file is provided with the Solaris
+system. Comment out the <tt class="literal">+auto_home</tt> entry found in
+the default file. It is used only if you run NIS+ or NIS and your
+servers offer a centrally maintained <em class="emphasis">auto_home</em>
+map. Add entries for individual user home directories or for all home
+directories from specific servers. Here is a modified
+<em class="emphasis">auto_home</em> map:
+</p>
+
+<blockquote><pre class="code"># Home directory map for automounter 
+# 
+#+auto_home 
+craig           crab:/export/home/craig
+*               horseshoe:/export/home/&amp;</pre></blockquote>
+
+<p>The first entry mounts the <em class="emphasis">/export/home/craig</em>
+filesystem shared by <em class="emphasis">crab</em> on the local mount
+point <em class="emphasis">/home/craig</em>. The
+<em class="emphasis">auto_home</em><a name="INDEX-1909" /></a>
+<a name="INDEX-1910" /></a>
+map is an indirect map, so the mount point specified in the map
+(<tt class="literal">craig</tt>) is relative to the
+<em class="emphasis">/home</em> mount point defined in the
+<em class="emphasis">auto_master</em> map. The second entry mounts every
+home directory found in the <em class="emphasis">/export/home</em>
+filesystem offered by <em class="emphasis">horseshoe</em> to a
+"like-named" mount point on the local host. For example,
+assume that <em class="emphasis">horseshoe</em> has two home directories,
+<em class="emphasis">/export/home/daniel</em> and
+<em class="emphasis">/export/home/kristin</em>. Automounter makes them
+both available on the local host as <em class="emphasis">/home/daniel</em>
+and <em class="emphasis">/home/kristin</em>. The asterisk
+(<tt class="literal">*</tt>) and the ampersand (<tt class="literal">&amp;</tt>)
+are wildcard characters used specifically for this purpose in autofs
+maps.
+</p>
+
+<p>That's it for the <em class="emphasis">auto_home</em> map. Refer
+back to the <em class="emphasis">auto_master</em> map. The third and final
+entry in the <em class="emphasis">/etc/auto_master</em> file is:
+</p>
+
+<blockquote><pre class="code">/-              auto_direct</pre></blockquote>
+
+<p>We added this entry for our direct map. The special mount point
+<tt class="literal">/-</tt> means that the map name refers to a direct map.
+Therefore the real mount points are found in the direct map file. We
+named our direct map file <em class="emphasis">/etc/auto_direct</em>.
+There is no default direct map file; you must create it from scratch.
+The file we created is:
+</p>
+
+<blockquote><pre class="code"># Direct map for automounter 
+# 
+/home/research  -rw       jerboas:/home/research
+/usr/man        -ro,soft  horseshoe,crab,jerboas:/usr/share/man</pre></blockquote>
+
+<p>The format of entries in a direct map file is:</p>
+
+<blockquote><pre class="code">mount-point     options   remote filesystem</pre></blockquote>
+
+<p>Our sample file contains two typical entries. The first entry mounts
+the remote filesystem <em class="emphasis">/home/research</em> offered by
+the server <em class="emphasis">jerboas</em> on the local mount point
+<em class="emphasis">/home/research</em>. It is mounted read/write. The
+second entry mounts the manpages read-only with a "soft"
+timeout.<a href="#FOOTNOTE-103">[103]</a> Note that three servers
+are specified for the manpages in a comma-separated list. If a server
+is unavailable or fails to respond within the soft timeout period,
+the client asks the next server in the list. This is one of the nice
+features of automounter.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-103" /></a><p>[103]See the description of NFS mount options
+earlier in this chapter.</p> </blockquote>
+
+<p>Automounter has four key features: the -hosts map, wildcarding,
+automounting, and multiple servers. The -hosts map makes every
+exported filesystem from every server listed in the
+<em class="emphasis">/etc/hosts</em> file available to the local user. The
+wildcard characters make it very easy to mount every directory from a
+remote server to a like-named directory on the local system.
+Automounting goes hand-in-glove with these two features because only
+the filesystems that are actually used are mounted. While -hosts and
+wildcards make a very large number of filesystems available to the
+local host, automounting limits the filesystems that are actually
+mounted to those that are needed. The last feature, multiple servers,
+improves the reliability of NFS by removing the dependence on a
+single server.
+</p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.5. Summary </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.2. Sharing Unix Printers </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch09_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:00 GMT -->
+</html>

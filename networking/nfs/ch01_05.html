@@ -1,0 +1,385 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch01_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+<head><title>The session and presentation layers (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch02_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">1.5. The session and presentation layers</h2>
+
+
+The session and presentation layers define the <a name="INDEX-196" /> <a name="INDEX-197" /> <a name="INDEX-198" /> <a name="INDEX-199" />creation and lifetime of network
+connections and the format of data sent over these connections.
+Sessions may be built on top of any supported transport protocol
+ --  login sessions use TCP, while services that broadcast
+information about the local host use UDP. The session protocol used
+by NFS and NIS is the Remote
+<a name="INDEX-200" />Procedure Call (RPC).</p>
+
+
+<a name="nfs2-CHP-1-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">1.5.1. The client-server model</h3>
+
+
+RPC provides a mechanism<a name="INDEX-201" />
+<a name="INDEX-202" />
+for one host to make a procedure call that appears to be part of the
+local process but is really executed on another machine on the
+network. Typically, the host on which the procedure call is executed
+has resources that are not available on the calling host. This
+distribution of computing services imposes a client/server
+relationship on the two hosts: the host owning the resource is a
+server for that resource, and the calling host becomes a client of
+the server when it needs access to the resource. The resource might
+be a centralized configuration file (NIS) or a shared filesystem
+(NFS).</p>
+
+
+Instead of executing the procedure on the local host, the RPC system
+bundles up the arguments passed to the procedure into a network
+datagram. The exact bundling method is determined by the presentation
+layer, described in the next section. The RPC client creates a
+session by locating the appropriate server and sending the datagram
+to a process on the server that can execute the RPC; see <a href="ch01_05.html#nfs2-CHP-1-FIG-1">Figure 1-1</a>. On the server, the arguments are unpacked,
+the server executes the result, packages the result (if any), and
+sends it back to the client. Back on the client side, the reply is
+converted into a return value for the procedure call, and the user
+application is re-entered as if a local procedure call had completed.
+This is the end of the "session," as defined in the ISO
+model.<a name="INDEX-203" /><a name="INDEX-204" /></p>
+
+
+<a name="nfs2-CHP-1-FIG-1" /><div class="figure"><img height="211" alt="Figure 1-1" src="figs/nfs2.0101.gif" width="406" /></div><h4 class="objtitle">Figure 1-1. Remote procedure call execution</h4>
+
+RPC services may be built on either TCP or UDP transports,
+<a name="INDEX-205" />
+<a name="INDEX-206" />although most are UDP-oriented because
+they are centered around short-lived requests. Using UDP also forces
+the RPC call to contain enough context information for its execution
+independent of any other RPC requests, since UDP packets may arrive
+in any order, if at all.</p>
+
+
+When an RPC call is made, the client may specify a timeout period in
+which the call must complete. If the server is overloaded or has
+crashed, or if the request is lost in transit to the server, the
+remote call may not be executed before the timeout period expires.
+The action taken upon an RPC timeout varies by application; some
+resend the RPC call, while others may look for another server.
+Detailed mechanics of making an RPC call can be found in <a href="ch13_01.html">Chapter 13, "Network Diagnostic and Administrative Tools"</a>.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">1.5.2. External data representation</h3>
+
+
+At first look, the data presentation layer seems<a name="INDEX-207" /> <a name="INDEX-208" /> <a name="INDEX-209" />
+like overkill. Data is data, and if the client and server processes
+were written to the same specification, they should agree on the
+format of the data  --  so why bother with a presentation
+protocol? While a presentation layer may not be needed in a purely
+homogeneous network, it is required in a heterogeneous network to
+unify differences in data representation. These differences are
+outlined in the following list:</p>
+
+
+<dl>
+<dt><i>Data byte ordering</i></dt>
+<dd>Does the most significant byte of <a name="INDEX-210" />an integer go
+in the odd- or even-numbered byte?</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Compiler behavior</i></dt>
+<dd>Do odd-sized quantities get padded out to
+<a name="INDEX-211" />even-byte boundaries? How are unions
+handled?</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Floating point numbers</i></dt>
+<dd>What standard is used for <a name="INDEX-212" />encoding floating point
+numbers?</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>Arrays and strings</i></dt>
+<dd>How do you transmit variable-sized objects,
+<a name="INDEX-213" /> <a name="INDEX-214" />such as arrays and strings?</p></dd>
+
+</dl>
+
+
+Again, a presentation protocol would not be necessary if datagrams
+consisted only of byte-oriented data. However, applications that use
+RPC expect a system call-like interface, including support for
+structures and data types more complex than byte streams. The
+presentation layer provides services for encoding and decoding
+argument buffers that may then be passed down to RPC for transmission
+to the client or server.</p>
+
+
+<a name="INDEX-215" /><a name="INDEX-216" /><a name="INDEX-217" />The External Data Representation (XDR)
+protocol was <a name="INDEX-218" /> <a name="INDEX-219" />developed by Sun Microsystems
+and is used by NIS and NFS at the presentation layer. XDR is built on
+the notion of an immutable network byte ordering, called
+<a name="INDEX-220" />the <em class="emphasis">canonical form</em>.
+It isn't really important what the canonical form is  -- 
+your system may or may not use the same byte ordering and structure
+packing conventions. The canonical form simply allows network hosts
+to exchange structured data (as opposed to streams of bytes)
+independently of any peculiarities of a particular machine. All data
+structures are converted into the network byte ordering and padded
+appropriately.</p>
+
+
+The rule of XDR is "sender makes local canonical; receiver
+makes canonical local." Any data that goes over the network is
+in canonical form.<a href="#FOOTNOTE-3">[3]</a> A host sending data on the network
+converts it to canonical form, and the host that receives the data
+converts it back into its local representation. A different way to
+implement the presentation layer might be "receiver makes
+local." In this case, the sender does nothing to the local
+data, and the receiver must deduce the packing and encoding technique
+and convert it into the local equivalent. While this scheme may send
+less data over the network  --  since it is not subject to
+additional padding  --  it places the burden of incorporating a
+new hardware architecture on the receiving side, rather than on the
+new machine. This doesn't seem like a major distinction, but
+consider having to change all existing, fielded software to handle
+the new machine's structure-packing conventions. It's
+usually worth the overhead of converting to and from canonical form
+to ensure that all new machines will be able to "plug in"
+to the network without any software changes.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-3" />[3]The canonical form matches the
+byte ordering of the Motorola and SPARC family of microprocessors, so
+these processors do not have to perform any byte swapping to
+translate to or from canonical form. This byte ordering is called Big
+Endian. Big Endian ordering is used for many Internet
+protocols.</p>
+
+</blockquote>
+
+
+The XDR and RPC layers complete the foundation necessary for a
+client/server distributed computing relationship. NFS and NIS are
+client/server applications, which means they sit at the top layer of
+the protocol stack and use the XDR and RPC services. To complete this
+introduction to network services, we'll take a look at the two
+mechanisms used to start and maintain servers for various<a name="INDEX-221" /> <a name="INDEX-222" /> <a name="INDEX-223" /> network services.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-1-SECT-5.3" /><div class="sect2">
+<a name="INDEX-224" /><h3 class="sect2">1.5.3. Internet and RPC server configuration</h3>
+
+
+The XDR and RPC services are <a name="INDEX-225" /> <a name="INDEX-226" />
+<a name="INDEX-227" />useful for applications that need to
+exchange data structures over the network. Each new RPC request
+contains all required information in its XDR-encoded arguments, just
+as a local procedure call gets its inputs from passed-in
+arguments.<a name="INDEX-228" /> RPC services are usually
+<em class="emphasis">connectionless</em> services
+<a name="INDEX-229" />because
+RPC requests do not require the creation of a long-lived network
+connection between the client and server. The client communicates
+with the server to send its request and receive a reply, but there is
+no connection or environment for the communication.</p>
+
+
+<a name="INDEX-230" /><a name="INDEX-231" /><a name="INDEX-232" /><a name="INDEX-233" /><a name="INDEX-234" /><a name="INDEX-235" />There
+are many other network
+<a name="INDEX-236" />
+<a name="INDEX-237" /><a name="INDEX-238" />services,
+<a name="INDEX-239" />such
+as <em class="emphasis">telnet</em> and <em class="emphasis">ftp</em>, that are
+commonly referred to as the Internet or ARPA services. They are part
+of the original suite of utilities designed for use on the Internet.
+Internet services are generally based on the TCP protocol and are
+<em class="emphasis">connection-oriented</em>  --  the service client
+establishes a connection to a server, and data is then exchanged in
+the form of a well-ordered byte stream. There is no need for RPC or
+XDR services, since the data is byte-oriented, and the service
+defines its own protocols for handling the data stream. The
+<em class="emphasis">telnet</em> service, for example, has
+<a name="INDEX-240" />its own protocol for
+querying the server about end-of-line, terminal type, and flow
+control conventions.</p>
+
+
+Note that RPC services are not required to be connectionless. RPC can
+be run over TCP, in a connection-oriented fashion. The TCP transport
+protocol <a name="INDEX-241" />may be used with RPC services whenever a
+large amount of data needs to be transferred. NIS, for example, uses
+UDP (in connectionless mode) for most of its operations, but switches
+to TCP whenever it needs to transfer an entire database from one
+machine to another. NFS supports either TCP or UDP for all its
+operations.</p>
+
+
+Most Internet services are managed by a <a name="INDEX-242" />
+<a name="INDEX-243" />super-daemon called
+<em class="emphasis">inetd</em> that accepts requests for connections to
+servers and starts instances of those servers on an as-needed basis.
+Rather than having many server processes,
+<a name="INDEX-244" />or
+<em class="emphasis">daemons</em>, running on each host,
+<em class="emphasis">inetd</em> starts them as requests arrive. Clients
+contact the <em class="emphasis">inetd</em> daemon on well-known port
+numbers for each service. These port numbers are published in the
+<em class="emphasis">/etc/services</em> file.<a name="INDEX-245" /><a name="INDEX-246" /></p>
+
+
+<em class="emphasis">inetd</em> sets up a one-to-one relationship between
+service clients and server-side daemons. Every
+<em class="emphasis">rlogin</em> shell, for example,
+<a name="INDEX-247" />has
+a client side <em class="emphasis">rlogin</em> process (that calls
+<em class="emphasis">inetd</em> upon invocation) and a server-side
+<em class="emphasis">in.rlogind</em> daemon that was started by
+<em class="emphasis">inetd</em>. In this regard,
+<em class="emphasis">inetd</em> and the services it supports are
+<em class="emphasis">multi-threaded</em>: they can service multiple
+clients at the same time, creating a new separate connection (and
+state information) for each client. A new server instance, or thread,
+is initiated by each request for that service, but a single daemon
+handles all incoming requests at once.</p>
+
+
+Only traffic specific to a single session moves over the connection
+between a client and its server. When the client is done with the
+service, it asks the server to terminate its connection, and the
+server daemon cleans up and exits. If the server prematurely ends the
+connection due to a crash, for example, the client drops its end of
+the connection as well.</p>
+
+
+Some RPC services can't afford the
+overhead<a name="INDEX-248" /> of using <em class="emphasis">inetd</em>. The
+standard <em class="emphasis">inetd</em>based services, like
+<em class="emphasis">telnet</em>, tend to be used for a long time, so the
+cost of talking to <em class="emphasis">inetd</em> and having it start a
+new server process is spread out over the lifetime of the connection.
+Many RPC calls are short in duration, lasting at most the time
+required to perform a disk operation.</p>
+
+
+RPC servers are generally started during the boot process and run as
+long as the machine is up. While the time required to start a new
+server process may be small compared to the time a remote login or
+<em class="emphasis">rsh</em> session exists, <a name="INDEX-249" />this overhead is simply too large for
+efficient RPC operation. As a result, RPC servers typically have one
+server process for the RPC service, and it executes remote requests
+for all clients in the same process. Some RPC servers are
+single-threaded: they execute requests one at a time. To achieve
+better performance, some RPC servers are multi-threaded: they have
+multiple threads of execution within the same process, sharing the
+same address space. There may be many clients of the RPC server, but
+their requests intermingle in the RPC server queue and are processed
+in the order in which server threads are dispatched to deal with the
+requests.</p>
+
+
+Instead of using pre-assigned ports and a super-server, RPC servers
+are designated by service number. The file
+<em class="emphasis">/etc/rpc</em> contains a list of RPC servers and
+their program numbers. Each program may contain many procedures. The
+NFS program, for example, contains more than a dozen procedures, one
+for each filesystem operation such as "read block,"
+"write block," "create file," "make
+symbolic link," and so on. RPC services still must use TCP/UDP
+port numbers to fit the underlying protocols, so the mapping of RPC
+program numbers to port numbers is handled by
+the<a name="INDEX-250" />
+<a name="INDEX-251" />
+<a name="INDEX-252" /> portmapper daemon
+(<em class="emphasis">portmap</em> on some systems,
+<em class="emphasis">rpcbind</em> on others).
+<a name="INDEX-253" /></p>
+
+
+When an RPC server initializes, it usually
+registers<a name="INDEX-254" />
+<a name="INDEX-255" />
+its service with the portmapper. The RPC server tells the portmapper
+which ports it will listen on for incoming requests, rather than
+having the portmapper listen for it, in <em class="emphasis">inetd</em>
+fashion. An RPC client contacts the portmapper daemon on the server
+to determine the port number used by the RPC server, or it may ask
+the portmapper to call the server indirectly on its behalf. In either
+case, the first RPC call from a client to a server must be made with
+the portmapper running. If the portmapper dies, clients will be
+unable to locate RPC daemons services on the server. A server without
+a running portmapper effectively stops serving NIS, NFS, and other
+RPC-based applications.</p>
+
+
+We'll come back to RPC mechanics and debugging techniques in
+later chapters. For now, this introduction to the configuration and
+use of RPC services suffices as a foundation for explaining the NFS
+and NIS applications built on top of them.</p>
+
+
+<a name="nfs2-CHP-1-SECT-5.3.1" /><div class="sect3">
+<h3 class="sect3">1.5.3.1. Socket RPC and Transport Independent RPC</h3>
+
+
+RPC was originally designed to work over <a name="INDEX-256" /> <a name="INDEX-257" />sockets, a programing<a name="INDEX-258" /> <a name="INDEX-259" /> interface for network communication
+introduced in the 1980s by the University of California in its 4.1c
+BSD version of Unix. Solaris 2.0 introduced Transport Independent RPC
+(TI-RPC). The motivation for TI-RPC was that it appeared that OSI
+networking <a name="INDEX-260" />would eventually supplant TCP/IP-based
+networking, and so a transport independent interface would make it
+easier to transition RPC applications was needed. While OSI
+networking did not take over, TI-RPC is still used in Solaris. TI-RPC
+introduces an additional configuration file,
+<em class="emphasis">/etc/netconfig</em>, which defines each transport
+that RPC services can listen for requests over. In addition to TCP
+and UDP, the <em class="emphasis">/etc/netconfig</em> file lists
+connectionless and connection-oriented loopback transports for RPC
+services that don't need to provide service outside the host.
+In Solaris 8, the <em class="emphasis">/etc/netconfig</em> file will
+also<a name="INDEX-261" />
+<a name="INDEX-262" />
+<a name="INDEX-263" /> let you
+<a name="INDEX-264" />
+<a name="INDEX-265" />
+<a name="INDEX-266" />
+<a name="INDEX-267" />specify
+services over TCP and UDP on IPv6 <a name="INDEX-268" /> <a name="INDEX-269" />network<a name="INDEX-270" /> <a name="INDEX-271" /> interfaces.</p>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch01_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">1.4. Transport layer</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2. Introduction to Directory Services </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch01_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:39 GMT -->
+</html>

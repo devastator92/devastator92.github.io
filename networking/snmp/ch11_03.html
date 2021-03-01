@@ -1,0 +1,741 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>OpenView's Extensible Agent (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">11.3. OpenView's Extensible Agent</h2>
+
+<a name="INDEX-1820" /><a name="INDEX-1821" /><a name="INDEX-1822" /><a name="INDEX-1823" /><a name="INDEX-1824" /><a name="INDEX-1825" />
+<a name="INDEX-1826" />
+<a name="INDEX-1827" />Before
+you start playing around with OpenView's extensible agent, make
+sure that you have its master agent (<em class="emphasis">snmpdm</em>)
+configured and running properly. You must also obtain an enterprise
+number, because extending the OpenView agent requires writing your
+own MIB definitions, and the objects you define must be part of the
+<em class="emphasis">enterprises</em> subtree.<a href="#FOOTNOTE-57">[57]</a> <a href="ch02_01.html">Chapter 2, "A Closer Look at SNMP"</a>
+describes how to obtain an enterprise number.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-57" />[57]Do not use
+my enterprise number. Obtaining your own private enterprise number is
+easy and free. Using my number will only confuse you and others later
+in the game.</p> </blockquote>
+
+<a name="INDEX-1828" /><a name="INDEX-1829" />MIBs are written using the SMI, of
+which there are two versions: SMIv1, defined in RFCs 1155 and 1212;
+and SMIv2, defined in RFCs 2578, 2579, and 2580. RFC 1155 notes that
+"ASN.1 constructs are used to define the structure, although
+the full generality of ASN.1 is not permitted." While
+OpenView's extensible agent file
+<em class="filename">snmpd.extend</em> uses ASN.1 to define objects, it
+requires some additional entries to create a usable object.
+<em class="filename">snmpd.extend</em> also does not support some of the
+SNMPv2 SMI constructs. In this chapter, we will discuss only those
+constructs that are supported.
+</p>
+
+By default, the configuration file for the extensible agent in the
+Unix version of OpenView is
+<em class="filename">/etc/SnmpAgent.d/snmp.extend</em>. To jump right in,
+copy the sample file to this location and then restart the agent:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>cp /opt/OV/prg_samples/eagent/snmpd.extend /etc/SnmpAgent.d/</b></tt>
+$ <tt class="userinput"><b>/etc/rc2.d/S98SnmpExtAgt stop</b></tt>
+$ <tt class="userinput"><b>/etc/rc2.d/S98SnmpExtAgt start</b></tt></pre></blockquote>
+
+<a name="INDEX-1830" /><a name="INDEX-1831" />You should see no errors and get an exit
+code of 0 (zero). If errors occur, check the
+<em class="filename">snmpd.log</em> file.<a href="#FOOTNOTE-58">[58]</a> If the
+agent starts successfully, try walking one of the objects monitored
+by the extensible agent. The following command checks the status of
+the mail queue:
+</p><blockquote class="footnote"> <a name="FOOTNOTE-58" />[58]On Solaris and
+HP-UX machines this file is located in
+<em class="filename">/var/adm/snmpd.log</em>.</p> </blockquote>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk sunserver1  .1.3.6.1.4.1.4242.2.2.0</b></tt>
+4242.2.2.0 : OCTET STRING- (ascii):     Mail queue is empty</pre></blockquote>
+
+We're off to a good start. We have successfully started and
+polled the extensible agent.
+</p>
+
+The key to OpenView's <em class="filename">snmpd.extend</em> file is
+the <tt class="literal">DESCRIPTION</tt>. If this seems a little weird, it
+is! Executing commands from within the <tt class="literal">DESCRIPTION</tt>
+section is peculiar to this agent, not part of the SNMP design. The
+<tt class="literal">DESCRIPTION</tt> tells the agent where to look to read,
+write, and run files. You can put a whole slew of parameters within
+the <tt class="literal">DESCRIPTION</tt>, but we'll tackle only a few
+of the more common ones. Here's the syntax for the
+<em class="filename">snmpd.extend</em> file:
+</p>
+
+<blockquote><pre class="code">your-label-here DEFINITIONS ::= BEGIN
+
+-- insert your comments here
+
+enterprise-name  OBJECT IDENTIFIER ::= { OID-label(1) OID-label{2) 3 }
+subtree-name1    OBJECT IDENTIFIER ::= { OID-label(3) 4 }
+subtree-name2    OBJECT IDENTIFIER ::= { OID-label(123) 56 }
+
+data-Identifier<a href="#FOOTNOTE-59">[59]</a> OBJECT-TYPE
+    SYNTAX Integer | Counter | Gauge | DisplayString<a href="#FOOTNOTE-60">[60]</a> 
+    ACCESS read-only | read-write
+    STATUS mandatory | optional | obsolete | deprecated<a href="#FOOTNOTE-61">[61]</a> 
+    DESCRIPTION
+        "
+         Enter Your Description Here
+         READ-COMMAND: /your/command/here passed1 passed2
+         READ-COMMAND-TIMEOUT: timeout_in_seconds (defaults to 3)
+         FILE-COMMAND: /your/file-command/here passed1 passed2
+         FILE-COMMAND-FREQUENCY: frequency_in_seconds (defaults to 10)
+         FILE-NAME: /your/filename/here
+        "
+    ::= { parent-subtree-name subidentifier }
+
+END</pre></blockquote>
+
+<a name="INDEX-1832" />
+<a name="INDEX-1833" />We can glean some style guidelines from
+RFC 2578. While there are many guidelines, some more useful than
+others, one thing stands out: case does matter. Much of ASN.1 is case
+sensitive. All ASN.1 keywords and macros should be in uppercase:
+<tt class="literal">OBJECT-TYPE</tt>, <tt class="literal">SYNTAX</tt>,
+<tt class="literal">DESCRIPTION</tt>, etc. Your
+<em class="emphasis">data-Identifiers</em> (i.e., object names) should
+start in lowercase and contain no spaces. If you have read any of the
+RFC MIBs or done any polling, you should have noticed that all the
+object names obey this convention. Try to use descriptive names and
+keep your names well under the 64-character limit; RFC 2578 states
+that anything over 32 characters is not recommended. If you define an
+object under an existing subtree, you should use this subtree-name,
+or parent-name, before each new object-name you create. The
+<em class="emphasis">ip</em> subtree in <em class="emphasis">mib-2</em> (RFC
+1213) provides an example of good practice:
+</p>
+
+<blockquote><pre class="code"><tt class="userinput"><b>ip</b></tt>           OBJECT IDENTIFIER ::= { mib-2 4 }
+
+<tt class="userinput"><b>ip</b></tt>Forwarding OBJECT-TYPE
+...
+::= { <tt class="userinput"><b>ip</b></tt> 1 }
+
+<tt class="userinput"><b>ip</b></tt>DefaultTTL OBJECT-TYPE
+...
+::= { <tt class="userinput"><b>ip</b></tt> 2 }</pre></blockquote>
+
+This file starts by defining the <em class="emphasis">ip</em> subtree. The
+names of objects within that subtree start with
+<em class="emphasis">ip</em> and use <em class="emphasis">ip</em> as the
+parent-subtree-name. As useful as this recommended practice is, there
+are times when it isn't appropriate. For example, this practice
+makes it difficult to move your objects to different parents while
+you are building a MIB file.
+</p>
+
+Here's a working <em class="filename">snmpd.extend</em> file that
+contains three definitions: <em class="emphasis">psZombieNum</em>,
+<em class="emphasis">prtDiagExitC</em>, and
+<em class="emphasis">whosOnCall</em>. I have placed all these objects
+within my own private enterprise (<em class="emphasis">2789</em>, which I
+have named <em class="emphasis">mauro</em>). <a href="ch11_03.html#enettdg-CHP-11-FIG-2">Figure 11-2</a>
+shows this portion of my private subtree.
+</p>
+
+<a name="enettdg-CHP-11-FIG-2" /><div class="figure"><img height="418" alt="Figure 11-2" src="figs/snmp_1102.gif" width="324" /></div><h4 class="objtitle">Figure 11-2.  mauro subtree</h4>
+
+You can now walk the tree and see what my new objects look like; my
+tree starts at the OID <em class="emphasis">.1.3.6.1.4.1.2789</em>, which
+is equivalent to
+<em class="emphasis">.iso.org.dod.internet.private.enterprises.mauro</em>.
+I can organize my own subtree any way I want, so I've split it
+into two branches beneath <em class="emphasis">mauro</em>:
+<em class="emphasis">mauro.sysInfo</em> (<em class="emphasis">2789.3</em>) will
+hold information about the status of the system itself
+(<em class="emphasis">psZombieNum</em> and <em class="emphasis">prtDiagExitC</em>
+), and <em class="emphasis">mauro.other</em>
+(<em class="emphasis">2789.255</em> ) will hold additional information
+(<em class="emphasis">whosOnCall</em> ). If you look further down, you can
+see the three leaf nodes we define in this file:
+</p>
+
+<blockquote><pre class="code">SampleExt DEFINITIONS ::= BEGIN
+
+-- comments appear here behind the dashes
+
+internet        OBJECT IDENTIFIER ::= { iso(1) org(3) dod(6) 1 }
+enterprises     OBJECT IDENTIFIER ::= { internet(1) private(4) 1 }
+mauro           OBJECT IDENTIFIER ::= { enterprises(1) 2789 }
+
+-- Now that we have defined mauro, let's define some objects
+
+sysInfo         OBJECT IDENTIFIER ::= { mauro 3 }
+other           OBJECT IDENTIFIER ::= { mauro 255 }
+
+psZombieNum OBJECT-TYPE
+  SYNTAX  INTEGER
+  ACCESS  read-only
+  STATUS  mandatory
+  DESCRIPTION
+    "Search through ps and return the number of zombies.
+    READ-COMMAND: VALUE=`ps -ef | grep -v grep | grep -c  \&lt;defunct\&gt;`; echo $VALUE
+    "
+ ::= { sysInfo 0 }
+
+prtDiagExitC OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "On Solaris, prtdiag shows us system diagnostic information. The 
+         manpage states that if this command exits with a non-zero value,
+         we have a problem. This is a great polling mechanism for some
+         systems.
+         READ-COMMAND: /usr/platform/`uname -m`/sbin/prtdiag &gt; /dev/null; echo $?"
+    ::= { sysInfo 1 }
+
+whosOnCall OBJECT-TYPE
+    SYNTAX  OctetString
+    ACCESS  read-write
+    STATUS  mandatory
+    DESCRIPTION
+        "This file contains the name of the person who will be on call
+         today. The helpdesk uses this file. Only the helpdesk and
+         managers should update this file. If you are sick or unable to
+         be on call please contact your manager and/or the helpdesk.
+         FILE-NAME: /opt/local/oncall/today.txt"
+    ::= { other 0 }
+
+END</pre></blockquote>
+
+The first two objects, <em class="emphasis">psZombieNum</em> and
+<em class="emphasis">prtDiagExitC</em>, both use the
+<tt class="literal">READ-COMMAND</tt> in the
+<tt class="literal">DESCRIPTION</tt>. This tells the agent to execute the
+named command and send any output the command produces to the NMS. By
+default, the program must complete within three seconds and have an
+exit value of 0 (zero). You can increase the timeout by adding a
+<tt class="literal">READ-COMMAND-TIMEOUT</tt>:
+</p>
+
+<blockquote><pre class="code">READ-COMMAND: /some/fs/somecommand.pl
+READ-COMMAND-TIMEOUT: 10</pre></blockquote>
+
+<a name="INDEX-1834" />This tells
+the agent to wait 10 seconds instead of 3 for a reply before killing
+the process and returning an error.
+</p>
+
+The last object, <em class="emphasis">whosOnCall</em>, uses a
+<tt class="literal">FILE-NAME</tt> in the <tt class="literal">DESCRIPTION</tt>.
+This tells the agent to return the first line of the file, program,
+script, etc. specified after <tt class="literal">FILE-NAME</tt>. Later we
+will learn how to manipulate this file.
+</p>
+
+<a name="INDEX-1835" /><a name="INDEX-1836" /><a name="INDEX-1837" /><a name="INDEX-1838" /><a name="INDEX-1839" />Now that we've created a MIB file
+with our new definitions, we need to load the new MIB into OpenView.
+This step isn't strictly necessary, but it's much more
+convenient to work with textual names than to deal with numeric IDs.
+To do this, use <i class="command">xnmloadmib</i>, discussed in <a href="ch06_01.html">Chapter 6, "Configuring Your NMS"</a>. After we load the MIB file containing
+our three new objects, we should see their names in the MIB browser
+and be able to poll them by name.
+</p>
+
+<a name="INDEX-1840" /><a name="INDEX-1841" /><a name="INDEX-1842" />Once you have copied the MIB file
+into the appropriate directory and forced the extensible agent,
+<em class="emphasis">extsubagt</em>, to reread its configuration (by using
+<i class="command">kill -HUP</i>), try walking the new objects using
+OpenView's <i class="command">snmpwalk</i> program:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk sunserver2 -c public .1.3.6.1.4.1.2789</b></tt>
+mauro.sysInfo.psZombieNum.0 : INTEGER: 0
+mauro.sysInfo.prtDiagExitC.0 : INTEGER: 2</pre></blockquote>
+
+<a name="INDEX-1843" /><a name="INDEX-1844" />Notice anything strange about our return
+values? We didn't get anything for
+<em class="emphasis">whosOnCall</em>. Nothing was returned for this object
+because we haven't created the <em class="filename">oncall.txt</em>
+file whose contents we're trying to read. We must first create
+this file and insert some data into the file. There are two ways of
+doing this. Obviously, you can create the file with your favorite
+text editor. But the clever way is to use <i class="command">snmpset</i>:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpset -c private sunserver2 \</b></tt>
+<tt class="userinput"><b>.1.3.6.1.4.1.2789.255.0.0 octetstring "david jones"</b></tt>
+mauro.Other.whosOnCall.0 : OCTET STRING- (ascii):        david jones</pre></blockquote>
+
+This command tells the SNMP agent to put <tt class="literal">david</tt>
+<tt class="literal">jones</tt> in the file
+<em class="filename">/opt/local/oncall/today.txt</em>. The filename is
+defined by the <tt class="literal">FILE-NAME:</tt>
+<tt class="literal">/opt/local/oncall/today.txt</tt> command that we wrote
+in the extended MIB. The additional <em class="emphasis">.0</em> at the
+end of the OID tells the agent we want the first (and only) instance
+of <em class="emphasis">whosOnCall</em>. (We could have used
+<em class="emphasis">.iso.org.dod.internet.private.enterprises.mauro.other.whosOnCall.0</em>
+instead of the numeric OID.) Furthermore, the
+<i class="command">snmpset</i> command specifies the datatype
+<tt class="literal">octetstring</tt>, which matches the
+<tt class="literal">OctetString</tt> syntax we defined in the MIB. This
+datatype lets us insert string values into the file. Finally,
+we're allowed to set the value of this object with
+<i class="command">snmpset</i> because we have
+<tt class="literal">read-write</tt> access to the object, as specified in
+the MIB.
+</p>
+
+If you choose to use an editor to create the file, keep in mind that
+anything after the first line of the file is ignored. If you want to
+read multiple lines you have to use a table; tables are covered in
+the next section.
+</p>
+
+<a name="INDEX-1845" />Now let's add another object
+to the MIB for our extended agent. We'll use a modification of
+the example OpenView gives us. We'll create an object named
+<em class="emphasis">fmailListMsgs</em> (<em class="emphasis">2</em>) that
+summarizes the messages in the mail queue. This object will live in a
+new subtree, named <em class="emphasis">fmail</em>
+(<em class="emphasis">4</em>), under the private
+<em class="emphasis">mauro</em> subtree. So the name of our object will be
+<em class="emphasis">mauro.fmail.fmailListMsgs</em> or, in numeric form,
+<em class="emphasis">.1.3.6.1.4.1.2789.4.2</em>. First, we need to define
+the <em class="emphasis">fmail</em> branch under the
+<em class="emphasis">mauro</em> subtree. To do this, add the following
+line to <em class="filename">snmpd.extend</em>:
+</p>
+
+<blockquote><pre class="code">fmail           OBJECT IDENTIFIER ::= { mauro 4 }</pre></blockquote>
+
+We picked 4 for the branch number, but we could have chosen any
+number that doesn't conflict with our other branches (3 and
+255). After we define <em class="emphasis">fmail</em> we can insert the
+definition for <em class="emphasis">fmailListMsgs</em> into
+<em class="filename">snmpd.extend</em>, placing it before the
+<tt class="literal">END</tt> statement:
+</p>
+
+<blockquote><pre class="code">fmailListMsgs OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "List of messages on the mail queue.
+         READ-COMMAND: /usr/lib/sendmail -bp
+         READ-COMMAND-TIMEOUT: 10"
+    ::= { fmail 2 }</pre></blockquote>
+
+When polled, <em class="emphasis">fmailListMsgs</em> runs the command
+<i class="command">sendmail -bp</i>, which prints a summary of the mail
+queue. When all this is done, you can use your management station or
+a tool such as <i class="command">snmpget</i> to read the value of
+<em class="emphasis">mauro.fmail.fmailListMsgs</em> and see the status of
+the outgoing mail queue.
+</p>
+
+<a name="enettdg-CHP-11-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">11.3.1. Tables</h3>
+
+<a name="INDEX-1846" /><a name="INDEX-1847" /><a name="INDEX-1848" /><a name="INDEX-1849" /><a name="INDEX-1850" />Tables allow the agent to return
+multiple lines of output (or other sets of values) from the commands
+it executes. At its most elaborate, a table allows the agent to
+return something like a spreadsheet. We can retrieve this spreadsheet
+using <em class="emphasis">snmpwalk</em> -- a process that's
+significantly easier than issuing separate <i class="command">get</i>
+operations to retrieve the data one value at a time. One table
+we've already seen is
+<em class="emphasis">.iso.org.dod.internet.mgmt.mib-2.interfaces.ifTable</em>,
+which is defined in MIB-II and contains information about all of a
+device's interfaces.
+</p>
+
+<a name="INDEX-1851" /><a name="INDEX-1852" /><a name="INDEX-1853" /><a name="INDEX-1854" /><a name="INDEX-1855" /><a name="INDEX-1856" /><a name="INDEX-1857" />Every
+table contains an <em class="firstterm">integer index</em>, which is a
+unique key that distinguishes the rows in the table. The index starts
+with 1, for the first row, and increases by one for each following
+row. The index is used as an instance identifier for the columns in
+the table; given any column, the index lets you select the data
+(i.e., the row) you want. Let's look at a small table,
+represented by the text file <em class="filename">animal.db</em>:
+</p>
+
+<blockquote><pre class="code">1       Tweety        Bird    Chirp   2
+2       Madison       Dog     Bark    4
+3       "Big Ben"     Bear    Grrr    5</pre></blockquote>
+
+<a name="INDEX-1858" />
+<a name="INDEX-1859" /><a name="INDEX-1860" />Our goal is to make this table
+readable via SNMP, using OpenView's extensible agent. This file
+is already in the format required by the agent. Each column is
+delimited by whitespace; a newline marks the end of each row. Data
+that includes an internal space is surrounded by quotes. OpenView
+doesn't allow column headings in the table, but we will want to
+think about the names of the objects in each row. Logically, the
+column headings are nothing more than the names of the objects we
+will retrieve from the table. In other words, each row of our table
+consists of five objects:
+</p>
+
+<dl>
+<dt><b>animalIndex</b></dt>
+<dd>
+An index that specifies the row in the table. The first row is 1, as
+you'd expect for SNMP tables. The <tt class="literal">SYNTAX</tt> for
+this object is therefore <tt class="literal">INTEGER</tt>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>animalName</b></dt>
+<dd>
+The animal's name. This is a text string, so the
+<tt class="literal">SYNTAX</tt> of this object will be
+<tt class="literal">DisplayString</tt>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>animalSpecies</b></dt>
+<dd>
+The animal's species (another text string, represented as a
+<tt class="literal">DisplayString</tt>).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>animalNoise</b></dt>
+<dd>
+The noise the animal makes (another <tt class="literal">DisplayString</tt>).</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><b>animalDanger</b></dt>
+<dd>
+An indication of how dangerous the animal is. This is another
+<tt class="literal">INTEGER</tt>, whose value can be from 1 to 6. This is
+called an "enumerated integer"; we're allowed to
+assign textual mnemonics to the integer values.
+</p>
+</dd>
+
+</dl>
+
+<a name="INDEX-1861" /><a name="INDEX-1862" />At this point, we have just about
+everything we need to know to write the MIB that allows us to read
+the table. For example, we know that we want an object named
+<em class="emphasis">animalNoise.2</em> to access the
+<em class="emphasis">animalNoise</em> object in the second row of the
+table; this object has the value <tt class="literal">Bark</tt>. It's
+easy to see how this notation can be used to locate any object in the
+table. Now let's write the MIB definition for the table.
+</p>
+
+<blockquote><pre class="code">TableExtExample DEFINITIONS ::= BEGIN
+
+internet        OBJECT IDENTIFIER ::= { iso(1) org(3) dod(6) 1 }
+enterprises     OBJECT IDENTIFIER ::= { internet(1) private(4) 1 }
+mauro           OBJECT IDENTIFIER ::= { enterprises(1) 2789 }
+other           OBJECT IDENTIFIER ::= { mauro 255 }
+
+AnimalEntry ::=
+    SEQUENCE {
+    animalIndex INTEGER,
+    animalName DisplayString,
+    animalSpecies DisplayString,
+    animalNoise DisplayString,
+    animalDanger INTEGER
+    }
+
+animalTable OBJECT-TYPE
+    SYNTAX SEQUENCE OF AnimalEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "This is a table of animals that shows:
+         Name
+         Species
+         Noise
+         Danger Level
+         <tt class="userinput"><b>FILE-NAME</b></tt>: /opt/local/animal.db"
+    ::= { other 247 }
+
+animalEntry OBJECT-TYPE
+    SYNTAX AnimalEntry
+    ACCESS not-accessible
+    STATUS mandatory
+    DESCRIPTION
+        "List of animalNum"
+    <tt class="userinput"><b>INDEX</b></tt> { animalIndex }
+    ::= { <tt class="userinput"><b>animalTable</b></tt> 1 }
+
+animalIndex OBJECT-TYPE
+    SYNTAX INTEGER
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "The unique index number we will use for each row"
+    ::= { <tt class="userinput"><b>animalEntry</b></tt> 1 }
+
+animalName OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "My pet name for each animal"
+    ::= { <tt class="userinput"><b>animalEntry</b></tt> 2 }
+
+animalSpecies OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "The animal's species"
+    ::= { <tt class="userinput"><b>animalEntry</b></tt> 3 }
+
+animalNoise OBJECT-TYPE
+    SYNTAX DisplayString
+    ACCESS read-only
+    STATUS mandatory
+    DESCRIPTION
+        "The noise or sound the animal makes"
+    ::= { <tt class="userinput"><b>animalEntry</b></tt> 4 }
+
+animalDanger OBJECT-TYPE
+    SYNTAX INTEGER {
+        no-Danger(1),
+        can-Harm(2),
+        some-Damage(3),
+        will-Wound(4),
+        severe-Pain(5),
+        will-Kill(6)
+    }
+    ACCESS <tt class="userinput"><b>read-write</b></tt>
+    STATUS mandatory
+    DESCRIPTION
+        "The level of danger that we may face with the particular animal"
+    ::= { <tt class="userinput"><b>animalEntry</b></tt> 5 }
+
+END</pre></blockquote>
+
+The table starts with a definition of the
+<em class="emphasis">animalTable</em> object, which gives us our
+<tt class="literal">DESCRIPTION</tt> and tells the agent where the
+<em class="filename">animal.db</em> file is located. The
+<tt class="literal">SYNTAX</tt> is <tt class="literal">SEQUENCE</tt>
+<tt class="literal">OF</tt> <tt class="literal">AnimalEntry</tt>.
+<em class="emphasis">AnimalEntry</em> (watch the case) gives us a quick
+view of all our columns. You can leave
+<em class="emphasis">AnimalEntry</em> out, but we recommend that you
+include it since it documents the structure of the table.
+</p>
+
+The table is actually built from <em class="emphasis">animalEntry</em>
+elements -- because object names are case sensitive, this object
+is different from <em class="emphasis">AnimalEntry</em>.
+<em class="emphasis">animalEntry</em> tells us what object we should use
+for our index or key; the object used as the key is in brackets after
+the <tt class="literal">INDEX</tt> keyword.
+</p>
+
+The definitions of the remaining objects are similar to the
+definitions we've already seen. The parent-subtree for all of
+these objects is <em class="emphasis">animalEntry</em>, which effectively
+builds a table row from each of these objects. The only object
+that's particularly interesting is
+<em class="emphasis">animalDanger</em>, which uses an extension of the
+<tt class="literal">INTEGER</tt> datatype. As we noted before, this object
+is an enumerated integer, which allows us to associate textual labels
+with integer values. The values you can use in an enumerated type
+should be a series of consecutive integers, starting with
+1.<a href="#FOOTNOTE-62">[62]</a> For example,
+the <em class="emphasis">animalDanger</em> object defines six values,
+ranging from 1 to 6, with strings like <tt class="literal">no-danger</tt>
+associated with the values.
+</p><blockquote class="footnote"> <a name="FOOTNOTE-62" />[62]Some SNMPv1 SMI-compliant MIB compilers will not
+allow an enumerated type of 0 (zero).</p> </blockquote>
+
+<a name="INDEX-1863" /><a name="INDEX-1864" /><a name="INDEX-1865" />You
+can save this table definition in a file and use the
+<i class="command">xnmloadmib</i> command to load it into OpenView. Once
+you've done that and created the <em class="filename">animal.db</em>
+file with a text editor, you can walk the table:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk sunserver1 .1.3.6.1.4.1.mauro.other.animalTable</b></tt>
+animalEntry.animalIndex.1 : INTEGER: 1
+animalEntry.animalIndex.2 : INTEGER: 2
+animalEntry.animalIndex.3 : INTEGER: 3
+animalEntry.animalName.1 : DISPLAY STRING-(ascii): Tweety
+animalEntry.animalName.2 : DISPLAY STRING-(ascii): Madison
+animalEntry.animalName.3 : DISPLAY STRING-(ascii): Big Ben
+animalEntry.animalSpecies.1 : DISPLAY STRING-(ascii): Bird 
+animalEntry.animalSpecies.2 : DISPLAY STRING-(ascii): Dog
+animalEntry.animalSpecies.3 : DISPLAY STRING-(ascii): Bear
+animalEntry.animalNoise.1 : DISPLAY STRING-(ascii): Chirp
+animalEntry.animalNoise.2 : DISPLAY STRING-(ascii): Bark
+animalEntry.animalNoise.3 : DISPLAY STRING-(ascii): Grrr
+animalEntry.animalDanger.1 : INTEGER: can-Harm
+animalEntry.animalDanger.2 : INTEGER: will-Wound
+animalEntry.animalDanger.3 : INTEGER: severe-Pain</pre></blockquote>
+
+<i class="command">snmpwalk</i> goes through the table a column at a
+time, reporting all the data in a column before proceeding to the
+next. This is confusing -- it would be easier if
+<i class="command">snmpwalk</i> read the table a row at a time. As it is,
+you have to hop from line to line when you are trying to read a row;
+for example, to find out everything about Tweety, you need to look at
+every third line (all the <em class="emphasis">.1</em> items) in the
+output.
+</p>
+
+<a name="INDEX-1866" /><a name="INDEX-1867" /><a name="INDEX-1868" /><a name="INDEX-1869" />Two more things are worth
+noticing in the <i class="command">snmpwalk</i> output. The first set of
+values that <i class="command">snmpwalk</i> reports are the index values
+(<em class="emphasis">animalIndex</em>). It then appends each index value
+to each OID to perform the rest of the walk. Second, the
+<em class="emphasis">animalDanger</em> output reports strings, such as
+<tt class="literal">can-Harm</tt>, rather than integers. The conversion
+from integers to strings takes place because we defined the
+<em class="emphasis">animalDanger</em> object as an enumerated integer,
+which associates a set of possible values with strings.
+</p>
+
+<a name="INDEX-1870" /><a name="INDEX-1871" /><a name="INDEX-1872" /><a name="INDEX-1873" />Of course, just reading a table
+doesn't do a whole lot of good. Let's say that we need to
+update this file periodically to reflect changes in the
+animals' behavior. The <em class="emphasis">animalDanger</em> object
+has an <tt class="literal">ACCESS</tt> of <tt class="literal">read-write</tt>,
+which allows us to set its value and update the database file using
+our SNMP tools. Imagine that the dog in row 2 turns very mean. We
+need to turn its danger level to 5 (<tt class="literal">severe-Pain</tt>).
+We could edit the file by hand, but it's easier to issue an
+<i class="command">snmpset</i>:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpset -c private sunserver2 \</b></tt>
+<tt class="userinput"><b>mauro.other.animalTable.animalEntry.animalDanger.2 integer "5"</b></tt>
+mauro.other.animalTable.animalEntry.animalDanger.2 : INTEGER: severe-Pain</pre></blockquote>
+
+Now let's go back and verify that the variable has been
+updated:<a href="#FOOTNOTE-63">[63]</a>
+</p><blockquote class="footnote"> <a name="FOOTNOTE-63" />[63]We could already deduce that the
+<i class="command">set</i> was successful when <i class="command">snmpset</i>
+didn't give us an error. This example does, however, show how
+you can <i class="command">snmpget</i> a single instance within a
+table.</p> </blockquote>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpget sunserver2 \</b></tt>
+<tt class="userinput"><b>mauro.other.animalTable.animalEntry.animalDanger.2</b></tt>
+mauro.other.animalTable.animalEntry.animalDanger.2 : INTEGER: severe-Pain</pre></blockquote>
+
+Once the <i class="command">snmpset</i> is complete, check the file to
+see how it has changed. In addition to changing the dog's
+danger level, it has enclosed all strings within quotes:
+</p>
+
+<blockquote><pre class="code">1 "Tweety" "Bird" "Chirp" 2
+2 "Madison" "Dog" "Bark" 5
+3 "Big Ben" "Bear" "Grrr" 5</pre></blockquote>
+
+<a name="INDEX-1874" />There are even more
+possibilities for keeping the file up-to-date. For example, you could
+use a system program or application to edit this file. A
+<i class="command">cron</i> job could kick off every hour or so and
+update the file. This strategy would let you generate the file using
+a SQL query to a database such as Oracle. You could then put the
+query's results in a file and poll the file with SNMP to read
+the results. One problem with this strategy is that you must ensure
+that your application and SNMP polling periods are in sync. Make sure
+you poll the file <em class="emphasis">after</em> Oracle has updated it,
+or you will be viewing old data.
+</p>
+
+<a name="INDEX-1875" /><a name="INDEX-1876" /><a name="INDEX-1877" />An effective way to ensure
+that the file is up-to-date when you read it is to use
+<tt class="literal">FILE-COMMAND</tt> within the table's definition.
+This tells the agent to run a program that updates the table before
+returning any values. Let's assume that we've written a
+script named <em class="filename">get_animal_status.pl</em> that
+determines the status of the animals and updates the database
+accordingly. Here's how we'd integrate that script into
+our table definition:
+</p>
+
+<blockquote><pre class="code">animalTable OBJECT-TYPE
+    SYNTAX   SEQUENCE OF AnimalEntry
+    ACCESS   not-accessible
+    STATUS   mandatory
+    DESCRIPTION
+        "This is a table of animals that shows:
+         Name
+         Species
+         Noise
+         Danger Level
+<tt class="userinput"><b>         FILE-COMMAND</b></tt>: /opt/local/get_animal_status.pl
+<tt class="userinput"><b>         </b></tt>FILE-NAME: /opt/local/animal.db"
+    ::= { other 247 }</pre></blockquote>
+
+The command must finish within 10 seconds or the agent will kill the
+process and return the old values from the table. By default, the
+agent runs the program specified by <tt class="literal">FILE-COMMAND</tt>
+only if it has not gotten a request in the last 10 seconds. For
+example, let's say you issue two <i class="command">snmpget</i>
+commands, two seconds apart. For the first
+<i class="command">snmpget</i>, the agent runs the program and returns
+the data from the table with any changes. The second time, the agent
+won't run the program to update the data -- it will return
+the old data, assuming that nothing has changed. This is effectively
+a form of caching. You can increase the amount of time the agent
+keeps its cache by specifying a value, in seconds, after
+<tt class="literal">FILE-COMMAND-FREQUENCY</tt>. For example, if you want
+to update the file only every 20 minutes (at most), include the
+following commands in your table definition:
+</p>
+
+<blockquote><pre class="code">       FILE-COMMAND: /opt/local/get_animal_status.pl
+<tt class="userinput"><b>       FILE-COMMAND-FREQUENCY</b></tt>: 1200
+<tt class="userinput"><b>       </b></tt>FILE-NAME: /opt/local/animal.db"</pre></blockquote>
+
+This chapter has given you a brief introduction to three of the more
+popular extensible SNMP agents on the market. While a thorough
+treatment of every configurable option for each agent is beyond the
+scope of this chapter, it should help you to understand how to use
+extensible agents. With an extensible agent, the possibilities are
+almost endless.<a name="INDEX-1878" /><a name="INDEX-1879" /><a name="INDEX-1880" /> <a name="INDEX-1881" /><a name="INDEX-1882" /><a name="INDEX-1883" /><a name="INDEX-1884" /> 
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.2. SystemEDGE</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12. Adapting SNMP to Fit Your Environment</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch11_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

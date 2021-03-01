@@ -1,0 +1,231 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+<head><title>Port Monitor (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">12.6. Port Monitor</h2>
+
+<a name="INDEX-1964" /><a name="INDEX-1965" /><a name="INDEX-1966" /><a name="INDEX-1967" /> <a name="INDEX-1968" /><a name="INDEX-1969" /><a name="INDEX-1970" /><a name="INDEX-1971" />Most TCP/IP services use static ports to
+listen for incoming requests. Monitoring these ports allows you to
+see whether particular servers or services are responding or not. For
+example, you can tell whether your mail server is alive by
+periodically poking port 25, which is the port on which an SMTP
+server listens for requests. Some other ports to monitor are FTP
+(23), HTTP (80) and POP3 (110).<a href="#FOOTNOTE-70">[70]</a>
+A freely available program called <em class="emphasis">netcat</em> can
+connect to and interact with a specific port on any device. We can
+write a wrapper for this program to watch a given port or service; if
+something happens outside of its normal operation, then we can send a
+trap. In this section, we'll develop a wrapper that checks the
+SMTP port (25) on our mail server. The program is very simple, but
+the results are outstanding!
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-70" />[70]<a name="INDEX-1972" /><a name="INDEX-1973" />Check your
+<em class="filename">services</em> file for a listing of port numbers and
+their corresponding services. On Unix systems, this file is usually
+in the directory <em class="filename">/etc</em>; on Windows it is usually
+in a directory such as <em class="filename">C:\WINNT
+\System32\drivers\etc</em>, though its location may vary
+depending on the version of Windows you are using.</p> </blockquote>
+
+Before we start to write the program, let's establish what we
+want to do. Telnet to port 25 of your SMTP server. Once you're
+connected, you can issue the command <i class="command">HELO
+mydomain.com</i>. This should give you a response of 250. After
+you get a response from the mail server, issue the
+<i class="command">QUIT</i> command, which tells the server you are done.
+Your session should look something like this:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>telnet mail.ora.com 25</b></tt>
+220 smtp.oreilly.com ESMTP O'Reilly &amp; Associates Sendmail 8.11.2 ready
+<tt class="userinput"><b>HELO</b></tt> mydomain.com
+250 OK
+<tt class="userinput"><b>QUIT</b></tt>
+221 closing connection</pre></blockquote>
+
+The <em class="emphasis">netcat</em> program needs to know what commands
+you want to send to the port you are monitoring. We will be sending
+only two commands to our mail server, so we'll create a file
+called <em class="filename">input.txt</em> that looks like this:
+</p>
+
+<blockquote><pre class="code">HELO mydomain.com
+QUIT</pre></blockquote>
+
+Next, we should test this file and see what output we get from the
+server. The actual <em class="emphasis">netcat</em> executable is named
+<em class="emphasis">nc</em>; to test the file, run it like this:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/local/bin/netcat/nc -i 1 mailserver 25 &lt; input.txt</b></tt></pre></blockquote>
+
+This command produces the same results as the telnet session. You
+won't see the commands in your <em class="filename">input.txt</em>
+file echoed, but you should see the server's responses. Once
+you have verified that <em class="emphasis">netcat</em> works and gives
+the same response each time, save a copy of its output to the file
+<em class="filename">mail_good</em>. This file will be used to determine
+what a normal response from your mail server looks like. You can save
+the output to a file with the following command:
+</p>
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>/opt/OV/local/bin/netcat/nc -i 1 mailserver 25 &lt; input.txt &gt; mail_good</b></tt></pre></blockquote>
+
+An alternate approach is to search for the line numbered 250 in the
+mail server's output. This code indicates that the server is up
+and running, though not necessarily processing mail correctly. In any
+case, searching for 250 shields you from variations in the
+server's response to your connection.
+</p>
+
+Here's a script called <i class="command">mail_poller.pl</i> that
+automates the process. Edit the appropriate lines in this script to
+reflect your local environment. Once you have customized the script,
+you should be ready to go. There are no command-line arguments. The
+script generates an output file called
+<em class="filename">mail_status</em> that contains a 0 (zero) if the
+server is okay (i.e., if the output of <em class="emphasis">netcat</em>
+matches $GOOD_FILE); any number other than 0 indicates that an error
+has occurred:
+</p>
+
+<blockquote><pre class="code">#!/usr/local/bin/perl
+# filename: mail_poller.pl
+
+$HOME_LOC     = "/opt/OV/local/bin/netcat";
+$NC_LOC       = "/opt/netcat/nc";
+$DIFF_LOC     = "/bin/diff";
+$ECHO_LOC     = "/bin/echo";
+
+$MAIL_SERVER  = "mail.exampledomain.com";
+$MAIL_PORT    =  25;
+$INPUT_FILE   = "$HOME_LOC\/input.txt";
+$GOOD_FILE    = "$HOME_LOC\/mail_good";
+$CURRENT_FILE = "$HOME_LOC\/mail_current";
+$EXIT_FILE    = "$HOME_LOC\/mail_status";
+
+$DEBUG = 0;
+
+print "$NC_LOC -i 1 -w 3 $MAIL_SERVER $MAIL_PORT 
+    \&lt; $INPUT_FILE \&gt; $CURRENT_FILE\n" unless (!($DEBUG));
+
+$NETCAT_RES = system "$NC_LOC -i 1 -w 3 $MAIL_SERVER $MAIL_PORT 
+    \&lt; $INPUT_FILE \&gt; $CURRENT_FILE";
+$NETCAT_RES = $NETCAT_RES / 256;
+
+if ($NETCAT_RES)
+{
+    # We had a problem with netcat... maybe a timeout?
+    system "$ECHO_LOC $NETCAT_RES &gt; $EXIT_FILE";
+    &amp;cleanup;
+}
+
+$DIFF_RES = system "$DIFF_LOC $GOOD_FILE $CURRENT_FILE";
+$DIFF_RES = $DIFF_RES / 256;
+
+if ($DIFF_RES)
+{
+    # looks like things are different!
+    system "$ECHO_LOC $DIFF_RES &gt; $EXIT_FILE";
+    &amp;cleanup;
+}
+else
+{
+    # All systems go!
+    system "$ECHO_LOC 0 &gt; $EXIT_FILE";
+    &amp;cleanup;
+}
+
+sub cleanup
+{
+   unlink "$CURRENT_FILE";
+   exit 0;
+}</pre></blockquote>
+
+After you run the program, review the results in
+<em class="filename">mail_status</em>. If you can, try shutting down the
+mail server and running the script again. Your file should now
+contain a nonzero error status.
+</p>
+
+<a name="INDEX-1974" />Once you have made sure the script works
+in your environment, you can insert an entry in
+<em class="filename">crontab</em> to execute this program at whatever
+interval you would like. In our environment, we use a 10-minute
+interval:
+</p>
+
+<blockquote><pre class="code"># Check the mail server and create a file that we can poll via OpenView
+1,11,21,31,41,51 * * * * /opt/OV/local/bin/netcat/mail_poller.pl</pre></blockquote>
+
+Notice we staggered the polling so that we don't check on the
+hour, half hour, or quarter hour. Once <i class="command">cron</i> has
+started updating <em class="filename">mail_status</em> regularly, you can
+use tools such as the extensible OpenView agent to check the
+file's contents. You can configure the agent to poll the file
+regularly and send the results to your management console. The entry
+in my <em class="filename">/etc/SnmpAgent.d/snmpd.extend</em> looks like
+this:
+</p>
+
+<blockquote><pre class="code">serviceInfo     OBJECT IDENTIFIER ::= { mauro 5 }
+
+-- BEGIN - serviceInfo
+--
+
+serMailPort  OBJECT-TYPE
+    SYNTAX  INTEGER
+    ACCESS  read-only
+    STATUS  mandatory
+    DESCRIPTION
+        "This file is updated via crontab. It uses netcat to check the
+         port and push a value into this file.
+         FILE-NAME: /opt/OV/local/bin/netcat/mail_status"
+    ::= { serviceInfo 0 }</pre></blockquote>
+
+We discuss the syntax of this file in <a href="ch11_01.html">Chapter 11, "Extensible SNMP Agents"</a>. Basically, this entry just defines a
+MIB object in the <em class="emphasis">serviceInfo</em> tree, which is
+node 5 under my private-enterprise tree. In other words, this
+object's OID is
+<em class="emphasis">mauro.serviceInfo.serMailPort</em>
+(<em class="emphasis">2789.5.0</em>). The object can be read by any
+program that can issue an SNMP <i class="command">get</i> operation. The
+<tt class="literal">DESCRIPTION</tt>, as we saw in <a href="ch11_01.html">Chapter 11, "Extensible SNMP Agents"</a>, specifies a filename from which the
+agent will read an integer value to use as the value of this object.
+This program can easily be modified to monitor any port on any number
+of machines. If you're ambitious, you might want to think about
+turning the <em class="emphasis">serMailPort</em> object into an array
+that reports the status of all your mail servers. <a name="INDEX-1975" /><a name="INDEX-1976" /><a name="INDEX-1977" /><a name="INDEX-1978" /><a name="INDEX-1979" />
+</p>
+
+Our goal in this chapter hasn't been to provide you with
+scripts you can immediately place in your environment. More to the
+point, we have wanted to show you what's possible, and get you
+thinking about how you might be able to write scripts that provide
+elaborate custom monitoring features. If you're thinking
+creatively about what you can do with SNMP, we've succeeded.
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.5. Disk-Space Checker</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13. MRTG</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/ch12_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:59 GMT -->
+</html>

@@ -1,0 +1,213 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/appb_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:00 GMT -->
+<head><title>Adding a Menu to NNM (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appb_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="appb_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">B.2. Adding a Menu to NNM</h2>
+
+<a name="INDEX-2154" /><a name="INDEX-2155" /><a name="INDEX-2156" /><a name="INDEX-2157" />Once you have a toolbox of scripts,
+adding them to an NNM menu makes them easier to access and execute.
+This trick can be especially useful if you prefer to use NNM's
+graphical interface.
+</p>
+
+The key to adding custom menus is the directory
+<em class="filename">$OV_REGISTRATION/C</em>.
+(<em class="filename">$OV_REGISTRATION</em> contains directories for all
+the languages available on your system; <em class="filename">C</em> is the
+directory for the default language and is probably where you should
+start.) The <em class="filename">C</em> directory contains all the files
+that make up the menu system you see when you run NNM. For example,
+the file <em class="filename">ovw</em> contains the familiar options from
+the main window (New, Open, Refresh, etc.).
+</p>
+
+<a name="INDEX-2158" />Let's look at the
+<em class="filename">$OV_REGISTRATION/C/ovsnmp/xnmloadmib</em> file.
+It's fairly easy to see how to hook an external command into a
+menu. Let's jump right in and create a menu that is two levels
+deep with two menu choices:
+</p>
+
+<blockquote><pre class="code">Application "Graph Menu"
+{
+        Menubar &lt;100&gt; "Local_Graphs" _p
+        {
+          &lt;100&gt; "Network"       _N f.menu "network_menu";
+        }
+
+        Menu "network_menu"
+        {
+          &lt;90&gt; "5 Minute CPU"   _M f.action "5mincpu";
+          &lt;90&gt; "Bits In and Out For All Up Interfaces"  \
+                                _B f.action "bit_for_all_up";
+        }
+
+        Action "5mincpu" {
+          Command "/opt/OV/local/scripts/Cisco_5min_cpu \
+                                            \"${OVwSelections}\"";
+          MinSelected     1;
+          MaxSelected     7;
+          SelectionRule   (isSNMPSupported || isSNMPProxied) ;
+        }
+
+        Action "bit_for_all_up" {
+          Command "/opt/OV/local/scripts/Cisco_Line_Up_Bits \
+                                              \"${OVwSelections}\"";
+          MinSelected     1;
+          MaxSelected     3;
+          SelectionRule   (isSNMPSupported || isSNMPProxied) ;
+        }
+}</pre></blockquote>
+
+Create a file within <em class="filename">$OV_REGISTRATION/C</em> and
+insert the previous code listing. Once this is done, run
+<i class="command">ovw</i> with the <i class="command">-verify</i> switch,
+which checks for errors.<a href="#FOOTNOTE-74">[74]</a> You may see errors or
+warnings about your new menu item but, if you're successful,
+you'll see an item that looks like the menu in <a href="appb_02.html#enettdg-APP-B-FIG-2">Figure B-2</a>. 
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-74" />[74]<a name="INDEX-2159" />Do not leave any backup files within any
+of the directories, because NNM takes each file seriously. Backup or
+<a name="INDEX-2160" /><a name="INDEX-2161" />
+redundant files will produce warnings when you run
+<i class="command">ovw</i>.</p> </blockquote>
+
+<a name="appb-4-fm2xml" /><blockquote><b>WARNING: </b> 
+NNM can be picky with registration files.
+If you can't see your menu, try the <i class="command">ovw
+-verify</i> trick. If it reveals no errors, take some entries
+out and restart <i class="command">ovw</i>. Keep doing this until your
+items appear. You should also break up your menu items into multiple
+files. Do not put all your menus and actions into one file. The more
+files you have, the easier it will be to diagnose and troubleshoot
+your new menu items.
+</p>
+</blockquote>
+
+<a name="enettdg-APP-B-FIG-2" /><div class="figure"><img alt="Figure B-2" src="figs/snmp_ab02.gif" /></div><h4 class="objtitle">Figure B-2.  A new menu</h4>
+
+Let's talk about some commonalties within our registration file:</p>
+
+<ul><li>
+<a name="INDEX-2162" /><a name="INDEX-2163" /><a name="INDEX-2164" />Each menu and menu item is
+associated with a keyboard shortcut that allows the user to access
+it. The trigger character is preceded by an underscore. For example,
+from the "Local_Graphs <img alt="Figure B.2" src="figs/U2192.gif" /> Network" menu, you can hit
+"M" to go to the "5 Minute CPU" item.
+</p>
+</li><li>
+<a name="INDEX-2165" />Each menu item has a precedence number
+within angle brackets. This allows you to control the order in which
+items appear. Items with the highest precedence appear first in a
+menu; items with the same precedence are listed in the order in which
+they appear in the file. For example, if we reduce the precedence of
+"5 Minute CPU" from &lt;90&gt; to &lt;80&gt; it will
+appear after the "Bits In and Out" menu item, because the
+higher-precedence item comes first.
+</p>
+</li></ul>
+<a name="INDEX-2166" />
+<a name="INDEX-2167" />The
+<tt class="literal">Menubar</tt> entry contains the menus that will appear
+in the top NNM menu bar. We used the function
+<tt class="literal">f.menu</tt> to call a submenu. The following code shows
+how we could have used <tt class="literal">f.action</tt> to call an action
+directly:
+</p>
+
+<blockquote><pre class="code">Menubar &lt;precedence&gt; "menubar Label" _MnemonicChar 
+   {
+      &lt;precedence&gt; "SubMenu Label" _MnemonicChar f.menu "menu-name"
+      &lt;precedence&gt; "Action Name" _MnemonicChar f.action "action-name"
+   }</pre></blockquote>
+
+<a name="INDEX-2168" />
+<a name="INDEX-2169" />
+<a name="INDEX-2170" />A
+<tt class="literal">Menu</tt> looks and behaves like the menu bar (or menu)
+that contains it, with a few differences. <tt class="literal">Menu</tt>s
+don't declare mnemonic characters or precedence; these are
+defined by the containing menu or menu bar. The
+<em class="emphasis">menu-name</em> is the linking name that appears after
+<tt class="literal">f.menu</tt>.
+</p>
+
+<blockquote><pre class="code">Menu "menu-name" 
+   {
+      &lt;precedence&gt; "SubMenu Label" _MnemonicChar f.menu  "menu-name"
+      &lt;precedence&gt; "Action Name" _MnemonicChar f.action "action-name"
+   }</pre></blockquote>
+
+<tt class="literal">Action</tt>s are called just like
+<tt class="literal">Menu</tt>s. The <em class="emphasis">action-name</em> is the
+linking name of an action that gets called when selected from a
+previous item (either a <tt class="literal">Menu</tt> or a
+<tt class="literal">Menubar</tt>):
+</p>
+
+<blockquote><pre class="code">Action "action-name" 
+   {
+      Command "/opt/OV/local/scripts/Cisco_5min_cpu \"${OVwSelections}\"";
+      MinSelected     1;
+      MaxSelected     7;
+      SelectionRule   (isSNMPSupported || isSNMPProxied) ;
+   }</pre></blockquote>
+
+There are a few additional parameters in our
+<tt class="literal">Action</tt> declaration:
+</p>
+
+<ul><li>
+<tt class="literal">Command</tt> specifies which program or script should
+be executed. The  <tt class="literal">\"${OVwSelections}\"</tt> at the end
+of the command string passes all currently selected objects to the
+program as arguments.
+</p>
+</li><li>
+<tt class="literal">MinSelected</tt> declares how many nodes must be
+selected before this item becomes available. If nothing is selected,
+the corresponding menu choice will be grayed out and unclickable.
+</p>
+</li><li>
+<tt class="literal">MaxSelected</tt> works the same way, but declares the
+maximum number of objects that can be selected.
+</p>
+</li><li>
+<tt class="literal">SelectionRule</tt><a name="INDEX-2171" /> uses capability fields<a href="#FOOTNOTE-75">[75]</a> within a logical statement. These rules
+declare what is necessary for the selection to be deemed a
+"good selection."
+</p><blockquote class="footnote">
+<a name="FOOTNOTE-75" />[75]Check out $OV_FIELDS for more definitions of capability
+fields.</p> </blockquote>
+</li></ul>
+<tt class="literal">Action</tt><a name="INDEX-2172" /> declarations can contain many additional
+parameters, as can registration files. The examples we've given
+should be enough to get you going in the right direction. The
+<em class="emphasis">OVwRegIntro</em> (5) manpage defines the syntax of
+the registration files in detail; read this page carefully if
+you're serious about adding custom menu items.<a name="INDEX-2173" /><a name="INDEX-2174" /><a name="INDEX-2175" /><a name="INDEX-2176" />
+</p>
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appb_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appb_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">B. More on OpenView's NNM</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">B.3. Profiles for Different Users </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/appb_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:01 GMT -->
+</html>

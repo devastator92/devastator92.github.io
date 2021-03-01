@@ -1,0 +1,1883 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>MAC and IP layer tools (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch13_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">13.2. MAC and IP layer tools</h2>
+
+
+The tools covered in this section operate<a name="INDEX-1960" /> <a name="INDEX-1961" />
+at the MAC and IP layers of the network protocol stack. Problems that
+manifest themselves as NFS or NIS failures may be due to an improper
+host or network configuration problem. The tools described in this
+section are used to ascertain that the basic network connectivity is
+sound. Issues that will be covered include setting network addresses,
+testing connectivity, and burst traffic handling.</p>
+
+
+<a name="nfs2-CHP-13-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">13.2.1. ifconfig: interface configuration</h3>
+
+
+<em class="emphasis">ifconfig</em> sets or examines the characteristics of
+a<a name="INDEX-1962" />
+<a name="INDEX-1963" /> <a name="INDEX-1964" /> network interface, such<a name="INDEX-1965" /> <a name="INDEX-1966" /> as its IP
+address or availability. At boot time, <em class="emphasis">ifconfig</em>
+is used to initialize network interfaces, possibly doing this in
+stages since some information may be available on the network itself
+through NIS. You can also use <em class="emphasis">ifconfig</em> to
+examine the current state of an interface and compare its address
+assignments with NIS map information. Interfaces may be physical
+devices, logical devices associated with a physical network
+interface, IP tunnels, or pseudo-devices such as the loopback device.
+Examples of physical devices include Ethernet interfaces or packet
+drivers stacked on top of low-level synchronous line drivers. IP
+tunnels are point-to-point interfaces that enable an IP packet to be
+encapsulated within another IP packet, appearing as a physical
+interface. For example, an IPv6-in-IPv4 tunnel allows IPv6 packets to
+be encapsulated within IPv4 packets, allowing IPv6 traffic to cross
+routers that understand only IPv4.</p>
+
+
+<a name="nfs2-CHP-13-SECT-2.1.1" /><div class="sect3">
+<h3 class="sect3">13.2.1.1. Examining interfaces</h3>
+
+
+To list all available network interfaces,
+<a name="INDEX-1967" />
+<a name="INDEX-1968" />invoke
+<em class="emphasis">ifconfig</em> with the <em class="emphasis">-a</em>
+option:<a href="#FOOTNOTE-30">[30]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-30" />[30]The protocols listed will depend on the
+contents of <em class="emphasis">inet_type(4)</em>. Both IPv6 and IPv4
+will be listed if <em class="emphasis">/etc/default/inet_type</em> does
+not exist, or if it defines DEFAULT_IP=BOTH. Only IPv4 will be listed
+if DEFAULT_IP=IP_VERSION4. The network interface Ethernet address
+will also be reported when <em class="emphasis">ifconfig</em> is invoked
+as root.</p>
+
+</blockquote>
+
+
+<blockquote><pre class="code"><tt class="userinput"><b>% ifconfig -a</b></tt>
+lo0: flags=1000849&lt;UP,LOOPBACK,RUNNING,MULTICAST,IPv4&gt; mtu 8232 index 1
+	        inet 127.0.0.1 netmask ff000000 
+hme0: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4&gt; mtu 1500 index 2
+	        inet 131.40.52.126 netmask ffffff00 broadcast 131.40.52.255
+lo0: flags=2000849&lt;UP,LOOPBACK,RUNNING,MULTICAST,IPv6&gt; mtu 8252 index 1
+	        inet6 ::1/128 
+hme0: flags=2000841&lt;UP,RUNNING,MULTICAST,IPv6&gt; mtu 1500 index 2
+	        inet6 fe80::a00:20ff:fe81:23f1/10 
+hme0:1: flags=2080841&lt;UP,RUNNING,MULTICAST,ADDRCONF,IPv6&gt; mtu 1500 index 2
+	        inet6 fec0::56:a00:20ff:fe81:23f1/64 
+hme0:2: flags=2080841&lt;UP,RUNNING,MULTICAST,ADDRCONF,IPv6&gt; mtu 1500 index 2
+	        inet6 2100::56:a00:20ff:fe81:23f1/64</pre></blockquote>
+
+
+In this example, <em class="emphasis">ifconfig</em> lists four different
+interfaces, <em class="emphasis">lo0</em>, <em class="emphasis">hme0</em>,
+<em class="emphasis">hme0:1</em>, and <em class="emphasis">hme0:2</em>.
+<em class="emphasis">lo0</em> is the loopback pseudo-device used by IP to
+communicate between network applications that specify the local host
+on both end-points. <em class="emphasis">hme0</em> is the actual physical
+Ethernet device configured on the host. Note that
+<em class="emphasis">lo0</em> is listed in two different lines: the first
+line reports the loopback configuration in use by IPv4, and the third
+line reports the loopback configuration in use by IPv6. IPv4
+specifies 127.0.0.1 as the loopback address; IPv6 specifies ::1/128.
+Similarly, the second line reports the IPv4 address used by the
+<em class="emphasis">hme0</em> device (131.40.52.126), and the fourth line
+reports the device's IPv6 link-local address
+(fe80::a00:20ff:fe81:23f1/10).</p>
+
+
+Solaris supports multiple logical interfaces associated with a single
+physical network interface. This allows a host to be assigned
+multiple IP addresses (even if the host only has a single network
+interface). This is particularly useful when a host communicates over
+various IPv6 addresses. In this example, <em class="emphasis">hme0:1</em>
+and <em class="emphasis">hme0:2</em> are logical interfaces associated
+with the physical network interface <em class="emphasis">hme0</em>.
+<em class="emphasis">hme0:1</em> uses the site-local IPv6 address
+fec0::56:a00:20ff:fe81:23f1/64, and <em class="emphasis">hme0:2</em> uses
+the global IPv6 address 2100::56:a00:20ff:fe81:23f1/64.</p>
+
+
+To examine a particular network interface, invoke
+<em class="emphasis">ifconfig</em> with its name as an argument. By
+default, the IPv4 interface configuration is reported, unless you
+specify the address family you are interested in, as in the third
+example:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ifconfig hme0</b></tt> 
+hme0: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4&gt; mtu 1500 index 2
+	        inet 131.40.52.126 netmask ffffff00 broadcast 131.40.52.255
+ 
+% <tt class="userinput"><b>ifconfig lo0</b></tt> 
+lo0: flags=1000849&lt;UP,LOOPBACK,RUNNING,MULTICAST,IPv4&gt; mtu 8232 index 1
+              inet 127.0.0.1 netmask ff000000  
+
+<tt class="userinput"><b>% ifconfig hme0 inet6</b></tt>
+hme0: flags=2000841&lt;UP,RUNNING,MULTICAST,IPv6&gt; mtu 1500 index 2
+              inet6 fe80::a00:20ff:fe81:23f1/10</pre></blockquote>
+
+
+If the specified interface does not exist on the system or is not
+configured into the kernel, <em class="emphasis">ifconfig</em> reports the
+error "No such device."</p>
+
+
+The <em class="emphasis">flags</em> field is a bitmap that describes
+the<a name="INDEX-1969" />
+<a name="INDEX-1970" />
+state of the interface. Values for the flags may be found in
+<em class="emphasis">/usr/include/net/if.h</em>. The most common settings
+are:</p>
+
+
+<dl>
+<dt><i>UP</i></dt>
+<dd>The network interface has been <a name="INDEX-1971" />marked up and is enabled to send or
+receive packets.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>RUNNING</i></dt>
+<dd>Kernel resources, such as<a name="INDEX-1972" /> device driver buffers, have been
+allocated to the interface to allow it to handle packets. An
+interface can be marked UP but not be running if the kernel is having
+trouble getting resources assigned to the interface. This is usually
+never a problem for Ethernet interfaces, but may surface when
+synchronous serial lines or fiber optic links are used. Note that
+Solaris hosts always have this flag set, regardless of the state of
+the interface.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>BROADCAST</i></dt>
+<dd>A valid broadcast address has been<a name="INDEX-1973" /> assigned to this interface. The
+interface reports its broadcast address when queried, and broadcast
+packets can be sent from the interface. There are no broadcast
+addresses in IPv6 -- their function is superseded by multicast
+addresses</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>LOOPBACK</i></dt>
+<dd>The interface is a loopback device: packets
+<a name="INDEX-1974" />sent
+out on the device are immediately placed on a receive queue for other
+processes on the local host. Although the loopback device is
+implemented entirely in software, you must configure it as though it
+were a physical network interface.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>MULTICAST</i></dt>
+<dd>A valid multicast address has been
+assigned<a name="INDEX-1975" /> to this interface. Listening on a
+multicast address is analogous to listening to a particular band of
+the radio dial. The packet is not addressed to a particular
+interface, instead, it is addressed to all interfaces listening on
+that multicast address.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><i>IPV4 / IPV6</i></dt>
+<dd>Indicates the version of the Internet Protocol in use. The
+<a name="INDEX-1976" />same interface can be configured to use
+both versions, although <em class="emphasis">ifconfig</em> prints
+<a name="INDEX-1977" />
+<a name="INDEX-1978" />the
+respective configuration on separate lines.</p></dd>
+
+</dl>
+
+
+The <em class="emphasis">mtu</em> specifies the maximum transmission
+<a name="INDEX-1979" />unit of
+the interface. IP uses path MTU discovery to determine the maximum
+transmission unit size across the link. On point-to-point links, the
+MTU is negotiated by the applications setting up the connection on
+both sides.</p>
+
+
+Every configured physical device is<a name="INDEX-1980" /> assigned a
+unique index number. The kernel associates the configuration values
+(IP address, MTU, etc.) with the index number for internal
+bookkeeping. It provides a useful means for network programming APIs
+to identify network interfaces.</p>
+
+
+The second line of <em class="emphasis">ifconfig</em> 's output
+shows the Internet (IP) address assigned to this interface, the
+broadcast (IPv4 only) address, and the network mask that is applied
+to the IPv4 address to derive the broadcast address. The previous
+example shows the ones form of the broadcast address. When invoked by
+<em class="emphasis">root</em>, <em class="emphasis">ifconfig</em> also
+displays <a name="INDEX-1981" />
+<a name="INDEX-1982" />the interface's Ethernet address
+where applicable.</p>
+
+
+The output of <em class="emphasis">ifconfig</em> resembles the first
+example<a name="INDEX-1983" />
+for almost all Ethernet interfaces configured to use IPv4, and the
+third example for almost all Ethernet interfaces configured to use
+IPv6. <em class="emphasis">ifconfig</em> reports different state
+information if the interface is for a synchronous serial line, the
+underlying data link for point-to-point IP networks. Point-to-point
+links are one foundation of a wide-area network, since they allow IP
+packets to be run over long-haul serial lines. When configuring a
+point-to-point link, the broadcast address is replaced with a
+destination address for the other end of the point-to-point link, and
+the BROADCAST flag is replaced by<a name="INDEX-1984" /> the POINTTOPOINT flag:</p>
+
+
+<blockquote><pre class="code">this-side% <tt class="userinput"><b>ifconfig ipdptp0</b></tt>
+ipdptp0: flags=10088d1&lt;UP,POINTOPOINT,RUNNING,NOARP,MULTICAST,PRIVATE,IPv4&gt; mtu 8232 index 3
+             inet 131.40.46.1 --&gt; 131.40.1.12 netmask ffffff00</pre></blockquote>
+
+
+This interface is a serial line that connects networks 131.40.46.0
+and 131.40.1.0; the machine on the other end of the line has a
+similar point-to-point interface configuration with the local and
+destination IP addresses reversed:</p>
+
+
+<blockquote><pre class="code">that-side% <tt class="userinput"><b>ifconfig ipdptp0</b></tt>
+ipdptp0: flags=10088d1&lt;UP,POINTOPOINT,RUNNING,NOARP,MULTICAST,PRIVATE,IPv4&gt; mtu 8232 index 5
+	        inet 131.40.1.12 --&gt; 131.40.46.1 netmask ffffff00</pre></blockquote>
+
+
+Marking the line PRIVATE means that the host-to-host connection will
+not be advertised to routers on the network. Note also that the
+Address Resolution Protocol (ARP) is not used over point-to-point
+links.</p>
+</div>
+
+
+
+<a name="nfs2-CHP-13-SECT-2.1.2" /><div class="sect3">
+<h3 class="sect3">13.2.1.2. Initializing an interface</h3>
+
+
+In addition to displaying the status of a <a name="INDEX-1985" /> <a name="INDEX-1986" /> <a name="INDEX-1987" />network interface,
+<em class="emphasis">ifconfig</em> is used to configure the interface.
+During the boot process, Solaris identifies the network interfaces to
+be configured by searching for
+<em class="emphasis">/etc/hostname.*[0-9]</em> and
+<em class="emphasis">/etc/hostname6.*[0-9]</em> files. For example the
+presence of <em class="emphasis">/etc/hostname.hme0</em> and
+<em class="emphasis">/etc/hostname.hme1</em> indicate that the two network
+interfaces <em class="emphasis">hme0</em> and <em class="emphasis">hme1</em>
+need to be assigned an IPv4 address at boot time. Similarly, the
+presence of <em class="emphasis">/etc/hostname6.hme0</em> indicates that
+<em class="emphasis">hme0</em> needs to be configured to use IPv6. You can
+statically assign an IP address to the interface by specifying the
+corresponding hostname in the
+<em class="emphasis">/etc/hostname.*[0-9]</em> or
+<em class="emphasis">/etc/hostname6.*[0-9]</em> file. Hostnames and their
+corresponding IP addresses may be managed through NIS, which requires
+a functioning network to retrieve map values. This chicken-and-egg
+problem is solved by invoking <em class="emphasis">ifconfig</em> twice
+during the four steps required to bring a host up on the network:</p>
+
+
+<ol><li>Early in the boot sequence, <em class="emphasis">/etc/init.d/network</em>
+executes <em class="emphasis">ifconfig</em> to
+<a name="INDEX-1988" />set the IP address of the interface.
+<em class="emphasis">ypbind</em> has not yet been started, so NIS is not
+running at this point. <em class="emphasis">ifconfig</em> matches the
+hostname in the local <em class="emphasis">/etc/inet/ipnodes</em> file,
+and assigns the IP address found there to the interface. The network
+mask is obtained by matching the longest possible mask in
+<em class="emphasis">/etc/inet/netmasks</em>. If it is not specified, then
+it is based on the class of the IPv4 address, as shown in <a href="ch13_02.html#nfs2-CHP-13-TABLE-3">Table 13-3</a> later in this chapter. The default broadcast
+address is the address with a host part of all ones.
+<em class="emphasis">ifconfig</em> also sets up the streams plumbing and
+the link-local IPv6 addresses.</p></li><li>IP routing is started by <em class="emphasis">/etc/init.d/inetinit</em>
+when the machine comes up to multiuser mode. The host obtains its
+site-local, global, and multicast addresses from the network IPv6
+routers that advertise prefix information. Critical network daemons,
+such as <em class="emphasis">ypbind</em> and the portmapper, are started
+next by <em class="emphasis">/etc/init.d/rpc</em>.</p></li><li><em class="emphasis">ifconfig</em> is invoked again, out of
+<em class="emphasis">/etc/init.d/inetsvc</em>, to reset the broadcast
+address and network mask of the IPv4 interfaces. Now that NIS is
+running, maps that override the default values may be referenced. If
+you must override the NIS network masks, it is recommended to use the
+<em class="emphasis">/etc/inet/netmasks</em> file with the appropriate
+mask instead of hand-tailoring the values directly onto the
+<em class="emphasis">ifconfig</em> command in the boot script.</p>
+
+
+For example, add the desired netmask entry to
+<em class="emphasis">/etc/inet/netmasks</em>:</p>
+
+
+<blockquote><pre class="code">131.40.0.0     255.255.255.0</pre></blockquote>
+
+
+
+The boot script updates all IPv4 up and configured network devices by
+invoking:</p>
+<blockquote><pre class="code">/usr/sbin/ifconfig -au4 netmask + broadcast +</pre></blockquote>
+
+
+
+The <em class="emphasis">netmask</em> argument tells
+<em class="emphasis">ifconfig</em> which parts of the IP address form the
+network number, and which form the host number. Any bit represented
+by a one in the <em class="emphasis">netmask</em> becomes part of the
+network number. The <em class="emphasis">broadcast</em> argument specifies
+the broadcast address to be used by this host. The plus signs in the
+example cause <em class="emphasis">ifconfig</em> to read the appropriate
+NIS map for the required information. For the netmask,
+<em class="emphasis">ifconfig</em> reads the <em class="emphasis">netmasks</em>
+map, and for the broadcast address, it performs a logical and of the
+netmask and host IP address read from the NIS
+<em class="emphasis">ipnodes</em> map.</p></li>
+
+<li><em class="emphasis">inetd</em>-based services and RPC services such as
+NFS, the automounter and the lock manager are started once the
+network interface has been fully configured. Applications that
+require a fully functional network interface, such as network
+database servers, should be started after the last
+<em class="emphasis">ifconfig</em> is issued in the boot sequence.</p></li></ol>
+Do not specify the hostname in
+<em class="emphasis">/etc/hostname*.[0-9]</em> if you plan to use DHCP to
+obtain your IPv4 addresses. DHCP enables<a name="INDEX-1989" />
+<a name="INDEX-1990" /> your host to dynamically obtain IPv4
+addresses, as well as other client configuration information over the
+network. By default, IPv6 address configuration is performed
+automatically as well. Hosts obtain their addresses and configuration
+information from IPv6 routers which advertise the prefix information
+used by the hosts to generate site-local and global addresses. Note
+that the host still invokes <em class="emphasis">ifconfig</em> to plumb
+the device and establish its link-local IPv6 address (in
+<em class="emphasis">/etc/init.d/network</em>), the router discovery
+daemon <em class="emphasis">in.ndpd</em> is later <a name="INDEX-1991" /> <a name="INDEX-1992" /> <a name="INDEX-1993" />invoked in
+<em class="emphasis">/etc/init.d/inetinit</em> to acquire the additional
+site-local and global addresses.</p>
+</div>
+
+
+
+<a name="nfs2-CHP-13-SECT-2.1.3" /><div class="sect3">
+<h3 class="sect3">13.2.1.3. Multiple interfaces</h3>
+
+
+You can place a system on more<a name="INDEX-1994" />
+<a name="INDEX-1995" /> than one network by either
+installing multiple physical network interfaces, or by configuring
+multiple logical interfaces associated with a physical network
+interface. In the first case, each network uses separate physical
+media, in the second case the networks are on the same physical
+media. A host that acts as a gateway between two networks is a good
+example of a system connected to physically separate networks. A host
+configured to run over both IPv4 and IPv6 is an example of a system
+with multiple logical interfaces and a single physical network.</p>
+
+
+<em class="emphasis">ifconfig</em> can configure the interfaces one at a
+time, or in groups. For example, if a host has several interfaces,
+they can be enabled individually by using
+<em class="emphasis">ifconfig</em>:</p>
+
+
+<blockquote><pre class="code">... 
+ifconfig hme0 acadia up netmask + broadcast + 
+... 
+ifconfig hme1 acadia-gw up broadcast 192.254.1.255 netmask +</pre></blockquote>
+
+
+As in the previous example, the plus signs (+) make
+<em class="emphasis">ifconfig</em> read the <a name="INDEX-1996" /><em class="emphasis">netmasks</em> database
+for its data. In both examples, the interfaces are marked
+<em class="emphasis">up</em> and configured with a single command.</p>
+
+
+<em class="emphasis">ifconfig</em> can also configure multiple interfaces
+at once using the <em class="emphasis">-a</em> option:</p>
+
+
+<blockquote><pre class="code">ifconfig -auD4 netmask + broadcast +</pre></blockquote>
+
+
+The <em class="emphasis">-auD4</em> set of options instructs
+<em class="emphasis">ifconfig</em> to update the netmask and broadcast
+configuration for all IPv4 <em class="emphasis">up</em> devices that are
+not under DHCP control.</p>
+
+
+Each network interface has a distinct hostname and IP address. One
+convention for two-network systems is to append
+<em class="emphasis">-gw</em> to the "primary" hostname. In
+this configuration, each network interface is on a separate IP
+network. Host <em class="emphasis">acadia</em> from the previous example
+appears in the NIS <em class="emphasis">ipnodes</em> map on network
+192.254.1.0 and 131.40.52.0:</p>
+
+
+<blockquote><pre class="code">192.254.1.1     acadia 
+131.40.52.20    acadia-gw</pre></blockquote>
+
+
+To hosts on the 131.40.52 network, the machine is
+<em class="emphasis">acadia-gw</em>, but on the 192.254.1 network, the
+same host is called <em class="emphasis">acadia</em>.</p>
+
+
+Systems with more than two network interfaces can use any convenient
+host naming scheme. For example, in a campus with four backbone
+Ethernet segments, machine names can reflect both the
+"given" name and the network name. A host sitting on all
+four IP networks is given four hostnames and four IP addresses:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">ipnodes file: </i>
+128.44.1.1      boris-bb1 
+128.44.2.1      boris-bb2 
+128.44.3.1      boris-bb3 
+128.44.4.1      boris-bb4</pre></blockquote>
+
+
+If the additional interfaces are configured after NIS is started,
+then the NIS <em class="emphasis">ipnodes</em> map is relied upon to
+provide the IP address for each interface. To configure an interface
+early in the boot process  --  before NIS is started  --  the
+appropriate hostname and IP address must be in
+<em class="emphasis">/etc/inet/ipnodes</em> on the local machine.</p>
+
+
+Note that you can configure the multiple physical network interfaces
+to be on separate IP networks. You can turn on IP interface groups on
+the host, such that it can have more than one IP address on the same
+subnet, and use the outbound networks for multiplexing traffic. You
+can also enable interface trunking on the host to use the multiple
+physical network interfaces as a single IP address.
+Trunking<a name="INDEX-1997" /> offers a
+measure of fault tolerance, since the trunked interface keeps working
+even if one of the network interfaces fails. It also scales as you
+add more network interfaces to the host, providing additional network
+bandwidth. We revisit IP interface groups and trunking<a name="INDEX-1998" /> <a name="INDEX-1999" /> in <a href="ch17_03.html#nfs2-CHP-17-SECT-3">Section 17.3, "Network infrastructure"</a>.</p>
+</div>
+
+
+
+<a name="nfs2-CHP-13-SECT-2.1.4" /><div class="sect3">
+<h3 class="sect3">13.2.1.4. Mismatched host information</h3>
+
+
+If you have inconsistent hostname and IP address<a name="INDEX-2000" /> <a name="INDEX-2001" /> information in the NIS
+<em class="emphasis">hosts</em> map and the local
+<em class="emphasis">hosts</em> file, or the NIS
+<em class="emphasis">ipnodes</em> map and the local
+<em class="emphasis">ipnodes</em> file, major confusion will result. The
+host may not be able to start all of its services if its host IP
+address changes during the boot process, and other machines will not
+know how to map the host's name to an IP address that is
+represented on the network.</p>
+
+
+You will find that some network activity works fine, where others
+fail. For example, you will be able to telnet into other systems from
+your misconfigured host, but the other systems will not be able to
+telnet into your misconfigured host. This is because the other hosts
+are using a different IP address than the one
+<em class="emphasis">ifconfig</em> used to configure your network
+interface. You will be able to mount NFS filesystems exported without
+restrictions, but will not be able to mount filesystems that are
+exported to your specific host (either explicitly or via netgroups)
+since the NFS server sees your request as coming from a different
+host.</p>
+
+
+This kind of failure indicates that the local host's IP address
+has changed between the early boot phase and the last
+<em class="emphasis">ifconfig</em>. You may find that the local
+<em class="emphasis">/etc/inet/hosts</em> file disagrees with the NIS
+<em class="emphasis">hosts</em> map or the local
+<em class="emphasis">/etc/inet/ipnodes</em> file disagrees with the NIS
+<em class="emphasis">ipnodes</em> map.</p>
+
+
+Mismatched IPv4 addresses between the <em class="emphasis">hosts</em> and
+<em class="emphasis">ipnodes</em> maps will lead to inconsistent behavior
+between IPv6-aware or -enabled applications and IPv6-unaware
+applications, because they obtain their address information from
+different sources. If the <em class="emphasis">hosts</em> database
+contains the correct information but the <em class="emphasis">ipnodes</em>
+database is corrupted, then IPv6-unaware applications will work
+correctly, while the IPv6-aware and -enabled applications will
+experience problems. The reverse is true when the corrupted<a name="INDEX-2002" /> <a name="INDEX-2003" /> information
+<a name="INDEX-2004" />
+<a name="INDEX-2005" />
+<a name="INDEX-2006" />is in the
+<em class="emphasis">hosts</em> database.</p>
+</div>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">13.2.2. Subnetwork masks</h3>
+
+
+The second <em class="emphasis">ifconfig</em> in the boot process
+installs<a name="INDEX-2007" /> <a name="INDEX-2008" /> <a name="INDEX-2009" /> proper masks and broadcast addresses if
+subnetting is used to divide a larger IP address space. Default
+subnetwork masks and broadcast addresses are assigned based on IP
+address class<a name="INDEX-2010" />, as
+shown in <a href="ch13_02.html#nfs2-CHP-13-TABLE-3">Table 13-3</a>.</p>
+
+
+<a name="nfs2-CHP-13-TABLE-3" /><h4 class="objtitle">Table 13-3. Default broadcast addresses </h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Address Class</p></th>
+<th>
+Network Address</p></th>
+<th>
+Network Mask</p></th>
+<th>
+Broadcast Address</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Class A</p></td>
+<td>
+x.0.0.0</p></td>
+<td>
+255.0.0.0</p></td>
+<td>
+x.255.255.255</p></td>
+</tr>
+
+<tr>
+<td>
+Class B</p></td>
+<td>
+x.y.0.0</p></td>
+<td>
+255.255.0.0</p></td>
+<td>
+x.y.255.255</p></td>
+</tr>
+
+<tr>
+<td>
+Class C</p></td>
+<td>
+x.y.z.0</p></td>
+<td>
+255.255.255.0</p></td>
+<td>
+x.y.z.255</p></td>
+</tr>
+
+
+</table><p>
+
+
+The NIS <em class="emphasis">netmasks</em> map contains an
+<a name="INDEX-2011" />
+<a name="INDEX-2012" />
+<a name="INDEX-2013" />association of network numbers and
+subnetwork masks and is used to override the default network masks
+corresponding to each class of IP address. A simple example is the
+division of a Class B network into Class C-like subnetworks, so that
+each subnetwork number can be assigned to a distinct physical
+network. To effect such a scheme, the <em class="emphasis">netmasks</em>
+NIS map contains a single entry for the Class B address:</p>
+
+
+<blockquote><pre class="code">131.40.0.0     255.255.255.0</pre></blockquote>
+
+
+Broadcast addresses are derived from the network mask and host IP
+address by performing a logical and of the two. Any bits that are
+<em class="emphasis">not</em> masked out by the netmask become part of the
+broadcast address, while those that are masked out are set to all
+ones in Solaris (other systems may set them to all zeros).</p>
+
+
+Network numbers are matched based on the number of octets normally
+used for an address of that class. IP address 131.40.52.28 has a
+Class B network number, so the first two octets in the IP address are
+used as an index into the <em class="emphasis">netmasks</em> map.
+Similarly, IP address 89.4.1.3 is a Class A address; therefore, only
+the first octet is used as a key into <em class="emphasis">netmasks</em>.
+This scheme simplifies the management of
+<em class="emphasis">netmasks</em>. By listing the network number to be
+partitioned, you do not have to itemize all subnetworks in the
+<em class="emphasis">netmasks</em> file.</p>
+
+
+Continuing the previous example, consider this
+<em class="emphasis">ifconfig</em>:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">ipnodes excerpt: </i>
+131.40.52.28    mahimahi 
+ 
+<i class="lineannotation">netmasks map: </i>
+131.40.0.0      255.255.255.0 
+ 
+<i class="lineannotation">ifconfig line: </i>
+ifconfig hme0 mahimahi netmask + 
+ 
+<i class="lineannotation">Resulting interface configuration: </i>
+% <tt class="userinput"><b>ifconfig hme0</b></tt> 
+hme0: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4&gt; mtu 1500 index 2 
+        inet 131.40.52.28 netmask ffffff00 broadcast 131.40.52.255</pre></blockquote>
+
+
+Using a plus sign (+) as the netmask instead of an explicit network
+mask forces the second <em class="emphasis">ifconfig</em> to read the NIS
+<em class="emphasis">netmasks</em> map for the correct mask. The
+four-octet mask is logically and-ed with the IP address, producing
+the broadcast network number. In the preceding example, the broadcast
+address is in the ones form. Note that the
+<em class="emphasis">network</em> mask is actually displayed as a
+hexadecimal mask value, and not as an IP address.</p>
+
+
+A more complex example involves dividing the Class C network 192.6.4
+into four subnetworks. To get four subnetworks, we need an additional
+two bits of network number, which are taken from the two most
+significant bits of the host number. The netmask is therefore
+extended into the next two bits, making it 26 bits instead of the
+default 24-bit Class C netmask:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Partitioning requires: </i>
+24 bits of Class C network number 
+2 additional bits of subnetwork number 
+6 bits left for host number 
+ 
+Last octet has 2 bits of netmask, 6 of host number: 
+11000000 binary = 192 decimal 
+ 
+<i class="lineannotation">Resulting netmasks file entry: </i>
+192.6.4.0         255.255.255.192</pre></blockquote>
+
+
+Again, only one entry in <em class="emphasis">netmasks</em> is needed, and
+the key for the entry matches the Class C network number that is
+being divided.</p>
+
+
+You use variable length subnetting when using Classless IP
+addressing. You specify how many bits of the IP address to use for
+the network, and how many to use for the host by setting the
+appropriate netmask entry. The format of the netmask entry is the
+same as before, however, there should be an entry for each subnet
+defined. <em class="emphasis">ifconfig</em> uses the longest possible
+matching mask. Say your engineering organization has been given
+control of the 131.40.86.0 network (addresses 131.40.86.0 -&gt;
+131.40.86.255). You decide to partition it into four separate
+subnetworks that map the four groups in your organization: Systems
+Engineering, Applications Engineering, Graphics Engineering, and
+Customer Support. You plan to use a single system to serve as your
+gateway between the four separate subnets and the enterprise network.
+Your enterprise network address is 131.40.7.22, and is therefore
+connected to the 131.40.7.0 enterprise network. In order to partition
+the 131.40.86 address space into four separate subnets, you need to
+use the two upper bits of the last octet to identify the network.
+<a href="ch13_02.html#nfs2-CHP-13-TABLE-4">Table 13-4</a> shows the distribution of the IP
+addresses to the different networks.</p>
+
+
+<a name="nfs2-CHP-13-TABLE-4" /><h4 class="objtitle">Table 13-4. Network assignment </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Organization</p></th>
+<th>
+Address Range</p></th>
+<th>
+Subnetwork</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+Systems Eng</p></td>
+<td>
+131.40.86.0 -&gt; 131.40.86.63</p></td>
+<td>
+131.40.86.0</p></td>
+</tr>
+
+<tr>
+<td>
+Applications Eng</p></td>
+<td>
+131.40.86.64 -&gt; 131.40.86.127</p></td>
+<td>
+131.40.86.64</p></td>
+</tr>
+
+<tr>
+<td>
+Graphics Eng</p></td>
+<td>
+131.40.86.128 -&gt; 131.40.86.191</p></td>
+<td>
+131.40.86.128</p></td>
+</tr>
+
+<tr>
+<td>
+Customer Support</p></td>
+<td>
+131.40.86.192 -&gt; 131.40.86.255</p></td>
+<td>
+131.40.86.192</p></td>
+</tr>
+
+
+</table><p>
+
+
+The last octet of the address will have two bits of netmask and six
+of host number:</p>
+
+
+<blockquote><pre class="code">11000000 binary = 192 decimal
+The resulting netmask: 255.255.255.192</pre></blockquote>
+
+
+The resulting netmasks file is:</p>
+
+
+<blockquote><pre class="code">131.40.0.0      255.255.255.0
+131.40.86.0     255.255.255.192
+131.40.86.64    255.255.255.192
+131.40.86.128   255.255.255.192
+131.40.86.192   255.255.255.192</pre></blockquote>
+
+
+The first entry indicates that the Class B network 131.40.0.0 is
+subnetted. The next four entries represent the four variable-length
+subnets for the classless addresses for the different groups.
+Addresses 131.40.86.0 through 131.40.86.255 have a subnet mask with
+26 bits in the subnet fields and 6 bits in the host field. All other
+addresses in the range 131.40.0.0 through 131.40.255.255 have a 24
+bit subnet field. The IP address assignments for the five network
+interfaces are shown in <a href="ch13_02.html#nfs2-CHP-13-TABLE-5">Table 13-5</a>.</p>
+
+
+<a name="nfs2-CHP-13-TABLE-5" /><h4 class="objtitle">Table 13-5. Assigning addresses to interfaces</h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Interface</p></th>
+<th>
+Subnetwork Range</p></th>
+<th>
+Broadcast</p></th>
+<th>
+Sample IP Address</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+hme0</p></td>
+<td>
+131.40.7.0 Backbone</p></td>
+<td>
+131.40.7.255</p></td>
+<td>
+131.40.7.22</p></td>
+</tr>
+
+<tr>
+<td>
+hme1</p></td>
+<td>
+131.40.86.0 -&gt; 131.40.86.63</p></td>
+<td>
+131.40.86.63</p></td>
+<td>
+131.40.86.1</p></td>
+</tr>
+
+<tr>
+<td>
+hme2</p></td>
+<td>
+131.40.86.64 -&gt; 131.40.86.127</p></td>
+<td>
+131.40.86.63</p></td>
+<td>
+131.40.86.65</p></td>
+</tr>
+
+<tr>
+<td>
+hme3</p></td>
+<td>
+131.40.86.128 -&gt; 131.40.86.191</p></td>
+<td>
+131.40.86.63</p></td>
+<td>
+131.40.86.129</p></td>
+</tr>
+
+<tr>
+<td>
+hme4</p></td>
+<td>
+131.40.86.192 -&gt; 131.40.86.255</p></td>
+<td>
+131.40.86.63</p></td>
+<td>
+131.40.86.193</p></td>
+</tr>
+
+
+</table><p>
+
+
+For example, the server would direct network traffic to the
+<em class="emphasis">hme0</em> interface when communicating with IP
+address 131.40.7.78, since it is part of the 131.40.7.0 subnet;
+<em class="emphasis">hme1</em> when communicating with 131.40.86.32, since
+it is part of the 131.40.86.0 subnet; <em class="emphasis">hme2</em> when
+communicating with 131.40.7.78, and so on.</p>
+
+
+<em class="emphasis">ifconfig</em> only governs the local machine's
+interface to the network. If a host cannot exchange packets with a
+peer host on the same network, then it is necessary to verify that a
+datagram circuit to the remote host exists and that the remote node
+is properly advertising itself on the network. Tools that perform
+these <a name="INDEX-2014" />
+<a name="INDEX-2015" />
+<a name="INDEX-2016" />tests are
+<em class="emphasis">arp</em> and <em class="emphasis">ping</em>.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">13.2.3. IP to MAC address mappings</h3>
+
+
+Applications use IP addresses and hostnames <a name="INDEX-2017" /> <a name="INDEX-2018" /> <a name="INDEX-2019" />to identify remote nodes, but
+packets sent on the Ethernet identify their destinations via a 48-bit
+MAC-layer address. The Ethernet interface on each host only receives
+packets that have its MAC address of a broadcast address in the
+destination field. IP addresses are completely independent of the
+48-bit MAC-level address; several disjoint networks may use the same
+sets of IP addresses although the 48-bit addresses to which they map
+are unique worldwide.</p>
+
+
+You can tell who makes an Ethernet interface by looking at the first
+three octets of its address. Some of the most popular prefixes are
+shown in <a href="ch13_02.html#nfs2-CHP-13-TABLE-6">Table 13-6</a>. Fortunately, newer diagnostic
+tools such as <em class="emphasis">ethereal</em> know how
+<a name="INDEX-2020" />
+<a name="INDEX-2021" />to
+map the prefix number to the vendor of the interface.
+<em class="emphasis">ethereal</em> is introduced later in this chapter in <a href="ch13_05.html#nfs2-CHP-13-SECT-5.2">Section 13.5.2, "ethereal / tethereal"</a>.</p>
+
+
+<a name="nfs2-CHP-13-TABLE-6" /><h4 class="objtitle">Table 13-6. Ethernet address prefixes </h4><table border="1">
+
+
+
+
+
+
+
+<tr>
+<th>
+Prefix</p></th>
+<th>
+Vendor</p></th>
+<th>
+Prefix</p></th>
+<th>
+Vendor</p></th>
+<th>
+Prefix</p></th>
+<th>
+Vendor</p></th>
+</tr>
+
+
+
+
+<tr>
+<td>
+00:00:0c</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:20:85</p></td>
+<td>
+3Com</p></td>
+<td>
+00:e0:34</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:00:3c</p></td>
+<td>
+Auspex</p></td>
+<td>
+00:20:af</p></td>
+<td>
+3Com</p></td>
+<td>
+00:e0:4f</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:00:63</p></td>
+<td>
+Hewlett-Packard</p></td>
+<td>
+00:60:08</p></td>
+<td>
+3Com</p></td>
+<td>
+00:e0:a3</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:00:65</p></td>
+<td>
+Network General</p></td>
+<td>
+00:60:09</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:e0:f7</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:00:69</p></td>
+<td>
+Silicon Graphics</p></td>
+<td>
+00:60:2f</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:e0:f9</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:00:f8</p></td>
+<td>
+DEC</p></td>
+<td>
+00:60:3e</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:e0:fe</p></td>
+<td>
+Cisco</p></td>
+</tr>
+
+<tr>
+<td>
+00:01:fa</p></td>
+<td>
+Compaq</p></td>
+<td>
+00:60:47</p></td>
+<td>
+Cisco</p></td>
+<td>
+02:60:60</p></td>
+<td>
+3Com</p></td>
+</tr>
+
+<tr>
+<td>
+00:04:ac</p></td>
+<td>
+IBM</p></td>
+<td>
+00:60:5c</p></td>
+<td>
+Cisco</p></td>
+<td>
+02:60:8c</p></td>
+<td>
+3Com</p></td>
+</tr>
+
+<tr>
+<td>
+00:06:0d</p></td>
+<td>
+Hewlett-Packard</p></td>
+<td>
+00:60:70</p></td>
+<td>
+Cisco</p></td>
+<td>
+08:00:02</p></td>
+<td>
+3Com</p></td>
+</tr>
+
+<tr>
+<td>
+00:06:29</p></td>
+<td>
+IBM</p></td>
+<td>
+00:60:83</p></td>
+<td>
+Cisco</p></td>
+<td>
+08:00:09</p></td>
+<td>
+Hewlett-Packard</p></td>
+</tr>
+
+<tr>
+<td>
+00:06:7c</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:60:8c</p></td>
+<td>
+3Com</p></td>
+<td>
+08:00:1a</p></td>
+<td>
+Data General</p></td>
+</tr>
+
+<tr>
+<td>
+00:06:c1</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:60:97</p></td>
+<td>
+3Com</p></td>
+<td>
+08:00:1b</p></td>
+<td>
+Data General</p></td>
+</tr>
+
+<tr>
+<td>
+00:07:01</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:60:b0</p></td>
+<td>
+Hewlett-Packard</p></td>
+<td>
+08:00:20</p></td>
+<td>
+Sun Microsystems</p></td>
+</tr>
+
+<tr>
+<td>
+00:07:0d</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:80:1c</p></td>
+<td>
+Cisco</p></td>
+<td>
+08:00:2b</p></td>
+<td>
+DEC</p></td>
+</tr>
+
+<tr>
+<td>
+00:08:c7</p></td>
+<td>
+Compaq</p></td>
+<td>
+00:80:5f</p></td>
+<td>
+Compaq</p></td>
+<td>
+08:00:5a</p></td>
+<td>
+IBM</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:11</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:90:27</p></td>
+<td>
+Intel</p></td>
+<td>
+08:00:69</p></td>
+<td>
+Silicon Graphics</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:1f</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:90:b1</p></td>
+<td>
+Cisco</p></td>
+<td>
+08:00:79</p></td>
+<td>
+Silicon Graphics</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:2f</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:a0:24</p></td>
+<td>
+3Com</p></td>
+<td>
+10:00:5a</p></td>
+<td>
+IBM</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:4b</p></td>
+<td>
+3Com</p></td>
+<td>
+00:aa:00</p></td>
+<td>
+Intel</p></td>
+<td>
+10:00:90</p></td>
+<td>
+Hewlett-Packard</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:79</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:c0:4f</p></td>
+<td>
+Dell</p></td>
+<td>
+10:00:d4</p></td>
+<td>
+DEC</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:7b</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:c0:95</p></td>
+<td>
+Network Appliance</p></td>
+<td>
+3C:00:00</p></td>
+<td>
+3Com</p></td>
+</tr>
+
+<tr>
+<td>
+00:10:f6</p></td>
+<td>
+Cisco</p></td>
+<td>
+00:e0:14</p></td>
+<td>
+Cisco</p></td>
+<td>
+aa:00:03</p></td>
+<td>
+DEC</p></td>
+</tr>
+
+<tr>
+<td>
+00:20:35</p></td>
+<td>
+IBM</p></td>
+<td>
+00:e0:1e</p></td>
+<td>
+Cisco</p></td>
+<td>
+aa:00:04</p></td>
+<td>
+DEC</p></td>
+</tr>
+
+
+</table><p>
+
+
+ARP, the Address Resolution Protocol, is used to maintain tables of
+32- to 48-bit address translations. The <em class="emphasis">ARP
+table</em> is a dynamic collection of MAC-to-IPv4 address
+mappings. To fill in the MAC-level Ethernet packet headers, the
+sending host must resolve the destination IPv4 address into a 48-bit
+address. The host first checks its ARP table for an entry keyed by
+the IPv4 address, and if none is found, the host broadcasts an ARP
+request containing the recipient's IPv4 address. Any machine
+supporting ARP address resolution responds to an ARP request with a
+packet containing its MAC address. The requester updates its ARP
+table, fills in the MAC address in the Ethernet packet header, and
+transmits the packet.</p>
+
+
+If no reply is received for the ARP request, the transmitting host
+sends the request again. Typically, a delay of a second or more is
+inserted between consecutive ARP requests to prevent a series of ARP
+packets from saturating the network. Flurries of ARP requests
+sometimes occur when a malformed packet is sent on the network; some
+hosts interpret it as a broadcast packet and attempt to get the
+Ethernet address of the sender via an ARP request. If many machines
+are affected, the ensuing flood of network activity can consume a
+considerable amount of the available bandwidth. This behavior is
+referred to as an <em class="emphasis">ARP storm</em>, and is most
+frequently caused by an electrical problem in a transceiver that
+damages packets after the host has cleanly written them over its
+network interface.</p>
+
+
+To examine the current ARP table entries, use <em class="emphasis">arp
+-a</em>:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>arp -a</b></tt> 
+Net to Media Table: IPv4
+Device   IP Address               Mask      Flags   Phys Addr 
+------ -------------------- --------------- ----- ---------------
+hme0   caramba              255.255.255.255       08:00:20:b9:2b:f6
+hme1   socks                255.255.255.255       08:00:20:e7:91:5d
+hme0   copper               255.255.255.255       00:20:af:9d:7c:92
+hme0   roger                255.255.255.255 SP    08:00:20:a0:33:90
+hme0   universo             255.255.255.255 U     
+hme0   peggy                255.255.255.255 SP    08:00:20:81:23:f1
+hme1   duke                 255.255.255.255       00:04:00:20:56:d7
+hme0   224.0.0.0            240.0.0.0       SM    01:00:5e:00:00:00
+hme1   224.0.0.0            240.0.0.0       SM    01:00:5e:00:00:00
+hme1   daisy                255.255.255.255       08:00:20:b5:3d:d7</pre></blockquote>
+
+
+The <em class="emphasis">arp -a</em> output listing reports the interface
+over which the ARP notification arrived, the IP address (or hostname)
+and its Ethernet address mapping. The unresolved entry (denoted by
+the <em class="emphasis">U</em> flag) is for a host that did not respond
+to an ARP request; after several minutes the entry is removed from
+the table. Complete entries in the ARP table may be
+<em class="emphasis">static</em> or <em class="emphasis">dynamic</em>,
+indicating how the address mappings were added and the length of
+their expected lifetimes.</p>
+
+
+Solaris identifies static entries with the <em class="emphasis">S</em>
+flag. The host's own Ethernet address as well as all multicast
+address entries (identified by the <em class="emphasis">M</em> flag) will
+always be static.The previous example was run on the host
+<em class="emphasis">roger</em>, therefore the static nature of the entry
+for its own Ethernet address and multicast entries. The absence of
+the <em class="emphasis">S</em> flag identifies a dynamic or learned
+entry.</p>
+
+
+Dynamic entries are added on demand during the course of normal IP
+traffic handling. Infrequently used mappings added in this fashion
+have a short lifetime; after five minutes without a reference to the
+entry, the ARP table management routines remove it. This ongoing
+table pruning is necessary to minimize the overhead of ARP table
+lookups. The ARP table is accessed using a hash table; a smaller,
+sparser table has fewer hash key collisions. A host that communicates
+regularly with many other hosts may have an ARP table that is fairly
+large, while a host that is quiescent or exchanging packets with only
+a few peers has a small ARP table.</p>
+
+
+The difference between dynamic and
+permanent<a name="INDEX-2022" /> <a name="INDEX-2023" /> entries is how they are added to the
+ARP table. Dynamic entries are added on the fly, as a result of
+replies to ARP requests. Permanent entries are loaded into the ARP
+table once at boot time, and are useful if a host must communicate
+with a node that cannot respond to an ARP request during some part of
+its startup procedure. For example, a diskless client may not have
+ARP support embedded in the boot PROM, requiring its boot server to
+have a permanent ARP table entry for it. Once the diskless node is
+running the Unix kernel, it should be able to respond to ARP requests
+to complete dynamic ARP table entries on other hosts.</p>
+
+
+The <em class="emphasis">arp -a</em> output reports a mask for every
+entry. This mask is used during lookup of an entry in the ARP table.
+The lookup function in the kernel applies the mask to the address
+being queried and compares it with the one in the table. If the
+resulting addresses match, the lookup is successful. A mask of
+255.255.255.255 (all ones) means that the two addresses need to be
+exactly the same in order to be considered equivalent. A mask of
+240.0.0.0 means that only the upper four bits of the address are used
+to find a matching address. In the previous example, all multicast
+addresses use the Ethernet address corresponding to the 240.0.0.0
+entry. The ARP mask does not provide much useful information to the
+regular user. Be sure not to confuse this ARP mask with the netmask
+specified by the <em class="emphasis">ifconfig</em> command. The ARP mask
+is generated and used only by the internal kernel routines to reduce
+the number of entries that need to be stored in the table. The
+netmask specified by the <em class="emphasis">ifconfig</em> command is
+used for IP routing.</p>
+
+
+A variation of the permanent ARP table
+entry<a name="INDEX-2024" />
+<a name="INDEX-2025" /> is a <em class="emphasis">published</em>
+mapping. Published mappings are denoted by the <em class="emphasis">P</em>
+flag. Published entries include the IP address for the current host,
+and the addresses that have been explicitly added by the
+<em class="emphasis">-s</em> or <em class="emphasis">-f</em> options (explained
+later in this chapter).</p>
+
+
+Publishing ARP table entries turns a host into an ARP server.
+Normally, a host replies only to requests for its own IP address, but
+if it has published entries then it replies for multiple IP
+addresses. If an ARP request is broadcast requesting the IP address
+of a published entry, the host publishing that entry returns an ARP
+reply to the sender, even though the IP address in the ARP request
+does not match its own.</p>
+
+
+This mechanism is used to cope with machines that cannot respond to
+ARP requests due to lack of ARP support or because they are isolated
+from broadcast packets by a piece of network partitioning hardware
+that filters out broadcast packets. This mechanism is also useful in
+SLIP or PPP configurations. When any of these situations exist, a
+machine is designated as an ARP server and is loaded with ARP entries
+from a file containing hostnames, Ethernet addresses, and the
+<em class="emphasis">pub</em> qualifier. For example, to publish the ARP
+entries for hosts <em class="emphasis">relax</em> and
+<em class="emphasis">stress</em> on server <em class="emphasis">irie</em>, we
+put the ARP information into a configuration file
+<em class="emphasis">/etc/arptable</em> and then load it using
+<em class="emphasis">arp -f</em>:</p>
+
+
+<blockquote><pre class="code">irie# <tt class="userinput"><b>cat /etc/arptable</b></tt> 
+relax   08:00:20:73:3e:ec         pub
+stress  08:00:20:b9:18:3d  pub
+irie# <tt class="userinput"><b>arp -f /etc/arptable</b></tt></pre></blockquote>
+
+
+The <em class="emphasis">-f</em> option forces <em class="emphasis">arp</em> to
+read the named file for entries, alternatively the
+<em class="emphasis">-s</em> option can be used to add a single mapping
+from the command line:</p>
+
+
+<blockquote><pre class="code">irie# <tt class="userinput"><b>arp -s relax 08:00:20:73:3e:ec pub</b></tt></pre></blockquote>
+
+
+As a diagnostic tool, <em class="emphasis">arp</em> is useful for
+resolving esoteric point-to-point connectivity problems. If a
+host's ARP table contains an incorrect entry, the machine using
+it will not be reachable, since outgoing packets will contain the
+wrong Ethernet address. ARP table entries may contain incorrect
+Ethernet addresses for several reasons:</p>
+
+
+<ul><li>Another host on the network is answering ARP requests for the same IP
+address, or all IP addresses, emulating a duplicate IP address on the
+network.</p></li><li>A host with a published ARP entry contains the wrong Ethernet address
+in its ARP table.</p></li><li>Either of the above situations exist, and the incorrect ARP reply
+arrives at the requesting host after the correct reply. When ARP
+table entries are updated dynamically, the last response received is
+the one that "wins." If the correct ARP response is
+received from a host that is physically close to the requester, and a
+duplicate ARP response arrives from a host that is located across
+several Ethernet bridges, then the later  --  and probably
+incorrect  --  response is the one that the machine uses for
+future packet transmissions.</p></li></ul>
+Inspection of the ARP table can reveal some obvious problems; for
+example, the three-octet prefix of the machine's Ethernet
+address does not agree with the vendor's label on the front of
+the machine. If you believe you are suffering from intermittent ARP
+failures, you can delete specific ARP table entries and monitor the
+table as it is repopulated dynamically. ARP table entries are deleted
+with <em class="emphasis">arp -d</em>, and only the superuser can delete
+entries. In the following example, we delete the ARP table entry for
+<em class="emphasis">fenwick</em>, then force the local host to send an
+ARP request for <em class="emphasis">fenwick</em> by attempting to connect
+to it using <em class="emphasis">telnet</em>. By examining the ARP table
+after the connection attempt, we can see if some other host has
+responded incorrectly to the ARP request:</p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>arp -d fenwick</b></tt> 
+fenwick (131.40.52.44) deleted 
+# <tt class="userinput"><b>telnet fenwick</b></tt> 
+<i class="lineannotation">...Telnet times out... </i>
+# <tt class="userinput"><b>arp -a | grep fenwick</b></tt>
+hme0   fenwick              255.255.255.255       08:00:20:79:61:eb</pre></blockquote>
+
+
+An example involving intermittent ARP failures is presented in <a href="ch15_01.html">Chapter 15, "Debugging Network Problems"</a>.</p>
+
+
+IPv6 nodes use the neighbor discovery mechanism to learn the link
+layer address (MAC in the case of Ethernet) of the other nodes
+connected to the link. The IPv6 neighbor discovery mechanism delivers
+the functionality previously provided by the combination of ARP, ICMP
+router discovery, and ICMP redirect mechanisms. This is done by
+defining special ICMP6 message types: neighbor solicitation and
+neighbor advertisement. A node issues neighbor solicitations when it
+needs to request the link-layer (MAC) address of a neighbor. Nodes
+will also issue neighbor advertisement messages in response to
+neighbor solicitation messages, as well as when their link-layer
+address <a name="INDEX-2026" />
+<a name="INDEX-2027" />
+<a name="INDEX-2028" />changes.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">13.2.4. Using ping to check network connectivity</h3>
+
+
+<em class="emphasis">ping</em> is similar to <em class="emphasis">arp</em> in
+that it provides information <a name="INDEX-2029" /> <a name="INDEX-2030" /> <a name="INDEX-2031" />about hosts on a network rather than
+information about data that is sent on the network.
+<em class="emphasis">arp</em> provides a low-level look at the MAC
+addressing used by a host, but it is not that powerful for diagnosing
+connectivity problems. <em class="emphasis">ping</em> is a more general
+purpose tool for investigating point-to-point connectivity problems
+and areas of questionable physical network topology.</p>
+
+
+<em class="emphasis">ping</em> uses the Internetwork Control Message
+Protocol (ICMP) echo <a name="INDEX-2032" />facility to ask a
+remote machine for a reply. ICMP is another component of the network
+protocol stack that is a peer of IP and ARP. The returned packet
+contains a timestamp added by the remote host which is used to
+compute the round trip packet transit time. In its simplest form,
+<em class="emphasis">ping</em> is given a hostname or IP address and
+returns a verdict on connectivity to that host:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping shamrock</b></tt> 
+shamrock is alive 
+% <tt class="userinput"><b>ping 131.40.1.15</b></tt> 
+131.40.1.15 is alive</pre></blockquote>
+
+
+The <em class="emphasis">-s</em> option puts <em class="emphasis">ping</em>
+into continuous-send mode, and displays the sequence numbers and
+transit times for packets as they are returned. Optionally, the
+packet size and packet count may be specified on the command line:</p>
+
+
+<blockquote><pre class="code">ping [-s] host [packet-size] [packet-count]</pre></blockquote>
+
+
+For example:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping -s mahimahi</b></tt> 
+PING mahimahi: 56 data bytes 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=0. time=3. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=1. time=2. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=2. time=2. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=3. time=3. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=4. time=2. ms 
+^C 
+----mahimahi PING Statistics---- 
+5 packets transmitted, 5 packets received, 0% packet loss 
+round-trip (ms)  min/avg/max = 2/2/3</pre></blockquote>
+
+
+and:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping -s mahimahi 100 3</b></tt> 
+PING mahimahi: 100 data bytes 
+108 bytes from mahimahi (131.40.52.28): icmp_seq=0. time=3. ms 
+108 bytes from mahimahi (131.40.52.28): icmp_seq=1. time=3. ms 
+108 bytes from mahimahi (131.40.52.28): icmp_seq=2. time=3. ms 
+ 
+----mahimahi PING Statistics---- 
+3 packets transmitted, 3 packets received, 0% packet loss 
+round-trip (ms)  min/avg/max = 3/3/3</pre></blockquote>
+
+
+The eight bytes added to each ICMP echo request in the corresponding
+reply are the timestamp information added by the remote host. If no
+explicit count on the number of packets is specified, then
+<em class="emphasis">ping</em> continues transmitting until interrupted.
+By default, <em class="emphasis">ping</em> uses a 56-byte packet, which is
+the smallest IP packet, complete with headers and checksums, that
+will be transmitted on the Ethernet.</p>
+
+
+The <em class="emphasis">ping</em> utility is good for answering questions
+about whether the remote host is attached to the network and whether
+the network between the hosts is reliable. Additionally,
+<em class="emphasis">ping</em> can indicate that a hostname and IP address
+are not consistent across several machines. The replies received when
+the host is specified by name may contain an incorrect IP address.
+Conversely, if <em class="emphasis">ping</em>ing the remote host by name
+does not produce a reply, try the IP address of the host. If a reply
+is received when the host is specified by address, but not by name,
+then the local machine has an incorrect view of the remote
+host's IP address. These kinds of problems are generally
+machine specific, so intermittent <em class="emphasis">ping</em> failures
+can be a hint of IP address confusion: machines that do not agree on
+the IP addresses they have been assigned.</p>
+
+
+If NIS is used, this could indicate that the NIS
+<em class="emphasis">ipnodes</em> map was corrupted or changed
+(incorrectly) since the remote host last booted. The NIS
+<em class="emphasis">ipnodes</em> map supersedes the local
+<em class="emphasis">/etc/inet/ipnodes</em> file,<a href="#FOOTNOTE-31">[31]</a> so a disparity between the two
+values for a remote machine is ignored; the NIS
+<em class="emphasis">ipnodes</em> map takes precedence. However, in the
+absence of NIS, the failure of a remote node to answer a
+<em class="emphasis">ping</em> to its hostname indicates the
+<em class="emphasis">/etc/inet/ipnodes</em> files are out of
+synchronization.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-31" />[31]You can
+change the search order for <em class="emphasis">hosts</em> and
+<em class="emphasis">ipnodes</em> in
+<em class="emphasis">/etc/nsswitch.conf</em> in order to reverse the
+precedence order.</p>
+
+</blockquote>
+
+
+Larger packet sizes may be used to test connectivity through network
+components that are suspected of damaging large packets or trains of
+packets. <em class="emphasis">ping</em> only sends one packet at a time,
+so it won't test the capacity of a network interface. However,
+it tells you whether packets close to the network's MTU can
+make it from point to point intact, through all of the network
+hardware between the two hosts.</p>
+
+
+Using the packet count indicators and transit times,
+<em class="emphasis">ping</em> can be used to examine connectivity,
+network segment length, and potential termination problems.
+Electrical problems, including poor or missing cable termination, are
+among the most difficult problems to diagnose and pinpoint without
+repeatedly splitting the network in half and testing the smaller
+segments. If <em class="emphasis">ping</em> shows that packets are dropped
+out of sequence, or that return packets are received in bursts, it is
+likely that either a network cable segment has an electrical fault or
+that the network is not terminated properly. These problems are more
+common in older 10Base-5 and 10Base-2 networks than in newer CAT5
+twisted pair networks.</p>
+
+
+For example, the following output from <em class="emphasis">ping</em>
+indicates that the network is intermittently dropping packets; this
+behavior is usually caused by improper termination and is quite
+random in nature:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>ping -s mahimahi</b></tt> 
+PING mahimahi: 56 data bytes 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=0. time=3. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=1. time=2. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=16. time=1295. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=17. time=3. ms 
+64 bytes from mahimahi (131.40.52.28): icmp_seq=18. time=2. ms</pre></blockquote>
+
+
+The gap between packets 1 and 16, along with the exceptionally long
+packet delay, indicates that a low-level network problem is
+<a name="INDEX-2033" />
+<a name="INDEX-2034" />
+<a name="INDEX-2035" />consuming
+packets.</p>
+</div>
+
+
+
+
+<a name="nfs2-CHP-13-SECT-2.5" /><div class="sect2">
+<h3 class="sect2">13.2.5. Gauging Ethernet interface capacity</h3>
+
+
+Even with a well-conditioned network<a name="INDEX-2036" />
+<a name="INDEX-2037" /> and proper host configuration
+information, a server may have trouble communicating with its clients
+because its network interface is overloaded. If an NFS server is hit
+with more packets than it can receive through its network interface,
+some client requests will be lost and eventually retransmitted. To
+the NFS clients, the server appears painfully slow, when it's
+really the server's network interface that is the problem.</p>
+
+
+The <em class="emphasis">spray</em> utility provides a<a name="INDEX-2038" /> <a name="INDEX-2039" />
+very coarse estimate of network interface capacity, both on
+individual hosts and through network hardware between hosts.
+<em class="emphasis">spray</em> showers a target host with consecutive
+packets of a fixed length by making remote procedure calls to the
+<em class="emphasis">rpc.sprayd</em> daemon on the remote host. After the
+last packet is sent, the <em class="emphasis">rpc.sprayd</em> daemon is
+queried for a count of the packets received; this value is compared
+to the number of packets sent to determine the percentage dropped
+between client and server.</p>
+
+
+On its own, <em class="emphasis">spray</em> is of limited usefulness as a
+measure of the packet handling capability of a machine. The packet
+containing the RPC call may be lost by the client, due to other
+activity on its network interface; it may be consumed by a collision
+on the network; or it may be incident to the server but not copied
+from the network by the server's network interface due to a
+lack of buffer space or excessive server CPU loading. Many packets
+are lost on the sending host, and <em class="emphasis">spray</em> has no
+knowledge of where the packets vanish once they get pass the
+application layer. Due to these factors, <em class="emphasis">spray</em>
+is best used to gauge the relative packet-handling speeds of two or
+more machines.</p>
+
+
+Here are some examples of using <em class="emphasis">spray</em> to test
+various network constraints. <em class="emphasis">spray</em> requires a
+hostname and takes a packet count, delay value, and packet length as
+optional arguments:</p>
+
+
+<blockquote><pre class="code">spray [-c count] [-d delay] [-l length] host</pre></blockquote>
+
+
+For example:</p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>spray wahoo</b></tt> 
+sending 1162 packets of length 86 to wahoo ...
+              675 packets (58.090%) dropped by wahoo
+              1197 packets/sec, 103007 bytes/sec</pre></blockquote>
+
+
+<em class="emphasis">spray</em> reports the number of packets received, as
+well as the transfer rate. The packet drop rates are only meaningful
+when used to compare the relative network input and output rates of
+the two machines under test.</p>
+
+
+It's important to note that network interface speed depends
+upon much more than CPU speed. A faster CPU helps a host process
+network protocols faster, but the network interface and bus hardware
+usually determine how quickly the host can pull packets from the
+network. A fast network interface may be separated from the CPU by a
+bus that has a high latency. Even a high-throughput I/O system may
+exhibit poor network performance if there is a large time overhead
+required to set up each packet transfer from the network interface to
+the CPU. Similar hosts stress each other fairly, since their network
+interfaces have the same input capacity.</p>
+
+
+Even on a well-conditioned, little-used network, a client machine
+that has a significantly faster CPU than its server may perform worse
+under the stress of <em class="emphasis">spray</em> than the same two
+machines with the client and server roles reversed. With increased
+CPU speed comes increased packet handling speed, so a faster machine
+can transmit packets quickly enough to outpace a slower server. If
+the disparity between client and server is great, then the client is
+forced to retransmit requests and the server is additionally burdened
+with the duplicate requests. Use <em class="emphasis">spray</em> to
+exercise combinations of client and server with varying packet sizes
+to identify cases in which a client may race ahead of its server.
+When a fast NFS client is teamed with a slower server, the NFS mount
+parameters require tuning as described in <a href="ch18_01.html#nfs2-CHP-18-SECT-1">Section 18.1, "Slow server compensation"</a>.</p>
+
+
+Send various sized packets to an NFS server to see how it handles
+"large" and "small" NFS requests. Disk write
+operations are "large," usually filling several full-size
+IP packets. Other operations, such as getting the attributes of a
+file, fit into a packet of 150 bytes or less. Small packets are more
+easily handled by all hosts, since there is less data to move around,
+but NFS servers may be subject to bursts of large packets during
+intense periods of client write operations. If no explicit arguments
+are given, <em class="emphasis">spray</em> sends 1162 packets of 86 bytes.
+In most implementations of <em class="emphasis">spray</em>, if either a
+packet count or packet length are given, the other argument is chosen
+so that 100 kbytes of data are transferred between client and server.
+Try using <em class="emphasis">spray</em> with packet sizes of 1500 bytes
+to judge how well an NFS server or the network handle write requests.</p>
+
+
+Normally, no delay is inserted between packets sent by
+<em class="emphasis">spray</em>, although the <em class="emphasis">-d</em>
+option may be used to specify a delay in microseconds. Insert delays
+between the packets to simulate realistic packet arrival rates, under
+"normal" conditions. Client requests may be separated by
+several tens of microseconds, so including a delay between packets
+may give you a more accurate picture of packet handling rates.</p>
+
+
+In <a href="ch13_02.html#nfs2-CHP-13-FIG-1">Figure 13-1</a>, <em class="emphasis">baxter</em> and
+<em class="emphasis">arches</em> are identical machines and
+<em class="emphasis">acadia</em> is a faster machine with a faster network
+interface. <em class="emphasis">spray</em> produces the following output:</p>
+
+
+<blockquote><pre class="code"><i class="lineannotation">Fast machine to slow machine: </i>
+[acadia]% <tt class="userinput"><b>spray baxter -c 100 -l 1160</b></tt> 
+sending 100 packets of length 1162 to baxter ... 
+        39 packets (39.000%) dropped by baxter 
+        520 packets/sec, 605037 bytes/sec 
+ 
+<i class="lineannotation">Fast machine to slow machine, with delay: </i>
+[acadia]% <tt class="userinput"><b>spray baxter -c 100 -l 1160 -d 1</b></tt> 
+sending 100 packets of length 1162 to baxter ... 
+        no packets dropped by baxter 
+        99 packets/sec, 115680 bytes/sec 
+ 
+<i class="lineannotation">Slow machine to fast machine: </i>
+[baxter]% <tt class="userinput"><b>spray acadia -c 100 -l 1160</b></tt> 
+sending 100 packets of length 1162 to acadia ... 
+        no packets dropped by acadia 
+        769 packets/sec, 893846 bytes/sec 
+ 
+<i class="lineannotation">Slow machine to identical machine: </i>
+[baxter]% <tt class="userinput"><b>spray arches -c 100 -l 1160</b></tt> 
+sending 100 packets of length 1162 to arches ... 
+        no packets dropped by arches 
+        769 packets/sec, 893846 bytes/sec</pre></blockquote>
+
+
+<a name="nfs2-CHP-13-FIG-1" /><div class="figure"><img height="202" alt="Figure 13-1" src="figs/nfs2.1301.gif" width="331" /></div><h4 class="objtitle">Figure 13-1. Testing relative packet handling rates</h4>
+
+When the fast machine sprays the slower one, a significant number of
+packets are dropped; but adding a one-microsecond delay between the
+packets allows the slow machine to keep pace and receive all incident
+packets. The slow machine to fast machine test produces the same
+packet handling rate as the slow machine showering an identical peer;
+if the slow machine sprays the fast one, the network bandwidth used
+is more than 30% greater than when the fast machine hammers the slow
+one. Note that you couldn't get NFS to insert delays like this,
+but performing the test with delays may indicate the location of a
+bottleneck. Knowing your constraints, you can change other
+configuration parameters, such as NFS client behavior, to avoid the
+bottleneck. We'll look at these tuning procedures more in <a href="ch18_01.html">Chapter 18, "Client-Side Performance Tuning"</a>.</p>
+
+
+The four tools discussed to this point  --  <em class="emphasis">ifconfig,
+arp, ping,</em> and <em class="emphasis">spray</em>  --  focus on
+the issues of packet addressing and routing. If they indicate a
+problem, all network services, such as <em class="emphasis">telnet</em>
+and <em class="emphasis">rlogin</em>, will be affected. We now move up
+through the network and transport layers in the network protocol
+stack, leaving the MAC<a name="INDEX-2040" /> <a name="INDEX-2041" /> and IP layers for the<a name="INDEX-2042" /> <a name="INDEX-2043" /> session <a name="INDEX-2044" /> <a name="INDEX-2045" />and <a name="INDEX-2046" /> <a name="INDEX-2047" />application layers.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch13_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch13_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">13. Network Diagnostic and Administrative Tools</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">13.3. Remote procedure call tools</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch13_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

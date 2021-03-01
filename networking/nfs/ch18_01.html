@@ -1,0 +1,565 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:55 GMT -->
+<head><title>Client-Side Performance Tuning (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch18_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 18. Client-Side Performance Tuning</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nfs2-CHP-18-SECT-1">Slow server compensation</a><br />
+<a href="ch18_02.html">Soft mount issues</a><br />
+<a href="ch18_03.html">Adjusting for network reliability problems</a><br />
+<a href="ch18_04.html">NFS over wide-area networks</a><br />
+<a href="ch18_05.html">NFS async thread tuning</a><br />
+<a href="ch18_06.html">Attribute caching</a><br />
+<a href="ch18_07.html">Mount point constructions</a><br />
+<a href="ch18_08.html">Stale filehandles</a><br /></p><p></div>
+
+The performance measurement and tuning <a name="INDEX-2635" /></a> <a name="INDEX-2636" /></a>techniques
+we've discussed so far have only dealt with making the NFS
+server go faster. Part of tuning an NFS network is ensuring that
+clients are well-behaved so that they do not flood the servers with
+requests and upset any tuning you may have performed. Server
+performance is usually limited by disk or network bandwidth, but
+there is no throttle on the rate at which clients generate requests
+unless you put one in place. Add-on products, such as the Solaris
+Bandwidth Manager, allow you to specify the amount of network
+bandwidth on specified ports, enabling you to restrict the amount of
+network resources used by NFS on either the server or the client. In
+addition, if you cannot make your servers or network any faster, you
+have to tune the clients to handle the network "as is."
+</p><p>
+
+<div class="sect1"><a name="nfs2-CHP-18-SECT-1" /></a>
+<h2 class="sect1">18.1. Slow server compensation</h2>
+
+The RPC retransmission algorithm cannot distinguish <a name="INDEX-2637" /></a> <a name="INDEX-2638" /></a>between <a name="INDEX-2639" /></a> <a name="INDEX-2640" /></a>a
+slow server and a congested network. If a reply is not received from
+the server within the RPC timeout period, the request is
+retransmitted subject to the timeout and retransmission parameters
+for that mount point. It is immaterial to the RPC mechanism whether
+the original request is still enqueued on the server or if it was
+lost on the network. Excessive RPC retransmissions place an
+additional strain on the server, further degrading response time.
+</p><p>
+
+<a name="nfs2-CHP-18-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">18.1.1. Identifying NFS retransmissions</h3>
+
+Inspection of the load average and disk activity on <a name="INDEX-2641" /></a>
+<a name="INDEX-2642" /></a>the servers may indicate that the
+servers are heavily loaded and imposing the tightest constraint. The
+NFS client-side statistics provide the most concrete evidence that
+one or more slow servers are to blame:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -rc</b></tt> 
+Client rpc:
+Connection-oriented:
+calls       badcalls    badxids     timeouts    newcreds    badverfs    
+1753584     1412        18          64          0           0           
+timers      cantconn    nomem       interrupts  
+0           1317        0           18          
+Connectionless:
+calls       badcalls    retrans     badxids     timeouts    newcreds    
+12443       41          334         80          166         0           
+badverfs    timers      nomem       cantsend    
+0           4321        0           206                 </pre></blockquote>
+
+The <em class="emphasis">-rc</em> option is given to
+<em class="emphasis">nfsstat</em>
+to<a name="INDEX-2643" /></a> look at the RPC statistics only,
+for client-side NFS operations. The call type demographics contained
+in the NFS-specific statistics are not of value in this analysis. The
+test for a slow server is having <em class="emphasis">badxid</em> and
+timeout
+<a name="INDEX-2644" /></a>
+<a name="INDEX-2645" /></a>
+<a name="INDEX-2646" /></a>of
+the same magnitude. In the previous example,
+<em class="emphasis">badxid</em> is nearly a third the value of
+<em class="emphasis">timeout</em> for connection-oriented RPC, and nearly
+half the value of <em class="emphasis">timeout</em> for connectionless
+RPC. Connection-oriented transports use a higher timeout than
+connectionless transports, therefore the number of timeouts will
+generally be less for connection-oriented transports. The high
+<em class="emphasis">badxid</em> count implies that requests are reaching
+the various NFS servers, but the servers are too loaded to send
+replies before the local host's RPC calls time out and are
+retransmitted. <em class="emphasis">badxid</em> is incremented each time a
+duplicate reply is received for a retransmitted request (an RPC
+request retains its XID through all retransmission cycles). In this
+case, the server is replying to all requests, including the
+retransmitted ones. The client is simply not patient enough to wait
+for replies from the slow server. If there is more than one NFS
+server, the client may be outpacing all of them or just one
+particularly sluggish node.
+</p><p>
+
+If the server has a <a name="INDEX-2647" /></a>duplicate request cache, retransmitted
+<a name="INDEX-2648" /></a>requests that match a non-idempotent
+NFS call currently in progress are ignored. Only those requests in
+progress are recognized and filtered, so it is still possible for a
+sufficiently loaded server to generate duplicate replies that show up
+in the <em class="emphasis">badxid</em> counts of its clients. Without a
+duplicate request cache, <em class="emphasis">badxid</em> and
+<em class="emphasis">timeout</em> may be nearly equal, while the cache
+will reduce the number of duplicate replies. With or without a
+duplicate request cache, if the <em class="emphasis">badxid</em> and
+<em class="emphasis">timeout</em> statistics reported by
+<em class="emphasis">nfsstat</em> (on the client) are of the same
+magnitude, then server performance is an issue deserving further
+investigation.
+</p><p>
+
+A mixture of network and server-related problems
+<a name="INDEX-2649" /></a>can
+make interpretation of the <em class="emphasis">nfsstat</em> figures
+difficult. A client served by four hosts may find that two of the
+hosts are particularly slow while a third is located across a network
+router that is digesting streams of large write packets. One slow
+server can be masked by other, faster servers: a retransmission rate
+of 10% (calculated as
+<em class="emphasis">timeout</em>/<em class="emphasis">calls</em>) would
+indicate short periods of server sluggishness or network congestion
+if the retransmissions were evenly distributed among all servers.
+However, if all timeouts occurred while talking to just one server,
+the retransmission rate <em class="emphasis">for that server</em> could be
+50% or higher.
+</p><p>
+
+A simple method for finding the
+distribution<a name="INDEX-2650" /></a> of retransmitted requests is to
+perform the same set of disk operations on each server, measuring the
+incremental number of RPC timeouts that occur when loading each
+server in turn. This experiment may point to a server that is
+noticeably slower than its peers, if a large percentage of the RPC
+timeouts are attributed to that host. Alternatively, you may shift
+your focus away from server performance if timeouts are fairly evenly
+distributed or if no timeouts occur during the server loading
+experiment. Fluctuations in server performance may vary by the time
+of day, so that more timeouts occur during periods of peak server
+usage in the morning and after lunch, for example.
+</p><p>
+
+Server response time may be clamped at some minimum value due to
+fixed-cost delays of sending packets through routers, or due to
+static configurations that cannot be changed for political or
+historical reasons. If server response cannot be improved, then the
+clients of that server must adjust their mount parameters to avoid
+further loading it with retransmitted requests. The relative patience
+of the client is determined by the timeout, retransmission count, and
+hard-mount<a name="INDEX-2651" /></a> <a name="INDEX-2652" /></a> variables.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-18-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">18.1.2. Timeout period calculation</h3>
+
+The timeout period is specified by the<a name="INDEX-2653" /></a>
+mount parameter <em class="emphasis">timeo</em>
+and<a name="INDEX-2654" /></a>
+<a name="INDEX-2655" /></a> <a name="INDEX-2656" /></a> is
+expressed in tenths of a second. For NFS over UDP, it specifies the
+value
+<a name="INDEX-2657" /></a>
+<a name="INDEX-2658" /></a>of a
+<em class="emphasis">minor timeout</em>, which occurs when the client RPC
+call over UDP does not receive a reply within the
+<em class="emphasis">timeo</em> period. In this case, the timeout period
+is doubled, and the RPC request is sent again. The process is
+repeated until the retransmission count <a name="INDEX-2659" /></a>
+<a name="INDEX-2660" /></a>
+<a name="INDEX-2661" /></a>specified
+by the <em class="emphasis">retrans</em> mount parameter is reached. A
+<em class="emphasis">major timeout</em> occurs
+when<a name="INDEX-2662" /></a>
+<a name="INDEX-2663" /></a>
+no reply is received after the retransmission threshold is reached.
+The default value for the minor timeout is vendor-specific; it can
+range from 5 to 13 tenths of a second. By default, clients are
+configured to retransmit from three to five times, although this
+value is also vendor-specific.
+</p><p>
+
+When using NFS over TCP, the <em class="emphasis">retrans</em> parameter
+has <a name="INDEX-2664" /></a>
+<a name="INDEX-2665" /></a>no effect, and it is up to the TCP
+transport to generate the necessary retransmissions on behalf of NFS
+until the value specified by the <em class="emphasis">timeo</em> parameter
+is reached. In contrast to NFS over UDP, the mount parameter
+<em class="emphasis">timeo</em> in NFS over TCP specifies the value of a
+major timeout, and is typically in the range of hundreds of a tenth
+of a second (for example, Solaris has a major timeout of 600 tenths
+of a second). The <em class="emphasis">minor timeout</em> value is
+internally controlled by the underlying TCP transport, and all you
+have to worry about is the value of the <em class="emphasis">major
+timeout</em> specified by <em class="emphasis">timeo</em>.
+</p><p>
+
+After a major timeout, the message: </p><p>
+
+<blockquote><pre class="code">NFS server host not responding still trying</pre></blockquote>
+
+is printed on the client's console. If a reply is eventually
+received, the "not responding" message is followed with
+the message:
+</p><p>
+
+<blockquote><pre class="code">NFS server host ok</pre></blockquote>
+
+Hard-mounting a filesystem guarantees<a name="INDEX-2666" /></a>
+<a name="INDEX-2667" /></a> that the sequence of retransmissions
+continues until the server replies. After a major timeout on a
+hard-mounted filesystem, the <em class="emphasis">initial</em> timeout
+period is doubled, beginning a new major cycle. Hard mounts are the
+default option. For example, a filesystem mounted
+via:<tt class="userinput"><b><a href="#FOOTNOTE-55">[55]</a></b></tt>
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-55" /></a>[55]We specifically use
+<em class="emphasis">proto=udp</em> to force the Solaris client to use the
+UDP protocol when communicating with the server, since the client by
+default will attempt to first communicate over TCP. Linux, on the
+other hand, uses UDP as the default transport for NFS. </p><p>
+</blockquote>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o proto=udp,retrans=3,timeo=10 wahoo:/export/home/wahoo /mnt</b></tt></pre></blockquote>
+
+has the retransmission sequence shown in <a href="ch18_01.html#nfs2-CHP-18-TABLE-1">Table 18-1</a>.</p><p>
+
+<a name="nfs2-CHP-18-TABLE-1" /></a><h4 class="objtitle">Table 18-1. NFS timeout sequence for NFS over UDP</h4><table border="1">
+
+
+
+
+
+<tr>
+<th>
+Absolute Time</p><p>
+</th>
+<th>
+Current Timeout</p><p>
+</th>
+<th>
+New Timeout</p><p>
+</th>
+<th>
+Event</p><p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+1.0</p><p>
+</td>
+<td>
+1.0</p><p>
+</td>
+<td>
+2.0</p><p>
+</td>
+<td>
+Minor</p><p>
+</td>
+</tr>
+<tr>
+<td>
+3.0</p><p>
+</td>
+<td>
+2.0</p><p>
+</td>
+<td>
+4.0</p><p>
+</td>
+<td>
+Minor</p><p>
+</td>
+</tr>
+<tr>
+<td>
+7.0</p><p>
+</td>
+<td>
+4.0</p><p>
+</td>
+<td>
+2.0</p><p>
+</td>
+<td>
+Major, double initial timeout</p><p>
+</td>
+</tr>
+<tr>
+<td>
+...NFS server  wahoo not responding...</p><p>
+</td>
+</tr>
+<tr>
+<td>
+9.0</p><p>
+</td>
+<td>
+2.0</p><p>
+</td>
+<td>
+4.0</p><p>
+</td>
+<td>
+Minor</p><p>
+</td>
+</tr>
+<tr>
+<td>
+13.0</p><p>
+</td>
+<td>
+4.0</p><p>
+</td>
+<td>
+8.0</p><p>
+</td>
+<td>
+Minor</p><p>
+</td>
+</tr>
+<tr>
+<td>
+21.0</p><p>
+</td>
+<td>
+8.0</p><p>
+</td>
+<td>
+4.0</p><p>
+</td>
+<td>
+Major, double initial timeout</p><p>
+</td>
+</tr>
+
+</table><p>
+
+Timeout periods are not increased without bound, for instance, the
+timeout period never exceeds 20 seconds
+(<em class="emphasis">timeo</em>=200) for Solaris clients using UDP, and
+60 seconds for Linux. The system may also impose a minimum timeout
+period in order to avoid retransmitting too aggressively. Because
+certain NFS operations take longer to complete than others, Solaris
+uses three different values for the minimum (and initial) timeout of
+the various NFS operations. NFS <em class="emphasis">write</em> operations
+typically take the longest, therefore a minimum timeout of 1,250
+msecs is used. NFS <em class="emphasis">read</em> operations have a
+minimum timeout of 875 msecs, and operations that act on metadata
+(such as <em class="emphasis">getattr</em>, <em class="emphasis">lookup</em>,
+<em class="emphasis">access</em>, etc.) usually take the least time,
+therefore they have the smaller minimum timeout of 750 msecs.
+</p>
+
+To accommodate slower servers, increase<a name="INDEX-2668" /></a>
+<a name="INDEX-2669" /></a> the <em class="emphasis">timeo</em>
+parameter used in the automounter maps or
+<em class="emphasis">/etc/vfstab</em>. Increasing
+<em class="emphasis">retrans</em> for UDP increases the length of the
+major timeout period, but it does so at the expense of sending more
+requests to the NFS server. These duplicate requests further load the
+server, particularly when they require repeating disk operations. In
+many cases, the client receives a reply after sending the second or
+third retransmission, so doubling the initial timeout period
+eliminates about half of the NFS calls sent to the slow server. In
+general, increasing the NFS RPC timeout is more helpful than
+increasing the retransmission count for hard-mounted filesystems
+accessed over UDP. If the server does not respond to the first few
+RPC requests, it is likely it will not respond for a
+"long" time, compared to the RPC timeout period.
+It's best to let the client sit back, double its timeout period
+on major timeouts, and wait for the server to recover. Increasing the
+retransmission count simply increases the noise
+<a name="INDEX-2670" /></a>level on the network while the client is
+waiting for the server to respond.
+</p><p>
+
+Note that Solaris clients only use the <em class="emphasis">timeo</em>
+mount parameter as a starting value. The Solaris client constantly
+adjusts the actual timeout according to the smoothed average
+round-trip time experienced during NFS operations to the server. This
+allows the client to dynamically adjust the amount of time it is
+willing to wait for NFS responses given the recent past
+responsiveness of the NFS server.
+</p><p>
+
+Use the <em class="emphasis">nfsstat -m</em> command to review the
+kernel's observed response times over the UDP transport for all
+NFS mounts:
+</p><p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nfsstat -m</b></tt>
+/mnt from mahimahi:/export
+ Flags:        vers=3,proto=udp,sec=sys,hard,intr,link,symlink,acl,rsize=32768,
+                 wsize=32768,retrans=2,timeo=15
+ Attr cache:   acregmin=3,acregmax=60,acdirmin=30,acdirmax=60
+ Lookups:      srtt=13 (32ms), dev=6 (30ms), cur=4 (80ms)
+ Reads:        srtt=24 (60ms), dev=14 (70ms), cur=10 (200ms)
+ Writes:       srtt=46 (115ms), dev=27 (135ms), cur=19 (380ms)
+ All:          srtt=20 (50ms), dev=11 (55ms), cur=8 (160ms)</pre></blockquote>
+
+The smoothed, average round-trip (<em class="emphasis">srtt</em>) times
+are reported in milliseconds, as well as the average deviation
+(<em class="emphasis">dev</em>) and the current "expected"
+response time (<em class="emphasis">cur</em>). The numbers in parentheses
+are the actual times in milliseconds; the other values are unscaled
+values kept by the kernel and can be ignored. Response times are
+shown for read and write operations, which are "big"
+RPCs, and for lookups, which typify "small" RPC requests.
+The response time numbers are only shown for filesystems mounted
+using the UDP transport. Retransmission handling is the
+responsibility of the TCP transport when using NFS over TCP.
+</p><p>
+
+Without the kernel's values as a baseline, choosing a new
+timeout value is best done empirically. Doubling the initial value is
+a good baseline; after changing the timeout value observe the RPC
+timeout rate and <em class="emphasis">badxid</em> rate using
+<em class="emphasis">nfsstat</em>. At first glance, it does not appear
+that there is any harm in immediately going to
+<em class="emphasis">timeo=200</em>, the maximum initial timeout value
+used in the retransmission algorithm. If server performance is the
+sole constraint, then this is a fair assumption. However, even a
+well-tuned network endures bursts of traffic that can cause packets
+to be lost at congested network hardware interfaces or dropped by the
+server. In this case, the excessively long timeout will have a
+dramatic impact on client performance. With
+<em class="emphasis">timeo=200</em>, RPC retransmissions
+"avoid" network congestion by waiting for
+<em class="emphasis">minutes</em> while the actual traffic peak may have
+been only a few <a name="INDEX-2671" /></a>milliseconds in duration.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-18-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">18.1.3. Retransmission rate thresholds</h3>
+
+There is little agreement among system administrators <a name="INDEX-2672" /></a>
+<a name="INDEX-2673" /></a>about acceptable
+retransmission rate thresholds. Some people claim that
+<em class="emphasis">any</em> request retransmission indicates a
+performance problem, while others chose an arbitrary percentage as a
+"goal." Determining the retransmission rate threshold for
+your NFS clients depends upon<a name="INDEX-2674" /></a> your choice of the
+<em class="emphasis">timeo</em> mount parameter and your expected response
+time variations. The equation in <a href="ch18_01.html#nfs2-CHP-18-FIG-1">Figure 18-1</a>
+expresses the expected retransmission rate as a function of the
+allowable response time variation and the <em class="emphasis">timeo</em>
+parameter.<a href="#FOOTNOTE-56">[56]</a>
+</p><p><blockquote class="footnote"> <a name="FOOTNOTE-56" /></a>[56]This retransmission threshold equation was
+originally presented in the <em class="emphasis">Prestoserve User's
+Manual</em>, March 1991 edition. The Manual and the Prestoserve
+NFS write accelerator are produced by Legato Systems.</p><p>
+</blockquote>
+
+<a name="nfs2-CHP-18-FIG-1" /></a><div class="figure"><img height="61" alt="Figure 18-1" src="figs/nfs2.1801.gif" width="409" /></div><h4 class="objtitle">Figure 18-1. NFS retransmission threshold</h4>
+
+If you allow a response time fluctuation of five milliseconds, or
+about 20% of a 25 millisecond average response time, and use a 1.1
+second (1100 millisecond) timeout period for metadata operations,
+then your expected retransmission rate is (5/1100) = .45%.
+</p><p>
+
+If you increase your timeout value, this equation dictates that you
+should <em class="emphasis">decrease</em> your retransmission rate
+threshold. This makes sense: if you make the clients more tolerant of
+a slow NFS server, they shouldn't be sending as many NFS RPC
+retransmissions. Similarly, if you want less variation in NFS client
+performance, and decide to reduce your allowable response time
+variation, <a name="INDEX-2675" /></a> <a name="INDEX-2676" /></a>you also need to reduce your
+retransmission threshold.
+</p><p>
+
+</div>
+<a name="nfs2-CHP-18-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">18.1.4. NFS over TCP is your friend</h3>
+
+You can alternatively use NFS over TCP to <a name="INDEX-2677" /></a> <a name="INDEX-2678" /></a>ensure that data is not retransmitted
+excessively. This, of course, requires that both, the client and
+server support NFS over TCP. At the time of this writing, many NFS
+implementations already support NFS over TCP. The added TCP
+functionality comes at a price: TCP is a heavier weight protocol that
+uses more CPU cycles to perform extra checks per packet. Because of
+this, LAN environments have traditionally used NFS over UDP.
+Improvements in hardware, as well as better TCP implementations have
+narrowed the performance gap between the two.
+</p><p>
+
+A Solaris client by default uses NFS Version 3 over TCP. If the
+server does not support it, then the client automatically falls back
+to NFS Version 3 over UDP or NFS Version 2 over one of the supported
+transports. Use the <em class="emphasis">proto=tcp</em> option to force a
+Solaris client to mount the filesystem using TCP only. In this case,
+the mount will fail instead of falling back to UDP if the server does
+not support TCP:
+</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o proto=tcp wahoo:/export /mnt</b></tt></pre></blockquote>
+
+Use the <em class="emphasis">tcp</em> option to force a Linux client to
+mount the filesystem using TCP instead of its default of UDP. Again,
+if the server does not support TCP, the mount attempt will fail:
+</p><p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount -o tcp wahoo:/export /mnt</b></tt> </pre></blockquote>
+
+TCP partitions the payload into segments equivalent to the size of an
+Ethernet packet. If one of the segments gets lost, NFS does not need
+to retransmit the entire operation because TCP itself handles the
+retransmissions of the segments. In addition to retransmitting only
+the lost segment when necessary, TCP also controls the transmission
+rate in order to utilize the network resources more adequately,
+taking into account the ability of the receiver to consume the
+packets. This is accomplished through a simple flow control
+mechanism, where the receiver indicates to the sender how much data
+it can receive.
+</p><p>
+
+TCP is extremely useful in error-prone or lossy networks, such as
+many WAN environments, which we <a name="INDEX-2679" /></a> <a name="INDEX-2680" /></a>discuss later<a name="INDEX-2681" /></a> <a name="INDEX-2682" /></a> in this <a name="INDEX-2683" /></a> <a name="INDEX-2684" /></a>chapter.
+</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch17_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch18_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">17.5. Protocol filtering</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">18.2. Soft mount issues</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch18_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:53:58 GMT -->
+</html>

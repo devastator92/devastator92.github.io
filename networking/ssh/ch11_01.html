@@ -1,0 +1,639 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:20 GMT -->
+<head><title>Case Studies (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 11. Case Studies</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#ch11-57817">Unattended SSH: Batch or cron Jobs</a><br />
+<a href="ch11_02.html">FTP Forwarding</a><br />
+<a href="ch11_03.html">Pine, IMAP, and SSH</a><br />
+<a href="ch11_04.html">Kerberos and SSH</a><br />
+<a href="ch11_05.html">Connecting Through a GatewayHost</a><br /><p></p></div>
+
+
+
+In this chapter we'll delve deeply into some advanced topics:
+complex port forwarding, integration of SSH with other applications,
+and more. Some interesting features of SSH don't come to the
+surface unless examined closely, so we hope you get a lot out of
+these case studies. Roll up your sleeves, dive in, and have fun.<p></p>
+
+
+
+<div class="sect1"><a name="ch11-57817" /></a>
+<h2 class="sect1">11.1. Unattended SSH: Batch or cron Jobs</h2>
+
+
+
+<a name="INDEX-1569" /></a><a name="INDEX-1570" /></a><a name="INDEX-1571" /></a>SSH
+isn't only a great interactive tool but also a resource for
+automation. Batch scripts, <em class="emphasis">cron</em> jobs, and other
+automated tasks can benefit from the security provided by SSH, but
+only if implemented properly. The major challenge is authentication:
+how can a client prove its identity when no human is available to
+type a password or passphrase? (We'll just write
+"password" from now on to mean both.) You must carefully
+select an authentication method, and then equally carefully make it
+work. Once this infrastructure is established, you must invoke
+<tt class="command">ssh</tt> properly to avoid prompting the user. In this
+case study, we discuss the pros and cons of different authentication
+methods for operating an SSH client unattended.<p></p>
+
+
+
+Note that any kind of unattended authentication presents a security
+problem and requires compromise, and SSH is no exception. Without a
+human present when needed to provide credentials (type a password,
+provide a thumbprint, etc.), those credentials must be stored
+persistently somewhere on the host system. Therefore, an attacker who
+compromises the system badly enough can use those credentials to
+impersonate the program and gain whatever access it has. Selecting a
+technique is a matter of understanding the pros and cons of the
+available methods, and picking your preferred poison. If you
+can't live with this fact, you shouldn't expect strong
+security of unattended remote jobs.<p></p>
+
+
+
+<a name="ch11-40897" /></a><div class="sect2">
+<h3 class="sect2">11.1.1. Password Authentication</h3>
+
+
+
+<a name="INDEX-1572" /></a>Rule
+<a name="INDEX-1573" /></a>number 1: forget
+password authentication if you care about the security of your batch
+jobs. In order to use password authentication, you must embed the
+password within the batch script or put it in a file which the script
+reads, etc. Whatever you do, the location of the password will be
+obvious to anyone reading the script. We don't recommend this
+technique; the public-key methods coming up are more secure.<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-3-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">11.1.2. Public-Key Authentication</h3>
+
+
+
+<a name="INDEX-1574" /></a>In
+public-key authentication, a private key is the client's
+credentials. Therefore the batch job needs access to the key, which
+must be stored where the job can access it. You have three choices of
+location for the key, which we discuss separately:<p></p>
+
+
+
+<ul><li>Store the encrypted key and its passphrase in the filesystem.<p></p></li><li>Store a plaintext (unencrypted) private key in the filesystem, so it
+doesn't require a passphrase.<p></p></li><li>Store the key in an agent, which keeps secrets out of the filesystem
+but requires a human to decrypt the key at system boot time.<p></p></li></ul>
+<a name="ch11-4-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.2.1. Storing the passphrase in the filesystem</h3>
+
+
+
+<a name="INDEX-1575" /></a><a name="INDEX-1576" /></a><a name="INDEX-1577" /></a>In this technique, you store an
+encrypted key and its passphrase in the filesystem so a script can
+access them. We don't recommend this method, since you can
+store an unencrypted key in the filesystem with the same level of
+security (and considerably less complication). In either case, you
+rely solely on the filesystem's protections to keep the key
+secure. This observation is the rationale for the next technique.<p></p>
+</div>
+
+
+
+
+
+<a name="ch11-80380" /></a><div class="sect3">
+<h3 class="sect3">11.1.2.2. Using a plaintext key</h3>
+
+
+
+A <a name="INDEX-1578" /></a><a name="INDEX-1579" /></a><a name="INDEX-1580" /></a>plaintext or unencrypted key requires no
+passphrase. To create one, run <tt class="command">ssh-keygen</tt> and
+simply press the Return key when prompted for a passphrase (or
+similarly, remove the passphrase from an existing key using
+<tt class="command">ssh-keygen
+</tt><span class="option">-</span><tt class="command">p</tt>). You can then
+supply the key filename on the <tt class="command">ssh</tt> command line
+using the <span class="option">-i</span> option, or in the client configuration
+file with the <tt class="literal">IdentityFile</tt> keyword. [<a href="ch07_04.html#ch07-80828">Section 7.4.2, "User Identity"</a>]<p></p>
+
+
+
+Usually plaintext keys are undesirable, equivalent to leaving your
+password in a file in your account. They are never a good idea for
+interactive logins, since the SSH agent provides the same benefits in
+a much more secure fashion. But a plaintext key is a viable option
+for automation, since the unattended aspect forces us to rely on some
+kind of persistent state in the machine. The filesystem is one
+possibility.<p></p>
+
+
+
+Given that the situations of a plaintext key, encrypted key with
+stored passphrase, and stored password are in a sense all equivalent,
+there are still three reasons to prefer the plaintext key method:<p></p>
+
+
+
+<ul><li>SSH provides much better control over account use on the server side
+with public-key authentication than with password; this is critical
+when setting up batch jobs, as we'll discuss shortly.<p></p></li><li>All other things being equal, public-key authentication is more
+secure than password authentication, since it doesn't expose
+the authentication secret to theft by a malicious server.<p></p></li><li>It is awkward to supply a password to SSH from another program. SSH
+is designed to take passwords from a user only: it doesn't read
+them from standard input but directly opens its controlling terminal
+to interact with the user. If there is no terminal, it fails with an
+error. In order to make this work from a program, you need to use a
+pseudo-terminal to interact with SSH (e.g., use a tool like Expect).<p></p></li></ul>
+Plaintext keys are frightening, though. To steal the key, an attacker
+needs to override filesystem protections only once, and this
+doesn't necessarily require any fancy hacking: stealing a
+single backup tape will do. That's why for most cases, we
+recommend the next method.<p></p>
+</div>
+
+
+
+
+
+<a name="ch11-5-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.2.3. Using an agent</h3>
+
+
+
+<a name="INDEX-1581" /></a><a name="INDEX-1582" /></a><a name="INDEX-1583" /></a><a name="INDEX-1584" /></a>The <tt class="command">ssh-agent</tt>
+provides another, somewhat less vulnerable method of key storage for
+batch jobs. A human invokes an agent and loads the needed keys from
+passphrase-protected key files, just once. Thereafter, unattended
+jobs use this long-running agent for authentication.<p></p>
+
+
+
+In this case, the keys are still in plaintext but within the memory
+space of the running agent rather than in a file on disk. As a matter
+of practical cracking, it is more difficult to extract a data
+structure from the address space of a running process than to gain
+illicit access to a file. Also, this solution avoids the problem of
+an intruder's walking off with a backup tape containing the
+plaintext key.<p></p>
+
+
+
+Security can still be compromised by overriding filesystem
+permissions, though. The agent provides access to its services via a
+Unix-domain socket, which appears as a node in the filesystem. Anyone
+who can read and write that socket can instruct the agent to sign
+authentication requests and thus gain use of the keys. But this
+compromise isn't quite so devastating since the attacker
+can't get the keys themselves through the agent socket. She
+merely gains use of the keys for as long as the agent is running and
+as long as she can maintain her compromise of the host.<p></p>
+
+
+
+The agent method does have a down side: the system can't
+continue unattended after a reboot. When the host comes up again
+automatically, the batch jobs won't have their keys until
+someone shows up to restart the agent and provide the passphrases to
+load the keys. This is just a cost of the improved security, and you
+have a pager, right?<p></p>
+
+
+
+Another bit of complication with the agent method is that you must
+arrange for the batch jobs to find the agent. SSH clients locate an
+agent via an environment variable pointing to the agent socket, such
+as
+<a name="INDEX-1585" /></a>SSH_AUTH_SOCK
+for the SSH1 and OpenSSH agents. [<a href="ch06_03.html#ch06-68458">Section 6.3.2.1, "Single-shell method"</a>] When
+you start the agent for batch jobs, you need to record its output
+where the jobs can find it. For instance, if the job is a shell
+script, you can store the environment values in a file:<p></p>
+
+
+
+<blockquote><pre class="code">$ ssh-agent | head -2 &gt; ~/agent-info
+$ cat ~/agent-info
+setenv SSH_AUTH_SOCK /tmp/ssh-res/ssh-12327-agent;
+setenv SSH_AGENT_PID 12328;</pre></blockquote>
+
+
+
+You can add keys to the agent (assuming C shell syntax here):<p></p>
+
+
+
+<blockquote><pre class="code">$ source ~/agent-info
+$ ssh-add batch-key
+Need passphrase for batch-key (batch job SSH key).
+Enter passphrase: **************</pre></blockquote>
+
+
+
+then instrument any scripts to set the same values for the
+environment variables:<p></p>
+
+
+
+<blockquote><pre class="code">#!/bin/csh
+# Source the agent-info file to get access to our ssh-agent.
+set agent = ~/agent-info
+if (-r $agent) then
+  source $agent
+else
+  echo "Can't find or read agent file; exiting."
+  exit 1
+endif
+# Now use SSH for something...
+ssh -q -o 'BatchMode yes' user@remote-server my-job-command</pre></blockquote>
+
+
+
+You also need to ensure that the batch jobs (and nobody else!) can
+read and write the socket. If there's only one uid using the
+<a name="INDEX-1586" /></a>agent, the simplest thing to do
+is start the agent under that uid (e.g., as root, do <tt class="command">su
+</tt><em class="emphasis">&lt;batch_account&gt;</em><tt class="command">
+ssh-agent ...</tt>). If multiple uids are using the agent, you
+must adjust the permissions on the socket and its containing
+directory so that these uids can all access it, perhaps using group
+permissions.<p></p>
+
+
+
+<a name="ch11-6-fm2xml" /></a><blockquote><b>TIP: </b>
+Some operating systems behave oddly with respect to permissions on
+Unix-domain sockets. Some versions of Solaris, for example,
+completely ignore the modes on a socket, allowing any process at all
+full access to it. To protect a socket in such situations, set the
+containing directory to forbid access. For example, if the containing
+directory is mode 700, only the directory owner may access the
+socket. (This assumes there's no other shortcut to the socket
+located elsewhere, such as a hard link.)<p></p>
+
+
+</blockquote>
+
+Using an agent for automation is more complicated and restrictive
+than using a plaintext key; however, it is more resistant to attack
+and doesn't leave the key on disk and tape where it can be
+stolen. Considering that the agent is still vulnerable to being
+misused via the filesystem, and that it is intended to run
+indefinitely, the advantages of this method are debatable. Still, we
+recommend the agent method as the most secure and flexible strategy
+for automated SSH usage in a security-conscious environment.<p></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-35818" /></a><div class="sect2">
+<h3 class="sect2">11.1.3. Trusted-Host Authentication</h3>
+
+
+
+<a name="INDEX-1587" /></a>If <a name="INDEX-1588" /></a><a name="INDEX-1589" /></a>security concerns are
+relatively light, consider trusted-host authentication for batch
+jobs. In this case, the "credentials" are the operating
+system's notion of a process's uid: the identity under
+which a process is running, which determines what rights it has over
+protected objects. An attacker need only manage to get control of a
+process running under your uid, to impersonate you to a remote SSH
+server. If he breaks root on the client, this is particularly simple,
+since root may create processes under any uid. The real crux, though,
+is the client host key: if the attacker gets that, he can sign bogus
+authentication requests presenting himself as any user at all, and
+<tt class="command">sshd</tt> will believe them.<p></p>
+
+
+
+Trusted-host authentication is in many ways the least secure SSH
+authentication method. [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>] It leaves systems
+vulnerable to transitive compromise: if an attacker gains access to
+an account on host H, she immediately has access to the same account
+on all machines that trust H, with no further effort. Also,
+trusted-host configuration is limited, fragile, and easy to get
+wrong. Public-key authentication affords both greater security and
+flexibility, particularly since you can restrict the commands that
+may be invoked and the client hosts that may connect, using its
+forced commands and other options in the authorization file.<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-7-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">11.1.4. Kerberos</h3>
+
+
+
+<a name="INDEX-1590" /></a><a name="INDEX-1591" /></a><a name="INDEX-1592" /></a>Kerberos-5 [<a href="ch11_04.html#ch11-75655">Section 11.4, "Kerberos and SSH"</a>] contains support for long-running jobs in the
+form of <em class="emphasis">renewable</em><a name="INDEX-1593" /></a> tickets.
+While there's no explicit support for these in SSH, a batch job
+can be designed to use them. As with agent usage, a human performs an
+initial
+<tt class="command">kinit</tt><a name="INDEX-1594" /></a>
+to get a TGT for the batch account, using the <span class="option">-r</span>
+switch to request a renewable ticket. Periodically, the batch job
+uses <tt class="command">kinit </tt><span class="option">-</span><tt class="command">R</tt>
+to renew the TGT before it expires. This can be repeated up to the
+maximum renewable lifetime of the ticket, typically a few days.<p></p>
+
+
+
+Like trusted-host authentication, however, SSH Kerberos support lacks
+the close authorization controls provided by the public-key options.
+Even in an installation using Kerberos for user authentication,
+it's probably best to use some form of public-key
+authentication for unattended jobs instead. For more information on
+renewable tickets, see the Kerberos-5 documentation.<p></p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-8-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">11.1.5. General Precautions for Batch Jobs</h3>
+
+
+
+<a name="INDEX-1595" /></a><a name="INDEX-1596" /></a>Regardless of the method you
+choose, some extra precautions will help secure your environment.<p></p>
+
+
+
+<a name="ch11-9-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.5.1. Least-privilege accounts</h3>
+
+
+
+<a name="INDEX-1597" /></a>The account under which the
+automated job runs should have only those privileges needed to run
+the job, and no more. Don't run every batch job as root just
+because it's convenient. Arrange your filesystem and other
+protections so the job can run as a less privileged user. Remember
+that unattended remote jobs increase the risk of account compromise,
+so take the extra trouble to avoid the root account whenever
+possible.<p></p>
+</div>
+
+
+
+
+
+<a name="ch11-10-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.5.2. Separate, locked-down automation accounts</h3>
+
+
+
+Create accounts that are used solely for automation. Try not to run
+system batch jobs in a user account, since you might not be able to
+reduce its privileges to the small set necessary to support the job.
+In many cases, an automation account doesn't even need to admit
+interactive logins. If jobs running under its uid are created
+directly by the batch job manager (e.g., <em class="emphasis">cron</em>),
+the account doesn't need a password and should be locked.<p></p>
+</div>
+
+
+
+
+
+<a name="ch11-11-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.5.3. Restricted-use keys</h3>
+
+
+
+As much as possible, restrict the target account to perform only the
+work needed for the job. With public-key authentication, automated
+jobs should use keys that aren't shared by interactive logins.
+Imagine that someday you might need to eliminate the key for security
+reasons, and you don't want to affect other users or jobs by
+this change. For maximum control, use a separate key for each
+automated task. Additionally, place all possible restrictions on the
+key by setting options in the authorization file. [<a href="ch08_02.html#ch08-13075">Section 8.2, "Public Key-Based Configuration "</a>] The <tt class="literal">command</tt> option
+restricts the key to running only the needed remote command, and the
+<tt class="literal">from</tt> option restricts usage to appropriate client
+hosts. Consider always adding the following <a name="INDEX-1598" /></a><a name="INDEX-1599" /></a><a name="INDEX-1600" /></a>options as well, if they don't
+interfere with the job:<p></p>
+
+
+
+<blockquote><pre class="code">no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty</pre></blockquote>
+
+
+
+These make it harder to misuse the key should it be stolen.<p></p>
+
+
+
+If you're using trusted-host authentication, these restrictions
+aren't available. In this case, it's best to use a
+special shell for the account, which limits the commands that may be
+executed. Since <tt class="command">sshd</tt> uses the target
+account's shell to run any commands on the user's behalf,
+this is an effective restriction. One standard tool is the Unix
+"<a name="INDEX-1601" /></a>restricted shell." Confusingly, the
+restricted shell is usually named "rsh", but has nothing
+to do with the Berkeley r-command for opening a remote shell,
+<tt class="command">rsh</tt>.<p></p>
+</div>
+
+
+
+
+
+<a name="ch11-12-fm2xml" /></a><div class="sect3">
+<h3 class="sect3">11.1.5.4. Useful ssh options</h3>
+
+
+
+<a name="INDEX-1602" /></a>When running SSH
+commands in a batch job, it's a good idea to use these options:<p></p>
+
+
+
+<blockquote><pre class="code">ssh -q -o 'BatchMode yes'</pre></blockquote>
+
+
+
+The <span class="option">-q</span><a name="INDEX-1603" /></a> option is for <a name="INDEX-1604" /></a>quiet mode, preventing SSH from printing
+a variety of warnings. This is sometimes necessary if you're
+using SSH as a pipe from one program to another. Otherwise, the SSH
+warnings may be interpreted as remote program output and confuse the
+local program. [<a href="ch07_04.html#ch07-20984">Section 7.4.15, "Logging and Debugging"</a>]<p></p>
+
+
+
+The
+<tt class="literal">BatchMode</tt><a name="INDEX-1605" /></a>
+keyword tells SSH not to prompt the user, who in this case
+doesn't exist. This makes error reporting more straightforward,
+eliminating some confusing SSH messages about failing to access a
+tty. [<a href="ch07_04.html#ch07-38751">Section 7.4.5.4, "Batch mode: suppressing prompts"</a>]<p></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch11-13-fm2xml" /></a><div class="sect2">
+<h3 class="sect2">11.1.6. Recommendations</h3>
+
+
+
+<a name="INDEX-1606" /></a><a name="INDEX-1607" /></a>Our recommended method for best
+security with unattended SSH operation is public-key authentication
+with keys stored in an agent. If that isn't feasible,
+trusted-host or plaintext-key authentication may be used instead;
+your local security concerns and needs will determine which is
+preferable, using the foregoing discussion as a guideline.<p></p>
+
+
+
+To the extent possible, use separate accounts and keys for each job.
+By doing so, you limit the damage caused by compromising any one
+account, or stealing any one key. But of course, there is a
+complexity trade-off here; if you have a hundred batch jobs, separate
+accounts or keys for each one may be too much to deal with. In that
+case, partition the jobs into categories according to the privileges
+they need, and use a separate account and/or key for each category of
+job.<p></p>
+
+
+
+You can ease the burden of multiple keys by applying a little
+automation to the business of loading them. The keys can all be
+stored under the same passphrase: a script prompts for the
+passphrase, then runs <tt class="command">ssh-add</tt> multiple times to
+add the various keys. Or they have different passphrases, and the
+human inserts a diskette containing the passphrases when loading
+them. Perhaps the passphrase list itself is encrypted under a single
+password provided by the human. For that matter, the keys themselves
+can be kept on the key diskette and not stored on the filesystem at
+all: whatever fits your needs and paranoia level.<a name="INDEX-1608" /></a><a name="INDEX-1609" /></a><a name="INDEX-1610" /></a><p></p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.8. Summary</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.2. FTP Forwarding</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:52:21 GMT -->
+</html>

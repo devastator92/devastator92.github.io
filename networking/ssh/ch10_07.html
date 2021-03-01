@@ -1,0 +1,235 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch10_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+<head><title>Remote Home Directories (NFS, AFS) (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch10_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<a name="INDEX-1556" /><h2 class="sect1">10.7. Remote Home Directories (NFS, AFS)</h2>
+
+
+
+We've mentioned NFS several times as a potential security risk
+for SSH installations. Now we delve into more detail on this topic.</p>
+
+
+
+In today's world of ubiquitous networking, it is common for
+your home directory to be shared among many machines via a network
+file-sharing protocol, such as SMB for Windows machines or NFS and
+AFS for Unix. This is convenient, but it does raise some issues with
+SSH, both technical and security-related.</p>
+
+
+
+SSH examines files in the target account's home directory in
+order to make critical decisions about authentication and
+authorization. For every form of authentication except password, the
+various <a name="INDEX-1557" />control files in your
+<a name="INDEX-1558" />home
+directory (<em class="filename">authorized_keys, .shosts, .k5login,
+</em>etc.) enable SSH access to your account. Two things are
+therefore important:</p>
+
+
+
+<ul><li>Your home directory needs to be safe from tampering.</p></li><li>SSH must have access to your home directory.</p></li></ul>
+<a name="ch10-6-fm2xml" /><div class="sect2">
+<h3 class="sect2">10.7.1. NFS Security Risks</h3>
+
+
+
+<a name="INDEX-1559" />The security of shared home directories is
+often not very high. Although the NFS protocol has versions and
+implementations that afford greater security, it is woefully insecure
+in most installations. Often, it employs no reliable form of
+authentication whatsoever, but rather uses the same scheme as
+<tt class="command">rsh</tt>: the source IP address and DNS identify
+clients, and a privileged source port is proof of trustworthiness. It
+then simply believes the uid number encoded in NFS requests and
+grants access as that user. Breaking into a home directory can be as
+simple as:</p>
+
+
+
+<ol><li>Discover the uid, and create an account with that uid on a laptop
+running Unix.</p></li><li>Connect that machine to the network, borrowing the IP address of a
+trusted host.</p></li><li>Issue a <tt class="command">mount</tt> command, <tt class="command">su</tt> to
+the account with the uid, and start rifling through the files.</p></li></ol>
+At this point, an intruder can easily add another public key to
+<em class="filename">authorized_keys</em>, and the account is wide open.
+The moral is that when designing a system, keep in mind that the
+security of SSH is no stronger than that of the home directories
+involved. You need at least to be aware of the trade-off between
+security and convenience involved here. If you are using an insecure
+NFS and want to avoid this weakness, you can:</p>
+
+
+
+<ul><li>Use SSH2, which has the
+<tt class="literal">UserConfigDirectory</tt><a name="INDEX-1560" /> option to place the
+per-user SSH configuration files, normally in
+<em class="filename">~/.ssh2</em>, elsewhere, say in
+<em class="filename">/var/ssh/</em><em class="emphasis">&lt;username&gt;</em>.
+You can still set the permissions so their owners can control them,
+but they won't be shared via NFS and thus not vulnerable. You
+can do the same with SSH1 or OpenSSH, but as they lack such a
+configuration option, you need to edit the source code.</p></li><li>Turn off <a name="INDEX-1561" />hostbased authentication, since the
+<em class="filename">~/.shosts</em> control file is vulnerable, and you
+can't change its location. Or, if you want to use hostbased
+authentication, set the <tt class="literal">IgnoreRhosts</tt> option. This
+causes <tt class="command">sshd</tt> to ignore
+<em class="filename">~/.shosts</em>, relying instead solely on the
+systemwide <em class="filename">/etc/shosts.equiv</em> file.</p></li><li>If you are truly paranoid, disable <a name="INDEX-1562" />swapping on your Unix machine.
+Otherwise, sensitive information such as server, host, and user keys,
+or passwords, may be written to disk as part of the normal operation
+of the Unix virtual memory system (should the running
+<tt class="command">sshd</tt> be swapped out to disk). Someone with root
+access (and a lot of knowledge and luck) could read the swap
+partition and tease this information out of the mess
+there -- though it's a difficult feat. Another option is to
+use an operating system that encrypts swap pages on disk, such as
+OpenBSD.</p></li></ul>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch10-69175" /><div class="sect2">
+<h3 class="sect2">10.7.2. NFS Access Problems</h3>
+
+
+
+Another problem that can arise with SSH and NFS is one of access
+rights. With the public-key or trusted-host methods, if the per-user
+control files are in the usual place, <tt class="command">sshd</tt> must
+read the target account's home directory in order to perform
+authentication. When that directory is on the same machine as
+<tt class="command">sshd</tt>, this isn't a problem.
+<tt class="command">sshd</tt> runs as root, and therefore has access to all
+files. However, if the directory is mounted from elsewhere via NFS,
+<tt class="command">sshd</tt> might not have access to the directory. NFS
+is commonly configured so the special access privileges accorded the
+root account don't extend to remote filesystems.</p>
+
+
+
+Now, this isn't a truly serious restriction. Since one of the
+root privileges is the ability to create a process with any uid, root
+can simply "become" the right user, and access the remote
+directory. SSH1 and SSH2 use this mechanism, but OpenSSH
+doesn't currently have it. [<a href="ch03_06.html#ch03-70588">Section 3.6, "As-User Access (userfile)"</a>]</p>
+
+
+
+You can work around the problem, but to do so you must make your
+<em class="filename">authorized_keys</em> file world-readable; the only
+way to let root read it remotely is to let everyone read it. This
+isn't too objectionable. The
+<em class="filename">authorized_keys</em> file contains no secrets; though
+you might prefer not to reveal which keys allow access to your
+account, thus advertising which keys to steal. However, to grant this
+access, you must make your home directory and
+<em class="filename">~/.ssh</em> world-searchable (that is, permissions at
+least 711). This doesn't allow other users to steal the
+contents, but it does allow them to guess at filenames and have those
+guesses verified. It also means that you must be careful about
+permissions on your files, since the top-level permissions on your
+directory don't prevent access by others.</p>
+
+
+
+All this may be entirely unacceptable or no problem at all; it
+depends on your attitude towards your files and the other users on
+the machines where your home directory is accessible.</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch10-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">10.7.3. AFS Access Problems</h3>
+
+
+
+<a name="INDEX-1563" />The
+Andrew File System, or AFS, is a file-sharing protocol similar in
+purpose to NFS, but considerably more sophisticated. It uses
+<a name="INDEX-1564" /><a name="INDEX-1565" />Kerberos-4 for user authentication and
+is generally more secure than NFS. The access problem discussed
+previously comes up for AFS, but it's more work to solve, and
+this time, OpenSSH is the winner.</p>
+
+
+
+Since AFS uses Kerberos, access to remote files is controlled by
+possession of an appropriate Kerberos ticket. There are no
+uid-switching games root can play; <tt class="command">sshd</tt> must have
+an appropriate, valid AFS ticket in order to access your home
+directory. If you are logged into that machine, of course, you can
+use Kerberos and AFS commands to get such a ticket. However
+<tt class="command">sshd</tt> needs it before you've logged in, so
+there's a bit of a quandary.</p>
+
+
+
+This need to transfer credentials from machine to machine isn't
+unique to SSH, of course, and there is a solution for it:
+<a name="INDEX-1566" />ticket forwarding. It takes some special
+support, because it's sufficient to just copy the ticket over
+to the remote host; tickets are issued specifically for particular
+hosts. Ticket forwarding isn't a feature of Kerberos-4
+generally (though it is in Kerberos-5), but AFS has implemented it
+specifically for Kerberos-4 TGTs and AFS access tokens, and OpenSSH
+performs this forwarding automatically. To use this feature, you must
+compile both the SSH client and server <tt class="literal"> -- with-kerberos</tt> and
+<tt class="literal"> -- with-afs</tt>, and turn on <tt class="literal">AFSTokenPassing</tt> on
+both sides (it is on by default). Then, if you have Kerberos-4 and
+AFS credentials when you log in via SSH, they are automatically
+transferred to the SSH server, permitting <tt class="command">sshd</tt>
+access to your home directory to perform public-key or trusted-host
+authentication.</p>
+
+
+
+If you're not using OpenSSH, you might have trouble using SSH
+in an AFS environment. Patches for SSH1 are available from various
+sources on the Internet adding the same AFS forwarding
+features,<a href="#FOOTNOTE-129">[129]</a> though we haven't had the opportunity to test them.</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-129" />[129]For example, Dug Song's
+<em class="filename">ssh-afs</em> patch; see <a href="http://www.monkey.org/~dugsong/ssh-afs">http://www.monkey.org/~dugsong/ssh-afs</a>.</p>
+
+
+</blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_06.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_08.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.6. Client Configuration</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.8. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch10_07.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:11 GMT -->
+</html>

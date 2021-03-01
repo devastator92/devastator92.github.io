@@ -1,0 +1,1081 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+<head><title>Mounting filesystems (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">6.3. Mounting filesystems</h2>
+
+This section uses filenames and command names<a name="INDEX-868" />
+<a name="INDEX-869" />
+<a name="INDEX-870" />
+specific to Solaris. Note that you are better off using the
+<em class="emphasis">automounter</em> (see <a href="ch09_01.html">Chapter 9, "The Automounter"</a>)
+to<a name="INDEX-871" /> mount
+filesystems, rather than using the <em class="emphasis">mount</em> utility
+described in this section. However, understanding the automounter,
+and why it is better than <em class="emphasis">mount</em>, requires
+understanding <em class="emphasis">mount</em>. Thus, we will discuss the
+concept of NFS filesystem mounting in the context of
+<em class="emphasis">mount</em>.
+</p>
+
+Solaris has different component names from non-Solaris systems. <a href="ch06_03.html#nfs2-CHP-6-TABLE-3">Table 6-3</a> shows the rough equivalents to non-Solaris
+systems.
+</p>
+
+<a name="nfs2-CHP-6-TABLE-3" /><h4 class="objtitle">Table 6-3. Correspondence of Solaris and non-Solaris mount components </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Description</p>
+</th>
+<th>
+Solaris</p>
+</th>
+<th>
+Non-Solaris</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+List of filesystems</p>
+</td>
+<td>
+/etc/vfstab</p>
+</td>
+<td>
+/etc/fstab</p>
+</td>
+</tr>
+<tr>
+<td>
+List of mounted filesystems</p>
+</td>
+<td>
+/etc/mnttab</p>
+</td>
+<td>
+/etc/mtab</p>
+</td>
+</tr>
+<tr>
+<td>
+RPC program number to network address mapper </p>
+
+(portmapper)</p>
+</td>
+<td>
+rpcbind</p>
+</td>
+<td>
+portmap</p>
+</td>
+</tr>
+<tr>
+<td>
+MOUNT daemon</p>
+</td>
+<td>
+mountd</p>
+</td>
+<td>
+rpc.mountd</p>
+</td>
+</tr>
+
+</table><p>
+
+NFS clients can mount any filesystem, or part of a filesystem, that
+has been exported from an NFS server. The filesystem can be
+listed<a name="INDEX-872" /> in the client's
+<em class="emphasis">/etc/vfstab</em> file, or it can be mounted
+explicitly using the <em class="emphasis">mount(1M)</em>
+<a name="INDEX-873" />
+<a name="INDEX-874" />command.
+(Also, in Solaris, see the <em class="emphasis">mount_nfs(1M)</em>
+manpage, which explains NFS-specific details of filesystem mounting.)
+</p>
+
+NFS filesystems appear to be "normal" filesystems on the
+client, which means that they can be mounted on any directory on the
+client. It's possible to mount an NFS filesystem over all or
+part of another filesystem, since the directories used as mount
+points appear the same no matter where they actually reside. When you
+mount a filesystem on top of another one, you obscure whatever is
+"under" the mount point. NFS clients see the most recent
+view of the filesystem. These potentially confusing issues will be
+the foundation for the discussion of NFS naming schemes later in this
+chapter.
+</p>
+
+<a name="nfs2-CHP-6-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">6.3.1. Using /etc/vfstab</h3>
+
+Adding entries to <em class="emphasis">/etc/vfstab</em> is one way to
+<a name="INDEX-875" />mount
+NFS filesystems. Once the entry has been added to the
+v<em class="emphasis">fstab</em> file, the client mounts it on every
+reboot. There are several features that distinguish NFS filesystems
+in the v<em class="emphasis">fstab</em> file:
+</p>
+
+<ul><li>
+The "device name" field is replaced with a
+<em class="emphasis">server:filesystem</em> specification, where the
+filesystem name is a pathname (not a device name) on the server.
+</p>
+</li><li>
+The "raw device name" field that is checked with
+<em class="emphasis">fsck</em>, is replaced with a -.
+</p>
+</li><li>
+The filesystem type is <em class="emphasis">nfs</em>, not
+<em class="emphasis">ufs</em> as for local filesystems.
+</p>
+</li><li>
+The <em class="emphasis">fsck</em> pass is set to -. </p>
+</li><li>
+The options field can contain a variety of NFS-specific mount
+options, covered in the <a href="ch06_03.html#nfs2-CHP-6-SECT-3.2">Section 6.3.2, "Using mount"</a>.
+</p>
+</li></ul>
+Some typical <em class="emphasis">vfstab</em> entries for NFS filesystems
+are:
+</p>
+
+<a name="ch06-6-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">ono:/export/ono</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/hosts/ono</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">nfs</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">yes</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">rw,bg,hard</pre></blockquote>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">onaga:/export/onaga</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/hosts/onaga</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">nfs</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">yes</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">rw,bg,hard</pre></blockquote>
+</td>
+</tr>
+<tr>
+<td>
+<blockquote><pre class="code">wahoo:/var/mail</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">/var/mail</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">nfs</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">-</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">yes</pre></blockquote>
+</td>
+<td>
+<blockquote><pre class="code">rw,bg,hard</pre></blockquote>
+</td>
+</tr>
+
+</table><p>
+
+The <em class="emphasis">yes</em> in theabove
+entries says to mount the filesystems whenever the system boots up.
+This field can be <em class="emphasis">yes</em> or
+<em class="emphasis">no</em>, and has the same effect for NFS and non-NFS
+filesystems.
+</p>
+
+Of course, each vendor is free to vary the server and filesystem name
+syntax, and your manual set should provide the best <a name="INDEX-876" />sample
+<em class="emphasis">vfstab</em> entries.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-3.2" /><div class="sect2">
+<h3 class="sect2">6.3.2. Using mount</h3>
+
+While entries in the v<em class="emphasis">fstab</em> file are
+useful<a name="INDEX-877" />
+<a name="INDEX-878" />
+<a name="INDEX-879" /> <a name="INDEX-880" /> for creating a long-lived NFS
+environment, sometimes you need to mount a filesystem right away or
+mount it temporarily while you copy files from it. The
+<em class="emphasis">mount</em> command allows you to perform an NFS
+filesystem mount that remains active until you explicitly unmount the
+filesystem using <em class="emphasis">umount</em>, or until the client is
+rebooted.
+</p>
+
+As an example of using <em class="emphasis">mount</em>, consider building
+and testing a new <em class="emphasis">/usr/local</em> directory. On an
+NFS client, you already have the "old"
+<em class="emphasis">/usr/local</em>, either on a local or NFS-mounted
+filesystem. Let's say you have built a new version of
+<em class="emphasis">/usr/local</em> on the NFS server
+<em class="emphasis">wahoo</em> and want to test it on this NFS client.
+Mount the new filesystem on top of the existing
+<em class="emphasis">/usr/local</em>:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>mount wahoo:/usr/local /usr/local</b></tt></pre></blockquote>
+
+Anything in the old <em class="emphasis">/usr/local</em> is hidden by the
+new mount point, so you can debug your new
+<em class="emphasis">/usr/local</em> as if it were mounted at boot time.
+</p>
+
+From the command line, <em class="emphasis">mount</em> uses a server name
+and filesystem name syntax similar to that of the
+v<em class="emphasis">fstab</em> file. The <em class="emphasis">mount</em>
+command assumes that the type is <em class="emphasis">nfs</em> if a
+hostname appears in the device specification. The server filesystem
+name must be an absolute pathname (usually starting with a leading
+/), but it need not exactly match the name of a filesystem exported
+from the server. Barring the use of the <em class="emphasis">nosub</em>
+option on the server (see <a href="ch06_02.html#nfs2-CHP-6-SECT-2.2">Section 6.2.2, "Exporting options"</a> earlier in this chapter), the only
+restriction on server filesystem names is that they must contain a
+valid, exported server filesystem name as a prefix. This means that
+you can mount a subdirectory of an exported filesystem, as long as
+you specify the entire pathname to the subdirectory in either the
+v<em class="emphasis">fstab</em> file or on the <em class="emphasis">mount</em>
+command line. Note that the <em class="emphasis">rw</em> and
+<em class="emphasis">hard</em> suboptions are redundant since they are the
+defaults (in Solaris at least). This book often specifies them in
+examples to make it clear what semantics will be.
+</p>
+
+For example, to mount a particular home directory from
+<em class="emphasis">/export/home of server ono</em>, you do not have to
+mount the entire filesystem. Picking up only the subdirectory
+that's needed may make the local filesystem hierarchy simpler
+and less cluttered. To mount a subdirectory of a server's
+exported filesystem, just specify the pathname to that directory in
+the v<em class="emphasis">fstab</em> file:
+</p>
+
+<blockquote><pre class="code">ono:/export/home/stern  -  /users/stern  nfs  -  yes  rw,bg,hard</pre></blockquote>
+
+Even though server <em class="emphasis">ono</em> exports all of
+<em class="emphasis">/export/home</em>, you can choose to handle some
+smaller portion of the <a name="INDEX-881" /> <a name="INDEX-882" /> <a name="INDEX-883" /> <a name="INDEX-884" />entire filesystem.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-3.3" /><div class="sect2">
+<h3 class="sect2">6.3.3. Mount options</h3>
+
+NFS mount options are as varied as the vendors themselves. There are
+a few well-known and widely supported options, and others that are
+added to support additional NFS features or to integrate secure
+remote procedure call systems. As with everything else that is
+vendor-specific, your system's manual set provides a complete
+list of supported mount options. Check the manual pages for
+<em class="emphasis">mount(1M), mount_nfs(1M),</em> and
+v<em class="emphasis">fstab(4)</em>.
+</p>
+
+
+<a name="ch06-8-fm2xml" /><blockquote><b>TIP: </b> 
+For the most part, the default set of mount options will serve you
+fine. However, pay particular attention to the
+<em class="emphasis">nosuid</em> suboption, which is described in <a href="ch12_01.html">Chapter 12, "Network Security"</a>. The <em class="emphasis">nosuid</em> suboption is
+not the default in Solaris, but perhaps it ought to be.
+</p>
+</blockquote>
+
+The Solaris <em class="emphasis">mount</em> command syntax for
+<a name="INDEX-885" /> <a name="INDEX-886" />
+<a name="INDEX-887" />mounting
+NFS filesystems is:
+</p>
+
+<blockquote><pre class="code">mount [ -F nfs ] [-mrO] [ -o suboptions ] server:pathname
+mount [ -F nfs ] [-mrO] [ -o suboptions ] mount_point
+mount [ -F nfs ] [-mrO] [ -o suboptions ] server:pathname mount_point
+mount [ -F nfs ] [-mrO] [ -o suboptions ] server1:pathname1,server2:pathname2,...serverN:pathnameN mount_point
+mount [ -F nfs ] [-mrO] [ -o suboptions ] server1,server2,...serverN:pathname mount_point</pre></blockquote>
+
+The first two forms are used when mounting a filesystem listed in the
+<em class="emphasis">vfstab</em> file. Note that
+<em class="emphasis">server</em> is the hostname of the NFS server. The
+last two forms are used when mounting replicas. See <a href="ch06_06.html#nfs2-CHP-6-SECT-6">Section 6.6, "Naming schemes"</a> later in this chapter.
+</p>
+
+The <em class="emphasis">-F nfs</em> option is used to specify that the
+filesystem being mounted is of type NFS. The option is not necessary
+because the filesystem type can be discerned from the presence of
+<em class="emphasis">host</em>:<em class="emphasis">pathname</em> on the
+command line.
+</p>
+
+The <em class="emphasis">-r</em> option says to mount the filesystem as
+read-only. The
+<a name="INDEX-888" />
+<a name="INDEX-889" />preferred
+way to specify read-only is the <em class="emphasis">ro</em> suboption to
+the <em class="emphasis">-o</em> option.
+</p>
+
+The <em class="emphasis">-m</em> option says to not record the entry in
+the <em class="emphasis">/etc/mnttab</em> file.
+</p>
+
+The <em class="emphasis">-O</em> option says to permit the filesystem to
+be mounted over an existing mount point. Normally if
+<em class="emphasis">mount_point</em> already has a filesystem mounted on
+it, the <em class="emphasis">mount</em> command will fail with a
+filesystem busy error.
+</p>
+
+In addition, you can use <em class="emphasis">-o</em> to specify
+suboptions. Suboptions can also be specified (without
+<em class="emphasis">-o</em>) in the mount options field in <b class="emphasis-bold">/</b><em class="emphasis">etc/vfstab</em>. The common
+NFS mount suboptions are:
+</p>
+
+<dl>
+<dt><i>rw/ro</i></dt>
+<dd>
+<em class="emphasis">rw</em> mounts a filesystem as read-write; this is
+the default. If <em class="emphasis">ro</em> is specified, the filesystem
+is mounted as read-only. Use the <em class="emphasis">ro</em> option if
+the server enforces write protection for various filesystems.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>bg/fg</i></dt>
+<dd>
+The <em class="emphasis">bg</em> option tells <em class="emphasis">mount</em>
+to retry a failed mount attempt in the background, allowing the
+foreground <em class="emphasis">mount</em> process to continue. By
+default, NFS mounts are not performed in the background, so
+<em class="emphasis">fg</em> is the default. We'll discuss the
+<em class="emphasis">bg</em> option further in the next section. Note that
+the <em class="emphasis">bg</em> option does not apply to the automounter
+(see <a href="ch09_01.html">Chapter 9, "The Automounter"</a>).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>grpid</i></dt>
+<dd>
+Since Solaris is a derivative of Unix System V, it will by default
+obey System V semantics. One area in which System V differs from 4.x
+BSD systems is in the group identifier of newly created files. System
+V will set the group identifier to the effective group identifier of
+the calling process. If the <em class="emphasis">grpid</em> option is set,
+BSD semantics are used, and so the group identifier is always
+inherited from the file's directory. You can control this
+behavior on a per-directory basis by not specifying
+<em class="emphasis">grpid</em>, and instead setting the set group id bit
+on the directory with the <em class="emphasis">chmod</em> command:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>chmod g+s /export/home/dir</b></tt></pre></blockquote>
+If the set group id bit is set, then even if
+<em class="emphasis">grpid</em> is absent, the group identifier of a
+created file is inherited from the group identifier of the
+file's directory. So for example:
+</p>
+
+<blockquote><pre class="code">% <tt class="userinput"><b>chmod g+s /export/home/di</b></tt>r
+% <tt class="userinput"><b>ls -ld /export/home/dir</b></tt>
+drwxr-sr-x   6 mre      writers 3584 May 24 09:17
+/export/home/dir/
+% <tt class="userinput"><b>touch /export/home/dir/test</b></tt>
+% <tt class="userinput"><b>ls -l /export/home/dir/test</b></tt>
+-rw-r--r--   1 mre      writers 0    May 27 06:07 /export/home/dir/test</pre></blockquote>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>quota/noquota</i></dt>
+<dd>
+Enables/prevents the quota command to check for quotas on the
+filesystem.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>port=n</i></dt>
+<dd>
+Specify the port number of the NFS server. The default is to use the
+port number as returned by the <em class="emphasis">rpcbind</em>. This
+option is typically used to support pseudo NFS servers that run on
+the same machine as the NFS client. The Solaris removable media
+(CD-ROMs and floppy disks) manager (<em class="emphasis">vold</em> ) is an
+example of such a server.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>public</i></dt>
+<dd>
+This option is useful for environments that have to cope with
+firewalls. We will discuss it in more detail in <a href="ch12_01.html">Chapter 12, "Network Security"</a><em class="emphasis">.</em>
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>suid/nosuid</i></dt>
+<dd>
+Under some situations, the <em class="emphasis">nosuid</em> option
+prevents security exposures. The default is
+<em class="emphasis">suid</em>. We will go into more detail in <a href="ch12_01.html">Chapter 12, "Network Security"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>sec=mode</i></dt>
+<dd>
+This option lets you set the security <em class="emphasis">mode</em> used
+on the filesystem. Valid security modes are as specified in <a href="ch06_02.html#nfs2-CHP-6-SECT-2.2">Section 6.2.2, "Exporting options"</a> earlier in this chapter.
+If you're using NFS Version 3, normally you need not be
+concerned with security modes in <em class="emphasis">vfstab</em> or the
+<em class="emphasis">mount</em> command, because Version 3 has a way to
+negotiate the security mode. We will go into more detail in <a href="ch12_01.html">Chapter 12, "Network Security"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>hard/soft</i></dt>
+<dd>
+By default, NFS filesystems are <em class="emphasis">hard</em> mounted,
+and operations on them are retried until they are acknowledged by the
+server. If the <em class="emphasis">soft</em> option is specified, an NFS
+RPC call returns a timeout error if it fails the number of times
+specified by the <em class="emphasis">retrans</em> option.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>vers=version</i></dt>
+<dd>
+The NFS protocol supports two versions: 2 and 3.
+By default, the <em class="emphasis">mount</em> command will attempt to
+use Version 3 if the server also supports Version 3; otherwise, the
+<em class="emphasis">mount</em> will use Version 2. Once the protocol
+version is negotiated, the version is bound to the filesystem until
+it is unmounted and remounted. If you are mounting multiple
+filesystems from the same server, you can use different versions of
+NFS. The binding of the NFS protocol versions is per mount point and
+not per NFS client/server pair. Note the NFS protocol version is
+independent of the transport protocol used. See the discussion of the
+<em class="emphasis">proto</em> option later in this section.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>proto=protocol</i></dt>
+<dd>
+The NFS protocol supports arbitrary transport protocols, both
+connection-oriented and connectionless. TCP is the commonly used
+connection-oriented protocol for NFS, and UDP is the commonly used
+connectionless protocol. The <em class="emphasis">protocol</em> specified
+in the <em class="emphasis">proto</em> option is the
+<em class="emphasis">netid</em> field (the first field) in the
+<em class="emphasis">/etc/netconfig</em> file. While the
+<em class="emphasis">/etc/netconfig</em> file supports several different
+netids, practically speaking, the only ones NFS supports today are
+<em class="emphasis">tcp</em> and <em class="emphasis">udp</em>. By default,
+the <em class="emphasis">mount</em> command will select TCP over UDP if
+the server supports TCP. Otherwise UDP will be used.
+</p>
+</dd>
+
+</dl>
+
+
+<a name="ch06-10-fm2xml" /><blockquote><b>TIP: </b> 
+It is a popular misconception that NFS Version 3 and NFS over TCP are
+synonymous. As noted previously, the NFS protocol version is
+independent of the transport protocol used. You can have NFS Version
+2 clients and servers that support TCP and UDP (or just TCP, or just
+UDP). Similarly, you can have NFS Version 3 clients that support TCP
+and UDP (or just TCP, or just UDP). This misconception arose because
+Solaris 2.5 introduced both NFS Version 3 and NFS over TCP at the
+same time, and so NFS mounts that previously used NFS Version 2 over
+UDP now use NFS Version 3 over TCP.
+</p>
+</blockquote>
+
+<dl>
+<dt><i>retrans/timeo</i></dt>
+<dd>
+The <em class="emphasis">retrans</em> option specifies the number of times
+to repeat an RPC request before returning a timeout error on a
+soft-mounted filesystem. The <em class="emphasis">retrans</em> option is
+ignored if the filesystem is using TCP. This is because it is assumed
+that the system's TCP protocol driver will do a better of job
+than the user of the <em class="emphasis">mount</em> command of judging
+the necessary TCP level retransmissions. Thus when using TCP, the RPC
+is sent just once before returning an error on a
+<em class="emphasis">soft</em> mounted filesystem. The
+<em class="emphasis">timeo</em> parameter varies the RPC timeout period
+and is given in tenths of a second. For example, in
+<em class="emphasis">/etc/vfstab, you</em> could have:
+</p>
+</dd>
+
+</dl>
+
+<blockquote><pre class="code">onaga:/export/home/mre  -  /users/mre nfs  -  yes  rw,proto=udp,retrans=6,timeo=11</pre></blockquote>
+
+<dl>
+<dt><i>retry=n</i></dt>
+<dd>
+This option specifies the number of times to retry the mount attempt.
+The default is 10000. (The default is only 1 when using the
+automounter. See <a href="ch09_01.html">Chapter 9, "The Automounter"</a>.) See <a href="ch06_03.html#nfs2-CHP-6-SECT-3.4">Section 6.3.4, "Backgrounding mounts"</a> later in this chapter.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>rsize=n/wsize=n</i></dt>
+<dd>
+This option controls the maximum transfer size of read
+(<em class="emphasis">rsize</em>) and write (<em class="emphasis">wsize</em>)
+operations. For NFS Version 2, the maximum transfer size is 8192
+bytes, which is the default. For NFS Version 3, the client and server
+negotiate the maximum. Solaris systems will by default negotiate a
+maximum transfer size of 32768 bytes.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>intr/nointr</i></dt>
+<dd>
+Normally, an NFS operation will continue until an RPC error occurs
+(and if mounted <em class="emphasis">hard</em>, most RPC errors will not
+prevent the operation from continuing) or until it has completed
+successfully. If a server is down and a client is waiting for an RPC
+call to complete, the process making the RPC call hangs until the
+server responds (unless mounted <em class="emphasis">soft</em>). With the
+<em class="emphasis">intr</em> option, the user can use Unix signals (see
+the manpage for <em class="emphasis">kill(1)</em>) to interrupt NFS RPC
+calls and force the RPC layer to return an error. The
+<em class="emphasis">intr</em> option is the default. The <em class="emphasis">nointr</em>
+option will cause the NFS client to ignore Unix signals.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>noac</i></dt>
+<dd>
+This option suppresses attribute caching and forces writes to be
+synchronously written to the NFS server. The purpose behind this
+option to is let each client that mounts with
+<em class="emphasis">noac</em> be guaranteed that when it reads a file
+from the server it will always have the most recent copy of the data
+at the time of the read. We will discuss attribute caching and
+asynchronous/synchronous NFS input/output in more detail in <a href="ch07_01.html">Chapter 7, "Network File System Design and Operation"</a>. 
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>actimeo=n</i></dt>
+<dd>
+The options that have the prefix <em class="emphasis">ac</em>(collectively referred to as the
+<em class="emphasis">ac*</em> options)affect the length of time that attributes are cached on
+NFS clients before the client will get new attributes from the
+server. The quantity <em class="emphasis">n</em> is specified in seconds.
+The two options prefixed with <em class="emphasis">acdir</em>affect the cache times of directory
+attributes. The two options prefixed with <em class="emphasis">acreg</em>
+affect the cache times of regular file attributes. The
+<em class="emphasis">actimeo</em> option simply sets the minimum and
+maximum cache times of regular files and directory files to be the
+same. We will discuss attribute caching in more detail in <a href="ch07_01.html">Chapter 7, "Network File System Design and Operation"</a>. 
+<a name="INDEX-890" />
+<a name="INDEX-891" />
+</p>
+</dd>
+
+</dl>
+
+<a name="ch06-12-fm2xml" /><blockquote><b>TIP: </b> 
+It is a popular misconception that if the
+minimum
+attribute timeout is set to 30 seconds, that the NFS client will
+issue a request to get new attributes for each open file every 30
+seconds. Marketing managers for products that compete with NFS use
+this misconception to claim that NFS is therefore a network bandwidth
+hog because of all the attribute requests that are sent around. The
+reality is that the attribute timeouts are checked only whenever a
+process on the NFS client tries to access the file. If the attribute
+timeout is 30 seconds and the client has not accessed the file in
+five hours, then during that five-hour period, there will be no NFS
+requests to get new attributes. Indeed, there will be no NFS requests
+at all. For files that are being continuously accessed, with an
+attribute timeout of 30 seconds, you can expect to get new attribute
+requests to occur no more often than every 30 seconds. Given that in
+NFS Version 2, and to an even higher degree in NFS Version 3,
+attributes are piggy-backed onto the NFS responses, attribute
+requests would tend to be seen far less often than every 30 seconds.
+For the most part, attribute requests will be seen most often when
+the NFS client opens a file. This is to guarantee cache consistency.
+See <a href="ch07_04.html#nfs2-CHP-7-SECT-4.1">Section 7.4.1, "File attribute caching"</a> for more details.
+</p>
+</blockquote>
+
+<dl>
+<dt><i>acdirmax=n</i></dt>
+<dd>
+This option is like <em class="emphasis">actimeo</em>, but it affects the
+maximum attribute timeout on directories; it defaults to 60 seconds.
+It can't be higher than 10 hours (36000 seconds).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>acdirmin=n</i></dt>
+<dd>
+This option is like <em class="emphasis">actimeo</em>, but it affects the
+minimum attribute timeout on directories; it defaults to 30 seconds.
+It can't be higher than one hour (3600 seconds).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>acregmax=n</i></dt>
+<dd>
+This option is like <em class="emphasis">actimeo</em>, but it affects the
+maximum attribute timeout on regular files; it defaults to 60
+seconds. It can't be higher than 10 hours (36000 seconds).
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>acregmin=n</i></dt>
+<dd>
+This option is like <em class="emphasis">actimeo</em>, but it affects the
+minimum attribute timeout on regular files; it defaults to three
+seconds. It can't be higher than one hour (3600 seconds).
+</p>
+</dd>
+
+</dl>
+
+The <em class="emphasis">nointr</em>, <em class="emphasis">intr</em>,
+<em class="emphasis">retrans</em>, <em class="emphasis">rsize</em>,
+<em class="emphasis">wsize</em>, <em class="emphasis">timeo</em>,
+<em class="emphasis">hard</em>, <em class="emphasis">soft, and ac*</em> options
+will be discussed in more detail in the <a href="ch18_01.html">Chapter 18, "Client-Side Performance Tuning"</a>,
+since they are directly responsible for altering clients'
+performance in periods of peak server loading.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-3.4" /><div class="sect2">
+<h3 class="sect2">6.3.4. Backgrounding mounts</h3>
+
+The mount protocol used by clients is subject to <a name="INDEX-892" /> <a name="INDEX-893" /> <a name="INDEX-894" />the same RPC timeouts as individual NFS
+RPC calls. When a client cannot mount an NFS filesystem during the
+allotted RPC execution time, it retries the RPC operation up to the
+count specified by the <em class="emphasis">retry</em> mount option. If
+the <em class="emphasis">bg</em> mount option is used,
+<em class="emphasis">mount</em> starts <a name="INDEX-895" />another process that continues trying to
+mount the filesystem in the background, allowing the
+<em class="emphasis">mount</em> command to consider that request complete
+and to attempt the next mount operation. If <em class="emphasis">bg</em>
+is not specified, <em class="emphasis">mount</em> blocks waiting for the
+remote fileserver to recover, or until the mount retry count has been
+reached. The default value of 10,000 may cause a single mount to hang
+for several hours before <em class="emphasis">mount</em> gives up on the
+fileserver.
+</p>
+
+You cannot put a mount in the background of any system-critical
+filesystem such as the root ( / ) or <em class="emphasis">/usr</em>
+filesystem on a diskless client. If you need the filesystem to run
+the system, you must allow the mount to complete in the foreground.
+Similarly, if you require some applications from an NFS-mounted
+partition during the boot process  --  let's say you start
+up a license server via a script in <em class="emphasis">/etc/rc2.d</em>
+ --  you should hard-mount the filesystem with these executables
+so that you are not left with a half-functioning machine. Any
+filesystem that is not critical to the system's operation can
+be mounted with the <em class="emphasis">bg</em> option. Use of background
+mounts allows your network to recover more gracefully from widespread
+problems such as power failures.
+</p>
+
+When two servers are clients of each other, the
+<em class="emphasis">bg</em> option must be used in at least one of the
+server's <em class="emphasis">/etc/vfstab</em> files. When both
+servers boot at the same time, for example as the result of a power
+failure, one usually tries to mount the other's filesystems
+before they have been exported and before NFS is started. If both
+servers use foreground mounts only, then a deadlock is possible when
+they wait on each other to recover as NFS servers. Using
+<em class="emphasis">bg</em> allows the first mount attempt to fail and be
+put into the background. When both servers finally complete booting,
+the backgrounded mounts complete successfully. So what if you have
+critical mounts on each client, such that backgrounding one is not
+appropriate? To cope, you will need to use the automounter (see <a href="ch09_01.html">Chapter 9, "The Automounter"</a>) instead of <em class="emphasis">vfstab</em> to
+mount NFS filesystems.
+</p>
+
+The default value of the <em class="emphasis">retry</em> option was chosen
+to be large enough to guarantee that a client makes a sufficiently
+good effort to mount a filesystem from a crashed or hung server.
+However, if some event causes the client and the server to reboot at
+the same time, and the client cannot complete the mount before the
+retry count is exhausted, the client will not mount the filesystem
+even when the remote server comes back online. If you have a power
+failure early in the weekend, and all the clients come up but a
+server is down, you may have to manually remount filesystems on
+clients that have reached their <a name="INDEX-896" /> <a name="INDEX-897" /> <a name="INDEX-898" />limit of mount retries.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-3.5" /><div class="sect2">
+<h3 class="sect2">6.3.5. Hard and soft mounts</h3>
+
+The <em class="emphasis">hard</em> and <em class="emphasis">soft</em> mount
+options determine <a name="INDEX-899" />
+<a name="INDEX-900" /> <a name="INDEX-901" /> <a name="INDEX-902" />how a client behaves when the server is
+excessively loaded for a long period or when it crashes. By default,
+all NFS filesystems are mounted <em class="emphasis">hard</em>, which
+means that an RPC call that times out will be retried indefinitely
+until a response is received from the server. This makes the NFS
+server look as much like a local disk as possible  --  the request
+that needs to go to disk completes at some point in the future. An
+NFS server that crashes looks like a disk that is very, very slow.
+</p>
+
+A side effect of hard-mounting NFS filesystems is that processes
+block (or "hang") in a high-priority disk wait state
+until their NFS RPC calls complete. If an NFS server goes down, the
+clients using its filesystems hang if they reference these
+filesystems before the server recovers. Using
+<em class="emphasis">intr</em> in conjunction with the
+<em class="emphasis">hard</em> mount option allows users to interrupt
+system calls that are blocked waiting on a crashed server. The system
+call is interrupted when the process making the call receives a
+signal, usually sent by the user typing <em class="emphasis">CTRL-C</em>
+(interrupt) or using<a name="INDEX-903" /> <a name="INDEX-904" />
+the <em class="emphasis">kill</em> command. <em class="emphasis">CTRL-\</em>
+(quit) is another way to generate a signal, as is logging out of the
+NFS client host. When using <em class="emphasis">kill</em><b class="emphasis-bold">,</b> only <em class="emphasis">SIGINT</em>,
+<em class="emphasis">SIGQUIT</em>, and <em class="emphasis">SIGHUP</em> will
+interrupt NFS operations.
+</p>
+
+When an NFS filesystem is <em class="emphasis">soft</em>-mounted, repeated
+RPC call failures eventually cause the NFS operation to fail as well.
+Instead of emulating a painfully slow disk, a server exporting a
+soft-mounted filesystem looks like a failing disk when it crashes:
+system calls referencing the soft-mounted NFS filesystem return
+errors. Sometimes the errors can be ignored or are preferable to
+blocking at high priority; for example, if you were doing an
+<em class="emphasis">ls -l</em> when the NFS server crashed, you
+wouldn't really care if the <em class="emphasis">ls</em> command
+returned an error as long as your system didn't hang.
+</p>
+
+The other side to this "failing disk" analogy is that you
+<em class="emphasis">never</em> want to write data to an unreliable
+device, nor do you want to try to load executables from it. You
+should not use the <em class="emphasis">soft</em> option on any filesystem
+that is writable, nor on any filesystem from which you load
+executables. Furthermore, because many applications do not check
+return value of the <em class="emphasis">read</em>(2) system call when
+reading regular files (because those programs were written in the
+days before networking was ubiquitous, and disks were reliable enough
+that reads from disks virtually never failed), you should not use the
+<em class="emphasis">soft</em> option on any filesystem that is supplying
+input to applications that are in turn using the data for a
+mission-critical purpose. NFS only guarantees the consistency of data
+after a server crash if the NFS filesystem was hard-mounted by the
+client. Unless you really know what you are doing, neveruse the <em class="emphasis">soft</em> option.
+</p>
+
+We'll come back to <em class="emphasis">hard</em>- and
+<em class="emphasis">soft</em>-mount issues in when <a name="INDEX-905" /> <a name="INDEX-906" /> <a name="INDEX-907" /> <a name="INDEX-908" />we discuss modifying
+client behavior in the face of slow NFS servers in <a href="ch18_01.html">Chapter 18, "Client-Side Performance Tuning"</a>.
+</p>
+
+</div>
+<a name="nfs2-CHP-6-SECT-3.6" /><div class="sect2">
+<h3 class="sect2">6.3.6. Resolving mount problems</h3>
+
+There are several things that can go wrong<a name="INDEX-909" /> <a name="INDEX-910" /> when attempting to mount an NFS
+filesystem. The most obvious failure of <em class="emphasis">mount</em> is
+when it <a name="INDEX-911" />cannot find the server, remote filesystem,
+or local mount point. You get the usual assortment of errors such as
+"No such host" and "No such file or
+directory." However, you may also get more cryptic messages
+like:
+</p>
+
+<blockquote><pre class="code">client# <tt class="userinput"><b>mount orion:/export/orion /hosts/orion</b></tt> 
+mount: orion:/export/orion on /hosts/orion: No such device.</pre></blockquote>
+
+If either the local or remote filesystem was specified incorrectly,
+you would expect a message about a nonexistent file or directory. The
+<em class="emphasis">device</em> hint in <a name="INDEX-912" /> <a name="INDEX-913" />this
+error indicates that NFS is not configured into the client's
+kernel. The <em class="emphasis">device</em> in question is more of a
+pseudo-device  --  it's the interface to the NFS vnode
+operations. If the NFS client code is not in the kernel, this
+interface does not exist and any attempts to use it return invalid
+device messages. We won't discuss how to build a kernel; check
+your documentation for the proper procedures and options that need to
+be included to support NFS.
+</p>
+
+Another cryptic message is "Permission denied." Often
+this is because the filesystem has been exported with the options
+<em class="emphasis">rw=client_list</em> or
+<em class="emphasis">ro=client_list</em> and your client is not in
+<em class="emphasis">client_list</em>. But sometimes it means that the
+filesystem on the server is not exported at all.
+</p>
+
+Probably the most common message on NFS clients is "NFS server
+not responding." An NFS client will attempt to complete an RPC
+call up to the number of times specified by the
+<em class="emphasis">retrans</em> option. Once the retransmission limit
+has been reached, the "not responding" message appears on
+the system's console (or in the console window):
+</p>
+
+<blockquote><pre class="code">NFS server bitatron not responding, still trying</pre></blockquote>
+
+followed by a message indicating that the server has responded to the
+client's RPC requests:
+</p>
+
+<blockquote><pre class="code">NFS server bitatron OK</pre></blockquote>
+
+These "not responding" messages may mean that the server
+is heavily loaded and cannot respond to NFS requests before the
+client has had numerous RPC timeouts, or they may indicate that the
+server has crashed. The NFS client cannot tell the difference between
+the two, because it has no knowledge of why its NFS RPC calls are not
+being handled. If NFS clients begin printing "not
+responding" messages, a server have may have crashed, or you
+may be experiencing a burst of activity causing poor server
+performance.
+</p>
+
+A less common but more confusing error message is "stale
+filehandle." Because NFS allows multiple clients to share the
+same directory, it opens up a window in which one client can delete
+files or directories that are being referenced by another NFS client
+of the same server. When the second client goes to reference the
+deleted directory, the NFS server can no longer find it on disk, and
+marks the handle, or pointer, to this directory
+"invalid." The exact causes of stale filehandles and
+suggestions for avoiding them are described in <a href="ch18_08.html#nfs2-CHP-18-SECT-8">Section 18.8, "Stale filehandles"</a>. 
+</p>
+
+If there is a problem with the server's NFS configuration, your
+attempt to mount filesystems from it will result in RPC errors when
+<em class="emphasis">mount</em> cannot reach the portmapper
+(<em class="emphasis">rpcbind</em>) on the server. If you get RPC
+timeouts, then the remote host may have lost its portmapper service
+or the <em class="emphasis">mountd</em> daemon may have exited
+prematurely. Use <em class="emphasis">ps</em> to locate these processes:
+</p>
+
+<blockquote><pre class="code">server% <tt class="userinput"><b>ps -e | grep -w mountd</b></tt> 
+274 ?        0:00 mountd
+server% <tt class="userinput"><b>ps -e | grep -w rpcbind</b></tt> 
+106 ?        0:00 rpcbind</pre></blockquote>
+
+You should see both the <em class="emphasis">mountd</em> and the
+<em class="emphasis">rpcbind</em> processes running on the NFS server.
+</p>
+
+If <em class="emphasis">mount</em> promptly reports "Program not
+registered," this means <a name="INDEX-914" />
+<a name="INDEX-915" />that
+the <em class="emphasis">mountd</em> daemon never started up and
+registered itself. In this case, make sure that
+<em class="emphasis">mountd</em> is getting started at boot time on the
+NFS server, by checking the
+<em class="emphasis">/etc/dfs/dfstab</em>file. See <a href="ch06_01.html#nfs2-CHP-6-SECT-1">Section 6.1, "Setting up NFS"</a> earlier in this chapter.
+</p>
+
+Another <em class="emphasis">mountd</em>-related problem is two
+<em class="emphasis">mountd</em> daemons competing for the same RPC
+service number. On some systems (not Solaris), there might be a
+situation when one mount daemon can be started in the boot script and
+one configured into <em class="emphasis">/etc/inet/inetd.conf</em>; the
+second instance of the server daemon will not be able to register its
+RPC service number with the portmapper. Since the
+<em class="emphasis">inetd</em>-spawned process is usually the second to
+appear, it repeatedly exits and restarts until
+<em class="emphasis">inetd</em> realizes that the server cannot be started
+and disables the service. The NFS RPC daemons should be started from
+the boot scripts and not from <em class="emphasis">inetd</em>, due to the
+overhead of spawning processes from the <em class="emphasis">inetd</em>
+server (see <a href="ch01_05.html#nfs2-CHP-1-SECT-5.3">Section 1.5.3, "Internet and RPC server configuration"</a>).
+</p>
+
+There is also a detection mechanism for attempts to
+<a name="INDEX-916" />
+<a name="INDEX-917" />
+<a name="INDEX-918" />
+<a name="INDEX-919" />make
+"transitive," or multihop, NFS mounts. You can only use
+NFS to mount another system's local filesystem as one of your
+NFS filesystems. You can't mount another system's
+NFS-mounted filesystems. That is, if
+<em class="emphasis">/export/home/bob</em> is local on
+<em class="emphasis">serverb</em>, then all machines on the network must
+mount <em class="emphasis">/export/home/bob</em> from
+<em class="emphasis">serverb</em>. If a client attempts to mount a
+remotely mounted directory on the server, the mount fails with a
+multihop error message. Let's say NFS client marble has done:
+</p>
+
+<blockquote><pre class="code"># mount serverb:/export/home/bob /export/home/bob</pre></blockquote>
+
+and <em class="emphasis">marble</em> is also an NFS server that exports
+<em class="emphasis">/export/home</em>. If a third system tries to mount
+<em class="emphasis">marble:/export/home/bob</em>, then the mount fails
+with the error:
+</p>
+
+<blockquote><pre class="code">mount: marble:/export/home/bob on /users/bob: Too many levels of remote in path</pre></blockquote>
+
+"Too many levels" means more than one  --  the
+filesystem on the server is itself NFS-mounted. You cannot nest NFS
+mounts by mounting through an intermediate fileserver. There are two
+practical sides to this restriction:
+</p>
+
+<ul><li>
+Allowing multihop mounts would defeat the host-based permission
+checking used by NFS. If a <em class="emphasis">server</em> limits access
+to a filesystem to a few clients, then one of these client should not
+be allowed to NFS-mount the filesystem and make it available to
+other, non-trusted systems. Preventing multihop mounts makes the
+server owning the filesystem the single authority governing its use
+ --  no other machine can circumvent the access policies set by
+the NFS server owning a filesystem.
+</p>
+</li><li>
+Any machine used as an intermediate server in a multihop mount
+becomes a very inefficient "gateway" between the NFS
+client and the server owning the filesystem.
+</p>
+</li></ul>
+We've seen how to export NFS filesystems on a network and how
+NFS clients mount them. With this basic explanation of NFS usage,
+we'll look at how NFS mounts are combined with symbolic links
+to create more complex  --  and <a name="INDEX-920" /> <a name="INDEX-921" />sometimes <a name="INDEX-922" /> <a name="INDEX-923" /> <a name="INDEX-924" />confusing  --  client filesystem
+structures.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch06_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch06_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">6.2. Exporting filesystems</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">6.4. Symbolic links</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch06_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:40 GMT -->
+</html>

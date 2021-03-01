@@ -1,0 +1,936 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:34 GMT -->
+<head><title>Access Control  (TCP/IP Network Administration, 3rd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Craig Hunt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596002971L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="TCP/IP Network Administration, 3rd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="TCP/IP Network Administration" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228" /><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+
+<h2 class="sect1">12.5. Access Control </h2>
+
+<p><em class="emphasis">Access control</em> is a <a name="INDEX-2746" />
+<a name="INDEX-2747" />technique
+for limiting access. Routers and hosts that use access control check
+the address of a host requesting a service against an
+<em class="emphasis">access control list</em>. If the list says that the
+remote host is permitted to use the requested service, the access is
+granted. If the list says that the remote host is not permitted to
+access the service, access is denied. Access control does not bypass
+any normal security checks. It adds a check to validate the source of
+a service request and retains all of the normal checks to validate
+the user.
+</p>
+
+<p>Access control systems are common in terminal servers and routers.
+For example, Cisco routers have an access control facility. Access
+control software is also available for Unix hosts. Two such packages
+are <tt class="literal">xinetd</tt> and the TCP wrapper program. First we
+examine TCP wrapper (<tt class="literal">tcpd</tt>), which gets its name
+from the fact that you wrap it around a network service so that the
+service can be reached only by going through the wrapper.
+</p>
+
+<a name="tcp3-CHP-12-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">12.5.1. wrapper </h3>
+
+<p>The wrapper package performs <a name="INDEX-2748" />
+<a name="INDEX-2749" />
+<a name="INDEX-2750" />two basic functions: it logs requests
+for Internet services, and provides an access control mechanism for
+Unix systems. Logging requests for specific network services is a
+useful monitoring function, especially if you are looking for
+possible intruders. If this were all it did, wrapper would be a
+useful package. But the real power of wrapper is its ability to
+control access to network services.
+</p>
+
+<p>The wrapper software is included with many versions of Linux and
+Unix. The wrapper <tt class="literal">tar</tt> file containing the C source
+code and Makefile necessary to build the wrapper daemon <tt class="literal">tcpd</tt>
+is also available from several sites on the Internet.
+</p>
+
+<p>If your Unix system does not include wrapper, download the source,
+make <tt class="literal">tcpd</tt>, and then install it in the same
+directory as the other network daemons. Edit
+<em class="emphasis">/etc/inetd.conf</em> and replace the path to each
+network service daemon that you wish to place under access control
+with the path to <tt class="literal">tcpd</tt>. The only field in the
+<em class="emphasis">/etc/inetd.conf</em> entry affected by
+<tt class="literal">tcpd</tt> is the sixth field, which contains the path
+to the network daemon.
+</p>
+
+<p>For example, the entry for the <tt class="literal">finger</tt> daemon in
+<em class="emphasis">/etc/inetd.conf</em> on our Solaris 8 system is:
+</p>
+
+<blockquote><pre class="code">finger  stream  tcp6  nowait  nobody  /usr/sbin/in.fingerd  in.fingerd</pre></blockquote>
+
+<p>The value in the sixth field is
+<em class="emphasis">/usr/sbin/in.fingerd</em>. To monitor access to the
+<tt class="literal">finger</tt> daemon, replace this value with
+<em class="emphasis">/usr/sbin/tcpd</em>, as in the following entry:
+</p>
+
+<blockquote><pre class="code">finger   stream  tcp6  nowait  nobody  /usr/sbin/tcpd   in.fingerd</pre></blockquote>
+
+<p>Now when <tt class="literal">inetd</tt> receives a request for
+<tt class="literal">fingerd</tt>, it starts <tt class="literal">tcpd</tt>
+instead. <tt class="literal">tcpd</tt> then logs the
+<tt class="literal">fingerd</tt> request, checks the access control
+information, and, if permitted, starts the real
+<tt class="literal">finger</tt> daemon to handle the request. In this way,
+<tt class="literal">tcpd</tt> acts as a gatekeeper for other functions.
+</p>
+
+<p>Make a similar change for every service you want to place under
+access control. Good candidates for access control are
+<tt class="literal">ftpd</tt>, <tt class="literal">tftpd</tt>,
+<tt class="literal">telnetd</tt>, and <tt class="literal">fingerd</tt>.
+Obviously, <tt class="literal">tcpd</tt> cannot directly control access for
+daemons that are not started by <tt class="literal">inetd</tt>, such as
+<tt class="literal">sendmail</tt> and NFS. However, other tools, such as
+<tt class="literal">portmapper</tt>, use the <tt class="literal">tcpd</tt>
+configuration files to enforce their own access controls. Thus the
+wrapper configuration can have a positive impact on the security of
+daemons that are not started by <tt class="literal">inetd</tt>.
+</p>
+
+<p>Using the wrapper on most Linux systems is even easier. There is no
+need to download and install the <tt class="literal">tcpd</tt> software. It
+comes as an integral part of the Linux release. You don't even
+have to edit the <em class="emphasis">/etc/inetd.conf</em> file because
+the sixth field of the entries in that file already points to the
+<tt class="literal">tcpd</tt> program, as shown below:
+</p>
+
+<blockquote><pre class="code">finger   stream  tcp  nowait  nobody  /usr/sbin/tcpd   in.fingerd -w</pre></blockquote>
+
+<a name="tcp3-CHP-12-SECT-5.1.1" /><div class="sect3">
+<h3 class="sect3">12.5.1.1. tcpd access control files </h3>
+
+<p>The information <a name="INDEX-2751" />
+<a name="INDEX-2752" /> <a name="INDEX-2753" />
+<a name="INDEX-2754" /> <a name="INDEX-2755" /><tt class="literal">tcpd</tt> uses to
+control access is in two files,
+<em class="emphasis">/etc/hosts.allow</em><a name="INDEX-2756" /> and
+<em class="emphasis">/etc/hosts.deny</em><a name="INDEX-2757" />. Each file's function is
+obvious from its name. <em class="emphasis">hosts.allow</em> contains the
+list of hosts that are allowed to access the network's
+services, and <em class="emphasis">hosts.deny</em> contains the list of
+hosts that are denied access. If the files are not found,
+<tt class="literal">tcpd</tt> permits every host to have access and simply
+logs the access request. Therefore, if you only want to monitor
+access, don't create these two files.
+</p>
+
+<p>If the files are found, <tt class="literal">tcpd</tt> checks the
+<em class="emphasis">hosts.allow</em> file first, followed by the
+<em class="emphasis">hosts.deny</em> file. It stops as soon as it finds a
+match for the host and the service in question. Therefore, access
+granted by <em class="emphasis">hosts.allow</em> cannot be overridden by
+<em class="emphasis">hosts.deny</em>.
+</p>
+
+<p>The format of entries in both files is the same:</p>
+
+<blockquote><pre class="code"><em class="replaceable">service-list</em> : <em class="replaceable">host-list</em> [: <em class="replaceable">shell-command</em>]</pre></blockquote>
+
+<p>The <em class="emphasis">service-list</em> is a list of network services,
+separated by commas. These are the services to which access is being
+granted (<em class="emphasis">hosts.allow</em>) or denied
+(<em class="emphasis">hosts.deny</em>). Each service is identified by the
+process name used in the seventh field of the
+<em class="emphasis">/etc/inetd.conf</em> entry. This is simply the name
+that immediately follows the path to <tt class="literal">tcpd</tt> in
+<em class="emphasis">inetd.conf</em>. (See <a href="ch05_01.html">Chapter 5, "Basic Configuration "</a>
+for a description of the arguments field in the
+<em class="emphasis">/etc/inetd.conf</em> entry.)
+</p>
+
+<p>Again, let's use <tt class="literal">finger</tt> as an example. We
+changed its <em class="emphasis">inetd.conf</em> entry to read:
+</p>
+
+<blockquote><pre class="code"> finger   stream  tcp  nowait  nobody  /usr/etc/tcpd   in.fingerd</pre></blockquote>
+
+<p>Given this entry, we would use <tt class="literal">in.fingerd</tt> as the
+service name in a <em class="emphasis">hosts.allow</em> or
+<em class="emphasis">hosts.deny</em> file.
+</p>
+
+<p>The <em class="emphasis">host-list</em> is a comma-separated list of
+hostnames, domain names, Internet addresses, or network numbers. The
+systems listed in the host-list are granted access
+(<em class="emphasis">hosts.allow</em>) or denied access
+(<em class="emphasis">hosts.deny</em>) to the services specified in the
+service-list. A hostname or an Internet address matches an individual
+host. For example, <em class="emphasis">rodent</em> is a hostname and
+172.16.12.2 is an Internet address. Both match a particular host. A
+domain name matches every host within that domain; e.g.,
+<em class="emphasis">.wrotethebook.com</em> matches
+<em class="emphasis">crab.wrotethebook.com</em>,
+<em class="emphasis">rodent.wrotethebook.com</em>,
+<em class="emphasis">horseshoe.wrotethebook.com</em>, and any other hosts
+in the domain. When specified in a <tt class="literal">tcpd</tt> access
+control list, domain names always start with a dot (.). A network
+number matches every IP address within that network's address
+space. For example, 172.16. matches 172.16.12.1, 172.16.12.2,
+172.16.5.1, and any other address that begins with 172.16. Network
+addresses in a <tt class="literal">tcpd</tt> access control list always end
+with a dot (.).
+</p>
+
+<p>A completed <em class="emphasis">hosts.allow</em> entry that grants FTP
+and Telnet access to all hosts in the
+<em class="emphasis">wrotethebook.com</em> domain is shown below:
+</p>
+
+<blockquote><pre class="code">ftpd,telnetd : .wrotethebook.com</pre></blockquote>
+
+<p>Two special keywords can be used in <em class="emphasis">hosts.allow</em>
+and <em class="emphasis">hosts.deny</em> entries. The keyword
+<a name="INDEX-2758" />ALL
+can be used in the service-list to match all network services, and in
+the host-list to match all hostnames and addresses. The second
+keyword, <a name="INDEX-2759" />LOCAL, can be used only in the
+host-list. It matches all local hostnames. <tt class="literal">tcpd</tt>
+considers a hostname "local" if it contains no embedded
+dots. Therefore, the hostname <em class="emphasis">rodent</em> would match
+on LOCAL, but the hostname
+<em class="emphasis">rodent.wrotethebook.com</em> would not match. The
+following entry affects all services and all local hosts:
+</p>
+
+<blockquote><pre class="code">ALL : LOCAL</pre></blockquote>
+
+<p>A more complete example of how <tt class="literal">tcpd</tt> is used will
+help you understand these entries. First, assume that you wish to
+allow every host in your local domain
+(<em class="emphasis">wrotethebook.com</em>) to have access to all
+services on your system, but you want to deny access to every service
+to all other hosts. Make an entry in
+<em class="emphasis">/etc/hosts.allow</em> to permit access to everything
+by everyone in the local domain:
+</p>
+
+<blockquote><pre class="code">ALL : LOCAL, .wrotethebook.com</pre></blockquote>
+
+<p>The keyword ALL in the services-list indicates that this rule applies
+to all network services. The colon (:) separates the services-list
+from the host-list. The keyword LOCAL indicates that all local
+hostnames without a domain extension are acceptable, and the
+<em class="emphasis">.wrotethebook.com</em> string indicates that all
+hostnames that have the <em class="emphasis">wrotethebook.com</em> domain
+name extensions are also acceptable.
+</p>
+
+<p>After granting access to just those systems you want to service,
+explicitly deny access to all other systems using the
+<em class="emphasis">hosts.deny</em> file. To prevent access by everyone
+else, make this entry in the <em class="emphasis">/etc/hosts.deny</em>
+file:
+</p>
+
+<blockquote><pre class="code">ALL : ALL</pre></blockquote>
+
+<p>Every system that does not match the entry in
+<em class="emphasis">/etc/hosts.allow</em> is passed on to
+<em class="emphasis">/etc/hosts.deny</em>. Here the entry denies everyone
+access, regardless of what service they are asking for. Remember,
+even with ALL in the services-list field, only services started by
+<tt class="literal">inetd</tt>, and only those services whose entries in
+<em class="emphasis">inetd.conf</em> have been edited to invoke
+<tt class="literal">tcpd</tt>, are affected. This does not automatically
+provide security for any other service.
+</p>
+
+<p>The syntax of a standard wrapper access control file can be a little
+more complicated than the examples above. A
+<em class="emphasis">hosts.allow</em> file might contain:
+</p>
+
+<blockquote><pre class="code">imapd, ipopd3 : 172.16.12.
+ALL EXCEPT imapd, ipopd3 : ALL</pre></blockquote>
+
+<p>The first entry says that every host whose IP address begins with
+172.16.12 is granted access to the IMAP and POP services. The second
+line says that all services except IMAP and POP are granted to all
+hosts. These entries would limit mailbox service to a single subnet
+while providing all other services to anyone who requested them. The
+<a name="INDEX-2760" />EXCEPT keyword is used to except
+items from an all-encompassing service list. It can also be used in
+the host-list of an access rule. For example:
+</p>
+
+<blockquote><pre class="code">ALL: .wrotethebook.com EXCEPT public.wrotethebook.com</pre></blockquote>
+
+<p>If this appeared in a <em class="emphasis">hosts.allow</em> file it would
+permit every system in the <em class="emphasis">wrotethebook.com</em>
+domain to have access to all services except for the host
+<em class="emphasis">public.wrotethebook.com</em>. The assumption is that
+<em class="emphasis">public.wrotethebook.com</em> is untrusted for some
+reason -- perhaps users outside of the domain are allowed to log
+into <em class="emphasis">public</em>.
+</p>
+
+<p>The final syntax variation uses the at-sign (<tt class="literal">@</tt>) to
+narrow the definition of services or hosts. Here are two examples:
+</p>
+
+<blockquote><pre class="code">in.telnetd@172.16.12.2 : 172.16.12.0/255.255.255.0
+in.rshd : KNOWN@robin.wrotethebook.com</pre></blockquote>
+
+<p>When the <tt class="literal">@</tt> appears in the services side of a rule
+it indicates that the server has more than one IP address and that
+the rule being defined applies only to one of those addresses.
+Examples of systems with more than one address are multi-homed hosts
+and routers. If your server is also the router that connects your
+local network to outside networks, you may want to provide services
+on the interface connected to the local network but not on the
+interface connected to the outside world. The <tt class="literal">@</tt>
+syntax lets you do that. If the first line in this example appeared
+in a <em class="emphasis">hosts.allow</em> file, it would permit access to
+the Telnet daemon through the network interface that has the address
+172.16.12.2 by any client with an address that begins with 172.16.12.
+</p>
+
+<p>The purpose of the <tt class="literal">@</tt> when it appears in the
+host-list of a rule is completely different. In the host-list, the
+<tt class="literal">@</tt> indicates that a username is required from the
+client as part of the access control test. This means that the client
+must run an <tt class="literal">identd</tt> daemon. The host-list can test
+for a specific username, but it is more common to use one of three
+possible keywords:
+</p>
+
+<dl>
+<a name="INDEX-2761" /><dt><i>KNOWN</i></dt>
+<dd>
+<p>The result of the test is KNOWN when the remote system returns a
+username in response to the query.
+</p>
+</dd>
+
+
+<a name="INDEX-2762" /><dt><i>UNKNOWN</i></dt>
+<dd>
+<p>The result of the test is UNKNOWN when the remote host does not run
+<tt class="literal">identd</tt> and thus fails to respond to the query.
+</p>
+</dd>
+
+
+<dt><i>ALL</i></dt>
+<dd>
+<p>This setting requires the remote host to return a username. It is
+equivalent to using KNOWN but is less commonly used.
+</p>
+</dd>
+
+</dl>
+
+<p>The final field that can be used in these entries is the optional
+shell-command field. When a match occurs for an entry that has an
+optional shell command, <tt class="literal">tcpd</tt> logs the access,
+grants or denies access to the service, and then passes the shell
+<a name="INDEX-2763" />command
+<a name="INDEX-2764" />to the shell for <a name="INDEX-2765" /> <a name="INDEX-2766" /> <a name="INDEX-2767" /> <a name="INDEX-2768" /> <a name="INDEX-2769" />execution.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-12-SECT-5.1.2" /><div class="sect3">
+<h3 class="sect3">12.5.1.2. Defining an optional shell command</h3>
+
+<p>The shell <a name="INDEX-2770" />
+<a name="INDEX-2771" />
+<a name="INDEX-2772" />command
+allows you to define additional processing that is triggered by a
+match in the access control list. In all practical examples this
+feature is used in the <em class="emphasis">hosts.deny</em> file to gather
+more information about the intruder or to provide immediate
+notification to the system administrator about a potential security
+attack. For example:
+</p>
+
+<blockquote><pre class="code">ALL : ALL : (safe_finger -l @%h | /usr/sbin/mail -s %d - %h root) &amp;</pre></blockquote>
+
+<p>In this example from a <em class="emphasis">hosts.deny</em> file, all
+systems that are not explicitly granted access in the
+<em class="emphasis">hosts.allow</em> file are denied access to all
+services. After logging the attempted access and blocking it,
+<tt class="literal">tcpd</tt> sends the <tt class="literal">safe_finger</tt>
+command to the shell for execution. All versions of
+<tt class="literal">finger</tt>, including <tt class="literal">safe_finger</tt>,
+query the remote host to find out who is logged into that host. This
+information is useful when tracking down an attacker. The result of
+the <tt class="literal">safe_finger</tt> command is mailed to the root
+account. The ampersand (<tt class="literal">&amp;</tt>) at the end of the
+line causes the shell commands to run in the background. This is
+important. Without it, <tt class="literal">tcpd</tt> would sit and wait for
+these programs to complete before returning to its own work.
+</p>
+
+<p>The <tt class="literal">safe_finger</tt> program is provided with wrapper.
+It is specially modified to be less vulnerable to attack than the
+standard <tt class="literal">finger</tt> program.
+</p>
+
+<p>There are some variables, such as <tt class="literal">%h</tt> and
+<tt class="literal">%d</tt>, used in the example above. These variables
+allow you to take values for the incoming connection and to use them
+in the shell process. <a href="ch12_05.html#tcp3-CHP-12-TABLE-1">Table 12-1</a> lists the
+variables you can use.
+</p>
+
+<a name="tcp3-CHP-12-TABLE-1" /><h4 class="objtitle">Table 12-1. Variables used with tcpd shell commands </h4><table border="1">
+
+
+
+<tr>
+<th>
+<p>Variable</p>
+</th>
+<th>
+<p>Value</p>
+</th>
+</tr>
+
+
+<tr>
+<td>
+<p>%a</p>
+</td>
+<td>
+<p>The client's IP address. </p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%A</p>
+</td>
+<td>
+<p>The server's IP address.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%c</p>
+</td>
+<td>
+<p>All available client information, including the username when
+available.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%d</p>
+</td>
+<td>
+<p>The network service daemon process name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%h</p>
+</td>
+<td>
+<p>The client's hostname. If the hostname is unavailable, the IP
+address is used.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%H</p>
+</td>
+<td>
+<p>The server's hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%n</p>
+</td>
+<td>
+<p>The client's hostname. If the hostname is unavailable, the
+keyword UNKNOWN is used. If a DNS lookup of the client's
+hostname and IP address do not match, the keyword PARANOID is used.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%N</p>
+</td>
+<td>
+<p>The server's hostname.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%p</p>
+</td>
+<td>
+<p>The network service daemon process id (PID).</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%s</p>
+</td>
+<td>
+<p>All available server information, including the username when
+available.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%u</p>
+</td>
+<td>
+<p>The client username or the keyword UNKNOWN if the username is
+unavailable.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>%%</p>
+</td>
+<td>
+<p>The percent character (%). </p>
+</td>
+</tr>
+
+</table><p>
+
+<p><a href="ch12_05.html#tcp3-CHP-12-TABLE-1">Table 12-1</a> shows that <tt class="literal">%h</tt> is the
+remote hostname and <tt class="literal">%d</tt> is the daemon being
+accessed. Refer back to the sample shell command. Assume that the
+attempted access to <tt class="literal">in.rshd</tt> came from the host
+<em class="emphasis">foo.bar.org</em>. The command passed to the shell
+would be:
+</p>
+
+<blockquote><pre class="code">safe_finger -l @foo.bar.org | 
+   /usr/sbin/mail -s in.rshd-foo.bar.org root</pre></blockquote>
+
+<p>The standard wrapper access control syntax is a complete
+configuration language that should cover any reasonable need. Despite
+this, there is also an extended version of the wrapper access control
+language.
+</p>
+
+</div>
+
+<a name="tcp3-CHP-12-SECT-5.1.3" /><div class="sect3">
+<h3 class="sect3">12.5.1.3. Optional access control language extensions</h3>
+
+<p>If wrapper <a name="INDEX-2773" />
+<a name="INDEX-2774" />is compiled with PROCESS_OPTIONS
+enabled in the Makefile, the syntax of the wrapper access control
+language is changed and extended. With PROCESS_OPTIONS enabled, the
+command syntax is not limited to three fields. The new syntax is:
+</p>
+
+<blockquote><pre class="code"><em class="emphasis">service-list</em> <b class="emphasis-bold">:</b> <em class="emphasis">host-list</em> <b class="emphasis-bold">:</b> <em class="emphasis">option</em> <b class="emphasis-bold">:</b> <em class="emphasis">option</em> ...</pre></blockquote>
+
+<p>The <em class="replaceable">service-list</em> and the
+<em class="replaceable">host-list</em> are defined in exactly the same
+way they were in the original wrapper syntax. The options are new,
+and so is the fact that multiple options are allowed for each rule.
+There are several possible options:
+</p>
+
+<dl>
+<dt><b><tt class="literal">allow</tt></b></dt>
+<dd>
+<p>Grants the requested service and must appear at the end of a rule.</p>
+</dd>
+
+
+<dt><b><tt class="literal">deny</tt></b></dt>
+<dd>
+<p>Denies the requested service and must appear at the end of a rule. </p>
+</dd>
+
+
+<dt><b><tt class="literal">spawn</tt> <em class="replaceable">shell-command</em></b></dt>
+<dd>
+<p>Executes the specified shell command as a child process.</p>
+</dd>
+
+
+<dt><b><tt class="literal">twist</tt> <em class="replaceable">shell-command</em></b></dt>
+<dd>
+<p>Executes the shell command instead of the requested service. </p>
+</dd>
+
+
+<dt><b><tt class="literal">keepalive</tt></b></dt>
+<dd>
+<p>Sends keepalive messages to the remote host. If the host does not
+respond, the connection is closed.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">linger</tt> <em class="replaceable">seconds</em></b></dt>
+<dd>
+<p>Specifies how long to try to deliver data after the server closes the
+connection.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">rfc931 [</tt> <em class="replaceable">timeout</em> <tt class="literal">]</tt></b></dt>
+<dd>
+<p>Uses the IDENT protocol to look up the user's name on the
+remote host. <em class="replaceable">timeout</em> defines how many
+seconds the server should wait for the remote host to respond.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">banners</tt> <em class="replaceable">path</em></b></dt>
+<dd>
+<p>Sends the contents of a message file to the remote system.
+<em class="replaceable">path</em> is the name of a directory that
+contains the banner files. The file displayed is the file that has
+the same name as the network daemon process.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">nice [</tt> <em class="replaceable">number</em> <tt class="literal">]</tt></b></dt>
+<dd>
+<p>Sets the <tt class="literal">nice</tt> value for the network service
+process. The default value is 10.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">umask</tt> <em class="replaceable">mask</em></b></dt>
+<dd>
+<p>Sets a <tt class="literal">umask</tt> value for files used by the network
+service process.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">user</tt> <em class="replaceable">user</em><tt class="literal">[.</tt><em class="replaceable">group</em><tt class="literal">]</tt></b></dt>
+<dd>
+<p>Defines the user ID and group ID under which the network service
+process runs. This overrides what is defined in
+<em class="emphasis">inetd.conf</em>.
+</p>
+</dd>
+
+
+<dt><b><tt class="literal">setenv</tt> <em class="replaceable">variable</em> <em class="replaceable">value</em></b></dt>
+<dd>
+<p>Sets an environment variable for the process runtime environment.</p>
+</dd>
+
+</dl>
+
+<p>A few examples based on the samples shown earlier will illustrate the
+differences in the new syntax. Using the new syntax, a
+<em class="emphasis">hosts.allow</em> file might contain:
+</p>
+
+<blockquote><pre class="code">ALL : LOCAL, .wrotethebook.com : ALLOW
+in.ftpd,in.telnetd : eds.oreilly.com : ALLOW
+ALL : ALL : DENY</pre></blockquote>
+
+<p>With the new syntax there is no need to have two files. The options
+ALLOW and DENY permit everything to be listed in a single file. The
+first line grants access to all services to every local host and
+every host in the <em class="emphasis">wrotethebook.com</em> domain. The
+second line gives the remote host
+<em class="emphasis">eds.oreilly.com</em> access through FTP and Telnet.
+The third line is the same as having the line <tt class="literal">ALL</tt>
+<tt class="literal">:</tt> <tt class="literal">ALL</tt> in the
+<em class="emphasis">hosts.deny</em> file; it denies all other hosts
+access to all of the services. Using the ALLOW and DENY options, the
+command:
+</p>
+
+<blockquote><pre class="code">ALL: .wrotethebook.com EXCEPT public.wrotethebook.com</pre></blockquote>
+
+<p>can be rewritten as: </p>
+
+<blockquote><pre class="code">ALL: .wrotethebook.com : ALLOW
+ALL: public.wrotethebook.com : DENY</pre></blockquote>
+
+<p>The shell command example using the original syntax is almost
+identical in the new syntax:
+</p>
+
+<blockquote><pre class="code">in.rshd : ALL: spawn (safe_finger -l @%h | /usr/sbin/mail -s %d - %h root) &amp; : DENY</pre></blockquote>
+
+<p>A more interesting variation on the shell command theme comes from
+using the <tt class="literal">twist</tt> option. Instead of passing a
+command to the shell for execution, the <tt class="literal">twist</tt>
+command executes a program for the remote user, but not the program
+the user expects. For example:
+</p>
+
+<blockquote><pre class="code">in.ftpd : ALL: twist /bin/echo 421 FTP not allowed from %h : DENY</pre></blockquote>
+
+<p>In this case, when the remote user attempts to start the FTP daemon,
+<tt class="literal">echo</tt> is started instead. The
+<tt class="literal">echo</tt> program then sends the message to the remote
+system and terminates the connection.
+</p>
+
+<p>The extended wrapper syntax is rarely used because everything can be
+done with the traditional syntax. It is useful to understand the
+syntax so that you can read it when you encounter it, but it is
+unlikely that you will feel the need to use it. An alternative to
+wrapper that you will encounter is <tt class="literal">xinetd</tt>. It
+replaces <tt class="literal">inetd</tt> and adds access controls. The
+basics of <tt class="literal">xinetd</tt> are covered in <a href="ch05_01.html">Chapter 5, "Basic Configuration "</a>. Here we focus on the access controls that it
+provides.
+</p>
+
+</div>
+</div>
+<a name="tcp3-CHP-12-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">12.5.2. Controlling Access with xinetd</h3>
+
+<p>As noted <a name="INDEX-2775" /> <a name="INDEX-2776" />in <a href="ch05_01.html">Chapter 5, "Basic Configuration "</a>, most
+of the information in the <em class="emphasis">xinetd.conf</em> file
+parallels values found in the <em class="emphasis">inetd.conf</em> file.
+What <tt class="literal">xinetd</tt> adds are capabilities similar to those
+of wrapper. <tt class="literal">xinetd</tt> reads the
+<em class="emphasis">/etc/hosts.allow</em> and
+<em class="emphasis">/etc/hosts.deny</em> files and implements the access
+controls defined in those files. Additionally,
+<tt class="literal">xinetd</tt> provides its own logging
+<a name="INDEX-2777" />and its own
+access controls. If your system uses <tt class="literal">xinetd</tt>, you
+will probably create <em class="emphasis">hosts.allow</em> and
+<em class="emphasis">hosts.deny</em> files to enhance the security of
+services, such as <tt class="literal">portmapper</tt>, that read those
+files, and you will use the security features of
+<tt class="literal">xinetd</tt> because those features provide improved
+access controls.
+</p>
+
+<p><tt class="literal">xinetd</tt> provides two logging parameters:
+<tt class="literal">log_on_success</tt> and
+<tt class="literal">log_on_failure</tt>. Use these parameters to customize
+the standard log entry made when a connection is successful or when a
+connection attempt fails. <tt class="literal">log_on_success</tt> and
+<tt class="literal">log_on_failure</tt> accept the following options:
+</p>
+
+<dl>
+<a name="INDEX-2778" /><dt><i>USERID</i></dt>
+<dd>
+<p>Logs the user ID of the remote user. USERID can be logged for both
+successful and failed connection attempts.
+</p>
+</dd>
+
+
+<a name="INDEX-2779" /><dt><i>HOST</i></dt>
+<dd>
+<p>Logs the address of the remote host. Like USERID, HOST can be used
+for both success and failure.
+</p>
+</dd>
+
+
+<a name="INDEX-2780" /><dt><i>PID</i></dt>
+<dd>
+<p>Logs the process ID of the server started to handle the connection.
+PID applies only to <tt class="literal">log_on_success</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-2781" /><dt><i>DURATION</i></dt>
+<dd>
+<p>Logs the length of time that the server handling this connection ran.
+DURATION applies only to <tt class="literal">log_on_success</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-2782" /><dt><i>EXIT</i></dt>
+<dd>
+<p>Logs the exit status of the server when the connection terminates.
+EXIT applies only to <tt class="literal">log_on_success</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-2783" /><dt><i>ATTEMPT</i></dt>
+<dd>
+<p>Logs unsuccessful connection attempts. ATTEMPT applies only to
+<tt class="literal">log_on_failure</tt>.
+</p>
+</dd>
+
+
+<a name="INDEX-2784" /><dt><i>RECORD</i></dt>
+<dd>
+<p>Logs the connection information received from the remote server.
+RECORD applies only to <tt class="literal">log_on_failure</tt>.
+</p>
+</dd>
+
+</dl>
+
+<p>In addition to logging, <tt class="literal">xinetd</tt> provides three
+parameters for access control. Use these parameters to configure
+<tt class="literal">xinetd</tt> to accept connections from certain hosts,
+paralleling the <em class="emphasis">hosts.allow</em> file, to reject
+connections from certain hosts, paralleling the
+<em class="emphasis">hosts.deny</em> file, and to accept connections only
+at certain times of the day. The three parameters are:
+</p>
+
+<dl>
+<a name="INDEX-2785" /><dt><b><tt class="literal">only_from</tt></b></dt>
+<dd>
+<p>This parameter identifies the hosts that are allowed to connect to
+the service. Hosts can be defined using:
+</p>
+
+
+<ul><li>
+<p>a numeric address. For example, 172.16.12.5 defines a specific host,
+and 129.6.0.0 defines all hosts with an address that begins with
+129.6. The address 0.0.0.0 matches all addresses.
+</p>
+</li><li>
+<p>an address scope. For example, 172.16.12.{3,6,8,23} defines four
+different hosts: 172.16.12.3, 172.16.12.6, 172.16.12.8, and
+172.16.12.23.
+</p>
+</li><li>
+<p>a network name. The network name must be defined in the
+<em class="emphasis">/etc/networks</em> file.
+</p>
+</li><li>
+<p>a canonical hostname. The IP address provided by the remote system
+must reverse-map to this hostname.
+</p>
+</li><li>
+<p>a domain name. The hostname returned by the reverse lookup must be in
+the specified domain. For example, the value
+<tt class="literal">.wrotethebook.com</tt> requires a host in the
+<em class="emphasis">wrotethebook.com</em> domain. Note that when a domain
+name is used, it starts with a dot.
+</p>
+</li><li>
+<p>an IP address with an associated address mask. For example,
+172.16.12.128/25 would match every address from 172.16.12.128 to
+172.16.12.255.
+</p>
+</li></ul>
+</dd>
+
+
+<a name="INDEX-2786" /><dt><b><tt class="literal">no_access</tt></b></dt>
+<dd>
+<p>This parameter defines the hosts that are denied access to the
+service. Hosts are defined using exactly the same methods as those
+described for the <tt class="literal">only_from</tt> attribute.
+</p>
+</dd>
+
+
+<a name="INDEX-2787" /><dt><b><tt class="literal">access_times</tt></b></dt>
+<dd>
+<p>This parameter defines the time of day a service is available, in the
+form
+<em class="replaceable">hour</em><tt class="literal">:</tt><em class="replaceable">min</em><tt class="literal">-</tt><em class="replaceable">hour</em><tt class="literal">:</tt><em class="replaceable">min</em>.
+A 24-hour clock is used. Hours are 0 to 23 and minutes are 0 to 59.
+</p>
+</dd>
+
+</dl>
+
+<p>If neither <tt class="literal">only_from</tt> nor
+<tt class="literal">no_access</tt> is specified, access is granted to
+everyone. If both are specified, the most exact match
+applies -- for example:
+</p>
+
+<blockquote><pre class="code">no_access            = 172.16.12.250
+only_from            = 172.16.12.0</pre></blockquote>
+
+<p>The <tt class="literal">only_from</tt> command in this example permits
+every system on network 172.16.12.0 to have access to the service.
+The <tt class="literal">no_access</tt> command takes away that access for
+one system. It doesn't matter whether the
+<tt class="literal">no_access</tt> command comes before or after the
+<tt class="literal">only_from</tt> command. It always works the same way
+because the more exact match takes precedence.
+</p>
+
+<p>A sample POP3 entry from <em class="emphasis">xinetd.conf</em> is shown
+below:
+</p>
+
+<blockquote><pre class="code"># default: on 
+# description: The POP3 service allows remote users to access their mail \
+#              using an POP3 client such as Netscape Communicator, mutt, \
+#              or fetchmail.
+
+service login
+{
+        socket_type             = stream
+        wait                    = no
+        user                    = root
+        log_on_success          += USERID
+        log_on_failure          += USERID
+        only_from               = 172.16.12.0
+        no_access               = 172.16.12.231
+        server                  = /usr/sbin/ipop3d
+}</pre></blockquote>
+
+<p>In the sample, the <tt class="literal">only_from</tt> command permits
+access from every system on network 172.16.12.0, which is the local
+network for this sample system, and blocks access from all other
+systems. Additionally, there is one system on subnet 17.16.12.0 (host
+172.16.12.231) that is not trusted to have POP access. The
+<tt class="literal">no_access</tt> command denies access to anyone on the
+system 172.16.12.231.
+</p>
+
+<p>Remember that wrapper and <tt class="literal">xinetd</tt> can only control
+access to services. These tools cannot limit access to data on the
+system or moving across the network. For that, you <a name="INDEX-2788" /> <a name="INDEX-2789" />need encryption.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.4. Security Monitoring </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.6. Encryption </td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tcp/ch12_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:34 GMT -->
+</html>

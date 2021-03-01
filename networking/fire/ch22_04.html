@@ -1,0 +1,1231 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+<head><title>ICMP and Network Diagnostics (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch22_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">22.4. ICMP and Network Diagnostics</h2>
+
+
+
+
+
+<a name="INDEX-2072" /> <a name="INDEX-2073" />The
+ICMP and network diagnostic protocols and programs are mostly used by
+network administrators to debug networks. They are the network
+administration equivalent of a carpenter's hammer and saw: the
+most basic, simple, and critical tools, ancient in design but
+nonetheless indispensable.</p><p>
+
+
+
+
+
+<a name="INDEX-2074" /> <a name="INDEX-2075" />
+<a name="INDEX-2076" />
+<a name="INDEX-2077" /> <a name="INDEX-2078" />Because they are widely accepted
+low-level protocols, they are also frequently exploited for attacks.
+A number of denial of service attacks are based upon malformed ICMP
+packets, and a number of Trojan horses use ICMP to send information
+out of compromised sites. In addition, forged or inaccurate ICMP
+packets are often used as part or all of attacks on systems. For
+instance, an attacker can send an ICMP "destination unreachable
+packet" for a host that is actually reachable; this will
+interfere with communications to the attacked destination.</p><p>
+
+
+
+
+
+any packet filtering systems let you filter ICMP packets in much the
+same way as TCP or UDP packets: by specifying the ICMP message type
+code instead of the TCP or UDP source or destination port number. If
+your packet filtering system has this capability, its documentation
+should include a list of the ICMP numeric codes or keywords that the
+packet filtering system understands. You may not want to filter all
+ICMP because it will prevent path MTU discovery from functioning, and
+this may cause problems (see <a href="ch04_01.html">Chapter 4, "Packets and Protocols "</a>, for more
+information about path MTU discovery).</p><p>
+
+
+
+
+
+<a name="ch22-15294" /><div class="sect2">
+<h3 class="sect2">22.4.1. ping</h3>
+
+
+
+
+
+<a name="INDEX-2079" /><a name="INDEX-2080" /><a name="INDEX-2081" />The
+<em class="emphasis">ping</em><a href="#FOOTNOTE-156">[156]</a> program checks network connectivity. The
+<em class="emphasis">ping</em> application generates an ICMP "echo
+request" packet. The destination system responds with an ICMP
+"echo response" packet. ICMP is typically implemented in
+the kernel, so it's the kernel that generates the "echo
+response" packet; there is no separate server for ICMP on most
+systems. (On some machines, the echo response is actually generated
+in the network interface itself, not in the operating system, and the
+machine need not even be fully running to respond to
+<em class="emphasis">ping</em>.) <em class="emphasis">ping</em> is not the only
+program that uses ICMP echo; others include
+<em class="emphasis">spray</em> and almost any dedicated network
+management tool.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-156" />[156]<em class="emphasis">ping</em>
+is not an acronym. Mike Muus, who wrote the original program,
+confirms that he named it after the noise sonar makes.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<em class="emphasis">ping</em> is a useful network troubleshooting tool,
+and it is reasonably safe. You'll probably want to allow
+<em class="emphasis">ping</em> outbound from at least the machines your
+network operations staff uses and inbound from at least the network
+operations center machines of your network service provider.</p><p>
+
+
+
+
+
+Because of where it is implemented, it is almost impossible to
+disable replies to <em class="emphasis">ping</em> on individual hosts;
+packet filtering is the only way to control it.</p><p>
+
+
+
+
+
+<a name="INDEX-2082" /><a name="INDEX-2083" />There are multiple dangers in
+allowing ICMP echo:</p><p>
+
+
+
+
+
+<ul><li>It can be used for a denial of service attack -- that is, to flood
+your network. Although any protocol you accept can be used in this
+way, ICMP echo is particularly tempting because commonly available
+programs designed for network testing (including some versions of
+<em class="emphasis">ping</em>) let you flood networks with simple
+command-line options.</p><p></li><li>Anybody who can send ICMP echo requests to and receive ICMP echo
+responses from your network can discover how many machines you have
+and what network addresses they're at; this increases the
+efficiency of any further attacks. That's why you want to limit
+requests to machines that have a legitimate reason to be probing your
+network.</p><p></li><li>Malformed ICMP echo requests may have unfortunate effects on weak
+implementations of IP. This is true of all protocols, but ICMP is
+easily overlooked and therefore tends to have hastily written
+implementations that are particularly vulnerable.</p><p></li><li>The data portion of ICMP echo requests and responses are unimportant
+to the protocol and may legally contain anything. This makes ICMP
+echo a particularly useful way to smuggle information through a
+firewall.</p><p></li></ul>
+<a name="ch22-15344" /><div class="sect3">
+<h3 class="sect3">22.4.1.1. Packet filtering characteristics of ping</h3>
+
+
+
+
+
+To allow the <em class="emphasis">ping</em> program to operate outbound
+(i.e., <em class="emphasis">ping</em>ing remote hosts), you'll have
+to allow ICMP echo request packets outbound and ICMP echo response
+packets inbound. To allow inbound <em class="emphasis">ping</em> (i.e., a
+remote host <em class="emphasis">ping</em>ing a local host), you'll
+have to allow ICMP echo request packets inbound and ICMP echo
+response packets outbound. If possible, you will also want to limit
+the acceptable size of ICMP echo request packets. Limiting the
+inbound size is a self-protection measure, designed to protect
+against denial of service attacks; limiting the outbound size is a
+matter of politeness.</p><p>
+
+
+
+
+
+<a name="ch22-30-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+essageType<a href="#FOOTNOTE-157">[157]</a></p><p>
+
+
+
+
+
+
+
+
+</blockquote></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+8</p><p></td>
+<td>
+Incoming <em class="emphasis">ping</em></p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+0</p><p></td>
+<td>
+Response to incoming <em class="emphasis">ping</em></p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+8</p><p></td>
+<td>
+Outgoing <em class="emphasis">ping</em></p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td>
+0</p><p></td>
+<td>
+Response to outgoing <em class="emphasis">ping</em></p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-157" />[157]ICMP messages do not have source or
+destination port numbers; they have a single ICMP message type field
+instead. ICMP has no ACK equivalent.</p><p>
+
+
+
+
+</blockquote>
+
+If you have a stateful packet filtering system, it is wise to
+configure it so that you allow responses only if you have seen a
+matching request. This is particularly important if you only allow
+requests in one direction, since the responses will be going in the
+direction where requests are denied. Unsolicited responses are always
+hostile, whether they are actual attacks or being used as covert
+channels to smuggle information.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-15457" /><div class="sect3">
+<h3 class="sect3">22.4.1.2. Proxying characteristics of ping</h3>
+
+
+
+
+
+<a name="INDEX-2084" />SOCKS5 provides a modified-client
+proxy system for <em class="emphasis">ping</em>. Because
+<em class="emphasis">ping</em> is neither TCP- nor UDP-based, it
+won't work with most generic proxy servers for modified-client
+proxying. Because <em class="emphasis">ping</em> transmits no
+user-supplied data to the destination host, modified-procedure
+proxying for <em class="emphasis">ping</em> is not possible.
+odified-procedure proxying also relies on the ability of the proxy
+server to intercept the request before the machine it's running
+on generates a reply, which is difficult with
+<em class="emphasis">ping</em>. In a pure modified-procedure proxying
+environment, <em class="emphasis">ping</em> will have to be provided by
+letting users connect to the proxying host (for instance, with a
+special web page) and run <em class="emphasis">ping</em> from there, as
+discussed in <a href="ch09_01.html">Chapter 9, "Proxy Systems"</a>. Several systems that use
+packet interception to do proxying supply <em class="emphasis">ping</em>
+proxies.</p><p>
+
+
+
+
+
+When proxying <em class="emphasis">ping</em>, it is a good idea to
+sanitize the packet bodies. Instead of passing the original data
+portion of the response or request, the proxy should replace it with
+an equivalent length of data generated by the proxy. This will
+prevent the use of <em class="emphasis">ping</em> as a covert channel. In
+a few cases, it will also interfere with debugging (some network
+problems are dependent on particular data patterns triggering bugs in
+networking hardware). Fortunately, this kind of debugging rarely
+needs to cross the Internet.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-31-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.4.1.3. Network address translation and ping</h3>
+
+
+
+
+
+<em class="emphasis">ping</em> does not use embedded IP addresses and
+should work without problems through any network address translation
+system that supports ICMP.<a name="INDEX-2085" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-15475" /><div class="sect2">
+<h3 class="sect2">22.4.2. traceroute</h3>
+
+
+
+
+
+<a name="INDEX-2086" /><a name="INDEX-2087" /><a name="INDEX-2088" /><em class="emphasis">traceroute</em> (also known
+as <em class="emphasis">tracert</em> on Microsoft systems) is an
+application that shows you the route that packets take to a
+particular IP destination. Because no system typically knows the full
+path to the destination (merely the next step towards the
+destination), this is a neat trick.<a href="#FOOTNOTE-158">[158]</a>
+<em class="emphasis">traceroute</em> works by carefully constructing
+special packets. The destination address of the packets is the remote
+host; depending on the implementation, the packets are either ICMP
+echo packets or UDP packets where the destination port is an unused
+(or so we hope, as we'll discuss later) port on the remote
+host. The really special thing about the packets, though, is that the
+time to live (TTL) fields are set very low (starting at 1), so that
+the packets will be rejected by intermediate routers as if they were
+looping in the network. By looking where the rejections (ICMP
+"time to live exceeded" messages) come from,
+<em class="emphasis">traceroute</em> can determine who the intermediate
+routers are.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-158" />[158]<em class="emphasis">traceroute</em> is, fundamentally, a
+"cool hack".</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+TTL is a field in the header of every IP packet. It normally
+isn't of interest from a firewall point of view. The name is
+somewhat misleading; it might be more intuitively called "hops
+to live". When a packet is first created, its TTL field is set
+to some value (typically 16, 30, or 255). Every router that handles
+the packet along its journey decrements the TTL field by 1. If the
+TTL field ever reaches 0, the packet is assumed to be in some sort of
+a loop; it is encapsulated within an ICMP "time to live
+exceeded" message and is returned to the source address.</p><p>
+
+
+
+
+
+Thus, the first router that handles the first of
+<em class="emphasis">traceroute</em>'s specially constructed packets
+(which has a TTL of 1) will decrement the TTL field, see that
+it's 0, and return an ICMP "time to live exceeded"
+message, telling <em class="emphasis">traceroute</em> the IP address of
+the first router (the IP source address in the ICMP message).</p><p>
+
+
+
+
+
+<em class="emphasis">traceroute</em> then constructs another packet, this
+time with a TTL of 2, and sends it out. This packet gets to the
+second router before TTL gets decremented to 0, and
+<em class="emphasis">traceroute</em> knows that the router that returns
+the ICMP "time to live exceeded" for that packet is the
+second router along the path to the destination.
+<em class="emphasis">traceroute</em> then constructs a packet with a TTL
+of 3, then 4, and so on, to determine the path to the destination.</p><p>
+
+
+
+
+
+<em class="emphasis">traceroute</em> knows it's finished when it
+gets back an ICMP "echo reply" or ICMP "destination
+unreachable" message, rather than an ICMP "time to live
+exceeded" message from some intermediate router.</p><p>
+
+
+
+
+
+ost versions of <em class="emphasis">traceroute</em> will also note and
+display relevant ICMP "host unreachable", "network
+unreachable", and other ICMP messages received.</p><p>
+
+
+
+
+
+If <em class="emphasis">traceroute</em> can't reach the destination
+host (or can't get anything back from it), it eventually times
+out.</p><p>
+
+
+
+
+
+<a name="ch22-15537" /><div class="sect3">
+<h3 class="sect3">22.4.2.1. Packet filtering characteristics of traceroute</h3>
+
+
+
+
+
+To allow <em class="emphasis">traceroute</em> outbound through your packet
+filters (i.e., someone running <em class="emphasis">traceroute</em> from
+the inside, to an external destination), you have to allow the
+constructed UDP or ICMP packets outbound, and the relevant ICMP
+response packets inbound (particularly "time to live
+exceeded" and "destination unreachable").</p><p>
+
+
+
+
+
+To allow <em class="emphasis">traceroute</em> inbound, you have to allow
+the constructed UDP or ICMP packets inbound, and the relevant ICMP
+messages back outbound. You may wish to limit this capability to the
+<em class="emphasis">traceroute</em> machines used by the network
+operations center of your network service provider, in order to keep
+a tight rein on the UDP packets allowed through your firewall.
+Limiting UDP protects RPC-based services (like NFS and NIS) and keeps
+attackers from using <em class="emphasis">traceroute</em> to discover
+which addresses at your site are actually assigned to hosts. The
+issues with ICMP echo, and the characteristics of echo and echo reply
+packets, are discussed earlier in the section about
+<em class="emphasis">ping</em>.</p><p>
+
+
+
+
+
+Some versions of <em class="emphasis">traceroute</em> that use UDP can be
+told (via a command-line or a compile-time option) which range of UDP
+ports to use for the destination. You may need to establish a
+convention for your site of what port(s) will be allowed through the
+packet filters for use by <em class="emphasis">traceroute</em>. You
+don't want to allow any more latitude in your packet filters
+for <em class="emphasis">traceroute</em> than absolutely necessary
+(particularly for incoming <em class="emphasis">traceroute</em>). Because
+<em class="emphasis">traceroute</em> is UDP-based, an attacker could
+potentially take advantage of the UDP-based rules in your packet
+filtering that are there to allow <em class="emphasis">traceroute</em> in
+order to attack other UDP-based services like NFS and NIS.</p><p>
+
+
+
+
+
+<a name="ch22-32-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+SourcePort<a href="#FOOTNOTE-159">[159]</a></p><p>
+
+
+
+
+
+
+
+
+</blockquote></th>
+<th>
+Dest.Port<a href="#FOOTNOTE-159">[159]</a></p><p></th>
+<th>
+essageType<a href="#FOOTNOTE-159">[159]</a></p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+<a href="#FOOTNOTE-160">[160]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td><a href="#FOOTNOTE-160">[160]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+Outgoing UDP <em class="emphasis">traceroute</em> probe</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+8</p><p></td>
+<td>
+Outgoing ICMP <em class="emphasis">traceroute</em> probe</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+0</p><p></td>
+<td>
+ICMP echo response (answering probe)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+11</p><p></td>
+<td>
+Incoming "time to live exceeded"</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+3</p><p></td>
+<td>
+Incoming "destination unreachable"</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td><a href="#FOOTNOTE-160">[160]</a></td>
+<td><a href="#FOOTNOTE-160">[160]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+Incoming UDP <em class="emphasis">traceroute</em> probe</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+8</p><p></td>
+<td>
+Incoming ICMP <em class="emphasis">traceroute</em> probe</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+0</p><p></td>
+<td>
+ICMP echo response (answering probe)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+11</p><p></td>
+<td>
+Outgoing "time to live exceeded"</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ICMP</p><p></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td><a href="#FOOTNOTE-159">[159]</a></td>
+<td>
+3</p><p></td>
+<td>
+Outgoing "destination unreachable"</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+
+<blockquote><a name="FOOTNOTE-159" />[159]UDP packets have source and destination
+ports; ICMP packets have only message type fields. UDP or ICMP have
+no ACK equivalent.</p><p>
+
+
+</blockquote><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-160" />[160]<em class="emphasis">traceroute</em> probe packet UDP
+source/destination ports vary by implementation, invocation, and/or
+command-line arguments. They are generally &gt;32768, but
+that's about the only generalization you can make about them.
+Specific implementations (particularly in routers and on non-Unix
+platforms) may vary. Destination ports, in particular, are usually in
+the range 33434 through 33523. (Why this is the case is somewhat
+complicated, and you should read the comments in the Unix
+<em class="emphasis">traceroute</em> source code if you're
+perversely curious.)</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-15741" /><div class="sect3">
+<h3 class="sect3">22.4.2.2. Proxying characteristics of traceroute</h3>
+
+
+
+
+
+Like <em class="emphasis">ping, traceroute</em> could easily be supported
+by an ICMP-knowledgeable modified-client proxy server. An appropriate
+server and client are provided as part of the SOCKS5 package.
+odified-procedure proxying is not possible with
+<em class="emphasis">traceroute,</em> although it is easy to use a web
+page to give people access to run <em class="emphasis">traceroute</em> on
+a bastion host.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch22-33-fm2xml" /><div class="sect3">
+<h3 class="sect3">22.4.2.3. Network address translation and traceroute</h3>
+
+
+
+
+
+Since <em class="emphasis">traceroute</em> is intended to determine the
+network addresses that packets go through, using it with a network
+address translation system will often create confusion. If the
+network address translation statement is aware of ICMP, there is no
+reason for the <em class="emphasis">traceroute</em> to actually fail, but
+the information it returns to the user will include the translated
+addresses. For somebody running <em class="emphasis">traceroute</em> from
+a translated address, this should not be a problem. On the other
+hand, running a <em class="emphasis">traceroute</em> to a translated
+address may produce unpredictable results. There often will simply be
+no relevant mapping, and the <em class="emphasis">traceroute</em> will
+fail.<a name="INDEX-2089" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-15753" /><div class="sect2">
+<h3 class="sect2">22.4.3. Other ICMP Packets</h3>
+
+
+
+
+
+<a name="INDEX-2090" /><a name="INDEX-2091" />A
+number of ICMP message types used for network management don't
+have programs associated with them. These are automatically generated
+and interpreted by various programs and network devices.</p><p>
+
+
+
+
+
+ICMP message types may also have codes, which contain more
+information. For instance, there are a number of codes under
+"destination unreachable", including "service
+unavailable", "communication administratively
+prohibited", and "fragmentation required and Don't
+Fragment set". In most cases, the codes within
+"destination unreachable" are the only ones of interest;
+none of the other widely used ICMP types actually use codes this way</p><p>
+
+
+
+
+
+What to do with ICMP messages depends on the message and the
+direction it's going in. We've already talked about
+"echo request", "echo reply",
+"destination unreachable", and "time to live
+exceeded" messages. The other ICMP message types you probably
+want to allow, both inbound and outbound, are "source
+quench" (used by a receiver to tell a sender to "slow
+down" because it's sending data too fast) and
+"parameter problem" (which is sort of a catch-all code to
+return when a problem with packet headers can't be reported any
+other way).</p><p>
+
+
+
+
+
+any other ICMP message types have the potential to change local
+information on your hosts (for example, "redirect" causes
+changes to a host's routing tables), so you probably
+don't want to allow such messages inbound through your packet
+filters.</p><p>
+
+
+
+
+
+Even "destination unreachable" can be problematic. Some
+attackers send out false "destination unreachable"
+messages, which may cause hosts to cut off communications in
+progress. (This is a popular attack against people using IRC.) There
+is no way to tell a valid "destination unreachable" from
+an invalid one, in general, because a "destination
+unreachable" can be sent by any machine in the path between the
+two hosts. However, most "destination unreachable"
+messages can legitimately be sent only at the beginning of a
+connection, and it is reasonable for hosts to ignore
+"destination unreachable" messages that are not plausible
+responses to packets that have been sent.</p><p>
+
+
+
+
+
+In general, you want to allow ICMP outbound only when it has the
+chance of doing you some good. Both "source quench" and
+"parameter problem" are used to get the sending host to
+be nicer to you and are worth allowing outbound. Any of the ICMP
+types that indicate that the connection can't be made
+("destination unavailable", "network
+unavailable", "service unavailable",
+"destination administratively unavailable", or
+"network administratively unavailable", for example) will
+help an attacker probe your network without giving you much benefit,
+and you may want to block these outbound.</p><p>
+
+
+
+
+
+There are two exceptions to this rule. First, you may find it
+expedient to return some sort of error (either an ICMP error or a TCP
+reset) to Auth<a href="#FOOTNOTE-161">[161]</a> queries if you are not going to
+allow them, in order to speed up mail transmission. This is discussed
+further in <a href="ch21_01.html">Chapter 21, "Authentication and Auditing Services"</a>. Second, you will want to
+return "fragmentation required and Don't Fragment
+set" from any host that can be directly reached with TCP from
+the Internet, in order to support path MTU discovery. This is
+discussed further in <a href="ch04_01.html">Chapter 4, "Packets and Protocols "</a>. In both these
+cases, the rules that you really want to implement are impossible to
+specify on most packet filtering systems; they don't allow you
+to specify that an ICMP type is allowable only in response to a
+specific port, or to specify specific codes within a type. You may be
+able to use other workarounds discussed in the detail sections on
+these issues.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-161" />[161]The Auth protocol is also known as
+<em class="emphasis">identd</em> after a popular Unix daemon that
+implements it.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+<a name="ch22-15772" /><div class="sect3">
+<h3 class="sect3">22.4.3.1. Packet filtering characteristics of ICMP</h3>
+
+
+
+
+
+As we've said earlier, ICMP packets do not have source or
+destination port numbers but have a single ICMP message type field
+instead. Many packet filtering systems will let you filter ICMP
+packets based on that field in the same way they allow you to filter
+TCP or UDP packets based on the source and destination port number
+fields. The following table lists some common ICMP message types and
+how you should handle them (whether you should allow them through
+your firewall or block them).</p><p>
+
+
+
+
+
+<a name="ch22-34-fm2xml" /><table border="1">
+
+
+
+
+<tr>
+<th>
+essageType</p><p></th>
+<th>
+Description</p><p></th>
+<th>
+Permit/Deny</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+0</p><p></td>
+<td>
+Echo reply (reply to <em class="emphasis">ping).</em></p><p></td>
+<td>
+See <em class="emphasis">ping</em> section earlier.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+3</p><p></td>
+<td>
+Destination unreachable. May indicate host unreachable, network
+unreachable, port unreachable, or other.</p><p></td>
+<td>
+See <em class="emphasis">traceroute</em> section earlier.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+4</p><p></td>
+<td>
+Source quench (somebody telling destination "slow down;
+you're talking too fast").</p><p></td>
+<td>
+Should usually be allowed in both directions.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+5</p><p></td>
+<td>
+Redirect (somebody telling destination to change a route); is
+supposed to be ignored by your systems unless it comes from a
+directly connected router. In particular, make sure the routers that
+are part of your firewall ignore it.</p><p></td>
+<td>
+Should usually be blocked inbound. Definitely block to routers that
+are part of your firewall.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+8</p><p></td>
+<td>
+Echo request (generated by <em class="emphasis">ping</em>).</p><p></td>
+<td>
+See <em class="emphasis">ping</em> section earlier.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+9</p><p></td>
+<td>
+Router announcement (used by router discovery).</p><p></td>
+<td>
+Should be blocked in both directions (see router discovery section
+earlier).</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+10</p><p></td>
+<td>
+Router selection (used by router discovery).</p><p></td>
+<td>
+Should be blocked in both directions (see router discovery section
+earlier).</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+11</p><p></td>
+<td>
+Time to live exceeded (packet appears to be looping).</p><p></td>
+<td>
+Should usually be allowed in both directions.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+12</p><p></td>
+<td>
+Parameter problem (problem with a packet header).</p><p></td>
+<td>
+Should usually be allowed in both directions.</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch22-35-fm2xml" /><div class="sect2">
+<h3 class="sect2">22.4.4. Summary of Recommendations for ICMP</h3>
+
+
+
+
+
+<ul><li>Allow ICMP echo requests outbound but limit incoming ICMP echo
+requests to those that are coming from machines with a legitimate
+need to probe your network (such as your network service
+provider's network operations center) and are bound to hosts
+known to have hardened network stacks. Allow ICMP echo responses
+either way, but only if they match recent requests.</p><p></li><li>Allow <em class="emphasis">traceroute</em> outbound, but limit incoming
+<em class="emphasis">traceroute</em> requests to those coming from
+machines with a legitimate need to probe your network and limit the
+port range used.</p><p></li><li>Look for a router that will allow you to sanity-check ICMP packets,
+and reject obviously malformed or malicious packets regardless of
+their source and destination.</p><p></li><li>Allow only safe ICMP message types, as described
+previously.<a name="INDEX-2092" /><a name="INDEX-2093" /> <a name="INDEX-2094" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch22_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch22_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">22.3. Protocols for Booting and Boot-Time Configuration</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">22.5. Network Time Protocol </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch22_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+</html>

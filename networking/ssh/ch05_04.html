@@ -1,0 +1,1785 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+<head><title>Getting Ready: Initial Setup (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.4. Getting Ready: Initial Setup</h2>
+
+
+
+We now embark on a detailed discussion of SSH server configuration,
+using both keywords and command-line options. Please keep in mind
+that SSH2 and OpenSSH are still evolving products and their features
+may change. Be sure to read their documentation for the latest
+information. SSH1 is no longer actively developed, so its feature set
+is unlikely to change.</p>
+
+
+
+We begin with initial setup decisions, such as: where should
+important files be kept? What should their permissions be? What
+TCP/IP settings should be used? What are the properties of the server
+key? Which encryption algorithms are supported?</p>
+
+
+
+<a name="ch05-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.4.1. File Locations</h3>
+
+
+
+<tt class="command">sshd</tt> expects certain files to exist, containing
+the server's host key, the random seed, and other data. The
+server looks for these files in default locations, or you may
+override them with keywords and command-line options as described
+later.</p>
+
+
+
+Although you may place these files anywhere you like, we strongly
+recommend keeping them on a local disk on your server machine, not on
+a remotely mounted disk (e.g., via NFS). This is for security
+reasons, as NFS will gleefully transmit your sensitive files
+unencrypted across the network. This would be especially disastrous
+for the unencrypted private host key!</p>
+
+
+
+As a running example, we use an invented directory,
+<em class="filename">/usr/local/ssh</em>, as our preferred (nondefault)
+location for the SSH server's files.</p>
+
+
+
+<a name="ch05-59943" /><div class="sect3">
+<h3 class="sect3">5.4.1.1. Host key files</h3>
+
+
+
+The host key of <tt class="command">sshd</tt> uniquely identifies a server
+to SSH clients. The host key is stored in a pair of files, one
+containing the private key and the other the public key. For SSH1 and
+OpenSSH, the private key is stored in
+<em class="filename">/etc/ssh_host_key</em> and is readable only by
+privileged programs such as the SSH server and clients. Its location
+may be changed with the
+<tt class="literal">HostKey</tt><a name="INDEX-759" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+HostKey /usr/local/ssh/key</pre></blockquote>
+
+
+
+The server's public key is stored in a second file with the
+same name but with <em class="emphasis">.pub</em> appended. So the default
+for SSH1 and OpenSSH is <em class="filename">/etc/ssh_host_key.pub</em>,
+and the preceding <tt class="literal">HostKey</tt> example implies
+<em class="filename">/usr/local/ssh/key.pub.</em></p>
+
+
+
+The OpenSSH server also has an SSH-2 host key, located by default in
+<em class="filename">/etc/ssh_host_dsa_key</em>, and its location may be
+moved with the
+<a name="INDEX-760" /><tt class="literal">HostDsaKey</tt>
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+HostDsaKey /usr/local/openssh/key2</pre></blockquote>
+
+
+
+For SSH2, the default private key file is
+<em class="filename">/etc/ssh2/hostkey</em> if the server is run by the
+superuser or <em class="filename">~/.ssh2/hostkey</em> if run by any other
+user. To specify a different private key file, use the
+<a name="INDEX-761" /><tt class="literal">HostKeyFile</tt>
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+HostKeyFile /usr/local/ssh/key</pre></blockquote>
+
+
+
+The server's public key file, normally
+<em class="filename">/etc/ssh2/hostkey.pub</em> for superusers or
+<em class="filename">~/.ssh2/hostkey.pub</em> for others, may be changed
+independently with the
+<a name="INDEX-762" /><tt class="literal">Public-HostKeyFile</tt>
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+PublicHostKeyFile /usr/local/ssh/pubkey</pre></blockquote>
+
+
+
+If you prefer command-line options, <tt class="command">sshd</tt> supports
+the <span class="option">-h</span> command-line option to specify the private
+key file:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -h /usr/local/ssh/key</pre></blockquote>
+
+
+
+Once again, the public key filename is derived by appending
+<em class="filename">.pub</em> to the private key filename, in this case,
+<em class="filename">/usr/local/ssh/key.pub.</em></p>
+</div>
+
+
+
+
+
+<a name="ch05-92636" /><div class="sect3">
+<h3 class="sect3">5.4.1.2. Random seed file</h3>
+
+
+
+<a name="INDEX-763" />The SSH
+server generates pseudo-random numbers for cryptographic operations.
+[<a href="ch03_07.html#ch03-14926">Section 3.7, "Randomness"</a>] It maintains a pool of random data for
+this purpose, derived either from the operating system if provided
+(e.g., <em class="filename">/dev/random</em> on some Unix flavors) or from
+various bits of changing machine state (e.g., clock time, statistics
+on resource use by processes, etc.). This pool is called the
+<em class="emphasis">random seed</em>. SSH1 stores it in
+<em class="filename">/etc/ssh_random_seed</em>, and its location may be
+changed with the
+<a name="INDEX-764" /><tt class="literal">RandomSeed</tt>
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+RandomSeed /usr/local/ssh/seed</pre></blockquote>
+
+
+
+Likewise for SSH2, the random seed is stored in
+<em class="filename">/etc/ssh2/random_seed</em>, and the location may be
+overridden with the
+<tt class="literal">RandomSeedFile</tt><a name="INDEX-765" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+RandomSeedFile /usr/local/ssh/seed2</pre></blockquote>
+
+
+
+If running on a system with a random-bit source, such as
+<em class="filename">/dev/urandom</em>, OpenSSH doesn't create a
+random seed file.</p>
+</div>
+
+
+
+
+
+<a name="ch05-26079" /><div class="sect3">
+<h3 class="sect3">5.4.1.3. Process ID file</h3>
+
+
+
+We said earlier that the SSH1 server's pid is stored in
+<em class="filename">/etc/ssh.pid</em>, and this location may be
+overridden with the
+<tt class="literal">PidFile</tt><a name="INDEX-766" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+PidFile /usr/local/ssh/pid</pre></blockquote>
+
+
+
+There is no corresponding keyword for
+<a name="INDEX-767" />SSH2. Its pid file is always named
+<em class="filename">/var/run/sshd2_</em><em class="replaceable">N</em><em class="filename">.pid</em>,
+where <em class="replaceable">N</em> is the TCP port number of the
+server. Since the default port is 22, the default pid file is
+<em class="filename">/var/run/sshd2_22.pid.</em> If multiple
+<tt class="command">sshd2</tt> processes are run simultaneously on
+different ports of the same machine, their pid files can be
+distinguished by this naming convention.</p>
+</div>
+
+
+
+
+
+<a name="ch05-8-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.1.4. Server configuration file</h3>
+
+
+
+The server configuration file is normally
+<em class="filename">/etc/sshd_config</em> for the SSH1 and OpenSSH
+servers and <em class="filename">/etc/ssh2/sshd2_config</em> for the SSH2
+server. An <a name="INDEX-768" /><a name="INDEX-769" />alternative
+configuration file can be specified with the <span class="option">-f</span>
+command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -f /usr/local/ssh/config</pre></blockquote>
+
+
+
+This is useful when testing a new server configuration: create a new
+file and instruct <tt class="command">sshd</tt> to read it. It is also
+necessary if you are running multiple <tt class="command">sshd </tt>s on
+the same machine and want them to operate with different
+configurations.</p>
+</div>
+
+
+
+
+
+<a name="ch05-33870" /><div class="sect3">
+<h3 class="sect3">5.4.1.5. User SSH directory</h3>
+
+
+
+<tt class="command">sshd1</tt> expects a user's SSH-related files to
+be found in the directory <em class="filename">~/.ssh.</em> This location
+can't be changed by serverwide configuration. (You have to
+modify the source code.)</p>
+
+
+
+<tt class="command">sshd2</tt> expects user files to be in the directory
+<em class="filename">~/.ssh2</em> by default, but this can be changed with
+the
+<tt class="literal">UserConfigDirectory</tt><a name="INDEX-770" />
+keyword. The directory name may be literal, as in:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+UserConfigDirectory /usr/local/ssh/my_dir</pre></blockquote>
+
+
+
+or it may be specified with <tt class="function">printf</tt>-like
+patterns, as in:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+UserConfigDirectory %D/.my-ssh</pre></blockquote>
+
+
+
+The <tt class="literal">%D</tt> pattern expands to the user's home
+directory. So the preceding example expands to
+<em class="filename">~/.my-ssh.</em> The following table shows the
+available patterns:</p>
+
+
+
+<a name="ch05-9-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Pattern</p></th>
+<th>
+Meaning</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<blockquote><pre class="code">%D</pre></blockquote></td>
+<td>
+User's home directory</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">%U</pre></blockquote></td>
+<td>
+User's login name</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">%IU</pre></blockquote></td>
+<td>
+User's uid (Unix user ID)</p></td>
+</tr>
+
+
+<tr>
+<td>
+<blockquote><pre class="code">%IG</pre></blockquote></td>
+<td>
+User's gid (Unix group ID)</p></td>
+</tr>
+
+
+
+</table><p>
+
+For the system administrator, the
+<tt class="literal">UserConfigDirectory</tt> keyword provides a quick way
+to override all users' SSH2 preferences. Specifically, you can
+cause <tt class="command">sshd2</tt> to ignore everybody's
+<em class="filename">~/.ssh2</em> directories, substituting your own
+instead. For instance, the line:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+UserConfigDirectory /usr/sneaky/ssh/%IU/</pre></blockquote>
+
+
+
+tells <tt class="command">sshd2</tt> to seek the preferences for each user
+in
+<em class="filename">/usr/sneaky/ssh/</em><em class="emphasis">&lt;username&gt;</em>
+instead of <em class="filename">~/.ssh</em>. This powerful feature can
+also be misused if your machine is compromised. If an intruder
+inserted the following line into <em class="filename">sshd2_config </em>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+UserConfigDirectory /tmp/hack</pre></blockquote>
+
+
+
+and uploaded his own public key file into
+<em class="filename">/tmp/hack</em>, he would gain SSH2 access to every
+user's account.</p>
+</div>
+
+
+
+
+
+<a name="ch05-11123" /><div class="sect3">
+<h3 class="sect3">5.4.1.6. Per-account authorization files</h3>
+
+
+
+The SSH1 and OpenSSH servers expect to find a user's public-key
+authorization file in <em class="filename">~/.ssh/authorized_keys</em>
+(and <em class="filename">~/.ssh/authorized_keys2</em> for OpenSSH/2).
+These locations can't be changed by serverwide configuration.</p>
+
+
+
+The SSH2 server uses a different key file layout. [<a href="ch06_01.html#ch06-52624">Section 6.1.2, "SSH2 Identities"</a>] The authorization file, normally
+<em class="filename">~/.ssh2/authorization</em><a name="INDEX-771" /><a name="INDEX-772" />, contains names of separate
+public key files, rather than the keys themselves.
+<tt class="command">sshd2</tt> can be instructed to find the authorization
+file elsewhere via the keyword
+<tt class="literal">AuthorizationFile</tt><a name="INDEX-773" />.</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+AuthorizationFile my_public_keys</pre></blockquote>
+
+
+
+Filenames can be absolute or are relative to the user's SSH2
+directory. The preceding lines specifies the file
+<em class="filename">~/.ssh2/my_public_keys</em>.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.4.2. File Permissions</h3>
+
+
+
+<a name="INDEX-774" />As security
+products, SSH1, SSH2, and OpenSSH require certain files and
+directories on the server machine to be protected from unwanted
+access. Imagine if your <em class="filename">authorized_keys</em> or
+<em class="filename">.rhosts</em> file were world-writable; anyone on that
+host could modify them and gain convenient access to your account.
+<tt class="command">sshd</tt> has several configuration keywords for
+reducing this risk.</p>
+
+
+
+<a name="ch05-71848" /><div class="sect3">
+<h3 class="sect3">5.4.2.1. Acceptable permissions for user files</h3>
+
+
+
+Users aren't always careful to protect important files and
+directories in their accounts, such as their
+<em class="filename">.rhosts</em> file or personal SSH directory. Such
+lapses can lead to security holes and compromised accounts. To combat
+this, you can configure <tt class="command">sshd</tt> to reject connections
+to any user account that has unacceptable permissions.</p>
+
+
+
+The
+<tt class="literal">StrictModes</tt><a name="INDEX-775" />
+keyword, with a value of <tt class="literal">yes</tt> (the default), causes
+<tt class="command">sshd</tt> to check the permissions of important files
+and directories. They must be owned by the account owner or by root,
+and group and world write permission must be disabled. For SSH1,
+<tt class="literal">StrictModes</tt> checks:</p>
+
+
+
+<ul><li>User's <a name="INDEX-776" />home
+directory</p></li><li>User's
+<em class="filename">~/.rhosts</em><a name="INDEX-777" />
+and
+<em class="filename">~/.shosts</em><a name="INDEX-778" />
+file</p></li><li>User's SSH configuration directory,
+<em class="filename">~/.ssh</em><a name="INDEX-779" /></p></li><li>User's SSH
+<em class="filename">~/.ssh/authorized_keys</em><a name="INDEX-780" />
+file</p></li></ul>
+For OpenSSH, <tt class="literal">StrictModes</tt> checks the same files as
+for SSH1, plus the user's authorization file for SSH-2
+connections, <em class="filename">~/.ssh/authorized_keys2.</em></p>
+
+
+
+For SSH2, the list is smaller and is checked only for trusted-host
+authentication:<a href="#FOOTNOTE-57">[57]</a> [<a href="ch03_04.html#ch03-19795">Section 3.4.2.3, "Trusted-host authentication (Rhosts and RhostsRSA)"</a>]</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-57" />[57]The <em class="emphasis">sshd2_config</em>
+manpage for SSH2 2.2.0 says that <tt class="literal">StrictModes</tt>
+isn't implemented, but this statement is obsolete.</p>
+
+
+</blockquote>
+
+
+
+<ul><li>User's home directory</p></li><li>User's <em class="filename">~/.rhosts</em> and
+<em class="filename">~/.shosts</em> file</p></li></ul>
+If any check fails, the server rejects SSH connection attempts to the
+account. If <tt class="literal">StrictModes</tt> is given the value
+<tt class="literal">no</tt>, these checks aren't performed.</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+StrictModes no</pre></blockquote>
+
+
+
+However, we strongly suggest you leave these checks enabled.</p>
+
+
+
+Even if <tt class="literal">StrictModes</tt> is enabled, though, it can be
+defeated in two ways. First, <tt class="command">sshd</tt> can be compiled
+with the flag
+<tt class="literal"> -- enable-group-writeability</tt><a name="INDEX-781" />
+[<a href="ch04_01.html#ch04-77323">Section 4.1.5.2, "Installation, files, and directories"</a>], which makes group-writable files
+acceptable to <tt class="literal">StrictModes</tt>. This can be useful for
+shared accounts, permitting all members of a group to modify
+SSH-related files in an account. Second, you can use POSIX ACLs,
+which are supported in Solaris and some other flavors of Unix, to set
+file permissions with greater precision. <tt class="command">sshd</tt>
+doesn't check ACLs, so one could argue that
+<tt class="literal">StrictModes</tt> is an incomplete test.</p>
+</div>
+
+
+
+
+
+<a name="ch05-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.2.2. Permissions for newly created files</h3>
+
+
+
+The
+<em class="emphasis">umask</em><a name="INDEX-782" /><a name="INDEX-783" />
+of a Unix process determines the default permissions for files and
+directories that the process creates.
+<tt class="command">sshd1</tt>'s umask may be specified with the
+keyword
+<tt class="literal">Umask</tt><a name="INDEX-784" />,
+so any files it creates have the desired permissions. The value is an
+ordinary Unix umask value, usually given in octal:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+# Create files rw-r -- r -- 
+ and directories rwx-r-xr-x:
+Umask 022</pre></blockquote>
+
+
+
+<a name="INDEX-785" />Remember that a leading zero is
+necessary for <tt class="command">sshd1</tt> to interpret the value as
+octal. For more information on umasks, see the Unix manpages for
+<tt class="command">umask</tt> or for most shells.</p>
+
+
+
+<tt class="command">sshd1</tt> creates a pid file (
+<em class="filename">/etc/sshd.pid</em> or the value of
+<tt class="literal">PidFile</tt><a name="INDEX-786" />)
+and a random seed file ( <em class="filename">/etc/ssh_random_seed</em> or
+the value of
+<tt class="literal">RandomSeed</tt><a name="INDEX-787" />).
+Only the pid file is affected by the server's umask. The random
+seed file is explicitly created with mode 0600, readable and writable
+only by the owner. Strictly speaking, this umask also applies to
+other processes spawned by
+<tt class="command">sshd1</tt> -- specifically, user shells -- but
+the value is typically overridden by shells.</p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-45576" /><div class="sect2">
+<h3 class="sect2">5.4.3. TCP/IP Settings</h3>
+
+
+
+Since the SSH protocol operates over TCP/IP, <tt class="command">sshd</tt>
+permits control over various parameters related to TCP/IP.</p>
+
+
+
+<a name="ch05-12-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.3.1. Port number and network interface</h3>
+
+
+
+By default, <tt class="command">sshd</tt> listens on TCP port 22. The port
+number may be changed with the
+<tt class="literal">Port</tt><a name="INDEX-788" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+Port 9876</pre></blockquote>
+
+
+
+or the <span class="option">-p</span> command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -p 9876</pre></blockquote>
+
+
+
+The SSH1 and OpenSSH servers accept integers in decimal, octal, or
+hexadecimal, while the SSH2 server reads all numbers as decimal. See
+<a href="ch05_04.html#ch05-74529">the sidebar "Numeric Values in Configuration Files"</a>.</p>
+
+
+
+You may also configure <tt class="command">sshd</tt> to bind its listening
+port on a particular network interface. By default, the port is bound
+on all active network interfaces on the host. The
+<tt class="literal">ListenAddress</tt><a name="INDEX-789" />
+keyword limits <tt class="command">sshd</tt> to listen on only one
+interface, with default value 0.0.0.0.</p>
+
+
+
+For example, suppose a computer has two Ethernet cards and is
+attached to two different networks. One interface has the address
+192.168.10.23, and the other, 192.168.11.17. By default,
+<tt class="command">sshd</tt> listens on both interfaces; therefore, you
+can reach the server by connecting to port 22 at either address.
+However, this may not always be what you want; perhaps you want to
+provide SSH service only to hosts on one network and not the other:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+ListenAddress 192.168.10.23</pre></blockquote>
+
+
+
+Of course, this represents a real restriction only if the two
+networks aren't otherwise connected together (say, by a
+router), so that port 22 on 192.168.10.23 is not reachable from the
+network 192.168.11/24.</p>
+
+
+
+OpenSSH permits more than <tt class="literal">ListenAddress</tt> line in
+the configuration file, permitting listening on selected multiple
+interfaces:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+ListenAddress 192.168.10.23
+ListenAddress 192.168.11.17</pre></blockquote>
+
+
+
+<a name="ch05-74529" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Numeric Values in Configuration Files</h4>
+
+
+
+SSH1 and OpenSSH accept numeric values in <a name="INDEX-790" />decimal,
+<a name="INDEX-791" />octal, or <a name="INDEX-792" />hexadecimal,
+using standard C language notation. If a value begins with
+<tt class="literal">0x</tt>, it is treated as hexadecimal. If it begins
+with a leading zero, it is considered octal. Any other numeric value
+is read as decimal.</p>
+
+
+
+SSH2, in contrast, requires all numbers to be given in decimal.</p>
+
+
+</td></tr></table><p></blockquote>
+</div>
+
+
+
+
+
+<a name="ch05-58373" /><div class="sect3">
+<h3 class="sect3">5.4.3.2. Invocation by inetd</h3>
+
+
+
+<tt class="command">sshd</tt> normally runs as a daemon, spawning child
+processes to handle connections. Alternatively, the server may be
+invoked by
+<tt class="command">inetd</tt><a name="INDEX-793" />
+as are many other network daemons. In this case,
+<em class="emphasis">inetd</em> invokes a new instance of the server for
+each connection.</p>
+
+
+
+If the <tt class="command">inetd</tt> behavior is desired, you must have an
+entry for <a name="INDEX-794" />SSH in the server machine's TCP/IP
+services map, either <em class="filename">/etc/services</em> or
+<em class="filename">/etc/inet/services</em>, such as:</p>
+
+
+
+<blockquote><pre class="code">ssh    tcp/22</pre></blockquote>
+
+
+
+and an appropriate line in the <tt class="command">inetd</tt> configuration
+file, <em class="filename">/etc/inetd.conf</em>, for the SSH service. This
+line must invoke <em class="emphasis">sshd</em> with the
+<span class="option">-i</span> command-line option, which turns on
+<em class="emphasis">inetd</em> behavior:</p>
+
+
+
+<blockquote><pre class="code">ssh stream  tcp     nowait  root    /usr/local/sbin/sshd     sshd -i</pre></blockquote>
+
+
+
+What this means, exactly, is that <em class="emphasis">sshd</em> simply
+starts up and expects to handle a single connection on a TCP socket
+attached to its standard input and output. This is opposed to its
+behavior without <span class="option">-i</span>, where it becomes a master
+server listening for TCP connections and starting subprocesses to
+handle individual connections.</p>
+
+
+
+The <tt class="command">inetd</tt> approach has advantages and
+disadvantages. On the down side, <tt class="command">inetd</tt>-based SSH
+connections are slower to start up if the session uses a server key,
+because <tt class="command">sshd</tt> generates a new key each time. This
+applies to connections using the SSH-1 protocol, i.e., the servers of
+SSH1 and OpenSSH/1. [<a href="ch03_05.html#ch03-70562">Section 3.5.1.2, "Session key exchange and the server key"</a>] Whether that's
+an issue, of course, depends on the speed of the server machine in
+question. On the up side, the <tt class="command">inetd</tt> approach
+allows using a wrapper program to invoke <tt class="command">sshd</tt>,
+should that be needed. Also, <em class="emphasis">inetd</em> provides a
+single, centralized point of control for all types of network
+connections, which simplifies maintenance. If you want to forbid all
+types of TCP/IP connections, for example, you can simply disable
+<tt class="command">inetd</tt> instead of running around killing other
+daemons.</p>
+</div>
+
+
+
+
+
+<a name="ch05-50432" /><div class="sect3">
+<h3 class="sect3">5.4.3.3. Idle connections</h3>
+
+
+
+<a name="INDEX-795" />Suppose an SSH
+connection is established between a server and a client, but no data
+passes over the connection for a long time. What should the server
+do: keep the connection alive, or terminate it?</p>
+
+
+
+SSH1 provides the
+<tt class="literal">IdleTimeout</tt><a name="INDEX-796" />
+keyword, which tells the server what to do if a connection is idle,
+i.e., if the user doesn't transmit any data in a given period.
+If <tt class="literal">IdleTimeout</tt> is zero (the default), the server
+does nothing, leaving idle connections intact:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+IdleTimeout 0</pre></blockquote>
+
+
+
+Otherwise, the server terminates the connection after a specified
+interval of idleness. In this case, the value of
+<tt class="literal">IdleTimeout</tt> is a positive integer, optionally
+followed by letter: <tt class="literal">s</tt> for seconds,
+<tt class="literal">m</tt> for minutes, <tt class="literal">h</tt> for hours,
+<tt class="literal">d</tt> for days, or <tt class="literal">w</tt> for weeks. If
+no letter is given, the number represents seconds.</p>
+
+
+
+Here are several ways to set an <tt class="literal">IdleTimeout</tt> of
+exactly one day:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+IdleTimeout 1d
+IdleTimeout 24h
+IdleTimeout 1440m
+IdleTimeout 86400s
+IdleTimeout 86400</pre></blockquote>
+
+
+
+The idle timeout can also be set for a given key in a user's
+<em class="filename">authorized_keys</em> file using the idle-timeout
+option. [<a href="ch08_02.html#ch08-46035">Section 8.2.7, "Setting Idle Timeout "</a>] Notably, this option overrides
+the server's <tt class="literal">IdleTimeout</tt> value but only for
+that key. This is a rare instance of a per-account option overriding
+a serverwide option.</p>
+</div>
+
+
+
+
+
+<a name="ch05-64115" /><div class="sect3">
+<h3 class="sect3">5.4.3.4. KeepAlive</h3>
+
+
+
+<tt class="literal">KeepAlive</tt><a name="INDEX-797" />
+is a related but distinct feature to <tt class="literal">IdleTimeout</tt>.
+Where <tt class="literal">IdleTimeout</tt> detects and ends healthy but
+unused connections, <tt class="literal">KeepAlive</tt> is concerned with
+recognizing when a connection has failed. Suppose a client
+establishes an SSH connection, and some time later, the client host
+crashes abruptly. If the SSH server has no reason to send unsolicited
+messages to the client, it may never notice the half-dead TCP
+connection to its partner, and the <em class="emphasis">sshd</em> remains
+around indefinitely, using up system resources such as memory and a
+process slot (and making the sysadmin's <tt class="command">ps</tt>
+output messy).</p>
+
+
+
+The <tt class="literal">KeepAlive</tt> keyword instructs
+<em class="emphasis">sshd</em> how to proceed if a connection problem
+occurs, such as a prolonged network outage or a client machine crash:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+KeepAlive yes</pre></blockquote>
+
+
+
+The value <tt class="literal">yes</tt> (the default) tells the server to
+set the TCP keepalive option on its connection to the client. This
+causes TCP to periodically transmit and expect keepalive messages. If
+it doesn't receive responses to these messages for a while, it
+returns an error to <em class="emphasis">sshd</em>, which then shuts down
+the connection. The value <tt class="literal">no</tt> means not to use
+keepalive messages.</p>
+
+
+
+The TCP keepalive feature, and hence SSH's
+<tt class="literal">KeepAlive</tt>, is intended to prevent half-dead
+connections from building up over time. The keepalive message
+interval and timeout period reflect this: they are quite long,
+typically on the order of hours. This is to minimize the network load
+imposed by the keepalive messages and also to prevent connections
+from being unnecessarily torn down because of transient problems,
+such as a temporary network outage or routing flap. These timers
+aren't set in SSH; they are properties of the host's TCP
+stack. They shouldn't be altered lightly, since they affect
+every TCP connection using keepalives on that host.</p>
+
+
+
+<a name="ch05-13-fm2xml" /><div class="sect4">
+<h4 class="sect4">5.4.3.4.1. KeepAlive and connection timeouts</h4>
+
+
+
+It's important to note that <tt class="literal">KeepAlive</tt>
+isn't intended to deal with the problem of losing connections
+due to firewall, proxying, NAT, or IP masquerading timeouts. This
+problem occurs when your SSH connection is going across one of these
+entities, which decides to tear it down because it's been idle
+for a while. Since this is done to conserve shared resources (such as
+a limited pool of external, routable IP addresses), these timeouts
+are typically quite short, perhaps a few minutes to an hour or so.
+The name "KeepAlive" suggests that it might be the right
+thing to use, since that's what you want to do -- keep your
+connection alive. But really, <tt class="literal">KeepAlive</tt> is the
+wrong name for it; it would be better named "DetectDead"
+(but that sounds like a spell a second-level cleric would use to
+avoid being eaten by zombies). In order for
+<tt class="literal">KeepAlive</tt> to deal with this problem, you have to
+dramatically shorten the TCP keepalive interval on the SSH host. This
+is contrary to its purpose and unwise because it affects not only SSH
+connections, but every TCP connection using keepalives, even those
+that don't need it. Doing this on the server side is an
+especially bad idea as a general principle, since a busy server may
+be using lots of TCP connections, and enabling
+<tt class="literal">KeepAlive</tt> on many of them since it's
+supposed to be an inexpensive feature. This can impose an unnecessary
+and damaging additional network load, especially if it becomes a
+widespread practice.</p>
+
+
+
+It's good to remember that the timeout annoying you so much is
+there for a reason. You may like to leave an SSH connection up for a
+long time unused, but if it's occupying one of a limited number
+of simultaneous outbound Internet TCP connections for your company,
+perhaps it's better if you just suck it up for the common good.
+Typing <tt class="literal">ssh</tt> again once in a while is really not
+that hard; use your shell's alias feature if you find the
+number of keystrokes onerous. If you genuinely think the timeout is
+inappropriate or unnecessary, argue the case with the network
+administrator, and try to get it changed.</p>
+
+
+
+For the occasions when it's really necessary, the right way to
+accomplish this sort of keepalive behavior is with an
+application-level mechanism implemented in SSH -- having it
+periodically send SSH protocol messages over the connection to make
+it appear nonidle. This feature isn't available in any SSH
+implementation we know of, but we encourage its addition. NAT, etc.,
+timeouts are a common problem, and we would like to discourage the
+misuse of TCP keepalives as a solution. In the meantime, the better
+low-tech solution is simply to have something that sends characters
+over your connection once in a while. Run Emacs and have it display
+the time in the mode line. Run a program in the background that
+prints "Boo!" to your terminal if it's been idle
+for 20 minutes. You get the idea.</p>
+</div>
+</div>
+
+
+
+
+
+<a name="ch05-14-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.3.5. Failed logins</h3>
+
+
+
+Suppose a user attempts to log in via SSH but fails to authenticate.
+What should the server do? The keywords
+<tt class="literal">LoginGraceTime</tt><a name="INDEX-798" />
+and
+<tt class="literal">PasswordGuesses</tt><a name="INDEX-799" />
+control the server's response.</p>
+
+
+
+Users are given a limited time to authenticate successfully, 10
+minutes by default. This timeout is controlled by the
+<tt class="literal">LoginGraceTime</tt> keyword, given a value in seconds:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+LoginGraceTime 60</pre></blockquote>
+
+
+
+or the <span class="option">-g</span> command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -g 60</pre></blockquote>
+
+
+
+To disable this feature, provide a <tt class="literal">LoginGraceTime</tt>
+value of zero:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+LoginGraceTime 0</pre></blockquote>
+
+
+
+or by command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -g 0</pre></blockquote>
+
+
+
+If password authentication is used for a connection request,
+<tt class="command">sshd2</tt> permits a client only three tries to
+authenticate before dropping the connection. This restriction may be
+modified with the
+<tt class="literal">PasswordGuesses</tt><a name="INDEX-800" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+PasswordGuesses 5</pre></blockquote>
+
+
+
+The situation with public-key authentication is slightly more
+complicated. There are two sorts of requests a client can make in
+this regard: a query whether a particular public key is authorized to
+log into the target account, and an actual authentication attempt
+including a signature of the corresponding private key. It's
+good to allow an unlimited number of queries, since otherwise it
+limits the number of keys one can have in an agent, for example. But
+it's reasonable to limit the number of failed attempts. None of
+the current SSH servers do what we consider to be the right thing.
+SSH1 and SSH2 simply allow an unlimited number of public-key queries
+or attempts. OpenSSH, on the other hand, limits the overall number of
+authentication attempts or queries of any kind, and it uses a
+built-in, nonconfigurable limit of 5 (the source code says 6, but the
+way it's coded it comes out to 5). So if you have five keys in
+your agent, you never get to use password authentication with the
+OpenSSH server, because it rejects your connection after determining
+that you can't use any of those keys. Or if you have six keys
+and the sixth is the one you need to use, you're out of luck;
+you have to remove some keys from your agent (or not use the agent)
+to get it to work (these numbers are one fewer for OpenSSH/2, by the
+way).</p>
+
+
+
+Of course, there's a security argument to be made here.
+It's better in a sense to not allow queries and always force
+the client to perform an attempt. That way, if it fails, the client
+doesn't know whether it was because the signature was wrong or
+the key is simply not authorized. This makes it harder for an
+attacker to determine which keys are the ones to try to steal. But in
+normal use it's computationally expensive for legitimate
+clients to do this, and so the protocol does allow queries.</p>
+</div>
+
+
+
+
+
+<a name="ch05-34208" /><div class="sect3">
+<h3 class="sect3">5.4.3.6. Limiting simultaneous connections</h3>
+
+
+
+<tt class="command">sshd</tt> can handle an arbitrary number of
+simultaneous connections by default. SSH2 provides the
+<tt class="literal">MaxConnections</tt><a name="INDEX-801" />
+keyword for limiting this number, say, if you want to conserve
+resources on the server machine:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+MaxConnections 32</pre></blockquote>
+
+
+
+To specify an unlimited number of connections, provide a value of
+zero:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+MaxConnections 0</pre></blockquote>
+
+
+
+Of course, the number of connections can also be limited by available
+memory or other operating system resources.
+<tt class="literal">MaxConnections</tt> has no effect on these other
+factors. (Sorry, you can't increase your CPU speed by setting a
+keyword!)</p>
+</div>
+
+
+
+
+
+<a name="ch05-27029" /><div class="sect3">
+<h3 class="sect3">5.4.3.7. Reverse IP mappings</h3>
+
+
+
+The SSH2 server optionally does a reverse DNS lookup on a
+client's IP address. That is, it looks up the name associated
+with the address, then looks up the addresses for that name and makes
+sure that the client's address is among them. If this check
+fails, the server refuses the connection.</p>
+
+
+
+<tt class="command">sshd2</tt> uses the <tt class="function">gethostbyname(
+)</tt><a name="INDEX-802" /> and <tt class="function">gethostbyaddr(
+)</tt><a name="INDEX-803" /> system services to perform these mappings, so
+the databases that are consulted depend on the host operating system
+configuration. It might use the <a name="INDEX-804" />DNS, the Network Information Service
+(NIS or YP), static files on server machine, or some combination.</p>
+
+
+
+To enable this check, use the
+<tt class="literal">RequireReverseMapping</tt><a name="INDEX-805" /><a name="INDEX-806" />
+keyword with a value of <tt class="literal">yes</tt> or
+<tt class="literal">no</tt> (the default):</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+RequireReverseMapping yes</pre></blockquote>
+
+
+
+This feature is a bit of security-oriented consistency checking. SSH
+uses cryptographic signatures to determine a peer's identity,
+but the list of peer public keys (the known hosts database) is often
+indexed by hostname, and so SSH must translate the address to a name
+in order to check the peer's identity. Reverse mapping tries to
+ensure that someone isn't playing games with the naming service
+in a cracking attempt. There is a tradeoff, however, since in
+today's Internet, the DNS reverse-address mappings aren't
+always kept up to date. The SSH server might reject legitimate
+connection attempts because of poorly maintained reverse-address
+mappings over which you have no control. In general, we recommend
+turning off this feature; it isn't usually worth the hassle.</p>
+</div>
+
+
+
+
+
+<a name="ch05-26328" /><div class="sect3">
+<h3 class="sect3">5.4.3.8. Controlling TCP_NODELAY</h3>
+
+
+
+TCP/IP has a feature called the Nagle Algorithm, which is designed to
+reduce the number of TCP segments sent with very small amounts of
+data (e.g., one byte), usually as part of an interactive terminal
+session. Over fast links such as Ethernet, the Nagle algorithm
+generally isn't needed. Over a wide-area network, however, it
+can cause noticeable delays in the responsiveness of X clients and
+character terminal displays, as multibyte terminal control sequences
+may be transmitted inconveniently by the algorithm. In such cases,
+you should turn off the Nagle Algorithm using the
+<tt class="literal">NoDelay</tt><a name="INDEX-807" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+NoDelay yes</pre></blockquote>
+
+
+
+<tt class="literal">NoDelay</tt> disables the Nagle Algorithm by toggling
+the TCP_NODELAY bit when requesting a TCP connection from the Unix
+kernel. Legal values are <tt class="literal">yes</tt> (to disable) and
+<tt class="literal">no</tt> (to enable; the default).</p>
+
+
+
+In order to work, this feature must be enabled at compile time using
+<tt class="literal"> -- enable-tcp-nodelay</tt>. [<a href="ch04_01.html#ch04-29328">Section 4.1.5.3, "TCP/IP support"</a>] Note also that
+<tt class="literal">NoDelay</tt> can be enabled or disabled by the SSH2
+client, rather than serverwide, using the client configuration
+keyword <tt class="literal">NoDelay</tt>. [<a href="ch07_04.html#ch07-70407">Section 7.4.4.4, "Controlling TCP_NODELAY"</a>]</p>
+</div>
+
+
+
+
+
+<a name="ch05-15-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.3.9. Discovering other servers</h3>
+
+
+
+SSH2 2.1.0 adds a feature for seeking out and discovering SSH2
+servers automatically. The keyword
+<tt class="literal">MaxBroadcastsPerSecond</tt><a name="INDEX-808" />,
+when given an integer value greater than zero, causes an SSH2 server
+to listen to UDP broadcasts sent to port 22:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+MaxBroadcastsPerSecond 10</pre></blockquote>
+
+
+
+A new program supplied with SSH2,
+<tt class="command">ssh-probe2</tt><a name="INDEX-809" />,
+sends broadcast queries and prints the locations and versions of any
+SSH2 servers it finds. The server only responds to this many queries
+per second; the rate-limiting prevents a denial-of-service attack
+that floods the server with queries, causing it to spend all its time
+replying to them.</p>
+
+
+
+<tt class="literal">MaxBroadcastsPerSecond</tt> and
+<tt class="command">ssh-probe2</tt> are a rather ad hoc solution for
+locating SSH2 servers. Perhaps when Dynamic DNS and SRV records
+become more widely used, such tricks won't be necessary.</p>
+</div>
+
+
+
+
+
+<a name="ch05-16-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.3.10. Agent forwarding</h3>
+
+
+
+<a name="INDEX-810" />Agent
+forwarding permits a series of SSH connections (from one machine to
+another to another, ...) to operate seamlessly using a single agent.
+[<a href="ch06_03.html#ch06-27937">Section 6.3.5, "Agent Forwarding"</a>] Agent forwarding may be enabled or
+disabled in the SSH2 server using the keyword
+<tt class="literal">ForwardAgent</tt><a name="INDEX-811" />
+or
+<tt class="literal">AllowAgentForwarding</tt><a name="INDEX-812" />
+with a value of <tt class="literal">yes</tt> (the default) or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+ForwardAgent no</pre></blockquote>
+
+
+
+It may also be enabled or disabled by the client. [<a href="ch06_03.html#ch06-29354">Section 6.3.5.3, "Enabling agent forwarding"</a>]</p>
+
+
+
+Agent forwarding is convenient, but in a security-sensitive
+environment, it might be appropriate to disable this feature. Because
+forwarded agent connections are implemented as Unix domain sockets,
+an attacker can conceivably gain access to them. These sockets are
+just nodes in the filesystem, protected only by file permissions that
+can be compromised.</p>
+
+
+
+For example, suppose you maintain a network of exposed, untrusted
+machines that you access from a more secure network using SSH. You
+might consider disabling agent forwarding on the untrusted machines.
+Otherwise, an attacker can compromise an untrusted machine; take
+control of a forwarded agent from a legitimate, incoming SSH
+connection; and use the agent's loaded keys to gain access to
+the secure network via SSH. (The attacker can't retrieve the
+keys themselves in this way, however.)</p>
+</div>
+
+
+
+
+
+<a name="ch05-17-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.3.11. Forwarding</h3>
+
+
+
+SSH's forwarding or tunneling feature protects other
+TCP/IP-based applications by encrypting their connections. We cover
+forwarding in great detail in <a href="ch09_01.html">Chapter 9, "Port Forwarding and X Forwarding"</a>, but we
+introduce here the serverwide configuration keywords for enabling and
+disabling it.</p>
+
+
+
+TCP port forwarding can be enabled or disabled by the keyword
+<tt class="literal">AllowTcp-Forwarding</tt><a name="INDEX-813" />
+with the value <tt class="literal">yes</tt> (the default) or
+<tt class="literal">no</tt>:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+AllowTcpForwarding no</pre></blockquote>
+
+
+
+or more selectively for particular users or Unix groups:</p>
+
+<a name="INDEX-814" /><a name="INDEX-815" /><a name="INDEX-816" /><a name="INDEX-817" />
+
+<blockquote><pre class="code"># SSH2 only
+AllowTcpForwardingForUsers smith jones roberts
+AllowTcpForwardingForGroups students faculty
+DenyTcpForwardingForUsers badguys
+DenyTcpForwardingForGroups bad*</pre></blockquote>
+
+
+
+Forwarding for X, the popular window system, can be separately
+enabled or disabled with the keyword
+<tt class="literal">X11Forwarding</tt><a name="INDEX-818" />
+(SSH1, SSH2, OpenSSH), or
+<tt class="literal">ForwardX11</tt><a name="INDEX-819" />
+or
+<tt class="literal">AllowX11Forwarding</tt><a name="INDEX-820" />
+(SSH2 synonyms for <tt class="literal">X11Forwarding</tt>). The default
+value is <tt class="literal">yes</tt>, to enable forwarding:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+X11Forwarding no 
+
+# SSH2 only: either will work
+ForwardX11 no
+AllowX11Forwarding no</pre></blockquote>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-18-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.4.4. Server Key Generation</h3>
+
+
+
+All SSH servers maintain a <a name="INDEX-821" /><a name="INDEX-822" />host key,
+which is persistent, generated by the system administrator when
+installing SSH, and identifies the host for authentication purposes.
+[<a href="ch05_04.html#ch05-59943">Section 5.4.1.1, "Host key files"</a>]</p>
+
+
+
+Separately, an SSH-1 server maintains another key while running,
+called the server key, which protects client/server communications.
+This key is temporary and never explicitly stored on disk. The server
+generates it at startup, and regenerates it at regular intervals.
+SSH1 and OpenSSH can specify the length of the server key in bits.
+The key length is 768 bits by default, 512 bits at a minimum, and you
+may choose another length using the
+<tt class="literal">ServerKeyBits</tt><a name="INDEX-823" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+ServerKeyBits 1024</pre></blockquote>
+
+
+
+or the <span class="option">-b</span> command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -b 1024</pre></blockquote>
+
+
+
+You may also specify the lifetime or <em class="emphasis">regeneration
+interval</em> of the server key. When the lifetime ends,
+another server key is generated and the process repeats, say, every
+10 minutes. This is a security feature: if an intruder captures a
+server key, it can decrypt transmissions for only a limited time (10
+minutes in our example). Likewise, if an encrypted transmission is
+captured by a sniffer, the server key necessary to decrypt the
+session is destroyed in the server after 10 minutes.</p>
+
+
+
+Key regeneration is specified in seconds. Regeneration occurs every
+3600 seconds (one hour) by default. The interval is specified with
+the
+<tt class="literal">KeyRegeneration-Interval</tt><a name="INDEX-824" />
+keyword:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KeyRegenerationInterval 1200</pre></blockquote>
+
+
+
+or the <em class="emphasis">-k</em> command-line option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -k 1200</pre></blockquote>
+
+
+
+A zero value turns off the key regeneration feature:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+KeyRegenerationInterval 0</pre></blockquote>
+
+
+
+or:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -k 0</pre></blockquote>
+
+
+
+The
+<tt class="literal">RekeyIntervalSeconds</tt><a name="INDEX-825" />
+keyword specifies how often (in seconds) <tt class="command">sshd2</tt>
+performs key exchange with the client to replace the session
+data-encryption and integrity keys. The default is 3600 seconds (one
+hour), and a zero value disables rekeying:<a href="#FOOTNOTE-58">[58]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-58" />[58]Note that
+at press time, you must disable session rekeying in the SSH2 server
+if you wish to use it with many other SSH clients, since the latter
+don't yet support session rekeying; the connection dies with an
+error once the rekeying interval expires.</p>
+
+
+</blockquote>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+RekeyIntervalSeconds 7200</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-67370" /><div class="sect2">
+<h3 class="sect2">5.4.5. Encryption Algorithms</h3>
+
+
+
+<a name="INDEX-826" /><a name="INDEX-827" />The SSH server supports a number of
+data-encryption algorithms for its secure connection; the client
+selects a cipher to use from the list the server supports. SSH2 has a
+server configuration option to set the list of allowable ciphers,
+selected from those the server software supports. The
+<tt class="literal">Ciphers</tt><a name="INDEX-828" />
+keyword serves this purpose. Its value may have two different forms:</p>
+
+
+
+<ul><li>A comma-separated list of algorithm names (strings), indicating which
+algorithms are permissible. The following
+<a name="INDEX-829" />table displays the supported values.</p></li></ul>
+<a name="ch05-19-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p></th>
+<th>
+Meaning</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<tt class="literal">3des-cbc</tt></p></td>
+<td>
+The 3DES (Triple DES) algorithm</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">blowfish-cbc</tt></p></td>
+<td>
+The Blowfish algorithm</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">twofish-cbc</tt></p></td>
+<td>
+The TwoFish algorithm</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">arcfour</tt></p></td>
+<td>
+The ARCFOUR algorithm</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">none</tt></p></td>
+<td>
+No encryption</p></td>
+</tr>
+
+
+
+</table><p>
+<ul><li>The <tt class="literal">none</tt><a name="INDEX-830" /> algorithm is
+available only when SSH is compiled with the
+<tt class="literal"> -- with-none</tt><a name="INDEX-831" /> flag. The
+<tt class="literal">-cbc</tt> suffixes indicate <a name="INDEX-832" />cipher block chaining. These
+algorithms are in a class called <a name="INDEX-833" /><em class="emphasis">block ciphers</em>,
+which may operate in a variety of modes; CBC is one of them.</p></li><li>A single string indicating a set of algorithms. The following table
+displays the supported values:</p></li></ul>
+<a name="ch05-20-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p></th>
+<th>
+Meaning</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<tt class="literal">none</tt></p></td>
+<td>
+Unencrypted transmission</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">any</tt></p></td>
+<td>
+Any algorithm implemented in the server, including
+<tt class="literal">none</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anycipher</tt></p></td>
+<td>
+Same as <tt class="literal">any</tt>, but excluding <tt class="literal">none</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anystd</tt></p></td>
+<td>
+Any standard algorithm found in the IETF SecSH draft (assuming it is
+implemented in the server), including <tt class="literal">none</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anystdcipher</tt></p></td>
+<td>
+Same as <tt class="literal">anystd</tt>, but excluding
+<tt class="literal">none</tt></p></td>
+</tr>
+
+
+
+</table><p>
+
+Here are some examples:</p>
+
+
+
+<blockquote><pre class="code"># SSH2, OpenSSH/2
+Ciphers 3des-cbc
+Ciphers 3des-cbc,blowfish-cbc,arcfour
+Ciphers any</pre></blockquote>
+
+
+
+Individual algorithms and sets of algorithms can't be mixed:</p>
+
+
+
+<blockquote><pre class="code"># This is ILLEGAL
+Ciphers 3des,anystd</pre></blockquote>
+
+
+
+The <tt class="literal">Ciphers</tt> keyword is useful for quickly
+disabling individual encryption algorithms, say, if a security hole
+is discovered in one of them. Just omit that algorithm from the
+<tt class="literal">Ciphers</tt> list and restart the server.</p>
+
+
+
+Support for some algorithms can be omitted from the SSH1 server at
+compile time. [<a href="ch04_01.html#ch04-53025">Section 4.1.5.6, "Encryption and ciphers"</a>] In particular, support for
+the <tt class="literal">none</tt> cipher type is not compiled in by
+default. This omission is a security feature to make insecure SSH
+sessions more difficult to create. Otherwise, if an attacker gained
+access to your account for a few moments, he could add "Ciphers
+none" to your SSH client configuration file. You might never
+notice this small change, but all of your future SSH connections
+would be insecure.<a href="#FOOTNOTE-59">[59]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-59" />[59]If you do connect using the
+<tt class="literal">none</tt> cipher, <tt class="command">ssh </tt>prints a
+warning message, "WARNING: Encryption is disabled!" Even
+so, an attacker can enable <tt class="literal">QuietMode</tt> in your
+clients and suppress this message. [<a href="ch05_08.html#ch05-52107">Section 5.8.1.3, "SSH1 Quiet mode"</a>]</p>
+
+
+</blockquote>
+
+
+
+Use the <tt class="literal">none</tt> cipher only for testing. Using the
+SSH-1 protocol with no encryption seriously weakens it: not only do
+you lose data privacy, but also you effectively lose server
+authentication and integrity protection. SSH-2 doesn't suffer
+from these problems. In either case, however, password authentication
+isn't available, since the password would be sent in the clear.</p>
+
+
+
+<a name="ch05-21-fm2xml" /><div class="sect3">
+<h3 class="sect3">5.4.5.1. MAC algorithms</h3>
+
+
+<a name="INDEX-834" /><a name="INDEX-835" />
+
+The <tt class="literal">MAC</tt> keyword lets you select the allowed
+integrity-checking algorithms, known as the Message Authentication
+Code, used by <tt class="command">sshd2</tt>. [<a href="ch03_02.html#ch03-98801">Section 3.2.3, "Hash Functions"</a>]
+Here are the available algorithms: [<a href="ch03_09.html#ch03-39382">Section 3.9.3, "Hash Functions"</a>]</p>
+
+
+
+<blockquote><pre class="code">hmac-sha1
+hmac-md5
+hmac-md5-96</pre></blockquote>
+
+
+
+The following <a name="INDEX-836" />table shows keywords with special meanings
+that can also be used:</p>
+
+
+
+<a name="ch05-22-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p></th>
+<th>
+Meaning</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+<tt class="literal">any</tt></p></td>
+<td>
+Any supported algorithm</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anymac</tt></p></td>
+<td>
+Any supported algorithm, except <tt class="literal">none</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anystd</tt></p></td>
+<td>
+Any standard algorithm; that is, one defined in the current working
+draft of the SSH-2 protocol</p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">anystdmac</tt></p></td>
+<td>
+Same as <tt class="literal">anystd</tt>, but excludes
+<tt class="literal">none</tt></p></td>
+</tr>
+
+
+<tr>
+<td>
+<tt class="literal">none</tt></p></td>
+<td>
+No MAC; this is insecure</p></td>
+</tr>
+
+
+
+</table><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-23-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.4.6. SSH Protocol Selection</h3>
+
+
+
+<a name="INDEX-837" />OpenSSH lets you limit its protocol
+support to SSH-1, SSH-2, or both, using the Protocol keyword.
+Permissible values are <tt class="literal">1</tt> (for SSH-1, the default),
+<tt class="literal">2</tt> (for SSH-2), or both <tt class="literal">1</tt> and
+<tt class="literal">2</tt> separated by a comma:</p>
+
+
+
+<blockquote><pre class="code"># OpenSSH only
+Protocol 1,2</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.3. Server Configuration: An Overview</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.5. Letting People in: Authentication and Access Control</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+</html>

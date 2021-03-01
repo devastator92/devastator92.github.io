@@ -1,0 +1,203 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>NFS and file locking (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.2. NFS and file locking</h2>
+
+The NFS (Versions 2 and 3) protocol <a name="INDEX-1602" /> <a name="INDEX-1603" /> <a name="INDEX-1604" />does not support
+file locking, but the NFS environment supports an ancillary protocol
+called NLM, which <a name="INDEX-1605" />originally stood for "Network
+Lock Manager." When an NFS filesystem on an NFS client gets a
+request to lock a file, instead of an NFS remote procedure call, it
+generates an NLM remote procedure call.
+</p>
+
+<a name="nfs2-CHP-11-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">11.2.1. The NLM protocol</h3>
+
+The NLM protocol consists of <a name="INDEX-1606" /> <a name="INDEX-1607" /> <a name="INDEX-1608" />
+<a name="INDEX-1609" />remote procedure calls that pattern
+fcntl arguments and results. Because blocking locks are supported (a
+process blocks waiting for a lock that conflicts with another
+holder), the NLM protocol has the notion of callbacks, from the file
+server to the NLM client to notify that a lock is available. In this
+way, the NLM client sometimes acts as an RPC server in order to
+receive delayed results from lock calls.
+</p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">11.2.2. NLM recovery</h3>
+
+The NFS protocol is stateless, but because<a name="INDEX-1610" />
+<a name="INDEX-1611" />
+<a name="INDEX-1612" /> file locking is inherently stateful,
+NLM is stateful. This results in a more complex scheme to recover
+from failures. There are three types of recovery scenarios to
+consider:
+</p>
+
+<ul><li>
+Server crash</p>
+</li><li>
+Client crash</p>
+</li><li>
+Network partition</p>
+</li></ul>
+<a name="nfs2-CHP-11-SECT-2.2.1" /><div class="sect3">
+<h3 class="sect3">11.2.2.1. Server crash</h3>
+
+When the NLM server crashes, NLM clients
+<a name="INDEX-1613" />
+<a name="INDEX-1614" />that are holding locks must reestablish
+them on the server when it restarts. The NLM protocol deals with this
+by having the status monitor on the server send a notification
+message to the status monitor of each NLM client that was holding
+locks. The initial period after a server restart is called the grace
+period. During the grace period, only requests to reestablish locks
+are granted. Thus, clients that reestablish locks during the grace
+period are guaranteed to not lose their locks.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-11-SECT-2.2.2" /><div class="sect3">
+<h3 class="sect3">11.2.2.2. Client crash</h3>
+
+When an NLM client crashes, it is desirable that<a name="INDEX-1615" /> <a name="INDEX-1616" /> any locks it was holding at the time
+be removed from all the NLM servers it had locks on. The NLM protocol
+deals with this by having the status monitor on the client send a
+message to each server's status monitor once the client
+reboots. The client reboot indication tells the server that the
+client no longer needs its locks.
+</p>
+
+Of course, if the client crashes and never comes back to life, the
+client's locks will persist indefinitely. This is not good for
+two reasons:
+</p>
+
+<ul><li>
+Resources are indefinitely leaked.</p>
+</li><li>
+Eventually another client will want to get a conflicting lock on at
+least one of the files the crashed client had locked. Thus the other
+client is postponed indefinitely.
+</p>
+</li></ul>
+This is one of the administrative issues you will <a name="INDEX-1617" /> <a name="INDEX-1618" />need to deal with,
+which we will cover later in this chapter.
+</p>
+
+</div>
+
+<a name="nfs2-CHP-11-SECT-2.2.3" /><div class="sect3">
+<h3 class="sect3">11.2.2.3. Network partition</h3>
+
+Suppose an NLM client is holding a lock, but
+<a name="INDEX-1619" />
+<a name="INDEX-1620" />the network route between it and the NLM
+server goes down: a network partition. At this point, from the
+perspective of the server, the situation is indistinguishable from a
+client that crashes<a name="INDEX-1621" /> <a name="INDEX-1622" /> <a name="INDEX-1623" /> but never comes back. Again, this is a
+situation you will need to handle.
+</p>
+
+</div>
+</div>
+<a name="nfs2-CHP-11-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">11.2.3. Mandatory locking and NFS</h3>
+
+NLM supports only advisory whole file and <a name="INDEX-1624" />
+<a name="INDEX-1625" />
+<a name="INDEX-1626" /> <a name="INDEX-1627" />byte range
+locking, and until NFS Version 4 is deployed, this means that the NFS
+environment cannot support mandatory whole file and byte range
+locking. The reason goes back to how mandatory locking interacts with
+advisory <em class="emphasis">fcntl</em> calls.
+</p>
+
+Let's suppose a process with ID 1867 issues an
+<em class="emphasis">fcntl</em> exclusive lock call on the entire range of
+a local file that has mandatory lock permissions set. This
+<em class="emphasis">fcntl</em> call is an advisory lock. Now the process
+attempts to write the file. The operating system can tell that
+process 1867 holds an advisory lock, and so, it allows the write to
+proceed, rather than attempting to acquire the advisory lock on
+behalf of the process 1867 for the duration of the write. Now suppose
+process 1867 does the same sequence on another file with mandatory
+lock permissions, but this file is on an NFS filesystem. Process 1867
+issues an <em class="emphasis">fcntl</em> exclusive lock call on the
+entire range of a file that has mandatory lock permissions set. Now
+process 1867 attempts to write the file. While the NLM protocol has
+fields in its lock requests to uniquely identify the process on the
+client that locked the file, the NFS protocol has no fields to
+identify the processes that are doing writes or reads. The file is
+advisory locked, and it has the mandatory lock permissions set, yet
+the NFS server has no way of knowing if the process that sent the
+write request is the same one that obtained the lock. Thus, the NFS
+server cannot lock the file on behalf of the NFS client. For this
+reason, some NFS servers, including Solaris servers, refuse any read
+or write to a file <a name="INDEX-1628" /> <a name="INDEX-1629" /> <a name="INDEX-1630" /> <a name="INDEX-1631" />with the mandatory lock permissions
+set.
+</p>
+
+</div>
+<a name="nfs2-CHP-11-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">11.2.4. NFS and Windows lock semantics</h3>
+
+The NLM protocol supports byte range locking<a name="INDEX-1632" />
+<a name="INDEX-1633" />
+<a name="INDEX-1634" /> and share
+reservations.
+</p>
+
+While Windows byte range locking is mandatory, on Unix servers it
+will be advisory. To the dismay of Windows software developers, this
+means that non-PC/NFS clients might step on PC/NFS clients, because
+the non-PC/NFS client does not try to acquire a lock. It also means
+that servers that support both NFS/NLM and SMB might not correctly
+handle cases where an NFS client is doing a read or write to a file
+that an SMB client has established a mandatory lock on.
+</p>
+
+PC/NFS clients will emulate share reservation semantics by issuing
+the share reservation remote procedure calls to the NLM server.
+However, most non-PC/NFS clients, or even local processes on Unix NLM
+servers will not honor the deny semantics of the share reservation of
+the PC/NFS client. Another problem with the emulation is that Windows
+semantics expect the share reservation and exclusive file creation to
+be atomic. The share reservation and file creation go out as separate
+operations, hence no atomicity, allowing a window of vulnerability,
+where a client can succeed in its exclusive create, but <a name="INDEX-1635" /> <a name="INDEX-1636" /> <a name="INDEX-1637" />not get the
+<a name="INDEX-1638" />
+<a name="INDEX-1639" />
+<a name="INDEX-1640" />share
+reservation.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11. File Locking </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.3. Troubleshooting locking problems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch11_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

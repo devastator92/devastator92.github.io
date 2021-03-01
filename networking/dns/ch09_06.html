@@ -1,0 +1,369 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Good Parenting (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch09_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.6. Good Parenting</h2>
+
+
+Now <a name="INDEX-1490" />
+<a name="INDEX-1491" />that the delegation to the
+<em class="emphasis">fx.movie.edu</em> name servers is
+in place, we -- responsible parents that we are -- should check
+that delegation using <em class="filename">host</em>. What? We
+haven't given you <em class="filename">host </em>yet? A version of
+<em class="emphasis">host</em> <a name="INDEX-1492" />
+<a name="INDEX-1493" />
+<a name="INDEX-1494" />for Unix is available via
+anonymous FTP from ftp.nikhef.nl as
+<em class="filename">/pub/network/host.tar.Z</em>.</p><p>
+
+
+To build <em class="filename">host</em>, first extract it:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>zcat host.tar.Z | tar -xvf -</b></tt></pre></blockquote>
+
+
+Then build it on your system:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>make</b></tt></pre></blockquote>
+
+
+<em class="filename">host</em>makes it easy to check
+delegation. With <em class="filename">host</em><em class="emphasis">,</em> you
+can look up the NS records for your zone on your parent zone's
+name servers. If those look good, you can use
+<em class="filename">host</em>to query each name
+server listed for the zone's SOA record. The query is
+nonrecursive, so the name server queried doesn't query other
+name servers to find the SOA record. If the name server replies,
+<em class="filename">host</em> checks the reply to see whether the
+<a name="INDEX-1495" /> <a name="INDEX-1496" /><em class="emphasis">aa -- </em>authoritative
+answer -- bit in the reply message is set. If it is, the name
+server checks to make sure that the message contains an answer. If
+both these criteria are met, the name server is flagged as
+authoritative for the zone. Otherwise, the name server is not
+authoritative, and <em class="filename">host</em> reports an error.</p><p>
+
+
+Why all the fuss over bad delegation? Incorrect delegation can slow
+name resolution or cause the propagation of old and erroneous root
+name server information. When a name server is queried for data in a
+zone it isn't authoritative for, it does its best to provide
+useful information to the querier. This "useful
+information" comes in the form of NS records for the closest
+ancestor zone the name server knows. (We mentioned this briefly in
+<a href="ch08_01.html">Chapter 8, "Growing Your Domain"</a>, when we discussed why you
+shouldn't register a caching-only name server.)</p><p>
+
+
+For example, say one of the <em class="emphasis">fx.movie.edu</em> name servers mistakenly
+receives an iterative query for the address of <em class="emphasis">carrie.horror.movie.edu</em>. It knows
+nothing about the <em class="emphasis">horror.movie.edu</em> zone (except for what
+it might have cached), but it likely has NS records for <em class="emphasis">movie.edu</em> cached, since those are its
+parent name servers. So it would return those records to the querier.</p><p>
+
+
+In that scenario, the NS records may help the querying name server
+get an answer. However, it's a fact of life on the Internet
+that not all administrators keep their root hints files up to date.
+If one of your name servers follows a bad delegation and queries a
+remote name server for records it doesn't have, look what can
+happen:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nslookup</b></tt> 
+Default Server:  terminator.movie.edu 
+Address:  192.249.249.3 
+&gt; <tt class="userinput"><b>set type=ns</b></tt> 
+&gt; <tt class="userinput"><b>.</b></tt> 
+Server:  terminator.movie.edu 
+Address:  192.249.249.3 
+
+Non-authoritative answer: 
+(root)  nameserver = D.ROOT-SERVERS.NET
+(root)  nameserver = E.ROOT-SERVERS.NET
+(root)  nameserver = I.ROOT-SERVERS.NET
+(root)  nameserver = F.ROOT-SERVERS.NET
+(root)  nameserver = G.ROOT-SERVERS.NET
+(root)  nameserver = A.ROOT-SERVERS.NET
+(root)  nameserver = H.ROOT-SERVERS.NET 
+(root)  nameserver = B.ROOT-SERVERS.NET
+(root)  nameserver = C.ROOT-SERVERS.NET
+<tt class="userinput"><b>(root)  nameserver = A.ISI.EDU          </b></tt><i class="lineannotation"> -- These three name </i>
+<tt class="userinput"><b>(root)  nameserver = SRI-NIC.ARPA       </b></tt><i class="lineannotation"> -- servers are no longer </i>
+<tt class="userinput"><b>(root)  nameserver = GUNTER-ADAM.ARPA   </b></tt><i class="lineannotation"> -- roots</i></pre></blockquote>
+
+
+A remote name server tried to "help out" our local name
+server by sending it the current list of roots. Unfortunately, the
+remote name server was corrupt and returned NS records that were
+incorrect. And our local name server, not knowing any better, cached
+that data.</p><p>
+
+
+
+<a name="ch09-17-fm2xml" /><blockquote><b>TIP: </b>
+BIND 4.9 and later name servers are resistant to this.</p><p>
+
+</blockquote>
+
+Queries to misconfigured <a name="INDEX-1497" /><em class="emphasis">in-addr.arpa</em> name servers often result
+in bad root NS records, because the <em class="emphasis">in-addr.arpa</em> and <em class="emphasis">arpa</em> zones are the closest ancestors of
+most <em class="emphasis">in-addr.arpa</em>subdomains, and name servers very seldom cache NS
+records of either <em class="emphasis">in-addr.arpa</em> or <em class="emphasis">arpa</em>. (The roots seldom give them out,
+since they delegate directly to lower-level subdomains.) Once your
+name server has cached bad root NS records, your name resolution may
+suffer.</p><p>
+
+
+Those root NS records may have your name server querying a root name
+server that is no longer at that IP address, or a root name server
+that no longer exists at all. If you're having an especially
+bad day, the bad root NS records may point to a real, nonroot name
+server that is close to your network. Even though it won't
+return authoritative root data, your name server will favor it
+because of its proximity to your network.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">9.6.1. Using host</h3>
+
+
+If our little lecture has convinced you of the importance of
+maintaining correct delegation, you'll be eager to learn how to
+use <em class="filename">host</em><a name="INDEX-1498" />
+<a name="INDEX-1499" />
+to ensure that you don't join the ranks of the miscreants.</p><p>
+
+
+The first step is to use <em class="filename">host</em> to look up your
+zone's NS records on a name server for your parent zone and
+make sure they're correct. Here's how we would check the
+<em class="emphasis">fx.movie.edu</em> NS records on
+one of the <em class="emphasis">movie.edu</em> name
+servers:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>host -t ns fx.movie.edu. terminator.movie.edu.</b></tt></pre></blockquote>
+
+
+If everything's okay with the NS records, we'll simply
+see them in the output:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu   NS   bladerunner.fx.movie.edu
+fx.movie.edu   NS   outland.fx.movie.edu</pre></blockquote>
+
+
+This tells us that all the NS records delegating <em class="emphasis">fx.movie.edu</em>from
+<em class="emphasis">terminator.movie.edu</em>are correct.</p><p>
+
+
+Next, we'll use <em class="filename">host </em>'s "SOA
+check" mode to query each of the name servers in the NS records
+for the <em class="emphasis">fx.movie.edu</em>
+zone's SOA record. This will also check whether the response
+was authoritative:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>host -C fx.movie.edu.</b></tt></pre></blockquote>
+
+
+Normally, this produces the NS records just listed, along with the
+contents of the <em class="emphasis">fx.movie.edu</em>zone's SOA record:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu      NS      bladerunner.fx.movie.edu
+bladerunner.fx.movie.edu     hostmaster.fx.movie.edu   (1 10800 3600 608400 3600)
+fx.movie.edu      NS      outland.fx.movie.edu
+bladerunner.fx.movie.edu      hostmaster.fx.movie.edu   (1 10800 3600 608400 3600)</pre></blockquote>
+
+
+If one of the <em class="emphasis">fx.movie.edu</em>
+name servers -- say <em class="emphasis">outland -- </em>were misconfigured, we
+might see this:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu   NS   bladerunner.fx.movie.edu
+fx.movie.edu   NS   outland.fx.movie.edu
+fx.movie.edu SOA record currently not present at outland.fx.movie.edu
+fx.movie.edu has lame delegation to outland.fx.movie.edu</pre></blockquote>
+
+
+This indicates that the name server on <em class="emphasis">outland</em>is running,
+but it's not authoritative for <em class="emphasis">fx.movie.edu</em><em class="emphasis">.</em></p><p>
+
+
+If one of the <em class="emphasis">fx.movie.edu</em>
+name servers weren't running at all, we'd see:</p><p>
+
+
+<blockquote><pre class="code">fx.movie.edu   NS   bladerunner.fx.movie.edu
+bladerunner.fx.movie.edu     hostmaster.fx.movie.edu   (1 10800 3600 608400 3600)
+fx.movie.edu   NS   outland.fx.movie.edu
+fx.movie.edu SOA record not found at outland.fx.movie.edu, try again</pre></blockquote>
+
+
+In this case, the <em class="emphasis">try again</em> message indicates
+that <em class="filename">host</em>sent <em class="emphasis">outland</em>a query and
+didn't get a response back in an acceptable amount of time.</p><p>
+
+
+While we could have checked the <em class="emphasis">fx.movie.edu</em>delegation using <em class="filename">nslookup</em><em class="emphasis">,
+</em><em class="filename">host </em>'s powerful command-line
+options make the task especially easy.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">9.6.2. Managing Delegation</h3>
+
+
+If the special effects lab gets bigger, we may find that we need
+additional name servers. We dealt with setting up new name servers in
+<a href="ch08_01.html">Chapter 8, "Growing Your Domain"</a> and even went over what information to
+send to the parent zone's administrator. But we never explained
+what the parent needed to do.</p><p>
+
+
+It turns out that the parent's job is relatively easy,
+especially if the administrators of the subdomain send complete
+information. Imagine that the special effects lab expands to a new
+network, 192.254.20/24. This network has a passel of new,
+high-powered graphics workstations. One of them, <em class="emphasis">alien.fx.movie.edu</em>, will act as the new
+network's name server.</p><p>
+
+
+The administrators of <em class="emphasis">fx.movie.edu</em> (we delegated it to the
+folks in the lab) send their parent zone's administrators
+(that's us) a short note:</p><p>
+
+
+<blockquote><pre class="code">Hi!
+
+We've just set up alien.fx.movie.edu (192.254.20.3) as a name
+server for fx.movie.edu.  Would you please update your
+delegation information?  I've attached the NS records you'll
+need to add.
+
+Thanks,
+
+Arty Segue
+ajs@fx.movie.edu
+
+----- cut here -----
+
+fx.movie.edu.  86400  IN  NS  bladerunner.fx.movie.edu.
+fx.movie.edu.  86400  IN  NS  outland.fx.movie.edu.
+fx.movie.edu.  86400  IN  NS  alien.fx.movie.edu.
+
+bladerunner.fx.movie.edu.  86400  IN  A  192.253.254.2
+outland.fx.movie.edu.      86400  IN  A  192.253.254.3
+alien.fx.movie.edu.        86400  IN  A  192.254.20.3</pre></blockquote>
+
+
+Our job as the <em class="emphasis">movie.edu</em>
+administrators is straightforward: add the NS and A records to
+<em class="filename">db.movie.edu</em>.</p><p>
+
+
+What if we're using <em class="filename">h2n</em> to create our name
+server data? We can stick the delegation information into the
+<em class="filename">spcl.movie</em> file, which <em class="filename">h2n</em>
+$INCLUDEs at the end of the <em class="filename">db.movie</em> file it
+creates.</p><p>
+
+
+The final step for the <em class="emphasis">fx.movie.edu</em> administrator is to send a
+similar message to <em class="email">noc@netsol.com</em><em class="email"> </em>(the
+administrator of the <em class="emphasis">in-addr.arpa</em> zone), requesting that the
+<em class="emphasis">20.254.192.in-addr.arpa</em>
+subdomain be delegated to <em class="emphasis">alien.fx.movie.edu</em>, <em class="emphasis">bladerunner.fx.movie.edu</em>, and
+<em class="emphasis">outland.fx.movie.edu</em>.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-6.2.1" /><div class="sect3">
+<h3 class="sect3">9.6.2.1. Stubs: another way to manage delegation</h3>
+
+
+<a name="INDEX-1500" />If you're running BIND 4.9 or
+later name servers, you don't have to manage delegation
+information manually. BIND 4.9 and later name servers support an
+experimental feature called <em class="emphasis">stub
+zones</em><a name="INDEX-1501" />,
+which enables a name server to pick up changes to delegation
+information automatically.</p><p>
+
+
+Name servers that act as stubs for a zone periodically perform
+discrete queries for the zone's SOA and NS records, as well as
+any necessary glue A records. The name server uses the NS records to
+delegate the zone from its parent, and the SOA record governs how
+often the name server does these queries. Now, when the
+administrators of a subdomain make changes to the subdomain's
+name servers, they simply update their NS records. The parent
+zone's authoritative name servers pick up the updated records
+within the refresh interval.</p><p>
+
+
+On the <em class="emphasis">movie.edu</em> name
+servers, here's what we'd add to
+<em class="filename">named.conf</em>:</p><p>
+
+
+<blockquote><pre class="code">zone "fx.movie.edu" {
+                type stub;
+                masters { 192.253.254.2; };
+                file "stub.fx.movie.edu";
+};</pre></blockquote>
+
+
+On a BIND 4.9 name server, we'd use this directive:</p><p>
+
+
+<blockquote><pre class="code">stub     fx.movie.edu    192.253.254.2     stub.fx.movie.edu</pre></blockquote>
+
+
+Note that we should configure all <em class="emphasis">movie.edu</em> name servers as stubs for
+<em class="emphasis">fx.movie.edu</em>, because if the
+<em class="emphasis">fx.movie.edu</em> delegation
+information changes, that won't change the <em class="emphasis">movie.edu</em> zone's serial
+number.<a href="#FOOTNOTE-69">[69]</a> Making all the
+<em class="emphasis">movie.edu</em> name servers stubs
+for the subdomain will keep them synchronized.<a name="INDEX-1502" /> <a name="INDEX-1503" /></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-69" />[69]BIND 9 name servers also don't promote
+the NS records into the parent zone, so they wouldn't be
+included in the zone transfer.</p><p>
+
+</blockquote>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.5. Subdomains of in-addr.arpa Domains</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.7. Managing the Transition to Subdomains</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

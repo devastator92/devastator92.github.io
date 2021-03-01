@@ -1,0 +1,415 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+<head><title>Server Configuration: An Overview (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch05_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">5.3. Server Configuration: An Overview</h2>
+
+
+
+As mentioned at the beginning of the chapter, the behavior of the
+server, <tt class="command">sshd</tt>, may be controlled at three levels:</p>
+
+
+
+<ul><li><em class="emphasis">Compile-time
+configuration</em><a name="INDEX-732" /> (<a href="ch04_01.html">Chapter 4, "Installation and Compile-Time Configuration"</a>) is
+accomplished when <tt class="command">sshd</tt> is built. For example, a
+server may be compiled with or without support for
+<em class="emphasis">rhosts</em> authentication.</p></li><li><em class="emphasis">Serverwide configuration</em>, the subject of this
+chapter, is performed by a system administrator and applies to a
+running instance of the server. For instance, an administrator may
+deny SSH access by all hosts in a given domain or make the server
+listen on a particular port.</p>
+
+
+
+Serverwide configuration can be dependent on compile-time
+configuration. For example, a server's trusted-host
+authentication options work only if the server is compiled with
+trusted-host authentication support included. Otherwise, the options
+have no effect. We identify such dependencies throughout the book.
+<a href="ch05_03.html#ch05-87517">Figure 5-1</a> highlights the serverwide configuration
+tasks.</p>
+
+<a name="ch05-87517" /><div class="figure"><img height="341" alt="Figure 5-1" src="figs/ssh_0501.gif" width="482" /></div><h4 class="objtitle">Figure 5-1. Serverwide configuration (highlighted parts)</h4>
+</li>
+<li><em class="emphasis">Per-account
+configuration</em><a name="INDEX-733" /> (<a href="ch08_01.html">Chapter 8, "Per-Account Server Configuration"</a>) is
+performed by the end user, specifically, the owner of the account to
+which an SSH connection has been requested. For example, users may
+permit or deny access to their own accounts from particular hosts,
+overriding the serverwide configuration.</p></li></ul>
+Suppose user deborah on the machine <em class="emphasis">client.unc.edu</em> invokes an SSH client.
+The clients's behavior is determined by the compile-time
+options selected when the software was built, the machinewide client
+configuration file on <em class="emphasis">client.unc.edu</em>, deborah's own
+client configuration file, and the command-line options used by
+deborah when invoking the client. An SSH server running on
+<em class="emphasis">server.unc.edu</em> accepts
+deborah's connection to the account charlie. The server's
+behavior is determined by the compile-time options used when
+<tt class="command">sshd</tt> was built, the machinewide server
+configuration file on <em class="emphasis">server.unc.edu</em>, the command-line options
+used when the SSH server was run, and charlie's personal server
+configuration file (e.g., an <em class="filename">authorized_keys</em>
+file), plus several files that set environment variables for the
+successful login session.</p>
+
+
+
+With three levels of server configuration, and multiple entry points
+for modifying the behavior at each level, things can get complicated.
+In particular, different options may work together or cancel each
+other. For example, user charlie can configure his account on
+<em class="emphasis">server.unc.edu</em> to accept
+connections from <em class="emphasis">client.unc.edu</em>, while the system
+administrator of <em class="emphasis">server.unc.edu</em> can configure the SSH
+server to reject them. (In this case, Charlie loses.) Administrators
+must understand not only how to configure the server themselves, but
+also how their choices interact with compile-time and per-account
+settings.</p>
+
+
+
+<a name="ch05-14984" /><div class="sect2">
+<h3 class="sect2">5.3.1. Server Configuration Files</h3>
+
+
+
+Serverwide configuration is accomplished in two ways: through a
+server configuration file, or through command-line options. In a
+<em class="emphasis">server configuration
+file</em><a name="INDEX-734" /><a name="INDEX-735" /><a name="INDEX-736" />, numerous configuration variables,
+called
+<em class="emphasis">keywords</em><a name="INDEX-737" />,
+may have their values set. For example, to set the TCP port on which
+the server will listen, a configuration file can contain the line:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+Port 1022</pre></blockquote>
+
+
+
+The configuration file is typically
+<em class="filename">/etc/sshd_config</em><a name="INDEX-738" />
+for SSH1 and OpenSSH or
+<em class="filename">/etc/ssh2/sshd2_config</em><a name="INDEX-739" />
+for SSH2. The file contains keywords and their values, as in the
+<tt class="literal">Port</tt> example, with one pair (keyword and value)
+per line. Keywords are <a name="INDEX-740" />case-insensitive:
+<tt class="literal">Port</tt>, <tt class="literal">port</tt>, and
+<tt class="literal">PoRt</tt> are all treated identically.
+<a name="INDEX-741" /><a name="INDEX-742" />Comments may appear
+in the file as well: any line beginning with a hash sign
+(<a name="INDEX-743" />#) is a
+comment:</p>
+
+
+
+<blockquote><pre class="code"># This is a comment</pre></blockquote>
+
+
+
+To use a configuration file
+<a name="INDEX-744" />other than
+the default, invoke <tt class="command">sshd</tt> with the
+<span class="option">-f</span> command-line option, providing the alternative
+filename as an argument:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -f /usr/local/ssh/my_config</pre></blockquote>
+
+
+
+For SSH2, the configuration file format has the following extensions
+in addition to keywords:</p>
+
+
+
+<dl>
+<dt><i><em class="emphasis">Sections</em> </i></dt>
+<dd>The label <tt class="literal">*:</tt><a name="INDEX-745" /> often appears at the beginning of
+the configuration file, since it is present in the sample
+configuration file distributed with SSH2. This actually serves no
+purpose and is confusing; see the following sidebar.</p></dd>
+
+
+
+<dt><i><em class="emphasis">Subsystems</em> </i></dt>
+<dd><a name="INDEX-746" />Keywords
+beginning with the string "subsystem-", such as:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+subsystem-sftp     sftp-server</pre></blockquote>
+
+
+
+indicate a subsystem, a predefined command that SSH2 clients may
+invoke by name. Subsystems are a layer of abstraction and a
+convenience feature. [<a href="ch05_07.html#ch05-86335">Section 5.7, "Subsystems"</a>]</p></dd>
+
+</dl>
+
+
+
+<a name="ch05-60828" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">What's That *: ?</h4>
+
+
+
+The
+<em class="filename">sshd2_config</em><a name="INDEX-747" />
+file supplied with SSH2 contains the following lines at the top, just
+above the keyword settings:</p>
+
+<a name="INDEX-748" />
+
+<blockquote><pre class="code"># The "*" defines for all hosts
+*:</pre></blockquote>
+
+
+
+This is unnecessary and misleading. In the client configuration file,
+a colon introduces a labelled <em class="emphasis">section</em> of the
+configuration file [<a href="ch07_01.html#ch07-11817">Section 7.1.3.3, "Configuration file sections"</a>], which limits the
+following configuration statements (up to the next label, or the end
+of the file) to apply only when the client is connecting to a host
+whose name matches the label.</p>
+
+
+
+The section label syntax is also recognized in the server
+configuration file, but it serves no purpose. The way the code is
+written, the only label that can ever match on the server side is
+<tt class="literal">*</tt>, and that is the effective default label,
+anyway, so it is unnecessary.</p>
+
+
+
+The section label is misleading because it suggests you can label a
+section in the server configuration file like this:</p>
+
+
+
+<blockquote><pre class="code">client.host.net:
+AllowUsers smith</pre></blockquote>
+
+
+
+By analogy with the client configuration file, you might expect that
+this restricts logins from the machine <em class="emphasis">client.host.net</em> to only accessing the
+account "smith". This won't work. In fact,
+statements labelled with anything besides <tt class="literal">*</tt> will
+be silently ignored by <tt class="command">sshd</tt>. Beware!</p>
+
+
+</td></tr></table><p></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-4-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.3.2. Command-Line Options</h3>
+
+
+
+<a name="INDEX-749" /><a name="INDEX-750" />Additionally, when invoking the
+server, you may supply command-line options. For example, the port
+value may be specified on the command line with the
+<em class="emphasis">-p</em> option:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ sshd -p 1022</pre></blockquote>
+
+
+
+Command-line options <a name="INDEX-751" /><a name="INDEX-752" />override settings in the configuration
+file. Thus, if the configuration file says port 1022 but the server
+is invoked with <span class="option">-p 2468</span>, the port used will be 2468.</p>
+
+
+
+Most command-line options duplicate the features found in the
+configuration file, for convenience, while a few provide unique
+functionality. For instance, the <span class="option">-f</span> option instructs
+<tt class="command">sshd</tt> to use a different configuration file, a
+feature that's useless to put in a configuration file.</p>
+
+
+
+On the other hand, keywords don't necessarily have command-line
+equivalents. Most SSH1 and OpenSSH keywords don't. Any SSH2
+keyword, however, may be set by the <span class="option">-o</span> server
+command-line option. For example, to set the TCP port number by this
+method:</p>
+
+
+
+<blockquote><pre class="code"># SSH2 only
+$ sshd2 -o "Port 1022"</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-5-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.3.3. Changing the Configuration</h3>
+
+
+
+<tt class="command">sshd</tt><a name="INDEX-753" />
+reads its configuration file at startup. Therefore, if you modify the
+file while the server is running, the changes don't affect the
+server. You must force the server to reread the file in order accept
+the changes. This is done by sending a
+<a name="INDEX-754" /><a name="INDEX-755" />SIGHUP signal to the server
+process.<a href="#FOOTNOTE-56">[56]</a> The pid of the server is
+found in a file, usually
+<em class="filename">/etc/sshd.pid</em><a name="INDEX-756" /><a name="INDEX-757" />
+for SSH1, <em class="filename">/var/run/sshd2_22.pid</em> for SSH2, or
+<em class="filename">/var/run/sshd.pid</em> for OpenSSH. [<a href="ch05_04.html#ch05-26079">Section 5.4.1.3, "Process ID file"</a>]</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-56" />[56] The SSH2 server supports SIGHUP restarts in
+Version 2.0.12 and up.</p>
+
+
+</blockquote>
+
+
+
+Suppose the PID file is <em class="filename">/etc/sshd.pid</em>, the
+default for <tt class="command">sshd1</tt>. To send the SIGHUP signal, run
+the Unix <tt class="command">kill</tt> command:</p>
+
+
+
+<blockquote><pre class="code">$ cat /etc/sshd.pid
+119384
+$ kill -HUP 119384</pre></blockquote>
+
+
+
+or more succinctly, with backquotes:</p>
+
+
+
+<blockquote><pre class="code">$ kill -HUP `cat /etc/sshd.pid`</pre></blockquote>
+
+
+
+The SIGHUP signal restarts <tt class="command">sshd</tt> (with a different
+pid) but doesn't terminate existing SSH connections, so the
+signal is safe to send while clients are connected. The new
+<tt class="command">sshd</tt> process reads and conforms to the new
+configuration.</p>
+
+
+
+The SIGHUP technique works only for settings in the configuration
+file, not command-line options. To change those, you must kill and
+restart the server with the new options. For example:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, SSH2, OpenSSH
+$ kill 119384
+$ sshd <em class="replaceable">new_options</em></pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch05-6-fm2xml" /><div class="sect2">
+<h3 class="sect2">5.3.4. A Tricky Reconfiguration Example</h3>
+
+
+
+<a name="INDEX-758" />Because command-line options override
+their configuration file equivalents, some interesting situations can
+arise. Suppose the configuration file defines the number of bits in
+the server key to be 1024:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+ServerKeyBits 1024</pre></blockquote>
+
+
+
+but the server is invoked with the <span class="option">-b</span> command-line
+option, overriding this value with 512:</p>
+
+
+
+<blockquote><pre class="code"># SSH1, OpenSSH
+$ sshd -b 512</pre></blockquote>
+
+
+
+The server uses a 512-bit key. Now, suppose you restart
+<tt class="command">sshd</tt> with SIGHUP:</p>
+
+
+
+<blockquote><pre class="code"># SSH1 only
+$ kill -HUP `cat /etc/sshd.pid`
+
+# OpenSSH only
+$ kill -HUP `cat /var/run/sshd.pid`</pre></blockquote>
+
+
+
+forcing <tt class="command">sshd</tt> to reread the configuration file.
+What do you think happens to the key length? Does the server set the
+length to 1024 after rereading the configuration file, or does the
+command-line option remain in effect for a 512-bit key? In fact, the
+command-line option takes precedence again, and the key remains 512
+bits. <tt class="command">sshd</tt> saves its argument vector (argv) and
+reapplies it on restart.</p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch05_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch05_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">5.2. Running the Server</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">5.4. Getting Ready: Initial Setup</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch05_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+</html>

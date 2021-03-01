@@ -1,0 +1,468 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch02_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:59 GMT -->
+<head><title>Adding Complexity to the Example (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch02_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">2.3. Adding Complexity to the Example</h2>
+
+
+
+The preceding example session provided a quick introduction to the
+most often-used client programs -- <tt class="command">ssh</tt> and
+<tt class="command">scp</tt> -- in a format to follow while sitting at
+your computer. Now that you have the basics, let's continue the
+example but include situations and complications glossed over the
+<a name="INDEX-125" />
+first time. These include the "known hosts" security
+feature and the SSH escape character.</p>
+
+
+
+<a name="ch02-3-fm2xml" /><blockquote><b>TIP: </b>
+If
+you're following at the computer as you read, your SSH clients
+might behave unexpectedly or differently from ours. As you will see
+throughout the book, SSH implementations are highly customizable, by
+both yourself and the system administrator, on either side of the
+secure connection. Although this chapter describes common behaviors
+of SSH programs based on their installation defaults, your system
+might be set up differently.</p>
+
+
+If commands don't work as you expect,
+try adding the <span class="option">-v</span> ("verbose")
+command-line option, for example:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -v shell.isp.com</pre></blockquote>
+
+
+
+This causes the client to print lots of information about its
+progress, often revealing the source of the discrepancy.</p></blockquote>
+
+
+
+<a name="ch02-49764" /><div class="sect2">
+<h3 class="sect2">2.3.1. Known Hosts</h3>
+
+
+
+The first time an SSH client encounters a new remote machine, it does
+some extra work and prints a message like the following:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -l pat shell.isp.com
+Host key not found from the list of known hosts.
+Are you sure you want to continue connecting (yes/no)?</pre></blockquote>
+
+
+
+Assuming you respond <tt class="literal">yes</tt> (the most common
+response), the client continues:</p>
+
+
+
+<blockquote><pre class="code">Host 'shell.isp.com' added to the list of known hosts.</pre></blockquote>
+
+
+
+This message appears only the first time you contact a particular
+remote host. The message is a security feature related to SSH's
+concept of <em class="emphasis">known
+hosts</em><a name="INDEX-126" /><a name="INDEX-127" />.</p>
+
+
+
+Suppose an adversary wants to obtain your password. He knows you are
+using SSH, and so he can't monitor your connection by
+eavesdropping on the network. Instead, he subverts the naming service
+used by your local host so that the name of your intended remote
+host, <em class="emphasis">shell.isp.com</em>,
+translates falsely to the IP address of a computer run by him! He
+then installs an altered SSH server on the phony remote host and
+waits. When you log in via your trusty SSH client, the altered SSH
+server records your password for the adversary's later use (or
+misuse, more likely). The bogus server can then disconnect with a
+preplanned error message such as "System down for
+maintenance -- please try again after 4:00 p.m." Even worse,
+it can fool you completely by using your password to log into the
+real <em class="emphasis">shell.isp.com</em> and
+transparently pass information back and forth between you and the
+server, monitoring your entire session. This hostile strategy is
+called a
+<a name="INDEX-128" /><a name="INDEX-129" />man-in-the-middle attack. [<a href="ch03_10.html#ch03-77405">Section 3.10.4, "Man-in-the-Middle Attacks"</a>] Unless you think to check the originating IP
+address of your session on the server, you might never notice the
+deception.</p>
+
+
+
+The SSH <em class="emphasis">known-host
+mechanism</em><a name="INDEX-130" /><a name="INDEX-131" /> prevents such attacks. When an SSH
+client and <a name="INDEX-132" />server make a connection, each of
+them proves its identity to the other. Yes, not only does the server
+authenticate the client, as we saw earlier when the server checked
+pat's password, but the client also authenticates the server by
+public-key cryptography. [<a href="ch03_04.html#ch03-62629">Section 3.4.1, "Establishing the Secure Connection"</a>] In short, each
+SSH server has a secret, unique ID, called a <em class="emphasis">host
+key</em><a name="INDEX-133" />, to
+identify itself to clients. The first time you connect to a remote
+host, a public counterpart of the host key gets copied and stored in
+your local account (assuming you responded "yes" to the
+client's prompt about host keys, earlier). Each time you
+reconnect to that remote host, the SSH client checks the remote
+host's identity using this public key.</p>
+
+
+
+Of course, it's better to have recorded the server's
+public host key before connecting to it the first time, since
+otherwise you are technically open to a man-in-the-middle attack that
+first time. Administrators can maintain system-wide known-hosts lists
+for given sets of hosts, but this doesn't do much good for
+connecting to random new hosts around the world. Until a reliable,
+widely deployed method of retrieving such keys securely exists (such
+as secure DNS, or X.509-based public-key infrastructure), this
+record-on-first-use mechanism is an acceptable compromise.</p>
+
+
+
+If authentication of the server fails, various things may happen
+depending on the reason for failure and the SSH configuration.
+Typically a warning appears on the screen, ranging from a repeat of
+the known-hosts message:</p>
+
+
+
+<blockquote><pre class="code">Host key not found from the list of known hosts.
+Are you sure you want to continue connecting (yes/no)?</pre></blockquote>
+
+
+
+<a name="INDEX-134" />to more dire words:</p>
+
+
+
+<blockquote><pre class="code">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: HOST IDENTIFICATION HAS CHANGED!    @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that the host key has just been changed.
+Please contact your system administrator.
+Add correct host key in &lt;path&gt;/known_hosts to get rid of this message.
+Agent forwarding is disabled to avoid attacks by corrupted servers.
+X11 forwarding is disabled to avoid attacks by corrupted servers.
+Are you sure you want to continue connecting (yes/no)</pre></blockquote>
+
+
+
+If you answer <tt class="literal">yes</tt>, <tt class="command">ssh</tt> allows
+the connection, but disables various features as a security
+precaution and doesn't update your personal known-hosts
+database with the new key; you must do that yourself to make this
+message go away.</p>
+
+
+
+As the text of the message says, if you see this warning, you
+aren't necessarily being hacked: for example, the remote host
+may have legitimately changed its host key for some reason. In some
+cases, even after reading this book, you won't know the cause
+of these messages. Contact your system administrator if you need
+assistance, rather than take a chance and possibly compromise your
+password. We'll cover these issues further when we discuss
+personal known hosts databases and how to alter the behavior of SSH
+clients with respect to host keys. [<a href="ch07_04.html#ch07-11389">Section 7.4.3, "Host Keys and Known-Hosts Databases"</a>]</p>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch02-71033" /><div class="sect2">
+<h3 class="sect2">2.3.2. The Escape Character</h3>
+
+
+
+<a name="INDEX-135" />Let us
+return to the <em class="emphasis">shell.isp.com</em>
+example, just after you'd discovered the attachment in your
+remote email message and saved it to the remote file
+<em class="filename">print-me</em>. In our original example, you then
+logged out of <em class="emphasis">shell.isp.com</em>
+and ran <tt class="command">scp</tt> to transfer the file. But what if you
+don't want to log out? If you're using a workstation
+running a window system, you can open a new window and run
+<tt class="command">scp</tt>. But if you're using a lowly text
+terminal, or you're not familiar with the window system running
+on your friend's computer, there is an alternative. You can
+temporarily interrupt the SSH connection, transfer the file (and run
+any other local commands you desire), and then resume the connection.</p>
+
+
+
+<tt class="command">ssh</tt> supports an <em class="emphasis">escape
+character,</em> a designated character that gets the attention
+of the SSH client. Normally, <tt class="command">ssh</tt> sends every
+character you type to the server, but the escape character is caught
+by the client, alerting it that special commands may follow. By
+default, the escape character is the tilde (<a name="INDEX-136" />~), but you
+can change it. To reduce the chances of sending the escape character
+unintentionally, that character must be the first character on the
+command line, i.e., following a newline (<tt class="literal">Control-J</tt>) or return (<tt class="literal">Control-M</tt>) character. If not, the
+client treats it literally, not as an escape character.</p>
+
+
+
+After the escape character gets the client's attention, the
+next character entered determines the effect of the escape. For
+example, the escape character followed by a
+<tt class="literal">Control-Z</tt> suspends <tt class="command">ssh</tt> like any
+other shell job, returning control to the local shell. Such a pair of
+characters is called an <em class="emphasis">escape
+sequence.</em><a name="INDEX-137" /> <a href="ch02_03.html#ch02-24501">Table 2-1</a>
+summarizes the supported escape sequences. It's followed by a
+list that describes each sequence's meaning.</p>
+
+
+
+<a name="ch02-24501" /><h4 class="objtitle">Table 2-1. ssh Escape Sequences </h4><table border="1">
+
+
+
+
+<tr>
+<th>
+Sequence</p></th>
+<th>
+Example with &lt;ESC&gt; = ~</p></th>
+<th>
+Meaning</p></th>
+</tr>
+
+
+
+
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; ^Z</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ ^Z</pre></blockquote></p></td>
+<td>
+Suspend the connection (<tt class="literal">^Z</tt> means
+<tt class="literal">Control-Z</tt>)</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; .</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ .</pre></blockquote></p></td>
+<td>
+Terminate the connection</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; #</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ #</pre></blockquote></p></td>
+<td>
+List all forwarded connections <a href="#FOOTNOTE-6">[6]</a></p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; &amp;</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ &amp;</pre></blockquote></p></td>
+<td>
+Send <tt class="command">ssh</tt> into the background (when waiting for
+connections to terminate)</p></td>
+</tr>
+
+
+<tr>
+<td>
+&lt;ESC&gt; r</p></td>
+<td>
+~ r</p></td>
+<td>
+Request rekeying immediately (SSH2 only)</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt;&lt;ESC&gt;</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ ~</pre></blockquote></p></td>
+<td>
+Send the escape character (by typing it twice)</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; ?</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ ?</pre></blockquote></p></td>
+<td>
+Print a help message</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; -</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ -</pre></blockquote></p></td>
+<td>
+Disable the escape character (SSH2 only)</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; V</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ V</pre></blockquote></p></td>
+<td>
+Print version information (SSH2 only)</p></td>
+</tr>
+
+
+<tr>
+<td>
+
+<blockquote><pre class="code">&lt;ESC&gt; s</pre></blockquote></p></td>
+<td>
+
+<blockquote><pre class="code">~ s</pre></blockquote></p></td>
+<td>
+Print statistics about this session (SSH2 only)</p></td>
+</tr>
+
+
+
+</table><p>
+
+
+<a name="FOOTNOTE-6" />[6]For SSH2, this option
+is documented but not implemented as of Version 2.3.0.</p>
+
+
+</blockquote>
+
+
+
+<ul><li>"<a name="INDEX-138" />Suspend the
+connection" puts <tt class="command">ssh</tt> into the background,
+suspended, returning control of the terminal to the local shell. To
+return to <tt class="command">ssh</tt>, use the appropriate job control
+command of your shell, typically <tt class="command">fg</tt>. While
+suspended, <tt class="command">ssh</tt> doesn't run, and if left
+suspended long enough, the connection may terminate since the client
+isn't responding to the server. Also, any
+<a name="INDEX-139" />forwarded connections are
+similarly blocked while <tt class="command">ssh</tt> is suspended. [<a href="ch09_02.html#ch09-87343">Section 9.2.9, "Termination"</a>]</p></li><li>"<a name="INDEX-140" />Terminate the connection" ends the SSH
+session immediately. This is most useful if you have lost control of
+the session: for instance, if a shell command on the remote host has
+hung and become unkillable. Any X or TCP port forwardings are
+terminated immediately as well. [<a href="ch09_02.html#ch09-87343">Section 9.2.9, "Termination"</a>]</p></li><li>"<a name="INDEX-141" /><a name="INDEX-142" /><a name="INDEX-143" />List all forwarded connections"
+prints a list of each X forwarding or TCP port forwarding connection
+currently established. This lists only active instances of
+forwarding; if forwarding services are available but not currently in
+use, nothing is listed here.</p></li><li>"Send ssh into the <a name="INDEX-144" />background," like the "suspend
+connection" command, reconnects your terminal to the shell that
+started <tt class="command">ssh</tt>, but it doesn't suspend the
+<tt class="command">ssh</tt> process. Instead, <tt class="command">ssh</tt>
+continues to run. This isn't ordinarily useful, since the
+backgrounded <tt class="command">ssh</tt> process immediately encounters an
+error.<a href="#FOOTNOTE-7">[7]</a> This escape sequence becomes
+useful if your <tt class="command">ssh</tt> session has active, forwarded
+connections when you log out. Normally in this situation, the client
+prints a message:</p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-7" />[7]The error occurs as <tt class="command">ssh
+</tt>attempts to read input from the now disconnected
+pseudo-terminal.</p>
+
+
+</blockquote>
+<blockquote><pre class="code">Waiting for forwarded connections to terminate...
+The following connections are open:
+X11 connection from shell.isp.com port 1996</pre></blockquote>
+
+as it waits for the forwarded connections to close before it exits.
+While the client is in this state, this escape sequence returns you
+to the local shell prompt.</p></li>
+
+<li><a name="INDEX-145" />"Request rekeying
+immediately" causes the SSH2 client and server to generate and
+use some new internal keys for encryption and integrity.</p></li><li>"<a name="INDEX-146" />Send the escape character"
+tells the client to send a real tilde (or whatever the escape
+character is) to the SSH server as plaintext, not to interpret it as
+an escape. "Disable the escape character" prevents
+further escape sequences from having any effect. The rest of the
+escape sequences are self-explanatory.</p></li></ul>
+To change the <tt class="command">ssh</tt> escape character, use the
+<a name="INDEX-147" />-<em class="emphasis">e</em>
+command-line option. For example, type the following to make the
+percent sign (%) the escape character when connecting to <em class="emphasis">shell.isp.com</em> as user pat:</p>
+
+
+
+<blockquote><pre class="code">$ ssh -e "%" -l pat shell.isp.com</pre></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.2. Remote Terminal Sessions with ssh</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.4. Authentication by Cryptographic Key</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch02_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:59 GMT -->
+</html>

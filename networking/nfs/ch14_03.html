@@ -1,0 +1,296 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+<head><title>snoop (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch14_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.3. snoop</h2>
+
+Network analyzers are ultimately the most <a name="INDEX-2188" />
+<a name="INDEX-2189" />useful tools available when it comes to
+debugging NFS problems. The <em class="emphasis">snoop</em> network
+analyzer bundled with Solaris was introduced in <a href="ch13_05.html#nfs2-CHP-13-SECT-5">Section 13.5, "Network analyzers"</a>. This section presents an example of how to
+use <em class="emphasis">snoop</em> to resolve NFS-related problems.
+</p>
+
+Consider the case where the NFS client <em class="emphasis">rome</em>
+attempts to access the contents of the filesystems exported by the
+server <em class="emphasis">zeus</em> through the
+<em class="emphasis">/net</em> automounter path:
+</p>
+
+<blockquote><pre class="code">rome<tt class="userinput"><b>% ls -la /net/zeus/export</b></tt>
+total 5
+dr-xr-xr-x   3 root     root           3 Jul 31 22:51 .
+dr-xr-xr-x   2 root     root           2 Jul 31 22:40 ..
+drwxr-xr-x   3 root     other        512 Jul 28 16:48 eng
+dr-xr-xr-x   1 root     root           1 Jul 31 22:51 home
+rome<tt class="userinput"><b>% ls /net/zeus/export/home</b></tt>
+/net/zeus/export/home: Permission denied</pre></blockquote>
+
+The client is not able to open the contents of the directory
+<em class="emphasis">/net/zeus/export/home</em>, although the directory
+gives read and execute permissions to all users:
+</p>
+
+<blockquote><pre class="code">rome<tt class="userinput"><b>% df -k /net/zeus/export/home</b></tt>
+filesystem            kbytes    used   avail capacity  Mounted on
+-hosts                     0       0       0     0%    /net/zeus/export/home</pre></blockquote>
+
+The <em class="emphasis">df</em> command shows the
+<em class="emphasis">-hosts</em> automap mounted on the path of interest.
+This means that the NFS filesystem
+<em class="emphasis">rome:/export/home</em> has not yet been mounted. To
+investigate the problem further, <em class="emphasis">snoop</em> is
+invoked while the problematic <em class="emphasis">ls</em> command is
+rerun:
+</p>
+
+<blockquote><pre class="code"> rome# <tt class="userinput"><b>snoop -i /tmp/snoop.cap rome zeus</b></tt>
+  1   0.00000      rome -&gt; zeus      PORTMAP C GETPORT prog=100003 (NFS) vers=3 
+proto=UDP
+  2   0.00314      zeus -&gt; rome      PORTMAP R GETPORT port=2049
+  3   0.00019      rome -&gt; zeus      NFS C NULL3
+  4   0.00110      zeus -&gt; rome      NFS R NULL3 
+  5   0.00124      rome -&gt; zeus      PORTMAP C GETPORT prog=100005 (MOUNT) vers=1 
+proto=TCP
+  6   0.00283      zeus -&gt; rome      PORTMAP R GETPORT port=33168
+  7   0.00094      rome -&gt; zeus      TCP D=33168 S=49659 Syn Seq=1331963017 Len=0 
+Win=24820 Options=&lt;nop,nop,sackOK,mss 1460&gt;
+  8   0.00142      zeus -&gt; rome      TCP D=49659 S=33168 Syn Ack=1331963018 
+Seq=4025012052 Len=0 Win=24820 Options=&lt;nop,nop,sackOK,mss 1460&gt;
+  9   0.00003      rome -&gt; zeus      TCP D=33168 S=49659     Ack=4025012053 
+Seq=1331963018 Len=0 Win=24820
+ 10   0.00024      rome -&gt; zeus      MOUNT1 C Get export list
+ 11   0.00073      zeus -&gt; rome      TCP D=49659 S=33168     Ack=1331963062 
+Seq=4025012053 Len=0 Win=24776
+ 12   0.00602      zeus -&gt; rome      MOUNT1 R Get export list 2 entries
+ 13   0.00003      rome -&gt; zeus      TCP D=33168 S=49659     Ack=4025012173 
+Seq=1331963062 Len=0 Win=24820
+ 14   0.00026      rome -&gt; zeus      TCP D=33168 S=49659 Fin Ack=4025012173 
+Seq=1331963062 Len=0 Win=24820
+ 15   0.00065      zeus -&gt; rome      TCP D=49659 S=33168     Ack=1331963063 
+Seq=4025012173 Len=0 Win=24820
+ 16   0.00079      zeus -&gt; rome      TCP D=49659 S=33168 Fin Ack=1331963063 
+Seq=4025012173 Len=0 Win=24820
+ 17   0.00004      rome -&gt; zeus      TCP D=33168 S=49659     Ack=4025012174 
+Seq=1331963063 Len=0 Win=24820
+ 18   0.00058      rome -&gt; zeus      PORTMAP C GETPORT prog=100005 (MOUNT) vers=3 
+proto=UDP
+ 19   0.00412      zeus -&gt; rome      PORTMAP R GETPORT port=34582
+ 20   0.00018      rome -&gt; zeus      MOUNT3 C Null
+ 21   0.00134      zeus -&gt; rome      MOUNT3 R Null 
+ 22   0.00056      rome -&gt; zeus      MOUNT3 C Mount /export/home
+ 23   0.23112      zeus -&gt; rome      MOUNT3 R Mount Permission denied</pre></blockquote>
+
+Packet 1 shows the client <em class="emphasis">rome</em> requesting the
+port number of the NFS service (RPC program number 100003, Version 3,
+over the UDP protocol) from the server's
+<em class="emphasis">rpcbind</em> (portmapper). Packet 2 shows the
+server's reply indicating <em class="emphasis">nfsd</em> is running
+on port 2049. Packet 3 shows the automounter's call to the
+server's <em class="emphasis">nfsd</em> daemon to verify that it is
+indeed running. The server's successful reply is shown in
+packet 4. Packet 5 shows the client's request for the port
+number for RPC program number 100005, Version 1, over TCP (the RPC
+MOUNT program). The server replies with packet 6 with port=33168.
+Packets 7 through 9 are TCP hand shaking between our NFS client and
+the server's <em class="emphasis">mountd</em>. Packet 10 shows the
+client's call to the server's <em class="emphasis">mountd</em>
+daemon (which implements the MOUNT program) currently running on port
+33168. The client is requesting the list of exported entries. The
+server replies with packet 12 including the names of the two entries
+exported. Packets 18 and 19 are similar to packets 5 and 6, except
+that this time the client is asking for the port number of the MOUNT
+program version 3 running over UDP. Packet 20 and 21 show the client
+verifying that version 3 of the MOUNT service is up and running on
+the server. Finally, the client issues the Mount
+<em class="emphasis">/export/home</em> request to the server in packet 22,
+requesting the filehandle of the <em class="emphasis">/export/home</em>
+path. The server's <em class="emphasis">mountd</em> daemon checks
+its export list, and determines that the host
+<em class="emphasis">rome</em> is not present in it and replies to the
+client with a "Permission Denied" error in packet 23.
+</p>
+
+The analysis indicates that the "Permission Denied" error
+returned to the <em class="emphasis">ls</em> command came from the MOUNT
+request made to the server, not from problems with directory mode
+bits on the client. Having gathered this information, we study the
+exported list on the server and quickly notice that the filesystem
+<em class="emphasis">/export/home</em> is exported only to the host
+<em class="emphasis">verona</em>:
+</p>
+
+<blockquote><pre class="code">rome$ <tt class="userinput"><b>showmount -e zeus</b></tt>
+export list for zeus:
+/export/eng  (everyone)
+/export/home verona</pre></blockquote>
+
+We could have obtained the same information by inspecting the
+contents of packet 12, which contains the export list requested
+during the transaction:
+</p>
+
+<blockquote><pre class="code">rome#<tt class="userinput"><b> snoop -i /tmp/cap -v -p 10,12</b></tt>
+...
+      Packet 10 arrived at 3:32:47.73
+RPC:  ----- SUN RPC Header -----
+RPC:  
+RPC:  Record Mark: last fragment, length = 40
+RPC:  Transaction id = 965581102
+RPC:  Type = 0 (Call)
+RPC:  RPC version = 2
+RPC:  Program = 100005 (MOUNT), version = 1, procedure = 5
+RPC:  Credentials: Flavor = 0 (None), len = 0 bytes
+RPC:  Verifier   : Flavor = 0 (None), len = 0 bytes
+RPC:  
+MOUNT:----- NFS MOUNT -----
+MOUNT:
+MOUNT:Proc = 5 (Return export list)
+MOUNT:
+...
+       Packet 12 arrived at 3:32:47.74
+RPC:  ----- SUN RPC Header -----
+RPC:  
+RPC:  Record Mark: last fragment, length = 92
+RPC:  Transaction id = 965581102
+RPC:  Type = 1 (Reply)
+RPC:  This is a reply to frame 10
+RPC:  Status = 0 (Accepted)
+RPC:  Verifier   : Flavor = 0 (None), len = 0 bytes
+RPC:  Accept status = 0 (Success)
+RPC:  
+MOUNT:----- NFS MOUNT -----
+MOUNT:
+MOUNT:Proc = 5 (Return export list)
+MOUNT:Directory = /export/eng
+MOUNT:Directory = /export/home
+MOUNT: Group = verona
+MOUNT:</pre></blockquote>
+
+For simplicity, only the RPC and NFS Mount portions of the packets
+are shown. Packet 10 is the request for the export list, packet 12 is
+the reply. Notice that every RPC packet contains the transaction ID
+(XID), the message type (call or reply), the status of the call, and
+the credentials. Notice that the RPC header includes the string
+<em class="emphasis">"This is a reply to frame 10".</em> This
+is not part of the network packet. <em class="emphasis">Snoop</em> keeps
+track of the XIDs it has processed and attempts to match calls with
+replies and retransmissions. This feature comes in very handy during
+debugging. The Mount portion of packet 12 shows the list of
+directories exported and the group of hosts to which they are
+exported. In this case, we can see that
+<em class="emphasis">/export/home</em> was only exported with access rights to the
+host <em class="emphasis">verona</em>. The problem<a name="INDEX-2190" /> <a name="INDEX-2191" /> can be fixed by
+adding the host <em class="emphasis">rome</em> to the export list on the
+server.
+</p>
+
+<a name="nfs2-CHP-14-SECT-3.1" /><div class="sect2">
+<h3 class="sect2">14.3.1. Useful filters</h3>
+
+Information is most useful when it can be <a name="INDEX-2192" />
+<a name="INDEX-2193" />
+<a name="INDEX-2194" />organized
+into categories and noise can be filtered and ignored.
+<em class="emphasis">snoop</em> provides powerful capture filters that
+allow you to collect only the kind of information you are interested
+in. The following list of <em class="emphasis">snoop</em> filters is
+useful when capturing NFS-related traffic. <em class="emphasis">snoop</em>
+provides very nice NFS and RPC level debugging features. The logical
+and, or, and not operators can be used on filters to build more
+powerful composite filters. You are encouraged to review the snoop
+documentation to learn more about the multiple filters available.
+</p>
+
+<dl>
+<dt><i>host</i></dt>
+<dd>
+Captures all traffic directed to or originating from the host
+specified. The following example captures all traffic destined to or
+coming from the host <em class="emphasis">rome</em> :
+</p>
+
+<blockquote><pre class="code"># s<tt class="userinput"><b>noop host rome</b></tt></pre></blockquote>
+Note that the <em class="emphasis">host</em> keyword is not required when
+the specified hostname does not conflict with the name of another
+<em class="emphasis">snoop</em> primitive. The previous <em class="emphasis">snoop
+host rome</em> command could have been invoked without the
+<em class="emphasis">host</em> keyword, and it would have generated the
+same output.
+</p>
+</dd>
+
+
+<dt><i>port nfs</i></dt>
+<dd>
+Captures NFS traffic regardless of the version. Note that MOUNT, NLM
+and Portmapper traffic is not captured. Useful once the mount has
+already occurred. The following two examples capture all NFS protocol
+traffic involving the host <em class="emphasis">rome</em>. A logical AND
+operation is implied by the juxtaposition of two boolean expressions.
+The two filters are equivalent:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop host rome port nfs</b></tt>
+# <tt class="userinput"><b>snoop host rome and port nfs</b></tt></pre></blockquote>
+</dd>
+
+
+<dt><i>port 111</i></dt>
+<dd>
+Captures rpcbind and portmapper traffic. Useful during filesystem
+mount negotiation. This example captures all rpcbind traffic on the
+network:
+</p>
+
+<blockquote><pre class="code"># <tt class="userinput"><b>snoop port 111</b></tt></pre></blockquote>
+</dd>
+
+
+<dt><i>rpc prog [,vers [,proc]]</i></dt>
+<dd>
+Use <em class="emphasis">rpc 100005</em> to capture MOUNT protocol related
+traffic. Useful during the mount process. The following example
+displays all MOUNT protocol traffic between the hosts
+<em class="emphasis">zeus</em> and <em class="emphasis">rome</em>:
+</p>
+
+<blockquote><pre class="code"><tt class="userinput"><b># snoop rpc 100005 host zeus rome</b></tt></pre></blockquote>
+
+Use <em class="emphasis">rpc 100021</em> to capture NLM traffic. Useful
+for tracking lock manager related traffic. The following example
+captures all NFS Version 3 Network Lock Manager traffic between hosts
+<em class="emphasis">zeus</em> and <em class="emphasis">rome</em>. Note that
+NLM v4 is <a name="INDEX-2195" /> <a name="INDEX-2196" /> <a name="INDEX-2197" />used <a name="INDEX-2198" /> <a name="INDEX-2199" /> <a name="INDEX-2200" />for NFS Version 3:
+</p>
+
+<blockquote><pre class="code"><tt class="userinput"><b># snoop host zeus host rome rpc 100021,4</b></tt></pre></blockquote>
+</dd>
+
+</dl>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_02.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_04.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.2. NFS statistics</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.4. Publicly available diagnostics</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch14_03.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:42 GMT -->
+</html>

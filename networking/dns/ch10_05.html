@@ -1,0 +1,335 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+<head><title>Forwarding (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch10_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">10.5. Forwarding</h2>
+
+
+<a name="INDEX-1585" />Certain
+<a name="INDEX-1586" />network connections discourage sending
+large volumes of traffic off-site, either because the network
+connection is billed by volume or because it's a slow link with
+high delay, like a remote office's satellite connection to the
+company's network. In these situations, you'll want to
+limit the off-site DNS traffic to the bare minimum. BIND provides a
+mechanism to do this: <em class="emphasis">forwarders</em>.</p><p>
+
+
+Forwarders are also useful if you need to shunt name
+<a name="INDEX-1587" />resolution to a particular name server.
+For example, if only one of the hosts on your network has Internet
+connectivity and you run a name server on that host, you can
+configure your other name servers to use it as a forwarder so that
+they can look up Internet domain names. (More on this use of
+forwarders when we discuss firewalls in <a href="ch11_01.html">Chapter 11, "Security"</a>.)</p><p>
+
+
+If you designate one or more servers at your site as forwarders, your
+name servers will send all their off-site queries to the forwarders
+first. The idea is that the forwarders handle all the off-site
+queries generated at the site, building up a rich cache of
+information. For any given query in a remote zone, there is a high
+probability that the forwarder can answer the query from its cache,
+avoiding the need for the other servers to send queries off-site. You
+don't do anything to a name server to make it a forwarder; you
+modify all the <em class="emphasis">other</em> serversat your site to direct their queries through the
+forwarders.</p><p>
+
+
+<a name="INDEX-1588" />A
+primary master or <a name="INDEX-1589" />slave name server's mode of
+operation changes slightly when it is configured to use a forwarder.
+If a resolver requests records that are already in the name
+server's authoritative data or cached data, the name server
+answers with that information; this part of its operation
+hasn't changed. However, if the records aren't in its
+database, the name server sends the query to a forwarder and waits a
+short period for an answer before resuming normal operation and
+contacting the remote name servers itself. What the name server is
+doing differently here is sending a <a name="INDEX-1590" />
+<a name="INDEX-1591" /><em class="emphasis">recursive</em> query to the
+forwarder, expecting it to find the answer. At all other times, the
+name server sends out <a name="INDEX-1592" />
+<a name="INDEX-1593" /><em class="emphasis">nonrecursive</em> queries to
+other name servers and deals with responses that only refer it to
+other name servers.</p><p>
+
+
+<a name="INDEX-1594" />For
+example, here is the BIND 8 and 9 <em class="emphasis">forwarders
+</em>substatement -- and the equivalent BIND 4 boot file
+directive -- for name servers in <em class="emphasis">movie.edu</em>.
+Both <em class="emphasis">wormhole.movie.edu</em> and
+<em class="emphasis">terminator.movie.edu</em> are the site's
+forwarders. We add this <em class="emphasis">forwarders</em> substatement
+to every name server's configuration file exceptthe ones for the forwarders themselves:</p><p>
+
+
+<blockquote><pre class="code">options {
+	forwarders { 192.249.249.1; 192.249.249.3; };
+};</pre></blockquote>
+
+
+<a name="INDEX-1595" />The
+equivalent BIND 4 directive is:</p><p>
+
+
+<blockquote><pre class="code">forwarders 192.249.249.1 192.249.249.3</pre></blockquote>
+
+
+When you use forwarders, try to keep your site configuration simple.
+You could end up with configurations that are really twisted.</p><p>
+
+<a name="ch10-15-fm2xml" /><blockquote><b>WARNING: </b>
+Avoid chaining your forwarders. Don't configure name server A
+to forward to server B, and server B to forward to server C (or worse
+yet, back to server A). This can cause long resolution delays and
+creates a brittle configuration, in which the failure of any
+forwarder in the chain impairs or breaks name resolution.</p><p>
+
+</blockquote>
+
+<a name="dns4-CHP-10-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">10.5.1. A More Restricted Name Server</h3>
+
+
+<a name="INDEX-1596" />You may want to restrict your name
+servers even further -- stopping them from even
+<em class="emphasis">trying</em> to contact an off-site server if their
+forwarder is down or doesn't respond. You can do this by
+configuring your name servers to use <a name="INDEX-1597" /> <a name="INDEX-1598" /> <a name="INDEX-1599" /><em class="emphasis">forward-only</em>
+mode. A name server in forward-only mode is a variation on a name
+server that uses forwarders. It still answers queries from its
+authoritative data and cached data. However, it relies
+<em class="emphasis">completely</em> on its forwarders; it
+doesn'ttry to contact other name servers
+to find information if the forwarders don't give it an answer.
+Here is an example of what the configuration file of a name server in
+forward-only mode would contain:<a name="INDEX-1600" /></p><p>
+
+
+<blockquote><pre class="code">options {
+	forwarders { 192.249.249.1; 192.249.249.3; };
+	forward only;
+};</pre></blockquote>
+
+
+On a BIND 4 name server, that would look like:</p><p>
+
+
+<blockquote><pre class="code">forwarders 192.249.249.1 192.249.249.3
+options forward-only</pre></blockquote>
+
+
+BIND name servers before 4.9 provide the same functionality using the
+<em class="emphasis">slave</em> directive instead of the <em class="emphasis">options
+forward-only</em> directive:</p><p>
+
+
+<blockquote><pre class="code">forwarders 192.249.249.1 192.249.249.3
+slave</pre></blockquote>
+
+
+Don't confuse this old use of the term "slave" with
+the modern use. In BIND 4 name servers, "slave" was
+synonymous with "forward-only." "Slave" now
+means a name server that gets zone data from a master server via a
+zone transfer.</p><p>
+
+
+If you use forward-only mode, you must have forwarders configured.
+Otherwise, it doesn't make sense to have forward-only mode set.
+If you configure a name server in forward-only mode and run a version
+of BIND older than 8.2.3, you might want to consider including the
+forwarders' IP addresses more than once. On a BIND 8 server,
+that would look like:</p><p>
+
+
+<blockquote><pre class="code">options {
+	forwarders { 192.249.249.1; 192.249.249.3;
+	        192.249.249.1; 192.249.249.3; };
+	forward only;
+};</pre></blockquote>
+
+
+On a BIND 4 server, it would be:</p><p>
+
+
+<blockquote><pre class="code">forwarders 192.249.249.1 192.249.249.3 192.249.249.1 192.249.249.3
+options forward-only</pre></blockquote>
+
+
+This name server contacts each forwarder only once, and it waits a
+short time for the forwarder to respond. Listing the forwarders
+multiple times directs the name server to
+<em class="emphasis">retransmit</em> queries to the forwarders and
+increases the overall length of time that the forward-only name
+server will wait for an answer from forwarders.</p><p>
+
+
+However, you have to ask yourself if it <em class="emphasis">ever</em>
+makes sense to use a name server in forward-only mode. Such a name
+server is completely dependent on its forwarders. You can achieve
+much the same results by not running a name server at all; instead,
+create a <em class="emphasis">resolv.conf</em> file that contains
+<em class="emphasis">nameserver</em> directives pointing to the
+<a name="INDEX-1601" />forwarders you were using. This
+way, you're still relying on the forwarders, but now your
+applications are querying the forwarders directly instead of having a
+name server query them on the applications' behalf. You lose
+the local caching and address sorting that the name server would have
+done, but you reduce the overall complexity of your site's
+configuration by running fewer name servers.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-10-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">10.5.2. Forward Zones</h3>
+
+
+Traditionally, using forwarders has been an all-or-nothing
+proposition: either you use forwarders to resolve every query your
+name server can't answer itself or you don't use
+forwarders at all. However, there are some situations in which it
+would be nice to have more control over forwarding. For example,
+maybe you'd like to resolve certain domain names using a
+particular forwarder, but other domain names iteratively.</p><p>
+
+
+BIND 8.2 introduced a new feature, <em class="emphasis">forward
+zones</em><a name="INDEX-1602" />, that allows you to configure your name
+server to use forwarders only when looking up certain domain names.
+(BIND 9's support for forward zones was added in 9.1.0.) For
+example, you can configure your name server to shunt all queries for
+domain names ending in <em class="emphasis">pixar.com</em> to a pair of
+Pixar's name servers:</p><p>
+
+
+<blockquote><pre class="code">zone "pixar.com" {
+	type forward;
+	forwarders { 138.72.10.20; 138.72.30.28; };
+};</pre></blockquote>
+
+
+Why would you ever configure this explicitly rather than letting your
+name server follow delegation from the <em class="emphasis">com</em> name
+servers to the <em class="emphasis">pixar.com</em> name servers? Well,
+imagine that you have a private connection to Pixar and you're
+told to use a special set of name servers, reachable only from your
+network, to resolve all <em class="emphasis">pixar.com</em> domain names.</p><p>
+
+
+Even though forwarding rules are specified in the
+<em class="emphasis">zone</em> statement, they apply to all domain names
+that endinthe domain name
+specified. That is, regardless of whether the domain name
+you're looking up, <em class="emphasis">foo.bar.pixar.com</em>, is
+in the <em class="emphasis">pixar.com</em> zone, the rule applies to it
+because it ends in <em class="emphasis">pixar.com</em> (or is in the
+<em class="emphasis">pixar.com</em> domain, if you prefer).</p><p>
+
+
+There's another variety of forward zone, in a way the opposite
+of the kind we just showed you. These allow you to specify which
+queries <em class="emphasis">don't</em> get forwarded. Therefore, it
+applies only to name servers with forwarders specified in the
+<em class="emphasis">options</em> statement, which would normally apply to
+all queries.</p><p>
+
+
+These forward zones are configured using a <em class="emphasis">zone
+</em>statement, but not of type <em class="emphasis">forward</em>.
+Instead, these are normal zones -- master, slave, or
+stub -- with a
+<em class="emphasis">forwarders</em><a name="INDEX-1603" /> substatement. To
+"undo" the forwarding configured in the <em class="emphasis">options
+</em>statement, we specify an empty list of forwarders:</p><p>
+
+
+<blockquote><pre class="code">options {
+	directory "/var/named";
+	forwarders { 192.249.249.3; 192.249.249.1; };
+};
+
+zone "movie.edu" {
+	type slave;
+	masters { 192.249.249.3; };
+	file "bak.movie.edu";
+	forwarders {};
+};</pre></blockquote>
+
+
+Wait a minute -- why would you need to disable forwarding in a
+zone you're authoritative for? Wouldn't you just answer
+the query and not use a forwarder?</p><p>
+
+
+Remember, the forwarding rules apply to queries for all domain names
+that end in the domain name of the zone. So this forwarding rule
+really applies only to queries for domain names in delegated
+subdomains of <em class="emphasis">movie.edu</em>, like
+<em class="emphasis">fx.movie.edu</em>. Without the forwarding rule, this
+name server would have forwarded a query for
+<em class="emphasis">matrix.fx.movie.edu</em> to the name servers at
+192.249.249.3 and 192.249.249.1. With the forwarding rule, it instead
+uses the subdomain's NS records from the <em class="emphasis">movie.edu
+</em>zone and queries the <em class="emphasis">fx.movie.edu
+</em>name servers directly.</p><p>
+
+
+Forward zones are enormously helpful in dealing with Internet
+firewalls, as we'll see in the next chapter.</p><p>
+
+
+<a name="ch10-18-fm2xml" /><blockquote><table border="1" cellpadding="6"><tr><td>
+<h4 class="objtitle">Forwarder Selection</h4>
+
+
+On BIND 8.2.3 name servers, you don't need to list forwarders
+more than once. These name servers don't necessarily query the
+forwarders in the order listed; they interpret the name servers in
+the list as "candidate" forwarders and choose which one
+to query first based on roundtrip time, the time it took to respond
+to previous queries.</p><p>
+
+
+This is a real benefit if a forwarder fails, especially the first one
+in the list. Older versions of BIND would keep blindly querying the
+failed forwarder and waiting before querying the next in the list.
+BIND 8.2.3 quickly realizes that the forwarder isn't responding
+and tries another first.</p><p>
+
+
+BIND 9 doesn't yet implement this more intelligent form of
+<a name="INDEX-1604" />forwarder selection, unfortunately,
+though it will retransmit queries to forwarders when
+necessary.<a name="INDEX-1605" /></p><p>
+
+</td></tr></table><p></blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch10_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.4. Incremental Zone Transfer </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">10.6. Views</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch10_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:29 GMT -->
+</html>

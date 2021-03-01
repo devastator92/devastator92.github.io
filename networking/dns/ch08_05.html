@@ -1,0 +1,253 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Planning for Disasters (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.5. Planning for Disasters</h2>
+
+
+<a name="INDEX-1387" />It's
+<a name="INDEX-1388" />
+<a name="INDEX-1389" />a fact of life on a network that things go
+wrong. Hardware fails, software has bugs, and people very
+occasionally make mistakes. Sometimes this results in minor
+inconveniences, like having a few users lose connections. Sometimes
+the results are catastrophic and involve the loss of important data
+and valuable jobs.</p><p>
+
+
+Because the Domain Name System relies so heavily on the network, it
+is vulnerable to network outages. Thankfully, the design of DNS takes
+into account the imperfection of networks: it allows for multiple,
+redundant name servers, retransmission of queries, retrying zone
+transfers, and so on.</p><p>
+
+
+The Domain Name System doesn't protect itself from every
+conceivable calamity, though. There are types of network
+failures -- some of them quite common -- that DNS doesn't
+or can't protect against. But with a small investment of time
+and money, you can minimize the threat of these outages.</p><p>
+
+
+<a name="dns4-CHP-8-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">8.5.1. Outages</h3>
+
+
+<a name="INDEX-1390" />
+<a name="INDEX-1391" />Power outages, for example, are
+relatively common in many parts of the world. In some parts of the
+U.S., thunderstorms or tornadoes may cause a site to lose power, or
+to have only intermittent power, for an extended period. Elsewhere,
+typhoons, volcanoes, or construction work may interrupt your
+electrical service.</p><p>
+
+
+If all your hosts are down, of course, you don't need name
+service. Quite often, however, sites have problems when power is
+<em class="emphasis">restored</em>. Following our recommendations, they
+run their name servers on file servers and big multiuser machines.
+And when the power comes up, those machines are naturally the last to
+boot -- because all those disks need to be <em class="filename">fsck
+</em>'d first! Which means that all the on-site hosts
+that are quick to boot do so without the benefit of name service.</p><p>
+
+
+This can cause all sorts of wonderful problems, depending on how your
+hosts' startup files are written. Unix hosts often execute some
+variant of:</p><p>
+
+
+<blockquote><pre class="code">/usr/sbin/ifconfig lan0 inet `hostname` netmask 255.255.128.0 up
+/usr/sbin/route add default site-router 1</pre></blockquote>
+
+
+to bring up their network interface and add a default route. Using
+host names in the commands
+(<tt class="literal">`</tt><em class="emphasis">hostname</em><tt class="literal">`</tt>
+expands to the local host name and <em class="emphasis">site-router</em>
+is the name of the local router) is admirable for two reasons:</p><p>
+
+
+<ul><li>It lets the administrators change the router's IP address
+without changing all the startup files on-site.</p></li><li>It lets the administrators change the host's IP address by
+changing the IP address in only one file.</p></li></ul>
+Unfortunately, the <a name="INDEX-1392" /><em class="filename">route</em> command fails
+without name service. The
+<em class="filename">ifconfig</em><a name="INDEX-1393" /> command fails only if the local
+host's name and IP address don't appear in the
+host's <em class="filename">/etc/hosts</em> file, so it's a
+good idea to leave at least that data in each host's
+<em class="filename">/etc/hosts</em>.</p><p>
+
+
+By the time the startup sequence reaches the
+<em class="filename">route</em> command, the network interface will be up,
+and the host will try to use name service to map the name of the
+router to an IP address. And since the host has no default route
+until the <em class="filename">route</em> command is executed, the only
+name servers it can reach are those on the local subnet.</p><p>
+
+
+If the booting host can reach a working name server on its local
+subnet, it can execute the <em class="filename">route</em> command
+successfully. Quite often, however, one or more of the name servers
+it can reach aren't yet running. What happens then depends on
+the contents of <a name="INDEX-1394" /><em class="filename">resolv.conf</em>.</p><p>
+
+
+BIND <a name="INDEX-1395" />resolvers fall back to the host table only
+if there is just one name server listed in <em class="filename">resolv.conf
+</em>(or if no name server is listed, and the resolver defaults
+to using a name server on the local host). If only one name server is
+configured, the resolver queries it, and if the network returns an
+error each time the resolver sends a query, the resolver falls back
+to searching the host table. The errors that cause the resolver to
+fall back include:</p><p>
+
+
+<ul><li>Receipt of an <a name="INDEX-1396" />ICMP
+<a name="INDEX-1397" />port
+unreachable message</p></li><li>Receipt of an ICMP <a name="INDEX-1398" />network unreachable message</p></li><li>Inability to send the UDP packet (e.g., because networking is not yet
+running on the local host)<a href="#FOOTNOTE-65">[65]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-65" />[65]Check <a href="ch06_01.html">Chapter 6, "Configuring Hosts"</a>, for vendor-specific enhancements to and
+variants of this resolver algorithm.</p><p>
+
+</blockquote></li></ul>
+If the host running the one configured name server isn't
+running at all, though, the resolver doesn't receive any
+errors. The name server is effectively a black hole. After about 75
+seconds of trying, the resolver just times out and returns a null
+answer to the application that called it. Only if the name server
+host has actually started networking -- but not yet started the
+name server -- does the resolver get an error: an ICMP port
+unreachable message.</p><p>
+
+
+Overall, the single name server configuration does work if you have
+name servers available on each network, but not as elegantly as we
+might like. If the local name server hasn't come up when a host
+on its network reboots, the <em class="filename">route </em>command fails.</p><p>
+
+
+This may seem awkward, but it's not nearly as bad as what
+happens with multiple name servers. With multiple servers listed in
+<em class="filename">resolv.conf</em>, BIND <em class="emphasis">never
+</em>falls back to the host table after the primary network
+interface has been <em class="filename">ifconfig </em>'d. The
+resolver simply loops through the name servers, querying them until
+one answers or the 75-plus second timeout is reached.</p><p>
+
+
+This is especially problematic during bootup. If none of the
+configured name servers is available, the resolver times out without
+returning an IP address, and adding the default route fails.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-8-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">8.5.2. Recommendations</h3>
+
+
+Our recommendation, as primitive as it sounds, is to hardcode the
+<a name="INDEX-1399" />IP address of the
+default router into the startup file or an external file (many
+systems use<a name="INDEX-1400" /><a name="INDEX-1401" /> <em class="filename">/etc/defaultrouter</em>).
+This ensures that your host's networking starts correctly.</p><p>
+
+
+An alternative is to list just a single, reliable name server on your
+host's local network in <em class="filename">resolv.conf</em>. This
+allows you to use the name of the default router in the startup file,
+as long as you make sure that the router's name appears in
+<em class="filename">/etc/hosts </em>(in case your reliable name server
+isn't running when the host reboots). Of course, if the host
+running the reliable name server isn't running when your host
+reboots, all bets are off. You won't fall back to
+<em class="filename">/etc/hosts</em> because there won't be any
+networking running to return an error to your host.</p><p>
+
+
+If your vendor's version of BIND allows configuration of the
+order in which services are queried or falls back from DNS to
+<em class="filename">/etc/hosts </em>if DNS doesn't find an answer,
+take advantage of it! In the former case, you can configure the
+resolver to check <em class="filename">/etc/hosts </em>first, and then
+keep a "stub" <em class="filename">/etc/hosts </em>file on
+each host, including the default router and the local host's
+name. In the latter situation, just make sure such a
+"stub" <em class="filename">/etc/hosts </em>exists; no other
+configuration should be necessary.</p><p>
+
+
+A last, promising prospect is to do away with setting the default
+route manually by using <a name="INDEX-1402" /><em class="firstterm">ICMP Router Discovery
+Messages</em>. This extension to the <a name="INDEX-1403" />
+<a name="INDEX-1404" />ICMP protocol, described in RFC 1256,
+uses broadcast or multicast messages to dynamically discover and
+advertise routers on a network. <a name="INDEX-1405" />Windows NT 4.0 supports it, though
+it's disabled by default. To enable it, follow the instructions
+in Knowledge Base article Q223756. Sun includes an implementation of
+this protocol in recent versions of Solaris as
+<em class="filename">/usr/sbin/in.rdisc,</em> and Cisco's
+Internetwork Operating System (IOS) supports it too.</p><p>
+
+
+And what if your default route is added correctly but the name
+servers still haven't come up? This can affect
+<em class="filename">sendmail</em>, NFS, and a slew of other services.
+<em class="filename">sendmail </em>won't canonicalize host names
+correctly without DNS, and your NFS mounts may fail.</p><p>
+
+
+<a name="INDEX-1406" /> <a name="INDEX-1407" />The best solution to this problem is to
+run a name server on a host with uninterruptible power. If you rarely
+experience extended power loss, battery backup might be enough. If
+your outages are longer and name service is critical to you, you
+should consider an <a name="INDEX-1408" /> <a name="INDEX-1409" />uninterruptible power system
+(UPS) with a generator of some kind.</p><p>
+
+
+If you can't afford luxuries like these, you might just try to
+track down the fastest booting host around and run a name server on
+it. Hosts with filesystem journaling should boot especially quickly
+since they don't need to <em class="filename">fsck</em>. Hosts with
+small filesystems should boot quickly, too, since they don't
+have as much filesystem to check.</p><p>
+
+
+Once you've located the right host, you'll need to make
+sure the host's IP address appears in the
+<em class="filename">resolv.conf</em> files of all the hosts that need
+full-time name service. You'll probably want to list the
+backed-up host last, since during normal operation hosts should use
+the name server closest to them. Then, after a power failure, your
+critical applications will still have name service, albeit at a small
+sacrifice in performance.</p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.4. Changing TTLs</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.6. Coping with Disaster</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

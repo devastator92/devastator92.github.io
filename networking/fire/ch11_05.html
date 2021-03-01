@@ -1,0 +1,353 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Reconfiguring for Production (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">11.5. Reconfiguring for Production</h2>
+
+
+
+
+
+<a name="INDEX-995" /><a name="INDEX-996" /> <a name="INDEX-997" />
+<a name="INDEX-998" /><a name="INDEX-999" /><a name="INDEX-1000" />Now it's time to move the
+machine from the configuration that was useful to you when you were
+building it to the best configuration for running it. You'll
+need to do several things:</p><p>
+
+
+
+
+
+<ol><li>Reconfigure and rebuild the kernel.</p><p></li><li>Remove all nonessential programs.</p></li><li><p>Mount as many filesystems as possible as read-only.</p></li></ol>
+<a name="ch11-3674" /><div class="sect2">
+<h3 class="sect2">11.5.1. Reconfigure and Rebuild the Kernel </h3>
+
+
+
+
+
+<a name="INDEX-1001" /><a name="INDEX-1002" /><a name="INDEX-1003" />The
+first step in this phase of building your bastion host is to rebuild
+the operating system kernel to remove kernel capabilities you
+don't need. This may sound intimidating, but it's
+generally a relatively straightforward operation; it needs to be,
+because you'll be using the same capabilities you'd use
+to install a new type of device on your system. Every Unix system, as
+shipped, contains some form of configuration support (they range
+considerably in how kernel reconfiguration is supported and in what
+you can do). Besides reducing the size of your kernel (and thereby
+making more memory available for other purposes), rebuilding the
+kernel denies to attackers the chance to exploit these capabilities.</p><p>
+
+
+
+
+
+Some capabilities are particularly dangerous. In particular, you
+should probably remove the following capabilities or device drivers:</p><p>
+
+
+
+
+
+<ul><li>NFS and related capabilities</p><p></li><li>Anything that enables network sniffing -- for example, Network
+Interface Tap (NIT) or Berkeley Packet Filter (BPF)</p><p></li></ul>
+Although NIT and BPF are provided for testing and debugging purposes,
+they are frequently used by attackers. NIT and BPF are dangerous
+because they let the machine grab all packets off the Ethernet
+it's attached to, instead of only the packets addressed to it.
+Disabling these capabilities may prevent you from using the machine
+as a packet filtering system, so you may not be able to delete them
+in all architectures.</p><p>
+
+
+
+
+
+If your bastion host is a dual-homed host, this is the time to
+disable IP forwarding.</p><p>
+
+
+
+
+
+You have to be more careful when you disable kernel capabilities than
+when you disable services started by <em class="emphasis">inetd</em> or at
+boot time from the <em class="emphasis">/etc/rc</em> files (as described
+earlier). There are a lot of interdependencies between kernel
+capabilities. For this reason, it's sometimes hard to determine
+exactly what a given capability is used for. The consequences of
+disabling a capability that is actually needed can be
+severe -- for example, the new kernel might not boot.</p><p>
+
+
+
+
+
+ake sure you follow your vendor's instructions for building
+and installing new kernels. Always keep a backup copy of your old
+kernel. If you have a backup, you can boot from it if you find out
+that something is wrong with the new kernel. Some boot systems need
+all the kernels to reside in the same partition, or they may need to
+be configured with the names of all the kernels you wish to boot.
+Either way, be sure that you have a backup kernel, that it's
+possible to boot that kernel, and that you know how to do so, all
+before you change the working kernel.</p><p>
+
+
+
+
+
+When you know you can safely reboot the machine, go through the
+kernel configuration files the same way you went through the startup
+files, checking every single line to make certain that it's
+something you want. Again, watch for places where one configuration
+file contains another, and check your documentation to be sure that
+you've looked at all the configuration files that are
+consulted. Often there is one file for including device drivers and
+one or more for parameters; IP forwarding will be in the latter.</p><p>
+
+
+
+
+
+Once you've got a working kernel, you'll probably want to
+delete or encrypt your old "full function" kernel.
+Replace it with a backup copy of the working minimal kernel. Doing so
+will keep an attacker who somehow manages to break into your machine
+from simply using that old kernel to reboot, and thereby restore all
+of the services you so carefully disabled. For similar reasons,
+you'll probably also want to delete the files and programs
+needed to build a new kernel.</p><p>
+
+
+
+
+
+If your kernel uses loadable modules, it may be difficult to
+determine when they're used. You will want to delete or encrypt
+all the ones that you don't want used, but because
+they're not always explicitly loaded, you may not know which
+those are. Keeping an alternate boot medium handy, try moving them
+out of the directory for loadable modules. Run the machine through
+its paces before you finally remove or encrypt them.</p><p>
+
+
+
+
+
+Beware! Your vendor may have provided copies of "generic"
+kernels (which typically have every possible capability enabled) in
+unexpected locations for use during the installation of the machine
+and its (nonexistent) client machines. Poke around in all the
+directories where installation files are kept and all the directories
+for clients. The documentation generally tells you where client
+kernels are but rarely tells you about the internals of the install
+process. Check the documentation for disaster recovery advice, which
+may helpfully tell you where to locate spare kernel images.<a name="INDEX-1004" /><a name="INDEX-1005" /><a name="INDEX-1006" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-3715" /><div class="sect2">
+<h3 class="sect2">11.5.2. Remove Nonessential Programs</h3>
+
+
+
+
+
+<a name="INDEX-1007" />The next step is to remove all of
+the programs that aren't essential for day-to-day operation. If
+a program isn't there, an attacker can't exploit any bugs
+that it might contain. This is especially true for
+<em class="emphasis">setuid/setgid</em> programs, which are a very
+tempting target for an attacker. You should remove programs you
+normally think of as being essential. Remember that the bastion host
+is purely providing Internet services; it does not need to be a
+comfortable environment in which to work.</p><p>
+
+
+
+
+
+Window systems and compilers are examples of major programs you can
+get rid of. Attackers find these programs very useful: window systems
+are fertile ground for security problems, and compilers can be used
+to build the attacker's own tools. Graphical system
+administration programs are also usually powerful, vulnerable, and
+frequently unnecessary; however, on some platforms, they may be
+impossible to remove. Documentation and help systems (including
+manual pages) are at best an education for attackers, and at worst
+another source of vulnerabilities. Attackers have been known to hide
+programs and files among manual pages. Make sure that you have the
+information internally, but remove it from all bastion hosts.</p><p>
+
+
+
+
+
+Before deleting programs like compilers, make sure you've
+finished using them yourself; make sure you've built,
+installed, and tested everything you're going to need on this
+machine, such as the tools for auditing the system (discussed in <a href="ch11_06.html#ch11-3775">Section 11.6, "Running a Security Audit"</a>, later in this chapter).</p><p>
+
+
+
+
+
+Instead of simply deleting key tools you'd expect an attacker
+to use, such as the compiler, you might want to replace them with
+programs that raise an alarm (for example, sending electronic mail or
+tripping your pager) when someone tries to run them. You might even
+want to have the programs halt the system after raising the alarm, if
+you believe it's better for the machine to be down than under
+attack. This is a prime way to humiliate yourself, however; you
+yourself are probably the one person most likely to forget where you
+are when you try to run a forbidden command. It's also a good
+way to set yourself up for denial of service attacks.</p><p>
+
+
+
+
+
+You'll want to do two scans looking for things to delete:</p><p>
+
+
+
+
+
+<ol><li>Walk through all the standard directories for binaries on your system
+(everything that's in root's path or in the default user
+path). If you're unsure whether a program is needed, turn off
+execute permission on it for a while (a few days) before you remove
+or encrypt it and see what happens. You may also want to run the
+machine for a while before you do the scan and check the access times
+on files to see if they've been used.</p><p></li><li>Use <em class="emphasis">find</em> to look for every file on the system
+that has the <em class="emphasis">setuid</em> or
+<em class="emphasis">setgid</em> bit turned on. The arguments to
+<em class="emphasis">find</em> differ radically from system to system, but
+you will probably want something like this:</p><p></li></ol>
+<blockquote><pre class="code">find / -type f \( -perm -04000 -o -perm -02000 \) -ls</pre></blockquote>
+
+
+
+
+<ol><li>Some versions of <em class="emphasis">find</em> provide special primitives
+for identifying <em class="emphasis">setuid</em> and
+<em class="emphasis">setgid</em> files.</p><p></li></ol>
+If your operating system provides a list of installed packages,
+you'll also want to look at that list, which may include things
+that have been stashed in interesting places.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch11-3740" /><div class="sect2">
+<h3 class="sect2">11.5.3. Mount Filesystems as Read-Only</h3>
+
+
+
+
+
+<a name="INDEX-1008" />
+<a name="INDEX-1009" /> <a name="INDEX-1010" /><a name="INDEX-1011" />Once you've configured a
+bastion host, you don't want it to change, so you should mount
+as many filesystems as possible as read-only. How much of the machine
+you can protect this way will depend on the version of Unix that
+you're running and the services that you're providing. A
+machine that you're using as a packet filtering router may be
+able to run with all of its disk space protected; a machine
+that's providing mail service will need space to keep temporary
+files in, if nothing else.</p><p>
+
+
+
+
+
+On a service host, you have to provide a certain amount of writable
+filesystem space for things like scratch space, system logs, and the
+mail spool. You might be able to use a RAM disk for this; however,
+you'll have to be sure that your operating system supports it,
+that you have enough RAM, and that you think you can afford to lose
+the contents of the RAM disk (for example, email in transit between
+internal hosts and the Internet) whenever your machine reboots.</p><p>
+
+
+
+
+
+With most versions of Unix, you'll also have to either provide
+writable disk space for memory swapping or turn off swapping. Many
+versions of Unix do not allow you to turn off swapping; however, they
+will usually allow you to use a separate disk for swap space, and
+that disk can safely be left writable. Using a RAM disk will increase
+your memory usage to the point where you will probably need swap
+space.</p><p>
+
+
+
+
+
+<a name="INDEX-1012" />Systems based on BSD 4.4-Lite (for
+instance, current releases of NetBSD, FreeBSD, and the BSDI product)
+have a new immutable attribute that can be set on a per-file basis.
+If a file is marked "immutable", the file cannot be
+changed, not even by root, unless the system is running in
+single-user mode. If your operating system provides this capability,
+use it to protect your programs and configuration files from
+tampering by an attacker. (We recommend this approach only if you
+cannot use hardware write protection, or as an additional layer of
+security to use with hardware write protection. Because it's
+implemented in software, it is more likely to be
+compromisable.)<a name="INDEX-1013" /> <a name="INDEX-1014" /><a name="INDEX-1015" /><a name="INDEX-1016" /><a name="INDEX-1017" /> <a name="INDEX-1018" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch11_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">11.4. Installing and Modifying Services</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.6. Running a Security Audit</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch11_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>

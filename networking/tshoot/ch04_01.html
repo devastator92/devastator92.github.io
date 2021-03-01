@@ -1,0 +1,464 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:49 GMT -->
+<head><title>Path Characteristics (Network Troubleshooting Tools)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Joseph D. Sloan" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600186XL" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Network Troubleshooting Tools" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Network Troubleshooting Tools" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 4. Path Characteristics</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#nettroubletools-CHP-4-SECT-1">Path Discovery with traceroute</a><br />
+<a href="ch04_02.html">Path Performance</a><br />
+      <a href="ch04_03.html">Microsoft Windows</a><br />
+      </p><p></div>
+
+In the last chapter, we attempted to answer a fundamental question,
+"Do we have a working network connection?" We used tools
+such as <em class="filename">ping</em> to verify basic connectivity. But
+simple connectivity is not enough for many purposes. For example, an
+ISP can provide connectivity but not meet your needs or expectations.
+If your ISP is not providing the level of service you think it
+should, you will need something to base your complaints on. Or, if
+the performance of your local network isn't adequate, you will
+want to determine where the bottlenecks are located before you start
+implementing expensive upgrades. In this chapter, we will try to
+answer the question, "Is our connection performing
+reasonably?"
+</p><p>
+
+We will begin by looking at ways to determine which links or
+individual connections compose a path. This discussion focuses on the
+tool <em class="filename">traceroute</em>. Next, we will turn to several
+tools that allow us to identify those links along a path that might
+cause problems. Once we have identified individual links of interest,
+we will examine some simple ways to further characterize the
+performance of those links, including estimating the bandwidth of a
+connection and measuring the available throughput.
+</p><p>
+
+<div class="sect1"><a name="nettroubletools-CHP-4-SECT-1" /></a>
+<h2 class="sect1">4.1. Path Discovery with traceroute</h2>
+
+<a name="INDEX-665" /></a><a name="INDEX-666" /></a><a name="INDEX-667" /></a><a name="INDEX-668" /></a><a name="INDEX-669" /></a>This section describes
+<em class="filename">traceroute</em>, a tool used to discover the links
+along a path. While this is the first step in investigating a
+path's behavior and performance, it is useful for other tasks
+as well. In the previous discussion of <em class="filename">ping</em>, it
+was suggested that you work your way, hop by hop, toward a device you
+can't reach to discover the point of failure. This assumes that
+you know the path.
+</p><p>
+
+Path discovery is also an essential step in diagnosing routing
+problems. While you may fully understand the structure of your
+network and know what path you want your packets to take through your
+network, knowing the path your packets actually take is essential
+information and may come as a surprise.
+</p><p>
+
+<a name="INDEX-670" /></a><a name="INDEX-671" /></a>Once packets leave your network,
+you have almost no control over the path they actually take to their
+destination. You may know very little about the structure of adjacent
+networks. Path discovery can provide a way to discover who their ISP
+is, how your ISP is connected to the world, and other information
+such as peering arrangements. <em class="filename">traceroute</em> is the
+tool of choice for collecting this kind of information.
+</p><p>
+
+<a name="INDEX-672" /></a><a name="INDEX-673" /></a>The <em class="filename">traceroute</em>
+program was written by Van Jacobson and others. It is based on a
+clever use of the <em class="emphasis">Time-To-Live</em> (TTL) field in
+the IP packet's header. The TTL field, described briefly in the
+last chapter, is used to limit the life of a packet. When a router
+fails or is misconfigured, a routing loop or circular path may
+result. The TTL field prevents packets from remaining on a network
+indefinitely should such a routing loop occur. A packet's TTL
+field is decremented each time the packet crosses a router on its way
+through a network. When its value reaches 0, the packet is discarded
+rather than forwarded. When discarded, an ICMP TIME_EXCEEDED message
+is sent back to the packet's source to inform the source that
+the packet was discarded. By manipulating the TTL field of the
+original packet, the program <em class="filename">traceroute</em> uses
+information from these ICMP messages to discover paths through a
+network.
+</p><p>
+
+<em class="filename">traceroute</em><a name="INDEX-674" /></a><a name="INDEX-675" /></a> sends a series of UDP packets with the
+destination address of the device you want a path to.<a href="#FOOTNOTE-16">[16]</a> By default,
+<em class="filename">traceroute</em> sends sets of three packets to
+discover each hop. <em class="filename">traceroute</em> sets the TTL field
+in the first three packets to a value of 1 so that they are discarded
+by the first router on the path. When the ICMP TIME_EXCEEDED messages
+are returned by that router, <em class="filename">traceroute</em> records
+the source IP address of these ICMP messages. This is the IP address
+of the first hop on the route to the destination.
+</p><p><blockquote class="footnote">
+<a name="FOOTNOTE-16" /></a>[16]<em class="filename">tracert</em>, a Windows variant of
+<em class="filename">traceroute</em>, uses ICMP rather than UDP.
+<em class="filename">tracert</em> is discussed later in this
+chapter.</p><p> </blockquote>
+
+Next, three packets are sent with their TTL field set to 2. These
+will be discarded by the second router on the path. The ICMP messages
+returned by this router reveal the IP address of the second router on
+the path. The program proceeds in this manner until a set of packets
+finally has a TTL value large enough so that the packets reach their
+destination.
+</p><p>
+
+Typically, when the probe packets finally have an adequate TTL and
+reach their destination, they will be discarded and an ICMP
+PORT_UNREACHABLE message will be returned. This happens because
+<em class="filename">traceroute</em> sends all its probe packets with what
+should be invalid port numbers, i.e., port numbers that aren't
+usually used. To do this, <em class="filename">traceroute</em> starts with
+a very large port number, typically 33434, and increments this value
+with each subsequent packet. Thus, each of the three packets in a set
+will have three different unlikely port numbers. The receipt of ICMP
+PORT_UNREACHABLE messages is the signal that the end of the path has
+been reached. Here is a simple example of using
+<em class="filename">traceroute</em>:
+</p><p>
+
+<blockquote><pre class="code">bsd1# traceroute 205.160.97.122
+traceroute to 205.160.97.122 (205.160.97.122), 30 hops max, 40 byte packets
+ 1  205.153.61.1 (205.153.61.1)  1.162 ms  1.068 ms  1.025 ms
+ 2  cisco (205.153.60.2)  4.249 ms  4.275 ms  4.256 ms
+ 3  165.166.36.17 (165.166.36.17)  4.433 ms  4.521 ms  4.450 ms
+ 4  e0.r01.ia-gnwd.Infoave.Net (165.166.36.33)  5.178 ms  5.173 ms  5.140 ms
+ 5  165.166.125.165 (165.166.125.165)  13.171 ms  13.277 ms  13.352 ms
+ 6  165.166.125.106 (165.166.125.106)  18.395 ms  18.238 ms  18.210 ms
+ 7  atm12-0-10-mp.r01.ia-clma.infoave.net (165.166.126.3)  18.816 ms  18.934 ms
+ 18.893 ms
+ 8  Serial5-1-1.GW1.RDU1.ALTER.NET (157.130.35.69)  26.658 ms  26.484 ms  26.855
+ ms
+ 9  Fddi12-0-0.GW2.RDU1.ALTER.NET (137.39.40.231)  26.692 ms  26.697 ms  26.490
+ms
+10  smatnet-gw2.customer.ALTER.NET (157.130.36.94)  27.736 ms  28.101 ms  27.738
+ ms
+11  rcmt1-S10-1-1.sprintsvc.net (205.244.203.50)  33.539 ms  33.219 ms  32.446 m
+s
+12  rcmt3-FE0-0.sprintsvc.net (205.244.112.22)  32.641 ms  32.724 ms  32.898 ms
+13  gwd1-S3-7.sprintsvc.net (205.244.203.13)  46.026 ms  50.724 ms  45.960 ms
+14  gateway.ais-gwd.com (205.160.96.102)  47.828 ms  50.912 ms  47.823 ms
+15  pm3-02.ais-gwd.com (205.160.97.41)  63.786 ms  48.432 ms  48.113 ms
+16  user58.ais-gwd.com (205.160.97.122)  200.910 ms  184.587 ms  202.771 ms</pre></blockquote>
+
+<a name="INDEX-676" /></a><a name="INDEX-677" /></a><a name="INDEX-678" /></a>The results should be fairly
+self-explanatory. This particular path was 16 hops long. Reverse name
+lookup is attempted for the IP address of each device, and, if
+successful, these names are reported in addition to IP addresses.
+Times are reported for each of the three probes sent. They are
+interpreted in the same way as times with <em class="filename">ping</em>.
+(However, if you just want times for one hop,
+<em class="filename">ping</em> is generally a better choice.)
+</p><p>
+
+<a name="INDEX-679" /></a><a name="INDEX-680" /></a>Although no packets were lost in
+this example, should a packet be lost, an asterisk is printed in the
+place of the missing time. In some cases, all three times may be
+replaced with asterisks. This can happen for several reasons. First,
+the router at this hop may not return ICMP TIME_EXCEEDED messages.
+Second, some older routers may incorrectly forward packets even
+though the TTL is 0. A third possibility is that ICMP messages may be
+given low priority and may not be returned in a timely manner.
+Finally, beyond some point of the path, ICMP packets may be blocked.
+</p><p>
+
+<a name="INDEX-681" /></a><a name="INDEX-682" /></a><a name="INDEX-683" /></a><a name="INDEX-684" /></a><a name="INDEX-685" /></a>Other
+routing problems may exist as well. In some instances
+<em class="filename">traceroute</em> will append additional messages to
+the end of lines in the form of an exclamation point and a letter.
+<tt class="literal">!H</tt>, <tt class="literal">!N</tt>, and
+<tt class="literal">!P</tt> indicate, respectively, that the host, network,
+or protocol is unreachable. <tt class="literal">!F</tt> indicates that
+fragmentation is needed. <tt class="literal">!S</tt> indicates a source
+route failure.
+</p><p>
+
+<a name="nettroubletools-CHP-4-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">4.1.1. Options</h3>
+
+<a name="INDEX-686" /></a><a name="INDEX-687" /></a><a name="INDEX-688" /></a><a name="INDEX-689" /></a>Two options control how much information
+is printed. Name resolution can be disabled with the
+<em class="filename">-n</em> option. This can be useful if name resolution
+fails for some reason or if you just don't want to wait on it.
+The <em class="filename">-v</em> option is the verbose flag. With this
+flag set, the source and packet sizes of the probes will be reported
+for each packet. If other ICMP messages are received, they will also
+be reported, so this can be an important option when troubleshooting.
+</p><p>
+
+<a name="INDEX-690" /></a><a name="INDEX-691" /></a>Several options may be used to alter the
+behavior of <em class="filename">traceroute</em>, but most are rarely
+needed. An example is the <em class="filename">-m</em> option. The TTL
+field is an 8-bit number allowing a maximum of 255 hops. Most
+implementations of <em class="filename">traceroute</em> default to trying
+only 30 hops before halting. The <em class="filename">-m</em> option can
+be used to change the maximum number of hops tested to any value up
+to 255.
+</p><p>
+
+<a name="INDEX-692" /></a><a name="INDEX-693" /></a>As noted earlier,
+<em class="filename">traceroute</em> usually receives a PORT_UNREACHABLE
+message when it reaches its final destination because it uses a
+series of unusually large port numbers as the destination ports.
+Should the number actually match a port that has a running service,
+the PORT_UNREACHABLE message will not be returned. This is rarely a
+problem since three packets are sent with different port numbers,
+but, if it is, the <em class="filename">-p</em> option lets you specify a
+different starting port so these ports can be avoided.
+</p><p>
+
+<a name="INDEX-694" /></a><a name="INDEX-695" /></a><a name="INDEX-696" /></a>Normally, <em class="filename">traceroute</em>
+sends three probe packets for each TTL value with a timeout of three
+seconds for replies. The default number of packets per set can be
+changed with the <em class="filename">-q</em> option. The default timeout
+can be changed with the <em class="filename">-w</em> option.
+</p><p>
+
+Additional options support how packets are routed. See the manpage
+for details on these if needed.
+</p><p>
+
+</div>
+<a name="nettroubletools-CHP-4-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">4.1.2. Complications with traceroute</h3>
+
+<a name="INDEX-697" /></a>The
+information <em class="filename">traceroute</em> supplies has its
+limitations. In some situations, the results returned by
+<em class="filename">traceroute</em> have a very short shelf life. This is
+particularly true for long paths crossing several networks and ISPs.
+</p><p>
+
+<a name="INDEX-698" /></a><a name="INDEX-699" /></a>You should also recall that a
+router, by definition, is a computer with multiple network
+interfaces, each with a different IP address. This raises an obvious
+question: which IP address should be returned for a router?
+For<em class="filename"> traceroute</em>, the answer is dictated by the
+mechanism it uses to discover the route. It can report only the
+address of the interface receiving the packet. This means a quite
+different path will be reported if <em class="filename">traceroute</em> is
+run in the reverse direction.
+</p><p>
+
+Here is the output when the previous example is run again from what
+was originally the destination to what was originally the source,
+i.e., with the source and destination exchanged:
+</p><p>
+
+<blockquote><pre class="code">C:\&gt;tracert 205.153.61.178
+
+Tracing route to 205.153.61.178 over a maximum of 30 hops
+
+  1   132 ms   129 ms   129 ms  pm3-02.ais-gwd.com [205.160.97.41]
+  2   137 ms   130 ms   129 ms  sprint-cisco-01.ais-gwd.com [205.160.97.1]
+  3   136 ms   129 ms   139 ms  205.160.96.101
+  4   145 ms   150 ms   140 ms  rcmt3-S4-5.sprintsvc.net [205.244.203.53]
+  5   155 ms   149 ms   149 ms  sl-gw2-rly-5-0-0.sprintlink.net [144.232.184.85]
+  6   165 ms   149 ms   149 ms  sl-bb11-rly-2-1.sprintlink.net [144.232.0.77]
+  7   465 ms   449 ms   399 ms  sl-gw11-dc-8-0-0.sprintlink.net [144.232.7.198]
+  8   155 ms   159 ms   159 ms  sl-infonet-2-0-0-T3.sprintlink.net [144.228.220.6]
+  9   164 ms   159 ms   159 ms  atm4-0-10-mp.r01.ia-gnvl.infoave.net [165.166.126.4]
+ 10   164 ms   169 ms   169 ms  atm4-0-30.r1.scgnvl.infoave.net [165.166.125.105]
+ 11   175 ms   179 ms   179 ms  165.166.125.166
+ 12   184 ms   189 ms   195 ms  e0.r02.ia-gnwd.Infoave.Net [165.166.36.34]
+ 13   190 ms   179 ms   180 ms  165.166.36.18
+ 14   185 ms   179 ms   179 ms  205.153.60.1
+ 15   174 ms   179 ms   179 ms  205.153.61.178
+
+Trace complete.</pre></blockquote>
+
+<a name="INDEX-700" /></a><a name="INDEX-701" /></a><a name="INDEX-702" /></a>There are several obvious differences.
+First, the format is slightly different because this example was run
+using Microsoft's implementation of
+<em class="filename">traceroute</em>, <em class="filename">tracert</em>. This,
+however, should present no difficulty.
+</p><p>
+
+A closer examination shows that there are more fundamental
+differences. The second trace is not simply the first trace in
+reverse order. The IP addresses are not the same, and the number of
+hops is different.
+</p><p>
+
+There are two things going on here. First, as previously mentioned,
+<em class="filename">traceroute</em> reports the IP number of the
+interface where the packet arrives. The reverse path will use
+different interfaces on each router, so different IP addresses will
+be reported. While this can be a bit confusing at first glance, it
+can be useful. By running <em class="filename">traceroute</em> at each end
+of a connection, a much more complete picture of the connection can
+be created.
+</p><p>
+
+<a href="ch04_01.html#nettroubletools-CHP-4-FIG-1">Figure 4-1</a> shows the first six hops on the path
+starting from the source for the first trace as reconstructed from
+the pair of traces. We know the packet originates at
+<em class="filename">205.153.61.178</em>. The first trace shows us the
+first hop is <em class="filename">205.153.61.1</em>. It leaves this router
+on interface <em class="filename">205.153.60.1</em> for
+<em class="filename">205.153.60.2</em>. The second of these addresses is
+just the next hop in the first trace. The first address comes from
+the second trace. It is the last hop before the destination. It is
+also reasonable in that we have two addresses that are part of the
+same class C network. With IP networks, the ends of a link are part
+of the link and must have IP numbers consistent with a single
+network.
+</p><p>
+
+<a name="nettroubletools-CHP-4-FIG-1" /></a><div class="figure"><img height="435" alt="Figure 4-1" src="figs/ntt_0401.gif" width="191" /></div><h4 class="objtitle">Figure 4-1. First six hops on path </h4>
+
+From the first trace, we know packets go from the
+<em class="filename">205.153.60.2</em> to
+<em class="filename">165.166.36.17</em>. From the reverse trace, we are
+able to deduce that the other end of the
+<em class="filename">165.166.36.17</em> link is
+<em class="filename">165.166.36.18</em>. Or, equivalently, the outbound
+interface for the <em class="filename">205.153.60.2</em> router has the
+address <em class="filename">165.166.36.18</em>.
+</p><p>
+
+In the same manner, the next router's inbound interface is
+<em class="filename">165.166.36.17,</em> and its outbound interface is
+<em class="filename">165.166.36.34</em>. This can be a little confusing
+since it appears that these last three addresses should be on the
+same network. On closer examination of this link and adjacent links,
+it appears that this class B address is using a subnet mask of
+<em class="filename">/20</em>. With this assumption, the addresses are
+consistent.
+</p><p>
+
+We can proceed in much the same manner to discover the next few
+links. However, when we get to the seventh entry in the first trace
+(or to the eighth entry working backward in the second trace), the
+process breaks down. The reason is simple -- we have asymmetric
+paths across the Internet. This also accounts for the difference in
+the number of hops between the two traces.
+</p><p>
+
+In much the same way we mapped the near end of the path, the remote
+end can be reconstructed as well. The paths become asymmetric at the
+seventh router when working in this direction. <a href="ch04_01.html#nettroubletools-CHP-4-FIG-2">Figure 4-2</a> shows the first four hops. We could probably
+fill in the remaining addresses for each direction by running
+<em class="filename">traceroute</em> to the specific machine where the
+route breaks down, but this probably isn't worth the effort.
+</p><p>
+
+<a name="nettroubletools-CHP-4-FIG-2" /></a><div class="figure"><img height="325" alt="Figure 4-2" src="figs/ntt_0402.gif" width="186" /></div><h4 class="objtitle">Figure 4-2. First four hops on reverse path</h4>
+
+<a name="INDEX-703" /></a><a name="INDEX-704" /></a><a name="INDEX-705" /></a><a name="INDEX-706" /></a>One possible surprise in <a href="ch04_01.html#nettroubletools-CHP-4-FIG-2">Figure 4-2</a> is that we have the same IP number,
+<em class="filename">205.160.97.41</em>, on each interface at the first
+hop. The explanation is that dial-in access is being used. The IP
+number <em class="filename">205.166.97.122</em> is assigned to the host
+when the connection is made. <em class="filename">205.160.97.41</em> must
+be the access router. This numbering scheme is normal for an access
+router.
+</p><p>
+
+Although we haven't constructed a complete picture of the
+path(s) between these two computers, we have laid out the basic
+connection to our network through our ISP. This is worth working out
+well in advance of any problems. When you suspect problems, you can
+easily ping these intermediate routers to pinpoint the exact location
+of a problem. This will tell you whether it is your problem or your
+ISP's problem. This can also be nice information to have when
+you call your ISP.
+</p><p>
+
+<a name="INDEX-707" /></a><a name="INDEX-708" /></a><a name="INDEX-709" /></a>To construct the bidirectional path using
+the technique just described, you need access to a second, remote
+computer on the Internet from which you can run
+<em class="filename">traceroute</em>. Fortunately, this is not a problem.
+There are a number of sites on the Internet, which, as a service to
+the network community, will run <em class="filename">traceroute</em> for
+you. Often called <em class="emphasis">looking glasses</em>, such sites
+can provide a number of other services as well. For example, you may
+be able to test how accessible your local DNS setup is by observing
+how well <em class="filename">traceroute</em> works. A list of such sites
+can be found at <a href="http://www.traceroute.org/">http://www.traceroute.org</a>. Alternately, the search string "web
+traceroute" or "traceroute looking glass" will
+usually turn up a number of such sites with most search engines.
+</p><p>
+
+<a name="INDEX-710" /></a><a name="INDEX-711" /></a><a name="INDEX-712" /></a>In theory, there is an alternative way
+to find this type of information with some implementations of
+<em class="filename">traceroute</em>. Some versions of
+<em class="filename">traceroute</em> support <em class="emphasis">loose source
+routing</em>, the ability to specify one or more intermediate
+hops that the packets must go through. This allows a packet to be
+diverted through a specific router on its way to its destination.
+(<em class="emphasis">Strict source routing</em> may also be available.
+This allows the user to specify an exact path through a network.
+While loose source routing can take any path that includes the
+specified hops, strict source routing must exactly follow the given
+path.)
+</p><p>
+
+<a name="INDEX-713" /></a><a name="INDEX-714" /></a><a name="INDEX-715" /></a>To construct a detailed list
+of all devices on a path, the approach is to use
+<em class="filename">traceroute</em> to find a path from the source host
+to itself, specifying a route through a remote device. Packets leave
+the host with the remote device as their initial destination. When
+the packets arrive at the remote device, that device replaces the
+destination address with the source's address, and the packets
+are redirected back to the source. Thus, you get a picture of the
+path both coming and going. (Of course, source routing is not limited
+to just this combination of addresses.)
+</p><p>
+
+<a name="INDEX-716" /></a>At least, that is how it should
+work in theory. In practice, many devices no longer support source
+routing. Unfortunately, source routing has been used in IP spoofing
+attacks. Packets sent with a spoofed source address can be diverted
+so they pass through the spoofed device's network. This
+approach will sometimes slip packets past firewalls since the packet
+seems to be coming from the right place.
+</p><p>
+
+This is shown in <a href="ch04_01.html#nettroubletools-CHP-4-FIG-3">Figure 4-3</a>. Without source
+routing, the packet would come into the firewall on the wrong
+interface and be discarded. With source routing, the packet arrives
+on the correct interface and passes through the firewall. Because of
+problems like this, source routing is frequently disabled.
+</p><p>
+
+<a name="nettroubletools-CHP-4-FIG-3" /></a><div class="figure"><img height="341" alt="Figure 4-3" src="figs/ntt_0403.gif" width="398" /></div><h4 class="objtitle">Figure 4-3. IP source spoofing</h4>
+
+One final word of warning regarding
+<em class="filename">traceroute -- </em>buggy or nonstandard
+implementations exist. Nonstandard isn't necessarily bad; it
+just means you need to watch for differences. For example, see the
+discussion of <em class="filename">tracert</em> later in this chapter.
+Buggy implementations, however, can really mislead you.<a name="INDEX-717" /></a><a name="INDEX-718" /></a><a name="INDEX-719" /></a><a name="INDEX-720" /></a>
+</p><p>
+
+</div>
+</div>
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch03_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch04_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">3.4. Microsoft Windows</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">4.2. Path Performance</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/tshoot/ch04_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:54:50 GMT -->
+</html>

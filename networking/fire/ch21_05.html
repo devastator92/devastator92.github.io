@@ -1,0 +1,702 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:39 GMT -->
+<head><title>Kerberos (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch21_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<a name="INDEX-1988" /><a name="INDEX-1989" /><h2 class="sect1">21.5. Kerberos</h2>
+
+
+
+
+
+<a name="INDEX-1990" />Kerberos was developed at MIT by Project
+Athena (the same folks who developed the X Window System). It is
+designed to provide authentication and encryption services through
+modified versions of standard clients and servers (e.g., Telnet
+clients and servers).</p><p>
+
+
+
+
+
+Kerberos provides strong authentication in a distributed environment,
+and it is widely available. It is the primary source of
+authentication in Windows 2000. Some other vendors also provide
+Kerberos support with their operating systems; MIT has freely
+available implementations for many versions of Unix; and the code is
+freely available if you wish it to port it to an operating system
+that does not yet have an implementation.</p><p>
+
+
+
+
+
+Kerberos attempts to solve the problem where a client wants to talk
+to a server over an untrusted network. The client and the server
+don't have to trust each other or the network, but they have to
+trust the Kerberos server (it is the trusted third party). Imagine a
+courier attempting to deliver gems to a jewelry store. The jewelry
+store doesn't want to let in a fake courier who might be a
+robber; the courier doesn't want to give the gems to a fake
+jeweler who might be a robber. If both of them trust a third party,
+that person can verify the identity of both sides of the transaction.</p><p>
+
+
+
+
+
+There have been two official releases of Kerberos, version 4 and
+version 5. Version 5 was released in 1993 and fixed a number of
+problems. We do not recommend using Kerberos version 4. MIT's
+Unix code is freely available under license (see <a href="appa_01.html">Appendix A, "Resources"</a>), but Kerberos is not in the public domain.
+Because Kerberos needs to be integrated into everything that uses
+authentication data, implementing Kerberos in your environment can be
+tricky. Several companies and operating systems vendors offer
+commercial versions of Kerberos where some or all of this work has
+been done for you.</p><p>
+
+
+
+
+
+<a name="INDEX-1991" />Windows 2000 uses
+some extensions to Kerberos version 5. As a result, not all
+operations are possible when you combine Windows 2000 with other
+implementations of Kerberos. In particular, there is a high degree of
+interoperability for authentication, but Windows 2000 also transfers
+Windows-specific data used for authorization. Other implementations
+of Kerberos will not have the authorization data available, so that
+authentication may succeed while authorization fails. While this is
+not technically a Kerberos interoperability problem (Kerberos is an
+authentication protocol, and the authorization is not part of it),
+the net result is that a Windows 2000 user who attempts to use a
+non-Windows 2000 Kerberos server will probably be unable to get
+access to Windows 2000 resources. On the other hand, other platforms
+do not normally transfer authorization data this way, so a Windows
+2000 Kerberos server can usually serve clients on other platforms.
+(As we discuss in the section on packet filtering characteristics of
+Kerberos, Windows 2000 uses TCP for some Kerberos transactions, and
+other platforms do not; this can result in authentication failures,
+particularly if the user is a valid Windows 2000 user with a full set
+of Windows 2000 authorization information.)</p><p>
+
+
+
+
+
+icrosoft's implementation of Kerberos uses Microsoft-specific
+names for many Kerberos concepts. This is intended to ease the
+transition to Kerberos for experienced Microsoft administrators by
+making the names similar to the old names for similar functions, and
+in some cases, the names may in fact be more intuitive. However, it
+may confuse experienced Kerberos administrators. We use standard
+Kerberos terminology, but when we introduce a term, we also give the
+icrosoft-specific name where applicable.</p><p>
+
+
+
+
+
+<a name="ch21-5-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.5.1. How It Works</h3>
+
+
+
+
+
+Kerberos provides secure authentication for clients and servers
+across an untrusted network, as long as the Kerberos authentication
+servers themselves are protected from tampering. <a href="ch21_05.html#ch21-32230">Figure 21-3</a> shows the basic requirements for a Kerberos
+network to be secure. Note that the trust relationships shown are the
+only important ones. The application server can be completely
+insecure, without being able to compromise anything. Similarly, the
+user can be hostile and try to attack the authentication server or
+the application server, without compromising security. The
+authentication server must be protected, and the client software must
+do what the user expects it to do. If either of these fails, security
+will be compromised. If the time is not synchronized, security may be
+compromised, but it's more likely that users will just be
+unable to authenticate.</p><p>
+
+
+
+
+
+<a name="ch21-32230" /><div class="figure"><img height="171" alt="Figure 21-3" src="figs/fire2.2103.gif" width="453" /></div><h4 class="objtitle">Figure 21-3. Kerberos requirements</h4>
+
+Kerberos uses slightly different terminology from most authentication
+systems. The area of authority of a Kerberos installation is called a
+<em class="emphasis">realm</em>. A realm is equivalent to a Windows NT or
+NIS domain, and in fact Windows 2000 uses <em class="emphasis">domain</em>
+instead of realm. All versions of Kerberos refer to the parties
+involved in a transaction as <em class="emphasis">principals</em>. A
+principal is an entity that needs to be authenticated. In most cases,
+a transaction involves a user talking to a server (for instance,
+somebody trying to pick up mail with POP), and therefore principals
+are normally users and services. In some cases, something else may
+need to be authenticated. For instance, the principals in the
+transaction when a machine transfers files for diskless booting are a
+host and a server instead of a user and a server.</p><p>
+
+
+
+
+
+<a name="INDEX-1992" /> <a name="INDEX-1993" />
+<a name="INDEX-1994" />The
+authentication server is also known as a <em class="emphasis">Key Distribution
+Center</em>, or KDC. In Windows 2000, every domain controller
+is also an authentication server.</p><p>
+
+
+
+
+
+Every principal has a secret that is shared with the authentication
+server. These secrets are known only by the principal and the
+authentication server, and they are never passed around the network
+unencrypted. However, principals identify each other every time they
+interact. Every time a user makes a request of a server that uses
+Kerberos, an identifier called a <em class="emphasis">ticket</em> is
+handed to the server. That ticket is specific to the user and to the
+server that the user is trying to use.</p><p>
+
+
+
+
+
+This could be a nasty problem for the user. The secret that a user
+shares with the authentication server is a password, and every time
+that password is needed, the user has to type it in. (Having software
+store the password is a major security risk.) Nobody wants to type in
+a password every time he or she reads a file on a file server, prints
+a file to a printer, or checks mail. The need to type in passwords is
+reduced two ways. First, you don't need a new ticket every time
+you interact with a service; tickets are all-day passes, typically
+good for eight hours. Second, you don't always have to give a
+password to get a ticket. Most services will accept tickets given out
+by a <em class="emphasis">ticket-granting service</em>. The
+ticket-granting service itself takes tickets (but it will accept only
+ones given out directly by the authentication server).</p><p>
+
+
+
+
+
+Suppose that you want to use a Kerberized POP server to read your
+mail, and you haven't done anything else with Kerberos in the
+last eight hours. When you ask to use the POP server, you will be
+asked for your password. The client will ask the authentication
+server for a ticket to the ticket-granting service and use the
+password to complete the process. It will then present that ticket to
+the ticket-granting service and ask for a ticket to the POP server.
+Finally, it will present this second ticket to the POP server. If you
+check your mail again, the client will give the same ticket to the
+POP server. If you decide to print a piece of mail to a Kerberized
+printing system, the client will take the ticket for the
+ticket-granting service and ask for a ticket to the print server, all
+without asking you for your password again. <a href="ch21_05.html#ch21-28325">Figure 21-4</a> shows the initial process for speaking to the
+first application server.</p><p>
+
+
+
+
+
+<a name="ch21-28325" /><div class="figure"><img height="256" alt="Figure 21-4" src="figs/fire2.2104.gif" width="434" /></div><h4 class="objtitle">Figure 21-4. Kerberos ticket exchange</h4>
+
+In standard Kerberos terminology, the master ticket you get from the
+ticket-granting service is called a <em class="emphasis">ticket granting
+ticket</em>, or TGT. In Windows 2000, it is called a
+<em class="emphasis">user ticket</em>. The ticket that is handed to an
+application is called a <em class="emphasis">session ticket</em> in
+standard Kerberos and a <em class="emphasis">service ticket</em> in
+Windows 2000.</p><p>
+
+
+
+
+
+Not all services will take a ticket that's given out by the
+ticket-granting service; for that matter, not all services will let
+you reuse a ticket. It's up to the service to decide how
+paranoid to be. Services that let you change your password, for
+instance, will normally require a ticket direct from the
+authentication service. If you leave to get a cup of tea, somebody at
+your keyboard will still be able to get tickets from the
+ticket-granting service, but not from the authentication service,
+because getting a ticket from the authentication service always
+requires providing a password.</p><p>
+
+
+
+
+
+In most Kerberos implementations, the password that the user types in
+as part of the authentication process is a fixed password. This
+password never crosses the network in the clear (so it can't be
+sniffed). On the other hand, nothing prevents an attacker from simply
+guessing the password. Kerberos goes to some lengths to avoid storing
+the password, even in encrypted form, where an attacker can get at it
+to optimize guessing attacks, but attackers are still free to try
+guessing the hard way (simply trying out passwords to see if they
+work). Some implementations support one-time password systems to
+prevent these attacks.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-6-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.5.2. Extending Trust</h3>
+
+
+
+
+
+Kerberos realms can trust each other, so that users who authenticate
+in one Kerberos realm can use resources in another. This is
+accomplished by using inter-realm tickets, which allow a
+ticket-granting service in one realm to issue tickets for another.
+Trust between Kerberos realms is transitive; if the chemistry
+department's realm trusts the realm run by the college of
+physical science, and so does the physics department, chemistry and
+physics trust each other.</p><p>
+
+
+
+
+
+When a service gets a ticket from outside the service's realm,
+the ticket includes information about the realm that originally
+issued the ticket, and all the realms that the ticket has gone
+through. In the preceding example, when a user in chemistry sends a
+ticket to a service in physics, the service will see that the ticket
+was issued in chemistry and passed through the college of physical
+science. The service can then use this information to decide what
+privileges the user should have.</p><p>
+
+
+
+
+
+Inter-realm trusts don't particularly change the firewall
+issues with using Kerberos. A firewall that's between two
+realms will see the same sorts of traffic as a firewall that's
+between two parts of the same realm, except for initial
+authentication.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-7-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.5.3. Packet Filtering Characteristics of Kerberos</h3>
+
+
+
+
+
+Kerberos v5 uses the assigned port 88 for ticket request operations.
+Although the Kerberos protocol specifies the use of UDP, Windows 2000
+may also use TCP for some requests. This is because Windows 2000
+tickets contain more information than standard Kerberos tickets and
+therefore may be larger than will fit in a single 1,500-byte UDP
+packet. When this happens, the client will make an initial request
+over UDP, receive a truncated answer, and repeat the request over
+TCP. (This is a standard mechanism in several UDP-based protocols,
+including DNS and WINS, which allows most requests to use
+low-overhead UDP, while falling back to the more expensive TCP as an
+easy means to accommodate occasionally larger data transfers.)</p><p>
+
+
+
+
+
+<a name="ch21-8-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+SourceAddr.</p><p></th>
+<th>
+Dest.Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest.Port</p><p></th>
+<th>
+ACKSet</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+ 88</p><p></td>
+<td>
+<a href="#FOOTNOTE-134">[134]</a></p><p>
+</td>
+<td>
+Request to internal KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+88</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-134">[134]</a></td>
+<td>
+Response from internal KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+ 88</p><p></td>
+<td><a href="#FOOTNOTE-134">[134]</a></td>
+<td>
+Request to external KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+88</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td><a href="#FOOTNOTE-134">[134]</a></td>
+<td>
+Response from external KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+ 88</p><p></td>
+<td>
+<a href="#FOOTNOTE-135">[135]</a></p><p>
+</td>
+<td>
+Over-length request to internal KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+88</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Over-length response from internal KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+ 88</p><p></td>
+<td><a href="#FOOTNOTE-135">[135]</a></td>
+<td>
+Over-length request to external KDC</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+88</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Over-length response from external KDC</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+<blockquote><a name="FOOTNOTE-134" />[134]UDP has no ACK equivalent.</p><p>
+</blockquote><blockquote class="footnote">
+<a name="FOOTNOTE-135" />[135]The ACK bit will not be set on the first packet but
+will be set on all subsequent packets.</p><p>
+</blockquote>
+
+All packets contain authenticators and integrity checksums. In order
+to start a conversation with a Kerberos server, you need to have
+previously arranged to share a secret with the server. This means
+that it is likely that you will be able to detect attempts by foreign
+machines to obtain Kerberos credentials. On the other hand, it means
+that you will need to have a set of processes and procedures so that
+you can add and remove systems from your Kerberos realms.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-9-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.5.4. Proxying and Network Address Translation Characteristics of Kerberos</h3>
+
+
+
+
+
+Kerberos authenticator packets include the IP addresses of the
+originating system. These addresses are supposed to be checked
+against the source IP address (although it does not appear that all
+implementations actually make this check) to prevent the packet from
+being sniffed and replayed from a different IP address. This makes it
+difficult to use Kerberos with proxies or network address translation
+because the IP address in the packet will be the address of the
+internal host, while the source address will be the proxy server or
+the translated address.</p><p>
+
+
+
+
+
+One solution, which requires modifications to the Kerberos
+sources,<a href="#FOOTNOTE-136">[136]</a> is to have the internal systems add the external IP
+addresses to all Kerberos packets. This effectively disables the IP
+address checking performed by remote systems. It also means that the
+internal systems are trusting not only the Kerberos server, but also
+the proxy or address translation system, which is capable of
+masquerading as any internal host. This significantly raises the
+risk; Kerberos servers are highly protected machines, but proxy and
+address translation servers are extremely exposed.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-136" />[136]The modification was written by Ken
+Hornstein and is available at <a href="ftp://ftp.ncsa.uiuc.edu/aces/kerberos/misc_patches/patch.app-proxy">ftp://ftp.ncsa.uiuc.edu/aces/kerberos/misc_patches/patch.app-proxy</a>.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+Since Kerberos is UDP-based, there are also the usual problems with
+UDP proxying; the proxy machine has to keep track of the state in
+order to know what packets are responses to what requests. This can
+cause difficulties in situations where there are lots of transactions
+or where packets are being lost.</p><p>
+
+
+
+
+
+It's worth noting that Kerberos also has a concept of
+<em class="emphasis">proxy tickets</em>. These are tickets that allow a
+server to act on behalf of another principal (for instance, a print
+service may use them to access a user's files). They
+don't have anything to do with proxying in the firewall sense.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch21-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">21.5.5. Summary of Recommendations for Kerberos</h3>
+
+
+
+
+
+<ul><li>If you use Kerberos internally and wish to allow machines to
+authenticate from the Internet, you can allow inbound authentication,
+but you should use one of the one-time password add-ons to prevent
+password guessing.</p><p></li><li>Allowing internal machines to authenticate to external Kerberos
+servers requires permitting dangerous amounts of UDP traffic. If you
+must allow it, restrict it to individual hosts and treat those
+machines as bastion hosts, or use proxying. Neither solution scales
+well.</p><p></li><li>You must be able to completely trust the security of any Kerberos
+server you use for authentication. Even if you allow hosts to
+authenticate against external Kerberos servers, don't accept
+externally controlled authentication for internal services.<a name="INDEX-1995" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch21_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch21_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">21.4. Modular Authentication for Unix </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">21.6. NTLM Domains</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch21_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:40 GMT -->
+</html>

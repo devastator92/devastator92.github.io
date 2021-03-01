@@ -1,0 +1,411 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+<head><title>Invocation and the master map (Managing NFS and NIS, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Hal Stern, Mike Eisler and Ricardo Labiaga" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565925106L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Managing NFS and NIS, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Managing NFS &amp; NIS" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.2. Invocation and the master map</h2>
+
+Now that we've seen how the<a name="INDEX-1414" /> <a name="INDEX-1415" />
+<a name="INDEX-1416" />
+automounter manages NFS mount information in various maps,
+we'll look at how it chooses which maps to use and how it gets
+started. The key file that tells the automounter about map files and
+mount points is the master map, which is the default map read by the
+automounter if no other command-line options are specified. This
+covers the format and use of the master map, some command-line
+options, and some timeout tuning techniques.
+</p>
+
+<a name="nfs2-CHP-9-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">9.2.1. The master map</h3>
+
+The master map is the map of maps. When the automounter is started,
+it reads the master map from where the
+<em class="emphasis">/etc/nsswitch.conf</em> configuration file says to
+read it, as determined by the <em class="emphasis">nsswitch.conf</em>
+entry named <em class="emphasis">automount:</em>. Thedefault <em class="emphasis">nsswitch.conf</em>  --  whether
+files, or NIS is used  --  has <em class="emphasis">files</em> listed
+first. The master map file, <em class="emphasis">/etc/auto_master</em>,
+lists all direct and indirect maps and their associated directories.
+It consists of triplets of directory name, map name, and mount
+options to be used with that map. Suppose your
+<em class="emphasis">/etc/auto_master</em> file contains:
+</p>
+
+<blockquote><pre class="code"># Directory     Map                     NFS Mount Options 
+/tools          /etc/auto_tools         -ro 
+/-              /etc/auto_direct</pre></blockquote>
+
+The first entry is for the indirect map
+<em class="emphasis">/etc/auto_tools</em>; entries in this map are mounted
+read-only (due to the <em class="emphasis">-ro</em> option) under the
+<em class="emphasis">/tools</em> directory. The second line of the master
+file is for a direct map; because there is no directory for the
+automounter to manage, the place holder <em class="emphasis">/-</em> is
+used. Note that the master map format is different from other
+automounter maps in the following ways:
+</p>
+
+<ul><li>
+With the master maps, the mount options are in the third column,
+whereas regular automounter maps place the options in the second
+column.
+</p>
+</li><li>
+The first column in a master map is always an absolute pathname that
+starts with a leading slash (/) and can have one or more additional
+slashes, whereas with indirect maps the first column is a map key
+that must not contain a slash.
+</p>
+</li></ul>
+The earlier example is somewhat limiting in that changes to the
+<em class="emphasis">auto_tools</em> or <em class="emphasis">auto_direct</em>
+map must be made by editing each <em class="emphasis">/etc/auto_tools</em>
+or <em class="emphasis">/etc/auto_direct</em> file on each NFS
+client. Instead, if we drop the <em class="emphasis">/etc/</em> prefix, we
+can allow the maps to be maintained in NIS or files:
+</p>
+
+<blockquote><pre class="code"># Directory     Map             NFS Mount Options 
+/tools          auto_tools         -ro 
+/-              auto_direct</pre></blockquote>
+
+In this example, we observe three things:</p>
+
+<ul><li>
+Two map names  --  <em class="emphasis">auto_direct</em> and
+<em class="emphasis">auto_tools</em>  --  are used in place of the
+files pulled from <em class="emphasis">/etc</em> in the previous example.
+</p>
+</li><li>
+The system decides to use NIS or files for
+<em class="emphasis">auto_direct</em> and <em class="emphasis">auto_tools</em>
+based on whether <em class="emphasis">files</em> or
+<em class="emphasis">nis</em> (or both) are specified in
+<em class="emphasis">nsswitch.conf</em>.
+</p>
+</li><li>
+Even though the corresponding map names in NIS are
+<em class="emphasis">auto_direct</em> and <em class="emphasis">auto_tools</em>,
+the <em class="emphasis">auto_master</em> file uses a canonical name form,
+which uses underscores and not periods to separate the prefix
+<em class="emphasis">auto</em> from the unique suffix
+(<em class="emphasis">direct</em> or <em class="emphasis">tools</em>). The
+reason is that in some directory systems, such as NIS+, a period is a
+reserved character.
+</p>
+</li></ul>
+There is no requirement that the master map be maintained as a local
+file. Indeed you might find it easier if you configure your
+network's clients' nfsswitch.conf file to read all the
+maps, including the master map from NIS by setting automount: line in
+nsswitch.conf as:
+</p>
+
+<blockquote><pre class="code">automount: nis</pre></blockquote>
+
+This way you can exercise control over each client's namespace
+without having to reconfigure every client each time you want to add
+or delete a map from the master map. We will cover how the
+automounter maps are integrated into NIS later, in <a href="ch09_03.html#nfs2-CHP-9-SECT-3">Section 9.3, "Integration with NIS"</a>.
+</p>
+
+The default master map is not going to appear as in the examples
+presented so far. The default Solaris
+<em class="emphasis">/etc/auto_master</em> file looks something like this:
+</p>
+
+<blockquote><pre class="code">+auto_master
+/net            -hosts          -nosuid,nobrowse
+/home           auto_home       -nobrowse
+/xfn            -xfn</pre></blockquote>
+
+We will discuss the first entry,
+<em class="emphasis">+auto_master</em> in <a href="ch09_03.html#nfs2-CHP-9-SECT-3.1">Section 9.3.1, "Mixing NIS and files in the same map"</a>. The second entry,
+/net, will be covered in <a href="ch09_05.html#nfs2-CHP-9-SECT-5.2.1">Section 9.5.2.1, "The -hosts map"</a>. The
+third entry, <em class="emphasis">/home</em>, will be covered in <a href="ch09_04.html#nfs2-CHP-9-SECT-4.1">Section 9.4.1, "Key substitutions"</a>.
+</p>
+
+The last entry, <em class="emphasis">/xfn</em>, is for the X/Open
+Federated Naming Standard (XFN), which <a name="INDEX-1417" />is a
+now-deprecated standard for federating directory systems. Recall from
+<a href="ch02_02.html#nfs2-CHP-2-SECT-2">Section 2.2, "Brief survey of common directory services"</a> that there are lots of directory
+services. XFN represented an attempt to allow them all to seamlessly
+co-exist in a global namespace. The idea was to allow users in one
+DNS domain to browse or access information (such as files, printers,
+or calendars) from another domain, even if the naming system that
+organized the information did not easily support cross-domain
+operations (as is the case with NIS). Because it appears that the
+world will be unifying under LDAP, and because
+<em class="emphasis">nsswitch.conf</em> meets most of the requirements for
+directory service switching, XFN has been deprecated. While the
+<em class="emphasis">/xfn</em> entry persists to allow you to browse any
+NIS or files data represented in XFN, expect XFN and
+<em class="emphasis">/xfn</em> to disappear from future Solaris releases.
+</p>
+
+</div>
+<a name="nfs2-CHP-9-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">9.2.2. Command-line options</h3>
+
+The <em class="emphasis">autofs</em> automounter is started during the
+boot sequence <a name="INDEX-1418" /> <a name="INDEX-1419" />from the
+<em class="emphasis">/etc/init.d/autofs</em> script. The automounter
+consists of two programs:
+</p>
+
+<dl>
+<dt><i><em class="emphasis">automount</em></i></dt>
+<dd>
+Used to initialize the automounter's mount points after it
+reads the master map.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i><em class="emphasis">automountd</em></i></dt>
+<dd>
+A daemon that handles requests <a name="INDEX-1420" />
+<a name="INDEX-1421" />from
+the in-kernel <em class="emphasis">autofs</em> filesystem to mount and
+unmount filesystems.
+</p>
+</dd>
+
+</dl>
+
+ Each program has several command-line options. </p>
+
+<a name="nfs2-CHP-9-SECT-2.2.1" /><div class="sect3">
+<h3 class="sect3">9.2.2.1. Automount command-line options</h3>
+
+<dl>
+<dt><i>-t time</i></dt>
+<dd>
+This is the time, in seconds, to wait before attempting to unmount a
+quiescent filesystem. The default is 600 seconds, but this value may
+need to be adjusted to accommodate various client usage patterns as
+described in <a href="ch09_02.html#nfs2-CHP-9-SECT-2.4">Section 9.2.4, "Tuning timeout values"</a>.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>-v</i></dt>
+<dd>
+If set, this option prints out any new <em class="emphasis">autofs</em>
+mounts or unmounts. The automount command will perform a mount for
+each new direct and indirect map, and will perform an unmount for
+each map no longer listed in the master map or any of its submaps.
+</p>
+</dd>
+
+</dl>
+
+</div>
+
+<a name="nfs2-CHP-9-SECT-2.2.2" /><div class="sect3">
+<h3 class="sect3">9.2.2.2. Automountd command-line options</h3>
+
+<dl>
+<dt><i>-T</i></dt>
+<dd>
+Turns on NFS call tracing, so the user sees the expansion of NFS
+calls handled by the automounter. If this option is used for
+debugging, then the standard output and standard error of the
+automounter daemon should be redirected to a file from its invocation
+in <em class="emphasis">/etc/init/autofs</em>:
+</p>
+
+<blockquote><pre class="code">/usr/lib/autofs/automountd -T &gt; /tmp/auto_nfscalls
+2&amp;1
+<i class="lineannotation">Excerpt from /tmp/auto_nfscalls </i>
+t8      LOOKUP REQUEST: Tue Sep 28 10:39:36 1999
+t8        name=news[] map=auto.tools opts=intr,nosuid path=/tools direct=0
+t8      LOOKUP REPLY    : status=0
+t1      MOUNT REQUEST:   Tue Sep 28 10:39:36 1999
+t1        name=news[] map=auto.tools opts=intr,nosuid path=/tools direct=0
+t1      MOUNT REPLY    : status=0, AUTOFS_DONE</pre></blockquote>
+
+
+In this example, the automounter daemon was asked by
+<em class="emphasis">autofs</em> to look up the directory
+<em class="emphasis">news</em>. It returned a status structure indicating
+that the daemon is requesting an NFS mount. The
+<em class="emphasis">autofs</em> filesystem then asked the daemon to
+perform the NFS mount, and the automounter returned a successful
+status. The prefixes <em class="emphasis">t8</em> and
+<em class="emphasis">t1</em> indicate the thread in the automounter daemon
+that did the operation.
+</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>-v</i></dt>
+<dd>
+Turns on a verbose mode that logs status messages to the console.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>-n</i></dt>
+<dd>
+Turns off browsing of indirect maps.</p>
+</dd>
+
+</dl>
+
+<dl>
+<dt><i>-D var=value</i></dt>
+<dd>
+Assigns the <em class="emphasis">value</em> to the variable
+<em class="emphasis">var</em> within the automounter's environment.
+<a href="ch09_04.html#nfs2-CHP-9-SECT-4.2">Section 9.4.2, "Variable substitutions"</a> contains more
+information on variable <a name="INDEX-1422" /> <a name="INDEX-1423" />substitutions within automounter maps.
+</p>
+</dd>
+
+</dl>
+
+</div>
+</div>
+<a name="nfs2-CHP-9-SECT-2.3" /><div class="sect2">
+<h3 class="sect2">9.2.3. The null map</h3>
+
+The automounter also
+<a name="INDEX-1424" />
+<a name="INDEX-1425" />
+<a name="INDEX-1426" />has a map "white-out" feature,
+via the <em class="emphasis">-null</em> special map. It is used after a
+directory to effectively delete any map entry affecting that
+directory from the automounter's set of maps. It must precede
+the map entry being deleted. For example:
+</p>
+
+<blockquote><pre class="code">/tools -null</pre></blockquote>
+
+This feature is used to override <em class="emphasis">auto_master</em> or
+direct map entries that may have been inherited from an NIS map. If
+you need to make per-machine changes to the automounter maps, or if
+you need local control over a mount point managed by the automounter,
+white-out the conflicting map entry with the
+<em class="emphasis">-null</em> map.
+</p>
+
+</div>
+<a name="nfs2-CHP-9-SECT-2.4" /><div class="sect2">
+<h3 class="sect2">9.2.4. Tuning timeout values</h3>
+
+When a filesystem has remained<a name="INDEX-1427" />
+<a name="INDEX-1428" /> <a name="INDEX-1429" />
+quiescent for some time, it is a candidate for unmounting. If the
+filesystem is busy, the attempts to unmount it will fail until the
+last open files and directories are closed. If an unmount attempt
+fails, the automounter tries it again later. However, it is difficult
+for the automounter to know if the filesystem is in fact in use. The
+simplest way to find out is to attempt to unmount it. So every ten
+minutes (or the period specified with the <em class="emphasis">-t</em>
+flag to <em class="emphasis">automount</em>) the automounter attempts to
+unmount every mounted filesystem.
+</p>
+
+There are two situations in which increasing the default unmount
+timeout period improves performance of the automounter:
+</p>
+
+<ul><li>
+When client processes keep files open for more than ten minutes</p>
+</li><li>
+When one or more processes requiring automounted filesystems run
+regularly, with periods greater than the default timeout
+</p>
+</li></ul>
+When the automounter attempts to unmount a filesystem, it either
+succeeds, or the one or more open files from one or more processes
+cause the <em class="emphasis">umount( )</em> call to return EBUSY. If
+there are several filesystems used by processes that behave in this
+fashion, then the automounter wastes numerous <em class="emphasis">umount(
+)</em> system calls. The cost isn't just the overhead of
+checking to see if a filesystem is in use. There are several caches
+that hold references on the filesystem that must be flushed. All this
+activity consumes CPU time, which can impact the performance of a
+system that is already under high load. Increasing the default
+unmount timeout period (using the <em class="emphasis">-t</em> option) to
+match the average filehandle lifetime reduces the overhead of using
+the automounter:
+</p>
+
+<blockquote><pre class="code">automount -t 3600</pre></blockquote>
+
+The timeout period is specified in seconds. The reduced number of
+mount operations comes at a cost of a longer binding to the NFS
+server. If the filesystem is mounted when the NFS server crashes, you
+will have lost the "working set" advantage of using the
+automounter  --  your system hangs until the server recovers.
+</p>
+
+As mentioned earlier, regularly scheduled processes may require
+longer automounter timeout periods. Regularly scheduled processes
+include those run by <em class="emphasis">cron</em> and repetitive
+operations performed by interactive users, such as
+<em class="emphasis">make</em> runs done several times an hour during
+bug-fixing cycles. Each regularly scheduled process begins by causing
+a filesystem mount; a corresponding unmount is done sometime before
+its next invocation if the default timeout period is shorter than the
+time between invocations.
+</p>
+
+If the time between process instances is long, the overhead of these
+repetitive mount operations is negligible. However, a job that is run
+every ten minutes initiates a sequence of mount and unmount
+operations, adding to the overhead incurred by running the
+automounter. For interactive processes that run to completion in a
+minute or less, the time to complete the mount increases the response
+time of the system, and it is sure to elicit complaints. In both
+cases, system performance is improved by reducing the overhead of the
+automounter through a longer default unmount timeout period.
+</p>
+
+You may not want to use the automounter for filesystems that are
+mounted or accessed nearly constantly through the day. The mail
+spool, for example, might be better placed in each client's
+<em class="emphasis">/etc/vfstab</em> file because it will be in
+near-constant use on the client. Most other filesystems benefit from
+the streamlined NFS administration provided by the automounter. Using
+the automounter is simplified even further<a name="INDEX-1430" /> <a name="INDEX-1431" /> <a name="INDEX-1432" /> by managing the
+<a name="INDEX-1433" />
+<a name="INDEX-1434" />
+<a name="INDEX-1435" />maps
+themselves with NIS.
+</p>
+
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9. The Automounter</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.3. Integration with NIS</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/nfs/ch09_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:41 GMT -->
+</html>

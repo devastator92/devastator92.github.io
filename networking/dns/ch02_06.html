@@ -1,0 +1,469 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:22 GMT -->
+<head><title>Resolution (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">2.6. Resolution</h2>
+
+
+<a name="INDEX-191" />
+<a name="INDEX-192" />Name servers are
+adept at retrieving data from the domain name space. They have to be,
+given the limited intelligence of most resolvers. Not only can they
+give you data from zones for which they're authoritative, they
+can also search through the domain name space to find data for which
+they're not authoritative. This process is called
+<em class="emphasis">name resolution</em> or simply
+<em class="emphasis">resolution</em>.</p><p>
+
+
+Because the namespace is structured as an inverted tree, a name
+server needs only one piece of information to find its way to any
+point in the tree: the domain names and addresses of the root name
+servers (is that more than one piece?). A name server can issue a
+query to a root name server for any domain name in the domain name
+space, and the root name server starts the name server on its way.</p><p>
+
+
+<a name="dns4-CHP-2-SECT-6.1" /><div class="sect2">
+<h3 class="sect2">2.6.1. Root Name Servers</h3>
+
+
+The <a name="INDEX-193" />
+<a name="INDEX-194" />root name servers know where the
+authoritative name servers for each of the top-level zones are. (In
+fact, some of the root name servers are authoritative for the generic
+top-level zones.) Given a query about any domain name, the root name
+servers can provide at least the names and addresses of the name
+servers that are authoritative for the top-level zone that the domain
+name ends in. And the top-level name servers can provide the list of
+the authoritative name servers for the second-level zone that the
+domain name ends in. Each name server queried gives the querier
+information about how to get "closer" to the answer
+it's seeking, or it provides the answer itself.</p><p>
+
+
+The root name servers are clearly important to
+<a name="INDEX-195" />resolution. Because they're so
+important, DNS provides mechanisms -- such as caching, which
+we'll discuss a little later -- to help offload the root
+name servers. But in the absence of other information, resolution has
+to start at the root name servers. This makes the root name servers
+crucial to the operation of DNS; if all the Internet root name
+servers were unreachable for an extended period, all resolution on
+the Internet would fail. To protect against this, the Internet has 13
+root name servers (as of this writing) spread across different parts
+of the network. For example, one is on PSINet, a commercial Internet
+backbone; one is on the NASA Science Internet; two are in Europe; and
+one is in Japan.</p><p>
+
+
+Being the focal point for so many queries keeps the roots busy; even
+with 13, the <a name="INDEX-196" />traffic to each root name
+server is very high. A recent informal poll of root name server
+administrators showed some roots receiving thousands of queries per
+second.</p><p>
+
+
+Despite the load placed on root name servers, resolution on the
+Internet works quite well. <a href="ch02_06.html#dns4-CHP-2-FIG-12">Figure 2-12</a> shows the
+resolution process for the address of a real host in a real domain,
+including how the process corresponds to traversing the domain name
+space tree.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-12" /><div class="figure"><img height="411" alt="Figure 2-12" src="figs/dns4_0212.gif" width="468" /></div><h4 class="objtitle">Figure 2-12. Resolution of girigiri.gbrmpa.gov.au on the Internet</h4>
+
+The local name server queries a root name server for the address of
+<em class="emphasis">girigiri.gbrmpa.gov.au</em> and is referred to the
+<em class="emphasis">au</em> name servers. The local name server asks an
+<em class="emphasis">au</em> name server the same question, and is
+referred to the <em class="emphasis">gov.au</em> name servers. The
+<em class="emphasis">gov.au</em> name server refers the local name server
+to the <em class="emphasis">gbrmpa.gov.au</em> name servers. Finally, the
+local name server asks a <em class="emphasis">gbrmpa.gov.au</em> name
+server for the address and gets the answer.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.2" /><div class="sect2">
+<h3 class="sect2">2.6.2. Recursion</h3>
+
+
+<a name="INDEX-197" />You may have noticed a big difference in
+the amount of work done by the name servers in the previous example.
+Four of the name servers simply returned the best answer they already
+had -- mostly referrals to other name servers -- to the queries
+they received. They didn't have to send their own queries to
+find the data requested. But one name server -- the one queried by
+the resolver -- had to follow successive referrals until it
+received an answer.</p><p>
+
+
+Why couldn't the local name server simply have referred the
+resolver to another name server? Because a stub resolver
+wouldn't have had the intelligence to follow a referral. And
+how did the name server know not to answer with a referral? Because
+the resolver issued a <a name="INDEX-198" />recursive query.</p><p>
+
+
+<a name="INDEX-199" />Queries come in two flavors,
+<em class="emphasis">recursive</em> and
+<em class="emphasis">iterative</em><a name="INDEX-200" />
+<a name="INDEX-201" /> (or
+<a name="INDEX-202" /><em class="emphasis">nonrecursive</em>).
+Recursive queries place most of the burden of resolution on a single
+name server. <em class="emphasis">Recursion</em>, or <em class="emphasis">recursive
+resolution</em>, is just a name for the resolution process used
+by a name server when it receives recursive queries. As with
+recursive algorithms in programming, the name server repeats the same
+basic process (querying a remote name server and following any
+referrals) until it receives an answer.
+<em class="emphasis">Iteration</em><a name="INDEX-203" />,
+or <em class="emphasis">iterative
+resolution</em><a name="INDEX-204" />, described in the next section,
+refers to the resolution process used by a name server when it
+receives iterative queries.</p><p>
+
+
+In recursion, a resolver sends a recursive query to a name server for
+information about a particular domain name. The queried name server
+is then obliged to respond with the requested data or with an error
+stating that data of the requested type doesn't exist or that
+the domain name specified doesn't exist.<a href="#FOOTNOTE-14">[14]</a> The name server can't just refer
+the querier to a different name server because the query was
+recursive.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-14" />[14]BIND 8
+name servers can be configured to ignore or refuse recursive queries;
+see <a href="ch11_01.html">Chapter 11, "Security"</a>, for how and why you'd want to
+do this.</p><p>
+
+</blockquote>
+
+
+If the queried name server isn't authoritative for the data
+requested, it will have to query other name servers to find the
+answer. It could send recursive queries to those name servers,
+thereby obliging them to find the answer and return it (and passing
+the buck). Or it could send iterative queries and possibly be
+referred to other name servers "closer" to the domain
+name it's looking for. Current implementations are polite and
+do the latter, following the referrals until an answer is
+found.<a href="#FOOTNOTE-15">[15]</a></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-15" />[15]The exception is a name server configured to
+forward all unresolved queries to a designated name server, called a
+forwarder. See <a href="ch10_01.html">Chapter 10, "Advanced Features"</a>, for more information on
+using forwarders.</p><p>
+
+</blockquote>
+
+
+A name server that receives a recursive query that it can't
+answer itself will query the "closest known" name
+servers. The <a name="INDEX-205" /> <a name="INDEX-206" />closest known name servers are the
+servers authoritative for the zone closest to the domain name being
+looked up. For example, if the name server receives a recursive query
+for the address of the domain name
+<em class="emphasis">girigiri.gbrmpa.gov.au</em>, it will first check
+whether it knows which name servers are authoritative for
+<em class="emphasis">girigiri.gbrmpa.gov.au</em>. If it does, it will send
+the query to one of them. If not, it will check whether it knows the
+name servers for <em class="emphasis">gbrmpa.gov.au</em>, and after that
+<em class="emphasis">gov.au</em>, and then <em class="emphasis">au</em>. The
+default, where the check is guaranteed to stop, is the root zone,
+since every name server knows the domain names and addresses of the
+root name servers.</p><p>
+
+
+Using the closest known name servers ensures that the resolution
+process is as short as possible. A <em class="emphasis">berkeley.edu</em>
+name server receiving a recursive query for the address of
+<em class="emphasis">waxwing.ce.berkeley.edu</em> shouldn't have to
+consult the root name servers; it can simply follow delegation
+information directly to the <em class="emphasis">ce.berkeley.edu</em> name
+servers. Likewise, a name server that has just looked up a domain
+name in <em class="emphasis">ce.berkeley.edu</em> shouldn't have to
+start resolution at the roots to look up another
+<em class="emphasis">ce.berkeley.edu</em> (or
+<em class="emphasis">berkeley.edu</em>) domain name; we'll show how
+this works in <a href="ch02_07.html#dns4-CHP-2-SECT-7">Section 2.7, "Caching"</a>.</p><p>
+
+
+The name server that receives the recursive query always sends the
+same query that the resolver sends it, for example, for the address
+of <em class="emphasis">waxwing.ce.berkeley.edu</em>. It never sends
+explicit queries for the name servers for
+<em class="emphasis">ce.berkeley.edu</em> or
+<em class="emphasis">berkeley.edu</em>, though this information is also
+stored in the namespace. Sending explicit queries could cause
+problems: there may be no <em class="emphasis">ce.berkeley.edu</em> name
+servers (that is, <em class="emphasis">ce.berkeley.edu</em> may be part of
+the <em class="emphasis">berkeley.edu</em> zone). Also, it's always
+possible that an <em class="emphasis">edu</em> or
+<em class="emphasis">berkeley.edu</em> name server already knows
+<em class="emphasis">waxwing.ce.berkeley.edu</em>'s address. An
+explicit query for the <em class="emphasis">berkeley.edu</em> or
+<em class="emphasis">ce.berkeley.edu</em> name servers would miss this
+information.<a name="INDEX-207" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.3" /><div class="sect2">
+<h3 class="sect2">2.6.3. Iteration</h3>
+
+
+<a name="INDEX-208" />
+<a name="INDEX-209" />Iterative resolution, on the other
+hand, doesn't require nearly as much work on the part of the
+queried name server. In iterative resolution, a name server simply
+gives the best answer <em class="emphasis">it already knows</em> back to
+the querier. No additional querying is required. The queried name
+server consults its local data (including its cache, which we talk
+about shortly), looking for the data requested. If it doesn't
+find the answer there, it finds the names and addresses of the name
+servers closest to the domain name in the query in its local data,
+and returns that as a referral to help the querier continue the
+resolution process. Note that the referral includes <em class="emphasis">all
+</em>of the name servers listed in the local data; it's
+up to the querier to choose which one to query next.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.4" /><div class="sect2">
+<h3 class="sect2">2.6.4. Choosing Between Authoritative Name Servers</h3>
+
+
+Some of the card-carrying Mensa members in our reading audience may
+be wondering how the <a name="INDEX-210" />name server that receives the recursive
+query chooses between the name servers authoritative for the zone.
+For example, we said that there are 13 root name servers on the
+Internet today. Does the name server simply query the one that
+appears first in the referral? Does it choose randomly?</p><p>
+
+
+<a name="INDEX-211" /> <a name="INDEX-212" /> <a name="INDEX-213" />BIND name servers use a metric called
+<em class="emphasis">roundtrip time</em>, or RTT,to
+choose between name servers authoritative for the same zone.
+Roundtrip time is a measurement of how long a remote name server
+takes to respond to queries. Each time a <a name="INDEX-214" />BIND name server sends a query to a remote
+name server, it starts an internal stopwatch. When it receives a
+response, it stops the stopwatch and makes a note of how long that
+remote name server took to respond. When the name server must choose
+which of a group of authoritative name servers to query, it simply
+chooses the one with the lowest RTT.</p><p>
+
+
+Before a BIND name server has queried a name server, it gives it a
+random RTT value, but lower than any real-world RTT. This ensures
+that the BIND name server queries all of the name servers
+authoritative for a given zone in a random order before playing
+favorites.</p><p>
+
+
+On the whole, this simple but elegant algorithm allows BIND name
+servers to "lock on" to the closest name servers quickly
+and without the overhead of an out-of-band mechanism to measure
+performance.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.5" /><div class="sect2">
+<h3 class="sect2">2.6.5. The Whole Enchilada</h3>
+
+
+All of this amounts to a
+<a name="INDEX-215" />resolution process that, taken as a
+whole, usually looks something like <a href="ch02_06.html#dns4-CHP-2-FIG-13">Figure 2-13</a>.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-13" /><div class="figure"><img height="313" alt="Figure 2-13" src="figs/dns4_0213.gif" width="448" /></div><h4 class="objtitle">Figure 2-13. The resolution process</h4>
+
+A resolver queries a local name server, which sends iterative queries
+to a number of other name servers in pursuit of an answer for the
+resolver. Each name server it queries refers it to another name
+server that is authoritative for a zone further down in the namespace
+and closer to the domain name sought. Finally, the local name server
+queries the authoritative name server, which returns an answer. All
+the while, the local name server uses each response it
+receives -- whether a referral or the answer -- to update the
+RTT of the responding name server, which will help it decide which
+name servers to query to resolve domain names in the
+future.<a name="INDEX-216" /> <a name="INDEX-217" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.6" /><div class="sect2">
+<h3 class="sect2">2.6.6. Mapping Addresses to Names</h3>
+
+
+<a name="INDEX-218" /> <a name="INDEX-219" />One
+major piece of functionality missing from the resolution process as
+explained so far is how addresses get mapped back to domain names.
+Address-to-name mapping is used to produce output that is easier for
+humans to read and interpret (in log files, for instance). It's
+also used in some authorization checks. Unix hosts map addresses to
+domain names to compare against entries in
+<em class="emphasis">.rhosts</em> and <em class="emphasis">hosts.equiv</em>
+files, for example. When using host tables, address-to-name mapping
+is trivial. It requires a straightforward sequential search through
+the host table for an address. The search returns the official host
+name listed. In DNS, however, address-to-name mapping isn't so
+simple. Data, including addresses, in the domain name space is
+indexed by name. Given a domain name, finding an address is
+relatively easy. But finding the domain name that maps to a given
+address would seem to require an exhaustive search of the data
+attached to every domain name in the tree.</p><p>
+
+
+<a name="INDEX-220" />Actually, there's a better solution
+that's both clever and effective. Because it's easy to
+find data once you're given the domain name that indexes that
+data, why not create a part of the domain name space that uses
+addresses as labels? In the Internet's domain name space, this
+portion is the <em class="emphasis">in-addr.arpa</em> domain.</p><p>
+
+
+Nodes in the <em class="emphasis">in-addr.arpa</em> domain are labeled
+after the numbers in the <a name="INDEX-221" />dotted-octet
+representation of IP addresses. (Dotted-octet representation refers
+to the common method of expressing 32-bit <a name="INDEX-222" />IP addresses as four numbers in the
+range
+to 255, separated by dots.) The <em class="emphasis">in-addr.arpa</em>
+domain, for example, could have up to 256 subdomains, one
+corresponding to each possible value in the first
+<a name="INDEX-223" />octet of an IP
+address. Each of these subdomains could have up to 256 subdomains of
+its own, corresponding to the possible values of the second octet.
+Finally, at the fourth level down, there are resource records
+attached to the final octet giving the full domain name of the host
+at that IP address. That makes for an awfully big domain:
+<em class="emphasis">in-addr.arpa</em>, shown in <a href="ch02_06.html#dns4-CHP-2-FIG-14">Figure 2-14</a>, is roomy enough for every IP address on the
+Internet.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-14" /><div class="figure"><img height="345" alt="Figure 2-14" src="figs/dns4_0214.gif" width="420" /></div><h4 class="objtitle">Figure 2-14. The in-addr.arpa domain</h4>
+
+Note that when read in a domain name, the IP address appears backward
+because the name is read from leaf to root. For example, if
+<em class="emphasis">winnie.corp.hp.com</em>'s IP address is
+15.16.192.152, the corresponding node in the
+<em class="emphasis">in-addr.arpa</em> domain is
+<em class="emphasis">152.192.16.15.in-addr.arpa</em>, which maps back to
+the domain name <em class="emphasis">winnie.corp.hp.com</em>.</p><p>
+
+
+IP addresses could have been represented the opposite way in the
+namespace, with the first octet of the IP address at the bottom of
+the <em class="emphasis">in-addr.arpa</em> domain. That way, the IP
+address would have read correctly (forward) in the domain name.</p><p>
+
+
+IP addresses are hierarchical, however, just like domain names.
+Network numbers are doled out much as domain names are, and
+administrators can then subnet their address space and further
+delegate numbering. The difference is that IP addresses get more
+specific from left to right, while domain names get less specific
+from left to right. <a href="ch02_06.html#dns4-CHP-2-FIG-15">Figure 2-15</a> shows what we mean.</p><p>
+
+
+<a name="dns4-CHP-2-FIG-15" /><div class="figure"><img height="93" alt="Figure 2-15" src="figs/dns4_0215.gif" width="331" /></div><h4 class="objtitle">Figure 2-15. Hierarchical names and addresses</h4>
+
+Making the first octets in the IP address appear highest in the tree
+gives administrators the ability to delegate authority for
+<em class="emphasis">in-addr.arpa</em> zones along network lines. For
+example, the <em class="emphasis">15.in-addr.arpa</em> zone, which
+contains the reverse-mapping information for all hosts whose IP
+addresses start with 15, can be delegated to the administrators of
+network 15.0.0.0. This would be impossible if the octets appeared in
+the opposite order. If the IP addresses were represented the other
+way around, <em class="emphasis">15.in-addr.arpa</em> would consist of
+every host whose IP address <em class="emphasis">ended</em> with
+15 -- not a practical zone to try to delegate.<a name="INDEX-224" /> <a name="INDEX-225" /></p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-2-SECT-6.7" /><div class="sect2">
+<h3 class="sect2">2.6.7. Inverse Queries</h3>
+
+
+The <em class="emphasis">in-addr.arpa</em> domain is clearly useful only
+for IP address-to-domain name mapping.
+<a name="INDEX-226" />Searching
+for a domain name that indexes an <em class="emphasis">arbitrary</em>
+piece of data -- something besides an address -- in the domain
+name space would require another specialized namespace, such as
+<em class="emphasis">in-addr.arpa</em>, or an exhaustive search.<a name="INDEX-227" /></p><p>
+
+
+That <a name="INDEX-228" />
+<a name="INDEX-229" />exhaustive
+search is to some extent possible, and it's called an
+<a name="INDEX-230" />
+<a name="INDEX-231" /><em class="emphasis">inverse
+query</em>. An inverse query is a search for the domain name
+that indexes a given datum. It's processed solely by the name
+server receiving the query. That name server searches all its local
+data for the item sought and, if possible, returns the domain name
+that indexes it. If it can't find the data, it gives up. No
+attempt is made to consult another name server.</p><p>
+
+
+Because any one name server knows about only part of the overall
+domain name space, an inverse query is never guaranteed to return an
+answer. For example, if a name server receives an inverse query for
+an IP address it knows nothing about, it can't return an
+answer, but it also doesn't know that the IP address
+doesn't exist, because it holds only part of the DNS database.
+What's more, the implementation of inverse queries is optional
+according to the DNS specification; BIND 4.9.8 still contains the
+code that implements inverse queries, but it's commented out by
+default. Neither BIND 8 nor BIND 9 includes that code at all, though
+they do recognize inverse queries and can make up fake responses to
+them.<a href="#FOOTNOTE-16">[16]</a>
+That's fine with us, because very little software (such as
+archaic versions of
+<em class="emphasis">nslookup</em><a name="INDEX-232" />) actually still uses inverse
+queries.<a name="INDEX-233" /></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-16" />[16]For details on this functionality, see
+"Query Refused," in <a href="ch12_01.html">Chapter 12, "nslookup and dig"</a><em class="emphasis">.</em></p><p>
+
+</blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch02_05.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch02_07.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">2.5. Resolvers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">2.7. Caching</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch02_06.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:23 GMT -->
+</html>

@@ -1,0 +1,396 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:08 GMT -->
+<head><title>Forwarding Security: TCP-wrappers and libwrap (SSH, The Secure Shell: The Definitive Guide)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Daniel J. Barrett and Richard E. Silverman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596000111L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="SSH, The Secure Shell: The Definitive Guide" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="SSH, The Secure Shell" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="ch09_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.4. Forwarding Security: TCP-wrappers and libwrap</h2>
+
+
+
+<a name="INDEX-1490" />At several
+points in this chapter, we have talked about security issues and
+limitations of forwarding. So far, we've seen very little
+control over who can connect to a forwarded port. The SSH1 and
+OpenSSH default is to allow connections only from the local host,
+which is reasonably secure for a single-user machine. But if you need
+to allow connections from elsewhere, you have a problem, since
+it's all or nothing: to allow connections from elsewhere (using
+<span class="option">-g</span> or
+<a name="INDEX-1491" /><tt class="literal">GatewayPorts=yes</tt>),
+you must allow them from anywhere. And with SSH2 it's worse:
+forwarded ports will always accept connections from anywhere. X
+forwarding is in a slightly better position, since the X protocol has
+its own authentication, but you might still prefer to restrict
+access, preventing intruders from exploiting an unknown security flaw
+or performing a denial-of-service attack. SSH on the Unix platform
+provides an optional feature for access control based on the client
+address, called <em class="emphasis">TCP-wrappers</em>.</p>
+
+
+
+The term TCP-wrappers refers to software written by Wietse Venema. If
+it isn't already installed in your Unix distribution, you can
+get it at:</p>
+
+
+
+<blockquote class="simplelist">
+
+<a href="ftp://ftp.porcupine.org/pub/security/index.html">ftp://ftp.porcupine.org/pub/security/index.html</a></p>
+
+</blockquote>
+
+
+
+TCP-wrappers are a global access control mechanism that integrates
+with other TCP-based servers, such as <tt class="command">sshd</tt> or
+<tt class="command">telnetd</tt>. Access control is based on the source
+address of incoming TCP connections. That is, a TCP-wrapper permits
+or denies connections based on their origin, as specified in the
+configuration files
+<em class="filename">/etc/hosts.allow</em><a name="INDEX-1492" />
+and
+<em class="filename">/etc/hosts.deny.</em><a name="INDEX-1493" />
+<a href="ch09_04.html#ch09-18511">Figure 9-12</a> shows where TCP-wrappers fit into the
+scheme of SSH configuration.</p>
+
+
+
+<a name="ch09-18511" /><div class="figure"><img height="339" alt="Figure 9-12" src="figs/ssh_0912.gif" width="482" /></div><h4 class="objtitle">Figure 9-12. TCP-wrappers and SSH configuration (highlighted parts)</h4>
+
+There are two ways to use TCP-wrappers. The most common method,
+<em class="emphasis">wrapping</em>, is applied to TCP servers that are
+normally invoked by <tt class="command">inetd</tt>. You "wrap"
+the server by editing <em class="filename">/etc/inetd.conf</em> and
+modifying the server's configuration line. Instead of invoking
+the server directly, you invoke the TCP-wrapper daemon,
+<tt class="command">tcpd</tt><a name="INDEX-1494" />,
+which in turn invokes the original server. Then, you edit the
+TCP-wrapper configuration files to specify your desired access
+control. <tt class="command">tcpd</tt> makes authorization decisions based
+on the their contents.</p>
+
+
+
+The <em class="emphasis">inetd</em> technique applies access control
+without having to modify the TCP server program. This is nice.
+However, <tt class="command">sshd</tt> is usually not invoked by
+<tt class="command">inetd</tt> [<a href="ch05_04.html#ch05-58373">Section 5.4.3.2, "Invocation by inetd"</a>], so the second
+method, <em class="emphasis">source code modification</em>, must be
+applied. To participate in TCP-wrapper control, the SSH server must
+be compiled with the flag
+<tt class="literal"> -- with-libwrap</tt><a name="INDEX-1495" /> to enable
+internal support for TCP-wrappers. [<a href="ch04_01.html#ch04-29328">Section 4.1.5.3, "TCP/IP support"</a>]
+<tt class="command">sshd</tt> then invokes TCP-wrapper library functions to
+do explicit access-control checks according to the rules in
+<em class="filename">/etc/hosts.allow</em> and
+<em class="filename">/etc/hosts.deny.</em> So in a sense, the term
+"wrapper" is misleading since <tt class="command">sshd</tt> is
+modified, not wrapped, to support TCP-wrappers. <a href="ch09_04.html#ch09-16826">Figure 9-13</a> illustrates the process.</p>
+
+
+
+<a name="ch09-16826" /><div class="figure"><img height="259" alt="Figure 9-13" src="figs/ssh_0913.gif" width="246" /></div><h4 class="objtitle">Figure 9-13. TCP-wrapper (libwrap) operation</h4>
+
+<a name="ch09-36-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.4.1. TCP-wrappers Configuration</h3>
+
+
+
+<a name="INDEX-1496" />The
+access control language for TCP-wrappers has quite a few options and
+may vary depending on whose package you use and what version it is.
+We won't cover the language completely in this book. Consult
+your local documentation for a complete understanding: the manpages
+on <em class="emphasis">tcpd</em> (8), <em class="emphasis">hosts_access
+</em>(5), and <em class="emphasis">hosts_options</em> (5). We will
+just indicate some simple, common configurations.</p>
+
+
+
+The TCP-wrapper configuration is kept in the files
+<em class="filename">/etc/hosts.allow</em> and
+<em class="filename">/etc/hosts.deny.</em> These files contain patterns of the form:</p>
+
+
+
+<blockquote><pre class="code">service_1 [service_2 service_3 ...] : client_1 [client_2 client_3 ...]</pre></blockquote>
+
+
+
+Each pattern matches some (server,client) pairs, and hence may match
+a particular client/server TCP connection. Specifically, a connection
+between client C and server S matches this rule if some service
+<em class="emphasis">service_i</em> matches S, and some
+<em class="emphasis">client_j</em> matches C. (We explain the format and
+matching rules for these subpatterns shortly.) The
+<em class="filename">hosts.allow</em> file is searched first, followed by
+<em class="filename">hosts.deny</em>. If a matching pattern is found in
+<em class="filename">hosts.allow</em>, the connection is allowed. If none
+is found there, but one matches in <em class="filename">hosts.deny</em>,
+the connection is dropped. Finally, if no patterns match in either
+file, the connection is allowed. Nonexistence of either file is
+treated as if the file existed and contained no matching patterns.
+Note that the default, then, is to allow everything.</p>
+
+
+
+There is also an extended syntax, documented on the
+<em class="filename">hosts_options </em>(5) manpage. It may or may not be
+available, depending on how your TCP-wrapper library was built. It
+has many more options, but in particular, it allows tagging an
+individual rule as denying or rejecting a matching connection; for
+example:</p>
+
+
+
+<blockquote><pre class="code">sshd1 : bad.host.com : DENY</pre></blockquote>
+
+
+
+Using this syntax, you can put all your rules into the
+<em class="filename">hosts.allow</em> file, rather than having to use both
+files. To reject anything not explicitly allowed, just put
+<tt class="literal">ALL: ALL:DENY</tt> at the end of the file.</p>
+
+
+
+In a pattern, each
+<a name="INDEX-1497" />service
+is a name indicating a server to which this pattern applies. SSH
+recognizes the following service names:</p>
+
+
+
+<dl>
+<dt><i>sshd</i></dt>
+<dd>The main SSH server. This can be <tt class="command">sshd</tt>,
+<tt class="command">sshd1</tt>, <tt class="command">sshd2</tt>, or whatever name
+you invoke the daemon under (its <em class="emphasis">argv[0]</em> value).</p></dd>
+
+
+<a name="INDEX-1498" />
+<dt><i>sshdfwd-x11</i></dt>
+<dd>The X forwarding port.</p></dd>
+
+
+<a name="INDEX-1499" />
+<dt><i>sshdfwd-<em class="emphasis">N</em></i></dt>
+<dd>Forwarded TCP port <em class="emphasis">N</em> (e.g., forwarded port 2001
+is <tt class="literal">service</tt> <tt class="literal">sshdfwd-2001</tt>).</p></dd>
+
+</dl>
+
+
+
+<a name="ch09-37-fm2xml" /><blockquote><b>TIP: </b>
+The X and port forwarding control features are available only in SSH1
+and SSH2; OpenSSH uses only <em class="emphasis">libwrap</em> to control
+access to the main server.</p>
+
+
+</blockquote>
+
+Each <em class="emphasis">client</em> is a pattern that matches a
+connecting client. It can be:</p>
+
+
+
+<ul><li>An IP address in dotted-quad notation (e.g., 192.168.10.1).</p></li><li>A hostname (DNS, or whatever naming services the host is using).</p></li><li>An IP network as
+network-number/<a name="INDEX-1500" />mask (e.g., 192.168.10.0/255.255.255;
+note that the "/n-mask-bits" syntax, 192.168.10.0/24,
+isn't recognized).</p></li><li>"ALL", matching any client source address.</p></li></ul>
+<a href="ch09_04.html#ch09-29132">Example 9-1</a> shows a sample
+<em class="filename">/etc/hosts.allow</em> configuration. This setup
+allows connections to any service from the local host's
+loopback address, and from all addresses 192.168.10.x. This host is
+running publicly available servers for SSH1, POP, and IMAP, so we
+allow connections to these from anywhere, but SSH-2 clients are
+restricted to sources in another particular range of networks.</p>
+
+
+
+<a name="ch09-29132" /><div class="example">
+<a name="INDEX-1501" /><h4 class="objtitle">Example 9-1. Sample /etc/hosts.allow File</h4>
+
+
+<blockquote><pre class="code">#
+# /etc/hosts.allow
+#
+# network access control for programs invoked by tcpd (see inetd.conf) or
+# using libwrap.  See the manpages hosts_access(5) and hosts_options(5).
+
+# allow all connections from my network or localhost (loopback address)
+#
+ALL : 192.168.10.0/255.255.255.0 localhost
+
+# allow connections to these services from anywhere
+#
+ipop3d imapd sshd1 : ALL
+
+# allow SSH-2 connections from the class C networks 
+# 192.168.20.0, 192.168.21.0, ..., 192.168.27.0
+#
+sshd2 : 192.168.20.0/255.255.248.0
+
+# allow connections to forwarded port 1234 from host blynken
+sshdfwd-1234 : blynken.sleepy.net
+
+# restrict X forwarding access to localhost
+sshdfwd-x11 : localhost
+
+# deny everything else
+#
+ALL : ALL : DENY</pre></blockquote>
+</div>
+
+
+
+We allow connections to the forwarded port 1234 from a particular
+host, <em class="emphasis">blynken.sleepy.net</em>.
+Note that this host doesn't have to be on any of the networks
+listed so far but can be anywhere at all. The rules so far say what
+is allowed, but don't by themselves forbid any connections. So
+for example, the forwarding established by the command <tt class="command">ssh1
+-L1234:localhost:21 remote</tt> is accessible only to the local
+host, since SSH1 defaults to binding only the loopback address in any
+case. But <tt class="command">ssh1 -g -L1234:localhost:21 remote</tt> is
+accessible to <em class="emphasis">blynken.sleepy.net</em> as well, as is either
+command using <tt class="command">ssh2</tt> instead (since
+<tt class="command">ssh2</tt> doesn't affect the localhost
+restriction and ignores the <span class="option">-g</span> option). The
+important difference is that with this use of TCP-wrappers,
+<tt class="command">sshd</tt> rejects connections to the forwarded port,
+1234, from any other address.</p>
+
+
+
+The <tt class="literal">sshdfwd-x11</tt> line restricts X-forwarding
+connections to the local host. This means that if
+<tt class="command">ssh</tt> connects to this host with X forwarding, only
+local X clients can use the forwarded X connection. X authentication
+does this already, but this configuration provides an extra bit of
+protection.<a href="#FOOTNOTE-127">[127]</a></p><blockquote class="footnote">
+
+
+<a name="FOOTNOTE-127" />[127]SSH2 2.1.0 has a bug that causes an SSH
+session to freeze after it rejects a forwarded connection because of
+a TCP-wrappers rule, at least on some Unix systems. Until this bug is
+fixed, don't use TCP-wrappers for protecting forwarded ports
+(although using it to restrict access to the main <tt class="command">sshd2
+</tt>server appears to work).</p>
+
+
+</blockquote>
+
+
+
+The final line denies any connection that doesn't match the
+earlier lines, making this a default-to-closed configuration. If you
+wanted instead to deny some particular connections but allow all
+others, you would use something like this:</p>
+
+
+
+<blockquote><pre class="code">ALL : evil.mordor.net : DENY
+telnetd : completely.horked.edu : DENY
+ALL : ALL : ALLOW</pre></blockquote>
+
+
+
+The final line is technically not required, but it's a good
+idea to make your intentions explicit. If you don't have the
+<em class="emphasis">host_options</em> syntax available, you instead have
+an empty <em class="emphasis">hosts.allow</em> file and the following
+lines in <em class="filename">hosts.deny </em>:</p>
+
+
+
+<blockquote><pre class="code">ALL : evil.mordor.net
+telnetd : completely.horked.edu</pre></blockquote>
+</div>
+
+
+
+
+
+
+
+
+<a name="ch09-38-fm2xml" /><div class="sect2">
+<h3 class="sect2">9.4.2. Notes About TCP-wrappers</h3>
+
+
+
+Here are a few things to remember when using TCP-wrappers:</p>
+
+
+
+<ul><li>You can't distinguish between ports forwarded by SSH1 and SSH2:
+the <tt class="literal">sshdfwd-*</tt> rules refer to both simultaneously.
+You can work around this limitation by linking each against a
+different <em class="emphasis">libwrap.a</em>, compiled with different
+filenames for the allow and deny files, or by patching the
+<tt class="command">ssh</tt> and <tt class="command">sshd</tt> executables
+directly, but then you have to keep track of these changes and extra
+files.</p></li><li>The big drawback to TCP-wrappers is that it affects all users
+simultaneously. An individual user can't specify custom access
+rules for himself; there's just the single set of global
+configuration files for the machine. This limits its usefulness on
+multiuser machines.</p></li><li>If you compile
+SSH with the <tt class="literal"> -- with-libwrap</tt> option, it is
+automatically and always turned on; there's no configuration or
+command-line option to disable the TCP-wrappers check. Remember that
+SSH does this check not only for forwarded ports and X connections
+but for connections to the main SSH server. As soon as you install a
+version of <tt class="command">sshd</tt> with TCP-wrappers, you must ensure
+that the TCP-wrappers configuration allows connections to the server,
+for instance with the rule <tt class="literal">sshd1 sshd2</tt>
+<tt class="literal">sshd</tt> <tt class="literal">:</tt> <tt class="literal">ALL</tt>
+in
+<em class="filename">/etc/hosts.allow.</em><a name="INDEX-1502" /></p></li><li>Using hostnames instead of addresses in the TCP-wrappers rule set
+involves the usual security tradeoff. Names are more convenient, and
+their use avoids breakage in the future if a host address changes. On
+the other hand, an attacker can potentially subvert the naming
+service and circumvent the access control. If the host machine is
+configured to use only its <em class="filename">/etc/hosts</em> file for
+name lookup, this may be acceptable even in a highly secure
+environment.</p></li><li>The TCP-wrappers package includes a program called
+<tt class="command">tcpdchk</tt><a name="INDEX-1503" />.
+This program examines the wrapper control files and reports
+inconsistencies that might signal problems. Many sites run this
+periodically as a safety check. Unfortunately,
+<tt class="command">tcpdchk</tt> is written only with explicit wrapping via
+<em class="emphasis">inetd.conf</em> in mind. It doesn't have any
+way of knowing about programs that refer to the control files via the
+<em class="emphasis">libwrap</em> routines, as does
+<tt class="command">sshd</tt>. When <tt class="command">tcpdchk</tt> reads
+control files with SSH rules, it finds uses of the service names
+sshd1, sshdfwd-<em class="replaceable">n</em>, etc., but no
+corresponding wrapped services in <em class="emphasis">inetd.conf</em>,
+and it generates a warning. Unfortunately, we know of no workaround.
+<a name="INDEX-1504" /></p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.3. X Forwarding</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.5. Summary</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/ssh/ch09_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:56:09 GMT -->
+</html>

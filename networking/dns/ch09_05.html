@@ -1,0 +1,398 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Subdomains of in-addr.arpa Domains (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch09_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">9.5. Subdomains of in-addr.arpa Domains</h2>
+
+
+<a name="INDEX-1471" />
+<a name="INDEX-1472" />Forward-mapping <a name="INDEX-1473" />domains aren't the only domains
+that you can divide into
+<a name="INDEX-1474" />subdomains and delegate. If your
+<em class="emphasis">in-addr.arpa</em> namespace is
+large enough, you may need to divide it, too. Typically, you divide
+the domain that corresponds to your network number into subdomains
+that correspond to your subnets. How that works depends on the type
+of network you have and on your network's subnet mask.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-5.1" /><div class="sect2">
+<h3 class="sect2">9.5.1. Subnetting on an Octet Boundary</h3>
+
+
+<a name="INDEX-1475" />Since
+<a name="INDEX-1476" />Movie U.
+<a name="INDEX-1477" />has just three /24 (class
+C-sized) networks, one per segment, there's no particular need
+to subnet those networks. However, our sister university, Altered
+State, has a class B-sized network, 172.20/16. Their network is
+subnetted between the third and fourth octet of the IP address; that
+is, their subnet mask is 255.255.255.0. They've already created
+a number of subdomains of their domain, <em class="emphasis">altered.edu</em>, including <em class="emphasis">fx.altered.edu</em> (okay, we copied them),
+<em class="emphasis">makeup.altered.edu</em>, and
+<em class="emphasis">foley.altered.edu</em>. Since
+each of these departments also runs its own subnet (their Special
+Effects department runs subnet 172.20.2/24, Makeup runs 172.20.15/24,
+and Foley runs 172.20.25/24), they'd like to divvy up their
+<em class="emphasis">in-addr.arpa</em> namespace
+appropriately, too.</p><p>
+
+
+Delegating <em class="emphasis">in-addr.arpa</em>subdomains is no different from delegating subdomains of
+forward-mapping domains. Within their <em class="filename">db.172.20
+</em>zone data file, they need to add NS records like these:</p><p>
+
+
+<blockquote><pre class="code">2     86400    IN    NS    gump.fx.altered.edu.
+  2     86400    IN    NS    toystory.fx.altered.edu.
+  15    86400    IN    NS    prettywoman.makeup.altered.edu.
+  15    86400    IN    NS    priscilla.makeup.altered.edu.
+  25    86400    IN    NS    blowup.foley.altered.edu.
+  25    86400    IN    NS    muppetmovie.foley.altered.edu.</pre></blockquote>
+
+
+delegating the subdomain that corresponds to each subnet to the
+correct name server in each subdomain.</p><p>
+
+
+A few important notes: the Altered States administrators could only
+use the third octet of the subnet in the owner name field because the
+default origin in this file is <em class="emphasis">20.172.in-addr.arpa</em>. They needed to use
+the fully qualified domain names of the name servers in the right
+side of the NS records, though, to avoid having the origin appended.
+And they <em class="emphasis">didn't</em> need glue address records,
+since the names of the name servers they delegated the zone to
+didn't end in the domain name of the zone.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-9-SECT-5.2" /><div class="sect2">
+<h3 class="sect2">9.5.2. Subnetting on a Non-Octet Boundary</h3>
+
+
+<a name="INDEX-1478" />What do you do about networks that
+aren't subnetted neatly on octet boundaries, like subnetted /24
+(class C-sized) networks? In these cases, you can't delegate
+along lines that match the subnets. This forces you into one of two
+situations: you have multiple subnets per <em class="emphasis">in-addr.arpa</em> zone, or you have multiple
+<em class="emphasis">in-addr.arpa</em> zones per
+subnet. Neither is particularly pleasing.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-5.2.1" /><div class="sect3">
+<h3 class="sect3">9.5.2.1. Class A and B networks</h3>
+
+
+<a name="INDEX-1479" />Let's take the case of the /8
+(class A-sized) network 15/8, subnetted with the subnet mask
+255.255.248.0 (a 13-bit subnet field and an 11-bit host field, or
+8192 subnets of 2048 hosts). In this case, the subnet 15.1.200.0, for
+example, extends from 15.1.200.0 to 15.1.207.255. Therefore, the
+delegation for that single subdomain in <em class="filename">db.15</em>,
+the zone data file for <em class="emphasis">15.in-addr.arpa</em>, might look like this:</p><p>
+
+
+<blockquote><pre class="code">200.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+200.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+201.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+201.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+202.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+202.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+203.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+203.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+204.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+204.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+205.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+205.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+206.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+206.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.
+207.1.15.in-addr.arpa.    86400    IN    NS    ns-1.cns.hp.com.
+207.1.15.in-addr.arpa.    86400    IN    NS    ns-2.cns.hp.com.</pre></blockquote>
+
+
+That's a lot of delegation for one subnet!</p><p>
+
+
+Luckily, BIND 8.2 and later as well as BIND 9.1.0 and later name
+servers support a control statement called
+<em class="emphasis">$GENERATE</em>. $GENERATE lets you create a group of
+resource records that differ only by a numerical iterator. For
+example, you could create the 16 NS records just listed using these
+two $GENERATE control statements:</p><p>
+
+
+<blockquote><pre class="code">$GENERATE 200-207 $.1.15.in-addr.arpa.  86400  IN  NS  ns-1.cns.hp.com.
+$GENERATE 200-207 $.1.15.in-addr.arpa.  86400  IN  NS  ns-1.cns.hp.com.</pre></blockquote>
+
+
+The syntax is fairly simple: when the name server reads the control
+statement, it iterates over the range specified as the first
+argument, replacing any dollar signs ($) in the template that follows
+the first argument with the current iterator.</p><p>
+</div>
+
+
+
+<a name="dns4-CHP-9-SECT-5.2.2" /><div class="sect3">
+<h3 class="sect3">9.5.2.2. Class C networks</h3>
+
+
+<a name="INDEX-1480" />Now let's look at the case of a
+subnetted <a name="INDEX-1481" />/24 (class C-sized)
+network, say 192.253.254/24, subnetted with the mask 255.255.255.192.
+Here, you have a single <em class="emphasis">in-addr.arpa</em> zone, <em class="emphasis">254.253.192.in-addr.arpa</em>, that
+corresponds to subnets 192.253.254.0/26, 192.253.254.64/26,
+192.253.254.128/26, and 192.253.254.192/26. This can be a problem if
+you want to let different organizations manage the reverse-mapping
+information corresponding to each subnet. You can solve this in one
+of three ways, none of them pretty.</p><p>
+
+
+<a name="dns4-CHP-9-SECT-5.2.2.1" /><div class="sect4">
+<h4 class="sect4">9.5.2.2.1. Solution 1</h4>
+
+
+The first solution is to administer the <em class="emphasis">254.253.192.in-addr.arpa</em> zone as a
+single entity and not even try to delegate. This requires either
+cooperation between the administrators of the four subnets involved
+or the use of a tool like <a name="INDEX-1482" />
+<a name="INDEX-1483" />
+<a name="INDEX-1484" />Webmin
+(<a href="http://www.webmin.com/webmin">http://www.webmin.com/webmin</a>) to
+allow each of the four administrators to take care of his or her own
+data.</p><p>
+</div>
+
+
+<a name="dns4-CHP-9-SECT-5.2.2.2" /><div class="sect4">
+<h4 class="sect4">9.5.2.2.2. Solution 2</h4>
+
+
+The second is to delegate at the <em class="emphasis">fourth</em> octet.
+That's even nastier than the /8 delegation we just showed you.
+You'll need at least a couple of NS records per IP
+addressin the file
+<em class="filename">db.192.253.254</em>, like this:</p><p>
+
+
+<blockquote><pre class="code">1.254.253.192.in-addr.arpa.    86400    IN    NS    ns1.foo.com.
+1.254.253.192.in-addr.arpa.    86400    IN    NS    ns2.foo.com.
+
+2.254.253.192.in-addr.arpa.    86400    IN    NS    ns1.foo.com.
+2.254.253.192.in-addr.arpa.    86400    IN    NS    ns2.foo.com.
+
+...
+
+65.254.253.192.in-addr.arpa.    86400    IN    NS    relay.bar.com.
+65.254.253.192.in-addr.arpa.    86400    IN    NS    gw.bar.com.
+
+66.254.253.192.in-addr.arpa.    86400    IN    NS    relay.bar.com.
+66.254.253.192.in-addr.arpa.    86400    IN    NS    gw.bar.com.
+
+...
+
+129.254.253.192.in-addr.arpa.    86400    IN    NS    mail.baz.com.
+129.254.253.192.in-addr.arpa.    86400    IN    NS    www.baz.com.
+
+130.254.253.192.in-addr.arpa.    86400    IN    NS    mail.baz.com.
+130.254.253.192.in-addr.arpa.    86400    IN    NS    www.baz.com.</pre></blockquote>
+
+
+and so on, all the way down to <em class="emphasis">254.254.253.192.in-addr.arpa</em>.</p><p>
+
+
+You can pare that down substantially by using $GENERATE:</p><p>
+
+
+<blockquote><pre class="code">$GENERATE 0-63 $.254.253.192.in-addr.arpa  86400  IN  NS  ns1.foo.com.
+$GENERATE 0-63 $.254.253.192.in-addr.arpa  86400  IN  NS  ns2.foo.com.
+
+$GENERATE 64-127 $.254.253.192.in-addr.arpa.  86400  IN  NS  relay.bar.com.
+$GENERATE 64-127 $.254.253.192.in-addr.arpa.  86400  IN  NS  gw.bar.com.
+
+$GENERATE 128-191 $.254.253.192.in-addr.arpa.  86400  IN  NS  mail.baz.com.
+$GENERATE 128-191 $.254.253.192.in-addr.arpa.  86400  IN  NS  www.baz.com.</pre></blockquote>
+
+
+Of course, in <em class="emphasis">ns1.foo.com</em>'s
+<em class="filename">named.conf</em>, you'd also expect to see:</p><p>
+
+
+<blockquote><pre class="code">zone "1.254.253.192.in-addr.arpa" {
+                type master;
+                file "db.192.253.254.1";
+};
+
+zone "2.254.253.192.in-addr.arpa" {
+                type master;
+                file "db.192.253.254.2";
+};</pre></blockquote>
+
+
+Or, if <em class="emphasis">ns1.foo.com</em> were
+running BIND 4, you'd expect to see these directives in
+<em class="filename">named.boot</em>:</p><p>
+
+
+<blockquote><pre class="code">primary    1.254.253.192.in-addr.arpa    db.192.253.254.1
+primary    2.254.253.192.in-addr.arpa    db.192.253.254.2</pre></blockquote>
+
+
+and in <em class="filename">db.192.253.254.1</em>, just the one PTR record:</p><p>
+
+
+<blockquote><pre class="code">$TTL 1d
+@    IN    SOA    ns1.foo.com.    root.ns1.foo.com.    (
+                         1        ; Serial
+                         3h       ; Refresh
+                         1h       ; Retry
+                         1w       ; Expire
+                         1h       ; Negative caching TTL
+
+    IN    NS    ns1.foo.com.
+    IN    NS    ns2.foo.com.
+
+    IN    PTR    thereitis.foo.com.</pre></blockquote>
+
+
+Notice that the PTR record is attached to the zone's domain
+name since the zone's domain name corresponds to just one IP
+address. Now, when a <em class="emphasis">254.253.192.in-addr.arpa</em> name server
+receives a query for the PTR record for <em class="emphasis">1.254.253.192.in-addr.arpa</em>, it refers
+the querier to <em class="emphasis">ns1.foo.com</em>
+and <em class="emphasis">ns2.foo.com</em>, which
+respond with the one PTR record in the zone.</p><p>
+</div>
+
+
+<a name="dns4-CHP-9-SECT-5.2.2.3" /><div class="sect4">
+<h4 class="sect4">9.5.2.2.3. Solution 3</h4>
+
+
+Finally, there's a clever technique that obviates the need to
+maintain a separate zone data file for each IP address.<a href="#FOOTNOTE-68">[68]</a> The organization responsible
+for the overall /24 network creates CNAME records for each of the
+domain names in the zone, pointing to domain names in new subdomains,
+which are then delegated to the proper servers. These new subdomains
+can be called just about anything, but names like <em class="emphasis">0-63</em>, <em class="emphasis">64-127</em>, <em class="emphasis">128-191</em>, and <em class="emphasis">192-255</em> clearly indicate the range of
+addresses each subdomain will reverse map. Each subdomain then
+contains only the PTR records in the range the subdomain is named
+for.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-68" />[68]We first saw this explained by Glen Herrmansfeldt of CalTech in
+the newsgroup <em class="emphasis">comp.protocols.tcp-ip.domains</em>. It's now
+codified as RFC 2317.</p><p>
+
+</blockquote>
+
+
+Partial contents of file <em class="filename">db.192.253.254</em>:</p><p>
+
+
+<blockquote><pre class="code">1.254.253.192.in-addr.arpa.  IN  CNAME  1.0-63.254.253.192.in-addr.arpa.
+2.254.253.192.in-addr.arpa.  IN  CNAME  2.0-63.254.253.192.in-addr.arpa.
+
+...
+
+0-63.254.253.192.in-addr.arpa.    86400    IN    NS    ns1.foo.com.
+0-63.254.253.192.in-addr.arpa.    86400    IN    NS    ns2.foo.com.
+
+65.254.253.192.in-addr.arpa. IN  CNAME 65.64-127.254.253.192.in-addr.arpa.
+66.254.253.192.in-addr.arpa. IN  CNAME 66.64-127.254.253.192.in-addr.arpa.
+
+...
+
+64-127.254.253.192.in-addr.arpa.    86400    IN    NS    relay.bar.com.
+64-127.254.253.192.in-addr.arpa.    86400    IN    NS    gw.bar.com.
+
+129.254.253.192.in-addr.arpa.  IN  CNAME  129.128-191.254.253.192.in-addr. arpa.
+130.254.253.192.in-addr.arpa.  IN  CNAME  130.128-191.254.253.192.in-addr. arpa.
+
+...
+
+128-191.254.253.192.in-addr.arpa.    86400    IN    NS    mail.baz.com.
+128-191.254.253.192.in-addr.arpa.    86400    IN    NS    www.baz.com.</pre></blockquote>
+
+
+Again, you can abbreviate this with $GENERATE:</p><p>
+
+
+<blockquote><pre class="code">$GENERATE 1-63 $ IN CNAME $.0-63.254.253.192.in-addr.arpa.
+
+0-63.254.253.192.in-addr.arpa.    86400    IN    NS    ns1.foo.com.
+0-63.254.253.192.in-addr.arpa.    86400    IN    NS    ns2.foo.com.
+
+$GENERATE 65-127 $ IN CNAME $.64-127.254.253.192.in-addr.arpa.
+
+64-127.254.253.192.in-addr.arpa.    86400    IN    NS    relay.bar.com.
+64-127.254.253.192.in-addr.arpa.    86400    IN    NS    gw.bar.com.</pre></blockquote>
+
+
+The zone data file for <em class="emphasis">0-63.254.253.192.in-addr.arpa</em>,
+<em class="filename">db.192.253.254.0-63</em>, can contain just PTR
+records for IP addresses 192.253.254.1 through 192.253.254.63.</p><p>
+
+
+Partial contents of file <em class="filename">db.192.253.254.0-63</em>:</p><p>
+
+
+<a name="INDEX-1485" /><a name="INDEX-1486" /><blockquote><pre class="code">$TTL 1d
+@    IN    SOA    ns1.foo.com.    root.ns1.foo.com.    (
+                          1       ; Serial
+                          3h      ; Refresh
+                          1h      ; Retry
+                          1w      ; Expire
+                          1h )    ; Negative caching TTL
+
+     IN    NS    ns1.foo.com.
+     IN    NS    ns2.foo.com.
+
+1    IN    PTR   thereitis.foo.com.
+2    IN    PTR   setter.foo.com.
+3    IN    PTR   mouse.foo.com.
+...</pre></blockquote>
+
+
+The way this setup works is a little tricky, so let's go over
+it. A resolver requests the PTR record for <em class="emphasis">1.254.253.192.in-addr.arpa</em>, causing its
+local name server to look that up. The local name server ends up
+asking a <em class="emphasis">254.253.192.in-addr.arpa</em> name server,
+which responds with the CNAME record indicating that <em class="emphasis">1.254.253.192.in-addr.arpa</em> is actually
+an alias for <em class="emphasis">1.0-63.254.253.192.in-addr.arpa</em> and
+that the PTR record is attached to that name. The response will also
+include NS records telling the local name server that the
+authoritative name servers for <em class="emphasis">0-63.254.253.192.in-addr.arpa</em> are
+<em class="emphasis">ns1.foo.com</em> and <em class="emphasis">ns2.foo.com</em>. The local name server then
+queries either <em class="emphasis">ns1.foo.com</em>
+or <em class="emphasis">ns2.foo.com</em> for the PTR
+record for <em class="emphasis">1.0-63.254.253.192.in-addr.arpa</em>, and
+receives the PTR<a name="INDEX-1487" /> record.<a name="INDEX-1488" /> <a name="INDEX-1489" /></p><p>
+</div>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch09_04.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_06.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">9.4. How to Become a Parent: Creating Subdomains</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9.6. Good Parenting</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch09_05.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

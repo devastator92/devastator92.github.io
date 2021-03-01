@@ -1,0 +1,506 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/appf_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:01 GMT -->
+<head><title>Configuring SNMPv3 (Essential SNMP)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Douglas Mauro and Kevin Schmidt" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="059600020L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Essential SNMP" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="Essential SNMP" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appf_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"></a></td><td align="right" valign="top" width="228"><a href="appf_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table></div>
+
+
+<h2 class="sect1">F.2. Configuring SNMPv3</h2>
+
+
+<a name="INDEX-2419" /><a name="INDEX-2420" />Now we get to put the SNMPv3
+concepts to use. We'll look at two examples: configuring a
+Cisco router and setting up the Net-SNMP tools on a system running
+Unix. The concepts are the same for both entities; the only
+difference is how you configure SNMPv3.</p>
+
+
+<a name="INDEX-2421" /><a name="INDEX-2422" />Most of the work in administering SNMPv3
+has to do with managing users and their passwords. It shouldn't
+be surprising that the table of users, passwords, and other
+authentication information is just another SNMP table, called
+<em class="emphasis">usmUser</em>. The table's full object ID is
+<em class="emphasis">.iso.org.dod.internet.snmpV2.snmpModules.snmpUsmMIB.usmMIBObjects
+usmUser</em> ; the numeric form is
+<em class="emphasis">.1.3.6.1.6.3.15.1.2</em>.</p>
+
+
+<a name="enettdg-APP-F-SECT-2.1" /><div class="sect2">
+<h3 class="sect2">F.2.1. Configuring SNMPv3 for a Cisco Router</h3>
+
+
+<a name="INDEX-2423" /><a name="INDEX-2424" /><a name="INDEX-2425" /><a href="ch07_01.html">Chapter 7, "Configuring SNMP Agents"</a> describes how to configure SNMP on a
+Cisco router. This section assumes that you're already familiar
+with IOS and that we don't have to tell you the basics, such as
+how to log into the router and get to privileged mode. It also
+assumes that you've read <a href="ch07_01.html">Chapter 7, "Configuring SNMP Agents"</a>
+and have configured basic SNMP on your router.</p>
+
+
+<a name="INDEX-2426" /><a name="INDEX-2427" />The
+first task in configuring SNMPv3 is to define a view. To simplify
+things, we'll create a view that allows access to the entire
+<em class="emphasis">internet</em> subtree:</p>
+
+
+<blockquote><pre class="code">router(config)#<tt class="userinput"><b>snmp-server view readview internet included</b></tt></pre></blockquote>
+
+
+This command creates a view called <em class="emphasis">readview</em>. If
+you want to limit the view to the <em class="emphasis">system</em> tree,
+for example, replace <tt class="literal">internet</tt> with
+<tt class="literal">system</tt>. The <tt class="literal">included</tt> keyword
+states that the specified tree should be included in the view; use
+<tt class="literal">excluded</tt> if you wanted to exclude a certain
+subtree.</p>
+
+
+<a name="INDEX-2428" />Next,
+create a group that uses the new view. The following command creates
+a group called <em class="emphasis">readonly</em> ; <tt class="literal">v3</tt>
+means that SNMPv3 should be used. The <tt class="literal">auth</tt> keyword
+specifies that the entity should authenticate packets without
+encrypting them; <tt class="literal">read</tt> <tt class="literal">readview</tt>
+says that the view named <em class="emphasis">readview</em> should be used
+whenever members of the <em class="emphasis">readonly</em> group access
+the router.</p>
+
+
+<blockquote><pre class="code">router(config)#<tt class="userinput"><b>snmp-server group readonly v3 auth read readview</b></tt></pre></blockquote>
+
+
+<a name="INDEX-2429" /><a name="INDEX-2430" /><a name="INDEX-2431" /><a name="INDEX-2432" /><a name="INDEX-2433" />Now
+let's create a user. The following command creates a user
+called <em class="emphasis">kschmidt</em>, who belongs to the
+<em class="emphasis">readonly</em> group. <tt class="literal">auth</tt>
+<tt class="literal">md5</tt> specifies that the router should use MD5 to
+authenticate the user (the other possibility is
+<tt class="literal">sha</tt>). The final item on the command line is the
+user's password or passphrase, which may not exceed 64
+characters.</p>
+
+
+<blockquote><pre class="code">router(config)#<tt class="userinput"><b>snmp-server user kschmidt readonly v3 auth md5 mysecretpass</b></tt></pre></blockquote>
+
+
+<a name="INDEX-2434" /><a name="INDEX-2435" /><a name="INDEX-2436" />
+<a name="INDEX-2437" />
+<a name="INDEX-2438" /> <a name="INDEX-2439" />
+<a name="INDEX-2440" />
+<a name="INDEX-2441" />
+<a name="INDEX-2442" />This
+configuration uses encryption only to prevent passwords from being
+transferred in the clear. The SNMP packets themselves, which may
+contain information that you don't want available to the
+public, are sent without encryption and can therefore be read by
+anyone who has a packet sniffer and access to your network. If you
+want to go a step further and encrypt the packets themselves, use a
+command like this:</p>
+
+
+<blockquote><pre class="code">router(config)#<tt class="userinput"><b>snmp-server user kschmidt readonly v3 auth md5 mysecretpass \ </b></tt>
+<tt class="userinput"><b>priv des56 passphrase</b></tt></pre></blockquote>
+
+
+<a name="INDEX-2443" /><a name="INDEX-2444" />The
+additional keywords on this command specify privacy (i.e., encryption
+for all SNMP packets), use of DES 56-bit encryption, and a passphrase
+to use when encrypting packets.</p>
+
+
+<a name="INDEX-2445" /><a name="INDEX-2446" />The
+encrypted passwords and passphrases depend on the engine ID, so if
+the engine ID changes you'll need to delete any users you have
+defined (with the familiar IOS <i class="command">no</i> command), and
+recreate them (with <i class="command">snmp-server user</i> commands).
+Why would the engine ID change? It's possible to set the engine
+ID on the IOS command line. You shouldn't ever need to set the
+engine ID explicitly, but if you do, you'll have to delete and
+recreate your users.</p>
+
+
+This has been the briefest of introductions to configuring SNMPv3 on
+a Cisco router. For more information see Cisco's documentation,
+which is available at <a href="http://www.cisco.com/univercd/cc/td/doc/product/software/ios120/120newft/120t/120t3/snmp3.htm">http://www.cisco.com/univercd/cc/td/doc/product/software/ios120/120newft/120t/120t3/snmp3.htm</a>.</p>
+</div>
+
+
+
+
+<a name="enettdg-APP-F-SECT-2.2" /><div class="sect2">
+<h3 class="sect2">F.2.2. Configuring SNMPv3 for Net-SNMP</h3>
+
+
+<a name="INDEX-2447" />
+<a name="INDEX-2448" /><a name="INDEX-2449" /><a name="INDEX-2450" /><a href="ch07_01.html">Chapter 7, "Configuring SNMP Agents"</a> describes basic configuration for
+Net-SNMP. In this section, we discuss how to configure
+Net-SNMP's Version 3 features. First, we will discuss how to
+configure SNMPv3 by editing the <em class="filename">snmpd.conf</em>
+<a href="#FOOTNOTE-82">[82]</a>
+files. Note that you must install OpenSSL before editing the files if
+you want to use either DES or SHA. OpenSSL is available from
+<a href="http://www.openssl.org/">http://www.openssl.org</a>.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-82" />[82]There are two <em class="filename">snmpd.conf</em> files
+in play here: the normal
+<em class="filename">/usr/share/snmp/snmpd.conf</em> file and the
+persistent <em class="filename">/var/ucd-snmp/snmpd.conf</em> file. The
+persistent file will be discussed momentarily.</p>
+
+</blockquote>
+
+
+<a name="INDEX-2451" />To create a user named
+<em class="emphasis">kschmidt</em> who has read-write access to the
+<em class="emphasis">system</em> subtree, add the following line to your
+<em class="filename">snmpd.conf</em> file:</p>
+
+
+<blockquote><pre class="code">rwuser  kschmidt auth system</pre></blockquote>
+
+
+<a name="INDEX-2452" /><a name="INDEX-2453" /><a name="INDEX-2454" />
+<a name="INDEX-2455" /><a name="INDEX-2456" /><a name="INDEX-2457" />To
+create a user with read-only access, use the command
+<tt class="literal">rouser</tt> instead of <tt class="literal">rwuser</tt>. The
+<tt class="literal">auth</tt> keyword requests secure authentication, but
+not privacy: the SNMP packets themselves aren't encrypted. The
+other possibilities are <tt class="literal">noauth</tt> (no authentication
+and no privacy) and <tt class="literal">priv</tt> (authentication and
+privacy). Now add the following line to
+<em class="filename">/var/ucd-snmp/snmpd.conf</em>:</p>
+
+
+<blockquote><pre class="code">createUser kschmidt MD5 mysecretpass</pre></blockquote>
+
+
+<a name="INDEX-2458" /><a name="INDEX-2459" /><a name="INDEX-2460" />
+<a name="INDEX-2461" /><a name="INDEX-2462" />This creates an MD5 password for the
+user <em class="emphasis">kschmidt</em>. The password assigned to
+<em class="emphasis">kschmidt</em> is <tt class="literal">mysecretpass</tt>. To
+create a user with a DES passphrase in addition to an MD5 password,
+add the following line to
+<em class="filename">/var/ucd-snmp/snmpd.conf:</em></p>
+
+
+<blockquote><pre class="code">createUser kschmidt MD5 mysecretpass DES mypassphrase</pre></blockquote>
+
+
+If you omit <tt class="literal">mypassphrase</tt>, Net-SNMP sets the DES
+passphrase to be the same as the MD5 password. The RFCs for SNMPv3
+recommend that passwords and passphrases be at least eight characters
+long; Net-SNMP enforces this recommendation and won't accept
+shorter passwords.</p>
+
+
+<a name="INDEX-2463" />
+<a name="INDEX-2464" /><a name="INDEX-2465" />After making these
+changes, stop and restart the agent. When the agent is started, it
+reads the configuration file, computes secret keys for the users you
+have added, and deletes the <tt class="literal">createUser</tt> commands
+from the file. It then places the secret key in the configuration
+file. This behavior has a number of consequences. The secret key is
+based on the engine ID, which for Net-SNMP is based on the IP
+address. Therefore, you can't copy configuration files from one
+machine to another. Furthermore, if you change a machine's IP
+address, you will have to reconfigure Net-SNMP: stop the agent, edit
+<em class="filename">/var/ucd-snmp/snmpd.conf</em>, delete any entries
+Net-SNMP has added for your users, add <tt class="literal">createUser</tt>
+commands to recreate your users, and start the agent again.</p>
+
+
+Now we can perform an <i class="command">snmpwalk</i> using Version 3
+authentication. The following command specifies Version 3, with the
+username <tt class="literal">kschmidt</tt>, requesting authentication
+without privacy using the MD5 algorithm. The password is
+<tt class="literal">mysecretpass</tt>:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk -v 3 -u kschmidt -l authNoPriv -a MD5 -A mysecretpass \</b></tt>
+<tt class="userinput"><b>server.ora.com</b></tt>
+system.sysDescr.0 = Linux server 2.2.14-VA.2.1 #1 Mon Jul 31 21:58:22 PDT 2000 i686
+system.sysObjectID.0 = OID: enterprises.ucdavis.ucdSnmpAgent.linux
+system.sysUpTime.0 = Timeticks: (1360) 0:00:13.60
+system.sysContact.0 = "Ora Network Admin"
+system.sysName.0 = server
+system.sysLocation.0 = "Atlanta, Ga"
+system.sysServices.0 = 0
+system.sysORLastChange.0 = Timeticks: (0) 0:00:00.00
+system.sysORTable.sysOREntry.sysORID.1 = OID: ifMIB
+...
+system.sysORTable.sysOREntry.sysORUpTime.9 = No more variables left in this MIB View</pre></blockquote>
+
+
+Note that we see only objects from the <em class="emphasis">system</em>
+subtree, even though the command tries to walk the entire tree. This
+limitation occurs because we have given <em class="emphasis">kschmidt</em>
+access only to the <em class="emphasis">system</em> subtree. If
+<em class="emphasis">kschmidt</em> tries to query a subtree he is not
+allowed to access, he gets the following result:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk -v 3 -u kschmidt -l authNoPriv -a MD5 -A mysecretpass \</b></tt>
+<tt class="userinput"><b>server.ora.com interfaces</b></tt>
+interfaces = No more variables left in this MIB View</pre></blockquote>
+
+
+<a name="INDEX-2466" />If
+you want privacy in addition to authentication, use a command like
+this:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk -v 3 -u kschmidt -l authPriv -a MD5 -A mysecretpass -x DES -X \</b></tt>
+<tt class="userinput"><b>mypassphrase server.ora.com</b></tt></pre></blockquote>
+
+
+Remember that to use DES privacy, you must install the OpenSSL
+library.</p>
+
+
+<a name="enettdg-APP-F-SECT-2.2.1" /><div class="sect3">
+<h3 class="sect3">F.2.2.1. Using snmpusm to manage users</h3>
+
+
+<a name="INDEX-2467" /><a name="INDEX-2468" /><a name="INDEX-2469" />The
+Net-SNMP utility <em class="emphasis">snmpusm</em> is used to maintain
+SNMPv3 users. The following command creates the user
+<em class="emphasis">kjs</em> by cloning the <em class="emphasis">kschmidt</em>
+user:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpusm -v 3 -u kschmidt -l authNoPriv -a MD5 -A mysecretpass localhost create \ kjs kschmidt</b></tt></pre></blockquote>
+
+
+<a name="INDEX-2470" /><a name="INDEX-2471" /><a name="INDEX-2472" />Since <em class="emphasis">kjs</em> was cloned
+from <em class="emphasis">kschmidt</em>, the two users now have the same
+authorization, password, and passphrase. It's obviously
+essential to change <em class="emphasis">kjs</em> 's password. To do
+so, use <em class="emphasis">snmpusm</em> with the <i class="command">-Ca</i>
+option. Similarly, to change the privacy passphrase, use
+<i class="command">-Cx</i>. The following two commands change the
+password and passphrase for the new user <em class="emphasis">kjs</em>:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpusm -v3 -l authNoPriv -u kjs -a MD5 -A mysecretpass localhost passwd \</b></tt>
+<tt class="userinput"><b>-Co -Ca mysecretpass mynewpass</b></tt>
+$ <tt class="userinput"><b>snmpusm -v3 -l authPriv -u kjs -a MD5 -A mysecretpass localhost passwd \</b></tt>
+<tt class="userinput"><b>-Co -Cx mypassphrase mynewphrase</b></tt></pre></blockquote>
+
+
+There are many things to note about this seemingly simple operation:</p>
+
+
+<ul><li>You must know both the password and passphrase for
+<em class="emphasis">kschmidt</em> to set up a new password and passphrase
+for <em class="emphasis">kjs</em>.</p></li><li>According to the documentation, Net-SNMP allows you to clone any
+given user only once. It's not clear whether this means that
+you can create only one clone of a user or that once you have created
+a clone, you can't create a clone of that clone. In any case,
+this restriction doesn't appear to be enforced.</p></li><li><em class="emphasis">snmpusm</em> can only clone users; it can't
+create them from scratch. Therefore, you must create the initial user
+by hand, using the process described above. (This isn't quite
+true. <em class="emphasis">snmpusm</em> can create a user, but once
+you've done so you have to assign it a password by changing its
+previous password. So you're in a catch-22: the new user
+doesn't have a password, so you can't change its
+password.)</p></li></ul>
+<a name="INDEX-2473" /><a name="INDEX-2474" /><a name="INDEX-2475" /><a name="INDEX-2476" />For the user to be written to the
+persistent <em class="filename">snmpd.conf</em> file, you must either stop
+and restart the agent or send an HUP signal to the
+<em class="emphasis">snmpd</em> process. This forces the agent to write
+the current state of the user table to disk, so the agent can reread
+it upon startup. Note that <i class="command">kill -9</i> does not
+produce the desired result.</p>
+
+
+The <i class="command">snmpusm</i> command exists primarily to allow end
+users to manage their own passwords and passphrases. As the
+administrator, you may want to change your users' passwords and
+passphrases periodically. This is possible only if you keep a master
+list of users and their passwords and passphrases.</p>
+
+
+<a name="INDEX-2477" /><a name="INDEX-2478" /><a name="INDEX-2479" /><a name="INDEX-2480" />If the
+engine ID changes, you will have to regenerate all the usernames,
+passwords, and passphrases. (Remember that the engine ID depends in
+part on the host's IP address and therefore changes if you have
+to change the address.) To do this, stop the agent and edit the
+<em class="filename">/var/ucd-snmp/snmpd.conf</em> file. Remove all the
+persistent <tt class="literal">usmUser</tt> entries and add new
+<tt class="literal">createUser</tt> commands (as described previously) for
+your users. A <tt class="literal">usmUser</tt> entry looks something like
+this:</p>
+
+
+<blockquote><pre class="code">usmUser 1 3 0x800007e580e134af77b9d8023b 0x6b6a7300 0x6b6a7300 NULL
+.1.3.6.1.6.3.10.1.1.2 0xb84cc525635a155b6eb5fbe0e3597873
+.1.3.6.1.6.3.10.1.2.2 0x1cfd8d3cadd95abce8efff7962002e24 ""</pre></blockquote>
+</div>
+
+
+
+<a name="enettdg-APP-F-SECT-2.2.2" /><div class="sect3">
+<h3 class="sect3">F.2.2.2. Simplifying commands by setting defaults</h3>
+
+
+<a name="INDEX-2481" /><a name="INDEX-2482" /><a name="INDEX-2483" /><a name="INDEX-2484" />At this point you may be
+wondering why anyone would use SNMPv3, because the commands are so
+painfully long and complex that it's practically impossible to
+type them correctly. Fortunately, there's a way around this
+problem. Net-SNMP allows you to set configuration variables that the
+commands pick up when they execute. Create a directory in your home
+directory called <em class="filename">.snmp</em>, then edit the
+<em class="filename">snmp.conf</em> file. Add entries that look like this:</p>
+
+
+<blockquote><pre class="code">defSecurityName   kschmidt
+defAuthType       MD5
+defSecurityLevel  authPriv
+defAuthPassphrase mysecretpass
+defPrivType       DES
+defPrivPassphrase mypassphrase
+defVersion        3</pre></blockquote>
+
+
+The fields in this file are:</p>
+
+
+<dl>
+<dt><b><tt class="literal">defSecurityName</tt></b></dt>
+<dd>The SNMPv3 username.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defAuthType</tt></b></dt>
+<dd><a name="INDEX-2485" /><a name="INDEX-2486" />The authentication method (either MD5
+or SHA).</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defSecurityLevel</tt></b></dt>
+<dd><a name="INDEX-2487" />The
+security level for the user. Valid levels are
+<tt class="literal">noAuthNoPriv</tt>, <tt class="literal">authNoPriv</tt>, and
+<tt class="literal">authPriv</tt>.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defAuthPassphrase</tt></b></dt>
+<dd><a name="INDEX-2488" />Your
+password; must be at least eight characters long.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defPrivType</tt></b></dt>
+<dd><a name="INDEX-2489" />The privacy protocol to use.
+Only DES is supported at this time.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defPrivPassphrase</tt></b></dt>
+<dd>Your privacy passphrase; not needed if the security level is
+<tt class="literal">noAuthNoPriv</tt> or <tt class="literal">authNoPriv</tt>.
+Must be at least eight characters long.</p></dd>
+
+</dl>
+
+
+<dl>
+<dt><b><tt class="literal">defVersion</tt></b></dt>
+<dd>The SNMP version to use (in this case, SNMPv3).</p></dd>
+
+</dl>
+
+
+You can also use the <i class="command">snmpconf</i> command to set up
+this file. <i class="command">snmpconf</i> prompts you for the various
+passwords and keywords that need to be in the file. In our opinion,
+it's easier to write the file yourself.</p>
+
+
+Once you've created <em class="filename">snmp.conf</em>, you can use
+defaults to simplify your commands. For example, the following
+command:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk -v3 -u kschmidt -l authPriv -a MD5 -A mysecretpass -x DES -X \ mypassphrase localhost</b></tt></pre></blockquote>
+
+
+becomes:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmpwalk localhost</b></tt></pre></blockquote>
+
+
+
+
+
+<a name="INDEX-2490" /><a name="INDEX-2491" /><a name="INDEX-2492" /><a name="INDEX-2493" />These defaults
+apply to all Net-SNMP commands, including
+<i class="command">snmpusm</i>.</p>
+</div>
+
+
+
+<a name="enettdg-APP-F-SECT-2.2.3" /><div class="sect3">
+<h3 class="sect3">F.2.2.3. Sending SNMPv3 traps with Net-SNMP</h3>
+
+
+<a name="INDEX-2494" />
+<a name="INDEX-2495" />
+<a name="INDEX-2496" />
+<a name="INDEX-2497" /> <a name="INDEX-2498" />
+<a name="INDEX-2499" />Sending an
+SNMPv3 trap with Net-SNMP is easy.<a href="#FOOTNOTE-83">[83]</a> Simply run
+<i class="command">snmptrap</i> with the normal SNMPv2 trap options
+combined with SNMPv3 options. For example:</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-83" />[83]SNMPv3 traps are
+simply SNMPv2 traps with added authentication and privacy
+capabilities.</p>
+
+</blockquote>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmptrap -v3 -l authPriv -u kjs -a MD5 -A mysecretpass -x DES -X mypassphrase \ 
+localhost '' .1.3.6.1.6.3.1.1.5.3 ifIndex i 2 ifAdminStatus i 1 ifOperStatus i 1</b></tt></pre></blockquote>
+
+
+Setting the appropriate configuration options in
+<em class="filename">~/.snmp/snmp.conf</em> greatly reduces the complexity
+of the command:</p>
+
+
+<blockquote><pre class="code">$ <tt class="userinput"><b>snmptrap localhost '' .1.3.6.1.6.3.1.1.5.3 ifIndex i 2 ifAdminStatus i 1 \ ifOperStatus i 1</b></tt></pre></blockquote>
+</div>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="appf_01.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="appf_03.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">F. SNMPv3</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">F.3. Final Words on SNMPv3</td></tr></table></div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/snmp/appf_02.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:01 GMT -->
+</html>

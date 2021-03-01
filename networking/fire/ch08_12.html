@@ -1,0 +1,1326 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_12.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:31 GMT -->
+<head><title>Putting It All Together (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_11.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch09_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.12. Putting It All Together</h2>
+
+
+
+
+
+<a name="INDEX-649" />This
+section works through a few more examples to show how many of the
+concepts we've talked about in this chapter come together in
+the real world. For detailed discussions of the packet filtering
+characteristics of particular protocols, see the chapters in <a href="part3.html">Part III, "Internet Services"</a>.</p><p>
+
+
+
+
+
+This section is designed to demonstrate the process of developing a
+filter set; filters are elaborated as we go on, rather than being
+produced in final form. We aren't attempting to show a complete
+filter set for any site. Every site is different, and you can get
+burned by packet filtering if you don't understand all the
+details and implications of its use in your particular environment.
+We want people to carefully consider and understand what
+they're doing  --  not blindly copy something out of a book
+(even ours!) without a careful consideration of how relevant and
+appropriate it is for their own situation. In any case, a full
+solution for a site requires considering packet filtering, proxying,
+and configuration issues. That process is illustrated in <a href="ch24_01.html">Chapter 24, "Two Sample Firewalls"</a>.</p><p>
+
+
+
+
+
+<a name="INDEX-650" />Let's start with a simple example:
+allowing inbound and outbound SMTP (so that you can send and receive
+electronic mail) and nothing else. You might start with the following
+rule set.</p><p>
+
+
+
+
+
+<a name="ch08-36-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+D</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+E</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<ul><li>Rules A and B allow inbound SMTP connections (incoming email).</p><p></li><li>Rules C and D allow outbound SMTP connections (outgoing email).</p></li><li><p>Rule E is the default rule that applies if all else fails.</p></li></ul>
+<a name="ch08-37-fm2xml" /><blockquote><b>TIP:</b> 
+We assume in this example that, for each packet, your filtering
+system looks at the rules in order. It starts at the top until it
+finds a rule that matches the packet, and then it takes the action
+specified.</p><p>
+
+
+
+
+</blockquote>
+
+Now, let's consider some sample packets to see what happens.
+Let's say that your host has IP address 172.16.1.1, and that
+someone is trying to send you mail from the remote host with IP
+address 192.168.3.4. Further, let's say the sender's SMTP
+client uses port 1234 to talk to your SMTP server, which is on port
+25. (SMTP servers are always assumed to be on port 25; see the
+discussion of SMTP in <a href="ch16_01.html">Chapter 16, "Electronic Mail and News"</a>).</p><p>
+
+
+
+
+
+<a name="ch08-38-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Dest Port</p><p></th>
+<th>
+Action (Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+1</p><p></td>
+<td>
+In</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit (A)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+2</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1234</p><p></td>
+<td>
+Permit (B)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<a href="ch08_12.html#ch08-73374">Figure 8-8</a> shows this case.</p><p>
+
+
+
+
+
+<a name="ch08-73374" /><div class="figure"><img height="284" alt="Figure 8-8" src="figs/fire2.0808.gif" width="467" /></div><h4 class="objtitle">Figure 8-8. Packet filtering: inbound SMTP (sample packets 1 and 2)</h4>
+
+In this case, the packet filtering rules permit your incoming email:</p><p>
+
+
+
+
+
+<ul><li>Rule A permits incoming packets from the sender's SMTP client
+to your SMTP server (represented by packet number 1 in the preceding
+table).</p><p></li><li>Rule B permits the responses from your server back to the
+sender's client (represented by packet number 2 in the
+preceding table).</p><p></li></ul>
+What about outgoing email from you to them? Let's say that your
+SMTP client uses port 1357 to talk to their SMTP server, as follows.</p><p>
+
+
+
+
+
+<a name="ch08-39-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action (Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+3</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit (C)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+4</p><p></td>
+<td>
+In</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1357</p><p></td>
+<td>
+Permit (D)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<a href="ch08_12.html#ch08-19241">Figure 8-9</a> shows this case.</p><p>
+
+
+
+
+
+<a name="ch08-19241" /><div class="figure"><img height="284" alt="Figure 8-9" src="figs/fire2.0809.gif" width="467" /></div><h4 class="objtitle">Figure 8-9. Packet filtering: outbound SMTP (sample packets 3 and 4)</h4>
+
+Again, in this case, the packet filtering rules permit your outgoing
+email:</p><p>
+
+
+
+
+
+<ul><li>Rule C permits outgoing packets from your SMTP client to their SMTP
+server (represented by packet number 3 above).</p><p></li><li>Rule D permits the responses from their server back to your client
+(represented by packet number 4 above).</p><p></li></ul>
+Now, let's stir things up. What happens if someone in the
+outside world (for example, someone on host 10.1.2.3) attempts to
+open a connection from port 5150 on his end to the web proxy server
+on port 8080 on one of your internal systems (for example,
+172.16.3.4) in order to carry out an attack? (See <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>, for a discussion of web proxy servers and
+their vulnerabilities.)</p><p>
+
+
+
+
+
+<a name="ch08-40-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action (Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+5</p><p></td>
+<td>
+In</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+<b class="emphasis-bold">Permit (D)</b></p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+6</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+5150</p><p></td>
+<td>
+<b class="emphasis-bold">Permit (B)</b></p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<a href="ch08_12.html#ch08-45778">Figure 8-10</a> shows this case.</p><p>
+
+
+
+
+
+<a name="ch08-45778" /><div class="figure"><img height="293" alt="Figure 8-10" src="figs/fire2.0810.gif" width="467" /></div><h4 class="objtitle">Figure 8-10. Packet filtering: inbound SMTP (sample packets 5 and 6)</h4>
+
+The preceding rule set allows this connection to take place! In fact,
+this rule set allows any connection to take place as long as both
+ends of the connection are using ports above 1023. Why?</p><p>
+
+
+
+
+
+<ul><li>Rules A and B together do what you want to allow inbound SMTP
+connections.</p><p></li><li>Rules C and D together do what you want to allow outbound SMTP
+connections.</p><p></li><li>But Rules B and D together end up allowing <em class="emphasis">all</em>
+connections where both ends are using ports above 1023, and this is
+certainly not what you intended.</p><p></li></ul>
+Lots of vulnerable servers are probably listening on ports above 1023
+at your site. Examples are web proxy servers (port 8080), X11 (port
+6000), databases (Sybase, Oracle, Informix, and other databases
+commonly use site-chosen ports above 1023), and so on. This is why
+you need to consider a rule set as a whole, instead of assuming that
+if each rule or group of rules is OK, the whole set is also OK.</p><p>
+
+
+
+
+
+What can you do about this? Well, what if you also looked at the
+source port in making your filtering decisions? Here are those same
+five basic rules with the source port added as a criterion.</p><p>
+
+
+
+
+
+<a name="ch08-41-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+D</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+E</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+And here are those same six sample packets, filtered by the new rules.</p><p>
+
+
+
+
+
+<a name="ch08-42-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action(Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+1</p><p></td>
+<td>
+In</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1234</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit (A)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+2</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+1234</p><p></td>
+<td>
+Permit (B)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+3</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+1357</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Permit (C)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+4</p><p></td>
+<td>
+In</p><p></td>
+<td>
+192.168.3.4</p><p></td>
+<td>
+172.16.1.1</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+1357</p><p></td>
+<td>
+Permit (D)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+5</p><p></td>
+<td>
+In</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+5150</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+Deny (E)</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+6</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+5150</p><p></td>
+<td>
+Deny (E)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+As you can see, when the source port is also considered as a
+criterion, the problem packets (numbers 5 and 6, representing an
+attack on your web proxy server) no longer meet any of the rules for
+packets to be permitted (rules A through D). The problem packets end
+up being denied by the default rule.</p><p>
+
+
+
+
+
+OK, now what if you're dealing with a slightly smarter
+attacker? What if the attacker uses port 25 as the client port on his
+end (he might do this by killing off the SMTP server on a machine he
+controls and using its port, or by carrying out the attack from a
+machine that never had an SMTP server in the first place, like a PC)
+and then attempts to open a connection to your web proxy server? Here
+are the packets you'd see.</p><p>
+
+
+
+
+
+<a name="ch08-43-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Action(Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+7</p><p></td>
+<td>
+In</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+<b class="emphasis-bold">Permit (D)</b></p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+8</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+25</p><p></td>
+<td>
+<b class="emphasis-bold">Permit (C)</b></p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<a href="ch08_12.html#ch08-43456">Figure 8-11</a> shows this case.</p><p>
+
+
+
+
+
+As you can see, the packets would be permitted, and the attacker
+would be able to make connections through your proxy server (as we
+discuss in <a href="ch15_01.html">Chapter 15, "The World Wide Web"</a>, this would certainly be
+annoying and could be disastrous).</p><p>
+
+
+
+
+
+So what can you do? The solution is to also consider the ACK bit as a
+filtering criterion. Again, here are those same five rules with the
+ACK bit also added as a criterion.</p><p>
+
+
+
+
+
+<a name="ch08-44-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Rule</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+ACK Set</p><p></th>
+<th>
+Action</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+A</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+B</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+C</p><p></td>
+<td>
+Out</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+External</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+25</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+D</p><p></td>
+<td>
+In</p><p></td>
+<td>
+External</p><p></td>
+<td>
+Internal</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+&gt;1023</p><p></td>
+<td>
+Yes</p><p></td>
+<td>
+Permit</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+E</p><p></td>
+<td>
+Either</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Any</p><p></td>
+<td>
+Deny</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<a name="ch08-43456" /><div class="figure"><img height="292" alt="Figure 8-11" src="figs/fire2.0811.gif" width="467" /></div><h4 class="objtitle">Figure 8-11. Packet filtering: inbound SMTP (sample packets 7 and 8)</h4>
+
+Now, packet 7 (the attacker attempting to open a connection to your
+web proxy server) will fail, as follows.</p><p>
+
+
+
+
+
+<a name="ch08-45-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Packet</p><p></th>
+<th>
+Direction</p><p></th>
+<th>
+Source Address</p><p></th>
+<th>
+Dest. Address</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+ACK Set</p><p></th>
+<th>
+Action(Rule)</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+7</p><p></td>
+<td>
+In</p><p></td>
+<td>
+10.1.2.3</p><p></td>
+<td>
+172.16.3.4</p><p></td>
+<td>
+TCP</p><p></td>
+<td>
+25</p><p></td>
+<td>
+8080</p><p></td>
+<td>
+No</p><p></td>
+<td>
+Deny (E)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+The only differences in this rule set are in rules B and D. Of these,
+rule D is the most important because it controls incoming connections
+to your site. Rule B applies to connections outgoing from your site,
+and sites are generally more interested in controlling incoming
+connections than outgoing connections.</p><p>
+
+
+
+
+
+Rule D now says to accept incoming packets from things that are
+supposedly SMTP servers (because the packets are coming from port 25)
+only if the packets have the ACK bit set; that is, only if the
+packets are part of a connection started from the inside (from your
+client to his server).</p><p>
+
+
+
+
+
+If someone attempts to open a TCP connection from the outside, the
+very first packet that he or she sends will not have the ACK bit set;
+that's what's involved in "opening a TCP
+connection". (See the discussion of the ACK bit in <a href="ch04_03.html#ch04-4551">Section 4.3.1, "TCP"</a> of the <a href="ch04_03.html#ch04-4523">Section 4.3, "Protocols Above IP"</a> discussion in <a href="ch04_01.html">Chapter 4, "Packets and Protocols "</a>.) If you block that very first packet (packet 7
+in the preceding example), you block the whole TCP connection.
+Without certain information in the headers of the first packet
+ --  in particular, the TCP sequence numbers  --  the
+connection can't be established.</p><p>
+
+
+
+
+
+Why can't an attacker get around this by simply setting the ACK
+bit on the first packet? Because the packet will get past the
+filters, but the destination will believe the packet belongs to an
+existing connection (instead of the one with which the packet is
+trying to establish a new connection). When the destination tries to
+match the packet with the supposed existing connection, it will fail
+because there isn't one, and the packet will be rejected.</p><p>
+
+
+
+
+
+<a name="ch08-46-fm2xml" /><blockquote><b>TIP:</b> 
+As a basic rule of thumb, any filtering rule that permits incoming
+TCP packets for outgoing connections (that is, connections initiated
+by internal clients) should require that the ACK bit be
+set.<a name="INDEX-651" /><a name="INDEX-652" /><a name="INDEX-653" /><a name="INDEX-654" /><a name="INDEX-655" /></p><p>
+
+
+
+
+</blockquote>
+
+At this point, you now have a simple rule set that allows the traffic
+you set out to allow, and only that traffic. It's not a full
+rule set (it doesn't include the default rules we discussed
+earlier), and it's not a very interesting rule set (you almost
+certainly want to allow more protocols than just SMTP). But
+it's a functioning rule set that you understand precisely, and
+from here you can build a configuration that actually meets your
+needs, using the information in the rest of this book.</p><p>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_11.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch09_01.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.11. What Rules Should You Use?</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">9. Proxy Systems</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch08_12.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:32 GMT -->
+</html>

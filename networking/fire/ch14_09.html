@@ -1,0 +1,666 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+<head><title>IPsec (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch14_10.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">14.9. IPsec</h2>
+
+
+
+
+
+<a name="INDEX-1343" /> <a name="INDEX-1344" />The IETF has been developing an
+IP security protocol (IPsec) that is built directly on top of IP and
+provides end-to-end cryptographically based security for both IPv4
+and IPv6. IPsec is a requirement for every IPv6 implementation and is
+an option for IPv4. Since IPv6 provides features that are not
+available in IPv4, the IPv6 and IPv4 versions of IPsec are
+implemented slightly differently. Although IPsec is still being
+standardized, it is sufficiently stable and standard that multiple
+interoperable implementations are now available and in use on IPv4.
+Possibly the best known of these is the IPsec implementation for
+Linux called FreeS/WAN.</p><p>
+
+
+
+
+
+Because IPsec is implemented at the IP layer, it can provide
+protection to any IP protocol including TCP and UDP. The security
+services that IPsec provides are:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>Access control</i></dt>
+<dd>The ability to establish an IPsec communication is controlled by a
+policy -- refusal to negotiate security parameters will prevent
+communication.</p><p></dd>
+
+
+
+
+
+<dt><i>Data origin authentication</i></dt>
+<dd>The recipient of a packet can be sure that it comes from the sender
+it appears to come from.</p><p></dd>
+
+
+
+
+
+<dt><i>Message integrity</i></dt>
+<dd>An attacker cannot modify a packet and have it accepted.</p><p></dd>
+
+
+
+
+
+<dt><i>Replay protection</i></dt>
+<dd>An attacker cannot resend a previously sent packet and have it
+accepted.</p><p></dd>
+
+
+
+
+
+<dt><i>Confidentiality</i></dt>
+<dd>An attacker cannot read intercepted data.</p><p></dd>
+
+</dl>
+
+
+
+
+
+In addition, it provides limited protections against traffic flow
+analysis. In some cases, it will keep an attacker from figuring out
+which hosts are exchanging data and what protocols they are using.</p><p>
+
+
+
+
+
+IPsec is made up of three protocols, each of which is defined as a
+framework that defines packet layouts and field sizes and is suitable
+for use by multiple cryptographic algorithms. The protocols
+themselves do not define specific cryptographic algorithms to use,
+although every implementation is required to support a specified set
+of algorithms. The protocols that make up IPsec are:</p><p>
+
+
+
+
+
+<ul><li>The Authentication Header (AH)</p><p></li><li>The Encapsulating Security Payload (ESP)</p></li><li><p>The Internet Security Association Key Management Protocol (ISAKMP)</p></li></ul>
+The Authentication Header (AH) protocol provides message integrity
+and data origin authentication; it can optionally provide anti-replay
+services as well. The integrity protection that AH provides covers
+packet header information including source and destination addresses,
+but there are exceptions for header parameters that are frequently
+changed by routers, such as the IPv4 TTL or IPv6 hop-count.</p><p>
+
+
+
+
+
+The Encapsulating Security Payload (ESP) protocol provides
+confidentiality (encryption) and limited protection against traffic
+flow analysis. ESP also includes some of the services normally
+provided by AH. Both AH and ESP rely on the availability of shared
+keys, and neither one has a way to move them from one machine to
+another. Generating these keys is handled by the third IPsec
+protocol, the ISAKMP.</p><p>
+
+
+
+
+
+ISAKMP is also a framework protocol; it doesn't by itself
+define the algorithms that are used to generate the keys for AH and
+ESP. The Internet Key Exchange (IKE) protocol uses the ISAKMP
+framework with specific key exchange algorithms to set up
+cryptographic keys for AH and ESP. This layering may seem confusing
+and overly complicated, but the separation of ISAKMP from IKE means
+that the same basic IPsec framework can be used with multiple
+different key exchange algorithms (including plain old manual key
+exchange). The standardization of IKE allows different people to
+implement the same key exchange algorithms and be guaranteed
+interoperability. The Linux FreeS/WAN project has an implementation
+of IKE called Pluto.</p><p>
+
+
+
+
+
+In IPv6 the AH and ESP protocols can be used simultaneously, with an
+IPv6 feature called <em class="emphasis">header chaining</em>, to provide
+authentication modes that ESP alone cannot provide. When they are
+used in this way it is recommended that ESP be wrapped by the
+additional AH header. In IPv4, it's not possible to use them
+both at once (you can have only one header at a time).</p><p>
+
+
+
+
+
+IPsec provides two operating modes for AH and ESP, transport and
+tunnel. In transport mode, AH or ESP occur immediately after the IP
+header and encapsulate the remainder of the original IP packet.
+<em class="emphasis">Transport mode</em> works only between individual
+hosts; the packet must be interpreted by the host that receives it.
+Transport is used to protect host-to-host communications. Hosts can
+use it to protect all of their traffic to other cooperating hosts, or
+they can use it much the way TLS is used, as a protection layer
+around specific protocols.</p><p>
+
+
+
+
+
+In <em class="emphasis">tunnel mode</em>, the entire original packet is
+encapsulated in a new packet, and a new IP header is generated. IPsec
+uses the term <em class="emphasis">security gateway</em> for any device
+that can operate in tunnel mode. This term applies to all devices
+that can take IP packets and convert them to and from the IPsec
+protocols, whether they are hosts or dedicated routers. Because the
+whole IP packet is included, the recipient can forward packets to a
+final destination after processing. Tunnel mode is used when two
+security gateways or a gateway and a host communicate, and it is what
+allows you to build a virtual private network using IPsec.</p><p>
+
+
+
+
+
+The AH and ESP protocols each contain a 32-bit value that is called
+the Security Parameter Index (SPI). This is an identifier that is
+used to distinguish between different conversations going to the same
+destination. Every IPsec implementation is required to be able to
+independently track security parameters for the combination of SPI,
+destination IP address, and the security protocol that is being used
+(either AH or ESP). This combination of parameters is called a
+Security Association (SA). It is the responsibility of the specific
+ISAKMP key management protocol to negotiate and set the cryptographic
+parameters, including the SPI, for each Security Association.</p><p>
+
+
+
+
+
+An SA is effectively the collection of the cryptographic keys and
+parameters for use by either AH or ESP:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>AH</i></dt>
+<dd>The cryptographic keys and algorithm identifiers used for integrity
+protection and anti-replay parameters</p><p></dd>
+
+
+
+
+
+<dt><i>ESP</i></dt>
+<dd>The cryptographic keys and algorithm identifiers used for encryption,
+integrity protection, and anti-replay parameters</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch14-35-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.9.1. Packet Filtering Characteristics of IPsec</h3>
+
+
+
+
+
+The AH and ESP protocols are implemented directly on top of the IP
+layer. AH is IP protocol 51, and ESP is IP protocol 50. The ISAKMP
+protocol uses UDP port 500 for both sending and receiving. In order
+to allow IPsec, you will need a packet filtering system that can
+filter on IP protocol type. Because IPsec provides end-to-end
+protections, a firewall will not be able to modify or even be able to
+inspect the contents of IPsec packets.</p><p>
+
+
+
+
+
+<a name="ch14-36-fm2xml" /><table border="1">
+
+
+
+
+
+
+
+
+<tr>
+<th>
+Direction</p><p></th>
+<th>
+Source Addr.</p><p></th>
+<th>
+Dest. Addr.</p><p></th>
+<th>
+Protocol</p><p></th>
+<th>
+Source Port</p><p></th>
+<th>
+Dest. Port</p><p></th>
+<th>
+Notes</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+AH</p><p></td>
+<td>
+<a href="#FOOTNOTE-36">[36]</a></p><p>
+
+
+
+
+
+
+
+
+</td>
+<td>&nbsp;</td>
+<td>
+Incoming AH, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+AH</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Incoming AH, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ESP</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Incoming ESP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ESP</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Incoming ESP, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+500</p><p></td>
+<td>
+500</p><p></td>
+<td>
+Incoming ISAKMP request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+500</p><p></td>
+<td>
+500</p><p></td>
+<td>
+ISAKMP response</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+AH</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Outgoing AH, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+AH</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Outgoing AH, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+ESP</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Outgoing ESP, client to server</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+ESP</p><p></td>
+<td>&nbsp;</td>
+<td>&nbsp;</td>
+<td>
+Outgoing ESP, server to client</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+Out</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+500</p><p></td>
+<td>
+500</p><p></td>
+<td>
+Outgoing ISAKMP request</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+In</p><p></td>
+<td>
+Ext</p><p></td>
+<td>
+Int</p><p></td>
+<td>
+UDP</p><p></td>
+<td>
+500</p><p></td>
+<td>
+500</p><p></td>
+<td>
+ISAKMP response</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+
+
+<blockquote>
+<a name="FOOTNOTE-36" />[36]AH and ESP do not have source or destination
+ports.</p><p>
+
+
+
+
+</blockquote>
+
+You may note that the table does not include information about the
+setting for the ACK bit. UDP has no equivalent of the TCP ACK bit.
+When TCP packets are incorporated into AH packets, their flags will
+still be present; it would be theoretically possible for a firewall
+that understood AH to use those ACK bits to determine the direction
+of the TCP connections and to filter using this information.
+Similarly, TCP and UDP packets in AH will have their original source
+and destination ports available for filtering.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-37-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.9.2. Proxying Characteristics of IPsec</h3>
+
+
+
+
+
+AH and ESP provide end-to-end message integrity protection that is
+calculated using data from the IP packet header. Using a proxy will
+change the header data, thereby causing a message integrity failure.
+In theory, it is possible for the IPsec architecture to allow the use
+of intermediary proxies in end-to-end communications if they can
+participate in the negotiation of integrity protection Security
+Association parameters. Unfortunately, the details for how this might
+work have not been defined so it is not currently possible to use
+IPsec through proxies.</p><p>
+
+
+
+
+
+It is, however, possible to use regular IP to the proxy system and
+have it speak IPsec to the destination. In addition, IPsec could be
+used with SOCKS. In this configuration, the client would set up
+communications with the SOCKS server via IPsec, and the SOCKS server
+would set up a separate IPsec communications channel to the final
+destination. However, this double use of IPsec may require
+significant CPU resources to implement.</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-38-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.9.3. Network Address Translation Characteristics of IPsec</h3>
+
+
+
+
+
+Both AH and ESP include message integrity protections for the entire
+packet, including the headers. If you modify the packet at all, even
+to change the source or destination address, you will make the packet
+invalid. It is therefore impossible to do network address translation
+with AH or ESP. On the other hand, it's perfectly possible to
+do network address translation on packets that are then tunneled in
+AH or ESP; they don't care what happened to the packet while it
+was still a standard IP packet.</p><p>
+
+
+
+
+
+Therefore, you can combine network address translation and IPsec
+tunneling, as long as you do the network address translation first
+and then set up the IPsec tunnel. (Using IPsec parlance, it would be
+possible to implement network address translation behind or on a
+security gateway.)</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch14-39-fm2xml" /><div class="sect2">
+<h3 class="sect2">14.9.4. Summary of Recommendations for IPsec</h3>
+
+
+
+
+
+<ul><li>IPsec is a good choice for building virtual private
+networks.<a name="INDEX-1345" />
+<a name="INDEX-1346" /></p><p></li></ul>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch14_08.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch14_10.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">14.8. The Generic Security Services API </td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">14.10. Remote Access Service </td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch14_09.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:35 GMT -->
+</html>

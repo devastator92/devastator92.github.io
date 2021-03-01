@@ -1,0 +1,448 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:30 GMT -->
+<head><title>Security (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_16.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+
+<h1 class="chapter">Chapter 11. Security</h1>
+<div class="htmltoc"><h4 class="tochead">Contents:</h4>
+      <a href="#dns4-CHP-11-SECT-1">TSIG</a><br />
+<a href="ch11_02.html">Securing Your Name Server</a><br />
+<a href="ch11_03.html">DNS and Internet Firewalls</a><br />
+<a href="ch11_04.html">The DNS Security Extensions</a><br /><p></p></div>
+
+
+
+
+<em>"I hope you've got your hair well fastened on?" he continued, as they set off.</p><p>
+"Only in the usual way," Alice said, smiling.</p><p>
+"That's hardly enough," he said, anxiously. "You see the wind is so very strong here. It's as strong as soup."</p><p>
+"Have you invented a plan for keeping the hair from being blown off?" Alice enquired. </p><p>
+"Not yet," said the Knight. "But I've got a plan for keeping it from falling off."</em></p><p>
+
+
+
+<a name="INDEX-1804" /></a><a name="INDEX-1805" /></a>Why should you care about DNS security? Why go to the trouble of securing a service that mostly maps names to addresses? Let us tell you a story.</p><p>
+
+
+In July 1997, during two periods of several days, users around the
+Internet who typed <em class="emphasis">www.internic.net</em> into their web browsers thinking they were going to the InterNIC's web site instead
+ended up at a web site belonging to the AlterNIC. (The AlterNIC runs
+an alternate set of root name servers that delegate to additional
+top-level domains with names like <em class="emphasis">med</em> and <em class="emphasis">porn</em>.)
+How'd it happen? Eugene Kashpureff, then affiliated with the
+AlterNIC, had run a program to "poison" the caches of
+major name servers around the world, making them believe that
+<em class="emphasis">www.internic.net</em>'s address
+was actually the address of the AlterNIC web server.</p><p>
+
+
+Kashpureff hadn't made any attempt to disguise what he had
+done; the web site that users reached was plainly the
+AlterNIC's, not the InterNIC's. But imagine someone
+poisoning your name server's cache to direct <em class="emphasis">www.amazon.com</em> or <em class="emphasis">www.wellsfargo.com</em> to his own web server,
+conveniently well outside local law enforcement jurisdiction.
+Further, imagine your users typing in their credit card numbers and
+expiration dates. Now you get the idea.</p><p>
+
+
+Protecting your users against these kinds of attacks requires DNS
+security. DNS security comes in several flavors. You can secure
+transactions -- the queries, responses, and other messages your
+name server sends and receives. You can secure your name server,
+refusing queries, zone transfer requests, and dynamic updates from
+unauthorized addresses, for example. You can even secure zone data by
+digitally signing it.</p><p>
+
+
+Since DNS security is one of the most complicated topics in DNS,
+we'll start you off easy and build up to the hard stuff.</p><p>
+
+
+<div class="sect1"><a name="dns4-CHP-11-SECT-1" /></a>
+<h2 class="sect1">11.1. TSIG</h2>
+
+
+<a name="INDEX-1806" /></a> <a name="INDEX-1807" /></a>BIND 8.2 introduced a
+new mechanism for securing DNS messages called <em class="emphasis">transaction
+signatures</em>, or TSIG for short. TSIG uses shared secrets
+and a one-way hash function to authenticate DNS messages,
+particularly responses and updates.</p><p>
+
+
+TSIG, now codified in <a name="INDEX-1808" /></a>RFC 2845, is relatively simple to
+configure, lightweight for resolvers and name servers to use, and
+flexible enough to secure DNS messages (including zone transfers) and
+dynamic updates. (Contrast this with the DNS Security Extensions,
+which we'll discuss at the end of this chapter.)</p><p>
+
+
+With TSIG configured, a name server or updater adds a TSIG record to
+the additional data section of a DNS message. The TSIG record
+"signs" the DNS message, proving that the message's
+sender had a cryptographic key shared with the receiver and that the
+message wasn't modified after it left the sender.<a href="#FOOTNOTE-81">[81]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-81" /></a>[81]Cryptography wonks may argue that TSIG "signatures"
+aren't really signatures in a cryptographic sense because they
+don't provide nonrepudiation. Since either holder of the shared
+key can create a signed message, the recipient of a signed message
+can't claim that only the sender could have sent it (the
+recipient could have forged it himself).</p><p>
+
+</blockquote>
+
+
+<a name="dns4-CHP-11-SECT-1.1" /></a><div class="sect2">
+<h3 class="sect2">11.1.1. One-Way Hash Functions</h3>
+
+
+TSIG provides authentication and data integrity through the use of a
+special type of mathematical formula called a <em class="emphasis">one-way hash
+function</em><a name="INDEX-1809" /></a>. A one-way
+hash function, also known as a <a name="INDEX-1810" /></a>
+<a name="INDEX-1811" /></a>cryptographic checksum or message
+digest, computes a fixed-size hash value based on arbitrarily large
+input. The magic of a one-way hash function is that each bit of the
+hash value depends on each and every bit of the input. Change a
+single bit of the input and the hash value changes dramatically and
+unpredictably -- so unpredictably that it's
+"computationally infeasible" to reverse the function and
+find an input that produces a given hash value.</p><p>
+
+
+TSIG uses a one-way hash function called MD5. In particular, it uses
+a variant of <a name="INDEX-1812" /></a>MD5 called
+HMAC-MD5. HMAC-MD5 works in a keyed mode in which the 128-bit hash
+value depends not only on the input, but also on a key.</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-1.2" /></a><div class="sect2">
+<h3 class="sect2">11.1.2. The TSIG Record</h3>
+
+
+We won't cover the <a name="INDEX-1813" /></a>TSIG record's syntax in detail
+because you don't need to know it: TSIG is a
+"meta-record" that never appears in zone data and is
+never cached by a resolver or name server. A signer adds the TSIG
+record to a DNS message, and the recipient removes and verifies the
+record before doing anything further, such as caching the data in the
+message.</p><p>
+
+
+You should know, however, that the TSIG record includes a hash value
+computed over the entire DNS message as well as some additional
+fields. (When we say "computed over," we mean that the
+raw, binary DNS message and the additional fields are fed through the
+HMAC-MD5 algorithm to produce the hash value.) The hash value is
+keyed with a secret shared between the signer and the verifier.
+Verifying the hash value proves both that the DNS message was signed
+by a holder of the shared secret and that it wasn't modified
+after it was signed.</p><p>
+
+
+The additional fields in the TSIG record include the time the DNS
+message was signed. This helps combat replay attacks, in which a
+hacker captures a signed, authorized transaction (say a dynamic
+update deleting an important resource record) and replays it later.
+The recipient of a signed DNS message checks the time signed to make
+sure it's within the allowable "fudge" (another
+field in the TSIG record).</p><p>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-1.3" /></a><div class="sect2">
+<h3 class="sect2">11.1.3. Configuring TSIG</h3>
+
+
+<a name="INDEX-1814" /></a>
+<a name="INDEX-1815" /></a>Before
+using TSIG for authentication, we need to configure one or more TSIG
+keys on either end of the transaction. For example, if we want to use
+TSIG to secure zone transfers between the master and slave name
+servers for <em class="emphasis">movie.edu</em>, we
+need to configure both name servers with a common key:</p><p>
+
+
+<blockquote><pre class="code">key terminator-wormhole.movie.edu. {
+	algorithm hmac-md5;
+	secret "skrKc4Twy/cIgIykQu7JZA==";
+};</pre></blockquote>
+
+
+The argument to the <em class="emphasis">key</em> statement in this
+example, <em class="emphasis">terminator-wormhole.movie.edu</em>, is
+actually the name of the key, though it looks like a domain name.
+(It's encoded in the DNS message in the same format as a domain
+name.) The TSIG RFC suggests you name the key after the two hosts
+that use it. The RFC also suggests that you use different keys for
+each pair of hosts.</p><p>
+
+
+It's important that the name of the key -- not just the
+binary data the key points to -- be identical on both ends of the
+transaction. If it's not, the recipient tries to verify the
+TSIG record and finds it doesn't know the key that the TSIG
+record says was used to compute the hash value. That causes errors
+like the following:</p><p>
+
+
+<blockquote><pre class="code">Nov 21 19:43:00 wormhole named-xfer[30326]: SOA TSIG verification from server 
+[192.249.249.1], zone movie.edu: message had BADKEY set (17)</pre></blockquote>
+
+
+The algorithm, for now, is always <em class="emphasis">hmac-md5</em>. The
+secret is the base 64 encoding of the binary key. You can create a
+base 64-encoded key using the <em class="filename">dnssec-keygen
+</em>program included in BIND 9 or the
+<em class="filename">dnskeygen</em> program included in BIND 8.
+Here's how you'd create a key using
+<em class="filename">dnssec-keygen</em>, the easier of the two to use:</p><p>
+
+
+<blockquote><pre class="code"># <tt class="userinput"><b>dnssec-keygen -a HMAC-MD5 -b 128 -n HOST terminator-wormhole.movie.edu.</b></tt>
+Kterminator-wormhole.movie.edu.+157+28446</pre></blockquote>
+
+
+The <span class="option">-a</span> option takes as an argument the name of the
+algorithm the key will be used with. (That's necessary because
+<em class="filename">dnssec-keygen </em>can generate other kinds of keys,
+as we'll see in the DNSSEC section.) <span class="option">-b</span> takes
+the length of the key as its argument; the RFC recommends using keys
+128 bits long. <span class="option">-n</span> takes as an argument HOST, the
+type of key to generate. (DNSSEC uses ZONE keys.) The final argument
+is the name of the key.</p><p>
+
+
+<em class="filename">dnssec-keygen </em>and <em class="filename">dnskeygen
+</em>both create files in their working directories that
+contain the keys generated. <em class="filename">dnssec-keygen </em>prints
+the base name of the files to its standard output. In this case,
+<em class="filename">dnssec-keygen</em> created the files
+<em class="filename">Kterminator-wormhole.movie.edu.+157+28446.key
+</em>and<em class="filename">
+Kterminator-wormhole.movie.edu.+157+28446.private</em>. You can
+extract the key from either file. The funny numbers (157 and 28446),
+in case you're wondering, are the key's DNSSEC algorithm
+number (157 is HMAC-MD5) and the key's fingerprint (28446), a
+hash value computed over the key to identify it. The fingerprint
+isn't particularly useful in TSIG, but DNSSEC supports multiple
+keys per zone, so identifying which key you mean by its fingerprint
+is important.</p><p>
+
+
+<em class="filename">Kterminator-wormhole.movie.edu.+157+28446.key
+</em>contains:</p><p>
+
+
+<blockquote><pre class="code">terminator-wormhole.movie.edu. IN KEY 512 3 157 skrKc4Twy/cIgIykQu7JZA==</pre></blockquote>
+
+
+and<em class="filename"> Kterminator-wormhole.movie.edu.+157+28446.private
+</em>contains:</p><p>
+
+
+<blockquote><pre class="code">Private-key-format: v1.2
+Algorithm: 157 (HMAC_MD5)
+Key: skrKc4Twy/cIgIykQu7JZA==</pre></blockquote>
+
+
+You can also choose your own key and encode it in base 64 using
+<em class="filename">mmencode</em> :</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>mmencode</b></tt><i class="lineannotation">
+foobarbaz</i>
+Zm9vYmFyYmF6</pre></blockquote>
+
+
+Since the actual binary key is, as the substatement implies, a
+secret, we should take care in transferring it to our name servers
+(e.g., by using <em class="filename">ssh</em>) and make sure that not just
+anyone can read it. We can do that by making sure our
+<em class="filename">named.conf </em>file isn't world-readable or by
+using the <em class="emphasis">include</em> statement to read the
+<em class="emphasis">key</em> statement from another file, which
+isn't world-readable:</p><p>
+
+
+<blockquote><pre class="code">include "/etc/dns.keys.conf";</pre></blockquote>
+
+
+There's one last problem that we see cropping up frequently
+with TSIG: <a name="INDEX-1816" /></a>time synchronization. The timestamp in the
+TSIG record is useful for preventing replay attacks, but it tripped
+us up initially because the clocks on our name servers weren't
+synchronized. That produced error messages like the following:</p><p>
+
+
+<blockquote><pre class="code">Nov 21 19:56:36 wormhole named-xfer[30420]: SOA TSIG verification from server 
+[192.249.249.1], zone movie.edu: BADTIME (-18)</pre></blockquote>
+
+
+We quickly remedied the problem using <a name="INDEX-1817" /></a>
+<a name="INDEX-1818" /></a>NTP, the network time protocol.<a name="INDEX-1819" /></a> <a name="INDEX-1820" /></a><a href="#FOOTNOTE-82">[82]</a><p></p><blockquote class="footnote">
+
+<a name="FOOTNOTE-82" /></a>[82]See the Time Synchronization Server web site at <a href="http://www.eecis.udel.edu/~ntp">http://www.eecis.udel.edu/~ntp</a> for information on NTP.</p><p>
+
+</blockquote>
+</div>
+
+
+
+
+<a name="dns4-CHP-11-SECT-1.4" /></a><div class="sect2">
+<h3 class="sect2">11.1.4. Using TSIG</h3>
+
+
+<a name="INDEX-1821" /></a>Now that
+we've gone to the trouble of configuring our name servers with
+TSIG keys, we should probably configure them to use those keys for
+something. In BIND 8.2 and later name servers, we can secure queries,
+responses, zone transfers, and dynamic updates with TSIG.</p><p>
+
+
+The key to configuring this is the <em class="emphasis">server</em>
+statement's <em class="emphasis">keys</em><a name="INDEX-1822" /></a> substatement, which tells a name
+server to sign queries and zone transfer requests sent to a
+particular remote name server. This <em class="emphasis">server
+</em>substatement, for example, tells the local name server,
+<em class="emphasis">wormhole.movie.edu</em>, to sign
+all such requests sent to 192.249.249.1 (<em class="emphasis">terminator.movie.edu</em>) with the key <em class="emphasis">terminator-wormhole.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">server 192.249.249.1 {
+	keys { terminator-wormhole.movie.edu.; };
+};</pre></blockquote>
+
+
+Now, on <em class="emphasis">terminator.movie.edu</em>, we can restrict zone transfers to those signed with the <em class="emphasis">terminator-wormhole.movie.edu</em> key:</p><p>
+
+
+<blockquote><pre class="code">zone "movie.edu" {
+	type master;
+	file "db.movie.edu";
+	allow-transfer { key terminator-wormhole.movie.edu.; };
+};</pre></blockquote>
+
+
+<em class="emphasis">terminator.movie.edu</em> also signs the zone transfer, which allows <em class="emphasis">wormhole.movie.edu</em> to verify it.</p><p>
+
+
+You can also restrict <a name="INDEX-1823" /></a>dynamic updates with TSIG by using the
+<em class="emphasis">allow-update</em> <a name="INDEX-1824" /></a>and
+<em class="emphasis">update-policy</em> <a name="INDEX-1825" /></a>substatements, as we showed you in the
+last chapter.</p><p>
+
+
+The <em class="filename">nsupdate</em><a name="INDEX-1826" /></a> programs shipped with BIND 8.2 and later
+support sending TSIG-signed dynamic updates. If you have the key
+files created by <em class="filename">dnssec-keygen</em> lying around, you
+can specify either of those as an argument to
+<em class="filename">nsupdate</em>'s <span class="option">-k</span> option.
+Here's how you'd do that with BIND 9's version of
+<em class="filename">nsupdate </em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate -k Kterminator-wormhole.movie.edu.+157+28446.key</b></tt></pre></blockquote>
+
+
+or:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate -k Kterminator-wormhole.movie.edu.+157+28446.private</b></tt></pre></blockquote>
+
+
+With the BIND 8.2 or later <em class="filename">nsupdate</em>, the syntax
+is a little different: <span class="option">-k</span> takes a directory and a
+key name as an argument, separated by a colon:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate -k /var/named:terminator-wormhole.movie.edu</b></tt>.</pre></blockquote>
+
+
+If you don't have the files around (maybe you're running
+<em class="filename">nsupdate</em> from another host), you can still
+specify the key name and the secret on the command line with the BIND
+9 <em class="filename">nsupdate </em>:</p><p>
+
+
+<blockquote><pre class="code">% <tt class="userinput"><b>nsupdate -y terminator-wormhole.movie.edu.:skrKc4Twy/cIgIykQu7JZA==</b></tt></pre></blockquote>
+
+
+The name of the key is the first argument to the <span class="option">-y</span>
+option, followed by a colon and the base 64-encoded secret. You
+don't need to quote the secret since base 64 values can't
+contain shell metacharacters, but you can if you like.</p><p>
+
+
+Michael <a name="INDEX-1827" /></a>Fuhr's
+<a name="INDEX-1828" /></a>Net::DNS Perl module also lets you send
+TSIG-signed dynamic updates and zone transfer requests. For more
+information on <a name="INDEX-1829" /></a>Net::DNS,
+see <a href="ch15_01.html">Chapter 15, "Programming with the Resolver and Name Server Library Routines"</a>.</p><p>
+
+
+Now that we've got a handy mechanism for securing DNS
+transactions, let's talk about securing our whole name
+server.<a name="INDEX-1830" /></a></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch10_16.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch11_02.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">10.16. IPv6 Forward and Reverse Mapping</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">11.2. Securing Your Name Server</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</div></div></div></div></body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch11_01.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:55:31 GMT -->
+</html>

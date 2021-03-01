@@ -1,0 +1,252 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+<head><title>Changing TTLs (DNS and BIND, 4th Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Paul Albitz and Cricket Liu" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="0596001584L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="DNS and BIND, 4th Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index.html" alt="DNS and BIND" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch08_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">8.4. Changing TTLs</h2>
+
+
+<a name="INDEX-1372" />An
+<a name="INDEX-1373" />experienced administrator needs to know
+how to set the time to live on his zone's data to his best
+advantage. The TTL<em class="firstterm"> </em>on a resource record,
+remember, is the length of time any name server can cache that
+record. So if the TTL for a particular resource record is 3600
+seconds and a server outside your network caches that record, it has
+to remove the entry from its cache after an hour. If it needs the
+same data after the hour is up, it has to query one of your name
+servers again.</p><p>
+
+
+When we introduced TTLs, we emphasized that your choice of a TTL
+dictates how current you keep copies of your data at the cost of
+increased load on your name servers. A low TTL means that name
+servers outside your network have to get data from your name servers
+often and therefore keep current. However, your name servers are then
+peppered by their queries.</p><p>
+
+
+You don't <em class="emphasis">have</em> to choose a TTL once and
+for all, though. You can -- and experienced administrators
+do -- change TTLs periodically to suit your needs.</p><p>
+
+
+Suppose we know that one of our hosts is about to be moved to another
+network. This host houses the <em class="emphasis">movie.edu</em> film library, a large
+collection of files our site makes available to Internet users.
+During normal operation, outside name servers cache the address of
+our host according to the default TTL set in the $TTL control
+statement, or for pre-BIND 8.2 name servers, in the SOA record. We
+set the default TTL for <em class="emphasis">movie.edu</em>to three hours in our sample files. A name server
+caching the old address record just before the change could have the
+wrong address for as long as three hours. A loss of connectivity for
+three hours is unacceptable, though. What can we do to minimize the
+loss of connectivity? We can lower the TTL so that outside servers
+cache the address record for a shorter period. By reducing the TTL,
+we force the outside servers to update their data more frequently,
+which means that any changes we make when we actually move the system
+are propagated to the outside world quickly. How long can we make the
+TTL? Unfortunately, we can't safely use a TTL of zero, which
+should mean "don't cache this record at all." Some
+older BIND 4 name servers can't return records with a TTL of
+zero, instead returning null answers or SERVFAIL errors. Small TTLs,
+like 30 seconds, are okay, though. The easiest change is to lower the
+TTL in the $TTL control statement in the <em class="filename">db.movie.edu
+</em>file. If you don't place an explicit TTL on resource
+records in the zone data files, the name server applies this
+<em class="firstterm">default TTL </em><a name="INDEX-1374" />
+<a name="INDEX-1375" />to
+each resource record. If you lower the default TTL, though, the new,
+lower default applies to all zone data, not just the address of the
+host being moved. The drawback to this approach is that your name
+server will be answering a lot more queries since the querying
+servers will cache <em class="emphasis">all</em> the data in your zone for
+a shorter period. A better alternative is to put a different TTL only
+on the affected address record.</p><p>
+
+
+To add an explicit TTL on an individual <a name="INDEX-1376" />resource record, place it before the IN in
+the class field. The TTL value is in seconds by default, but you can
+also specify units of <em class="emphasis">m</em> (minutes),
+<em class="emphasis">h</em> (hours), <em class="emphasis">d</em> (days), and
+<em class="emphasis">w</em> (weeks), just as you could in the $TTL control
+statement. Here's an example of an explicit TTL from
+<em class="filename">db.movie.edu</em>:</p><p>
+
+
+<blockquote><pre class="code">cujo  1h IN  A    192.253.253.5  ; explicit TTL of 1 hour</pre></blockquote>
+
+
+If you're observant and have read RFC 1034, you may have
+noticed a potential problem when loading this record on an older name
+server: the explicit TTL on <em class="emphasis">cujo</em>'s address is one hour, but
+the TTL field in the <a name="INDEX-1377" />SOA
+record -- ostensibly the minimum TTL for the zone on pre-BIND 8.2
+name servers -- is higher. Which takes precedence?</p><p>
+
+
+If older BINDs followed the original DNS RFCs to the letter, the TTL
+field in the SOA record would really define the minimum TTL for all
+resource records in the zone. Thus, you could specify only explicit
+TTLs larger than this minimum. Older BIND name servers don't
+work this way, though. In other words, in BIND, "minimum"
+is not really minimum. Instead, BIND interprets the minimum TTL field
+in the SOA record as a "default" TTL. (Newer BINDs, of
+course, have the explicit default TTL set with $TTL to go by.) If
+there is no TTL on a record, the minimum applies. If there is a TTL
+on the resource record, BIND allows it even if it is smaller than the
+minimum. That one record is sent out in responses with the smaller
+TTL, while all other records are sent out with the
+"minimum" TTL from the SOA record.</p><p>
+
+
+You should also know that when giving out answers, a slave supplies
+the same TTL a primary master does -- that is, if a primary gives
+out a TTL of one hour for a particular record, a slave will, too. The
+slave doesn't decrement the TTL according to how long
+it's been since it loaded the zone. So, if the TTL of a single
+resource record is set smaller than the default, both the primary and
+slave name servers give out the resource record with the same,
+smaller TTL. If the slave name server has reached the expiration time
+for the zone, it expires the whole zone. It will never expire an
+individual resource record within a zone.</p><p>
+
+
+So BIND does allow you to put a small TTL on an individual resource
+record if you know that the data is going to change shortly. Thus,
+any name server caching that data caches it only for a brief time.
+Unfortunately, while BIND makes tagging records with a small TTL
+possible, most administrators don't spend the time to do it.
+When a host's address changes, you often lose connectivity to
+it for a while.</p><p>
+
+
+More often than not, the host having its address changed is not one
+of the main hubs on the site, so the outage affects few people. If
+one of the mail hubs or a major web server or FTParchive -- like the film library -- is moving,
+though, a day's loss of connectivity may be unacceptable. In
+cases like this, the administrator should plan ahead and reduce the
+TTL on the data to be changed.</p><p>
+
+
+Remember that the TTL on the affected data needs to be lowered
+<em class="emphasis">before</em> the change takes place. Reducing the TTL
+on a workstation's address record and changing the
+workstation's address simultaneously may do you little or no
+good; the address record may have been cached seconds before you made
+the change and linger until the old TTL times out. <em class="emphasis">And
+</em>be sure to factor in the time it'll take your slaves
+to load from your primary master. For example, if your default TTL is
+12 hours and your refresh interval is 3 hours, be sure to lower the
+TTLs at least 15 hours ahead of time, so that by the time you move
+the host, all the old, longer-TTL records will have timed out. Of
+course, if all your slaves are BIND 8 or 9 name servers that use
+NOTIFY, the slaves shouldn't take the full refresh interval to
+synch up.</p><p>
+
+
+<a name="dns4-CHP-8-SECT-4.1" /><div class="sect2">
+<h3 class="sect2">8.4.1. Changing Other SOA Values</h3>
+
+
+We briefly mentioned increasing the refresh interval as a way of
+offloading your primary master name server. Let's discuss
+refresh in a little more detail and go over the remaining
+<a name="INDEX-1378" />SOA values, too.</p><p>
+
+
+The <a name="INDEX-1379" /><em class="firstterm">refresh</em> value,
+you'll remember, controls how often a slave checks whether its
+zone data is up to date. The <a name="INDEX-1380" /><em class="firstterm">retry </em>value then
+becomes the refresh time after the first failure to reach a master
+name server. The <a name="INDEX-1381" /><em class="firstterm">expire </em>value
+determines how long zone data can be held before it's
+discarded, when a master is unreachable. Finally, on pre-BIND 8.2
+name servers, the <em class="emphasis">default</em><a name="INDEX-1382" /><em class="firstterm">
+TTL </em>sets how long zone information may be cached. On
+newer name servers, the last SOA field is the negative caching TTL.</p><p>
+
+
+Suppose we've decided we want the slaves to pick up new
+information every hour instead of every three hours. We change the
+refresh value to <em class="emphasis">1h</em> in each of the zone data
+files (or with the <em class="emphasis">-o</em> option to
+<em class="filename">h2n</em>). Since retry is related to refresh, we
+should probably reduce retry, too -- to every 15 minutes or so.
+Typically, retry is less than refresh, but that's not
+required.<a href="#FOOTNOTE-64">[64]</a> Although lowering the refresh value will speed up the
+distribution of zone data, it will also increase the load on the name
+server being loaded from, since the slaves will check more often. The
+added load isn't much, though; each slave makes a single SOA
+query during each zone's refresh interval to check its
+master's copy of the zone. So with two slave name servers,
+changing the refresh time from three hours to one hour will generate
+only four more queries (per zone) to the primary master in any
+three-hour span.</p><blockquote class="footnote">
+
+<a name="FOOTNOTE-64" />[64]Actually, BIND 8 servers will warn you if
+refresh is set to less than 10 times the retry interval.</p><p>
+
+</blockquote>
+
+
+Of course, if all of your slaves run BIND 8 or 9 and you use NOTIFY,
+refresh doesn't mean as much. But if you have even one BIND 4
+slave, your zone data may take up to the refresh interval to reach
+it.</p><p>
+
+
+Some older versions of BIND slaves stopped answering queries during a
+zone load. As a result, BIND was modified to spread out the zone
+loads, reducing the periods of unavailability. So, even if you set a
+low refresh interval, your slaves may not check exactly as often as
+you request. BIND 4 name servers attempt a certain number of zone
+loads, and then wait 15 minutes before trying another batch. On the
+other hand, BIND 4.9 and later may also refresh moreoften than the refresh interval. These newer BINDs wait a
+random number of seconds between one-half the refresh interval and
+the full refresh interval to check serial numbers.</p><p>
+
+
+Expiration times on the order of a week are common -- longer if
+you frequently have problems reaching your updating source. The
+expiration time should always be much larger than the retry and
+refresh intervals; if the expire time is smaller than the refresh
+interval, your slaves will expire their data before trying to load
+new data. BIND 8 will complain if you set an expire time less than
+refresh plus retry, less than twice retry, less than seven days, or
+greater than six months. (BIND 9.1.0 doesn't complain yet.)
+Choosing an expire time that meets all BIND 8's criteria is a
+good idea in most situations.</p><p>
+
+
+If your zone's data doesn't change much, you might
+consider raising its <a name="INDEX-1383" />
+<a name="INDEX-1384" />default
+TTL. Default TTLs are commonly a few hours to one day, but you can
+use longer values. One week is about the longest value that makes
+sense for a TTL. Longer than that and you may find yourself unable to
+change bad, cached data in a reasonable amount of<a name="INDEX-1385" /> time.<a name="INDEX-1386" /></p><p>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch08_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch08_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">8.3. Registering Name Servers</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">8.5. Planning for Disasters</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="index.html" /><area shape="rect" coords="595,1,704,108" href="../fire/index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/dns/ch08_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:57:28 GMT -->
+</html>

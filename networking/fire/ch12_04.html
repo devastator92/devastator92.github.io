@@ -1,0 +1,1340 @@
+<html>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+<head><title>Disabling Nonrequired Services (Building Internet Firewalls, 2nd Edition)</title><link rel="stylesheet" type="text/css" href="../style/style1.css" />
+
+<meta name="DC.Creator" content="Elizabeth D. Zwicky, Simon Cooper and D. Brent Chapman" /><meta name="DC.Format" content="text/xml" scheme="MIME" /><meta name="DC.Language" content="en-US" /><meta name="DC.Publisher" content="O'Reilly &amp; Associates, Inc." /><meta name="DC.Source" scheme="ISBN" content="1565928717L" /><meta name="DC.Subject.Keyword" content="stuff" /><meta name="DC.Title" content="Building Internet Firewalls, 2nd Edition" /><meta name="DC.Type" content="Text.Monograph" />
+
+</head><body bgcolor="#ffffff">
+
+<img alt="Book Home" border="0" src="gifs/smbanner.gif" usemap="#banner-map" /><map name="banner-map"><area shape="rect" coords="1,-2,616,66" href="index-2.html" alt="Building Internet Firewalls" /><area shape="rect" coords="629,-11,726,25" href="jobjects/fsearch.html" alt="Search this book" /></map>
+
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr></table><div>
+
+
+
+<h2 class="sect1">12.4. Disabling Nonrequired Services</h2>
+
+
+
+
+
+When you have a secure machine, you can start to set up the services
+on it. The first step is to remove the services that you don't
+want to run. Consult <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, for more
+information about deciding which services you don't want to
+run. The main idea is to remove all services that you don't
+actually need for the machine to do the work it's designed to
+do, even if they seem convenient or harmless.</p><p>
+
+
+
+
+
+<a name="ch12-3-fm2xml" /><div class="sect2">
+<h3 class="sect2">12.4.1. How Are Services Managed Under Windows NT?</h3>
+
+
+
+
+
+<a name="INDEX-1066" /> <a name="INDEX-1067" /> <a name="INDEX-1068" />There are two parts to
+service management. First, the administrative interfaces, which you
+use to install, remove, and configure services, and to manually start
+and stop them. Second, the underlying mechanisms, which automatically
+handle services and make them continuously available. You do not
+normally need to know about these mechanisms in order to administer a
+machine. We discuss them here for two reasons:</p><p>
+
+
+
+
+
+<ul><li>If you end up building a particularly specialized bastion host, you
+may need a very fine degree of comprehension and control over the
+services, in which case you will need this information.</p><p></li><li>People who are accustomed to administering Unix hosts expect to have
+this level of information, and will attempt to control services at
+this level, only to become confused and hostile when they run into
+some of the more obscure side effects of the differences between the
+two operating systems.</p><p></li></ul>
+Under Windows NT, the tool that is normally used to install services
+that are provided by Microsoft is the Networking control panel.
+Services that are provided by other vendors will come with their own
+installation programs. Some services are configured from the
+Networking control panel, while others have their own configuration
+and management programs.</p><p>
+
+
+
+
+
+The tool that is used to manually start and stop services is the
+Services control panel. The Services control panel can also set up
+some generic configuration information for services, but any
+service-specific parameters have to be managed separately. Windows
+2000 gives more information and control from the Services control
+panel than Windows NT 4; a number of things are accessible only from
+the registry in Windows NT 4 but are nicely presented in the user
+interface in Windows 2000 (for instance, information about which
+services depend on each other).</p><p>
+
+
+
+
+
+The rest of this section discusses the underlying mechanisms; you may
+feel free to ignore it if you do not need control of services beyond
+that presented by the user interface.</p><p>
+
+
+
+
+
+<a name="INDEX-1069" /> <a name="INDEX-1070" />Services under Windows
+NT are always started by the Service Control Manager (SCM). (The SCM
+is unfortunately completely different from the user-visible Services
+control panel.) Services can be started as part of the boot process
+or on demand. Services started during boot can start at any time from
+the very beginning (for services with a "boot" startup
+type) to after users are already able to log in (for services with an
+"autostart" type). While Unix boot mechanisms specify an
+explicit order for services to start up in, Windows NT services
+specify their dependencies and type, and the operating system figures
+out what order to start them in. This is in general more effective at
+letting you add new services and get them started correctly but makes
+it harder to calculate the order that services actually start in.</p><p>
+
+
+
+
+
+"On demand" can also cover a range of situations. Most
+commonly, it means that the service starts when a user starts an
+application that needs the service.<a href="#FOOTNOTE-24">[24]</a> "On demand" services can also be started
+explicitly from the Services control panel, or any other application
+that talks to the Service Control Manager (for instance, the SQL
+Service Manager). Services that are RPC providers (directly or
+through DCOM) will be started if there is a request for them.
+Finally, services can have dependency information, and a demand
+service can be started because a service that depends on it attempts
+to start. This can create a situation where a service is marked as
+demand but actually starts at boot time, because a service that
+depends on it is marked as autostart.</p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-24" />[24]Note that this
+depends on the application explicitly attempting to start the
+service; "on demand services" will not be started simply
+because an application demands them, despite the name.</p><p>
+
+
+
+
+</blockquote>
+
+
+
+
+
+Not everything that you think of as a service will appear in the
+Services control panel. Some things that behave like services are
+implemented entirely or in part as drivers that are loaded into the
+operating system and do not run as separate processes at all. These
+are not actually services from the operating system's point of
+view, and they are listed in the Devices control panel instead of the
+Services control panel. They are, however, listed as services in the
+registry, with registry entries in the following:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services</pre></blockquote>
+
+
+
+
+
+This lists all services in alphabetical order, and you will have to
+look at the value for "Start" to see if they are turned
+on and when they start up.</p><p>
+
+
+
+
+
+Not everything in the Services section of the registry is a network
+server; the registry also includes normal device drivers and
+filesystem drivers in this section, and some things that function as
+servers in the context of the local machine function as clients in
+the Internet context. That is, they provide a centralized service for
+programs running on the local machine, but they do not accept
+requests from other hosts. For instance, a DHCP service is installed
+by default; it acts as a client, requesting information from a DHCP
+server. However, it then distributes this information to other
+processes on the machine, which makes it a service from the operating
+system's point of view. There is no straightforward way to tell
+whether something is a purely local service or a network service, or
+whether something marked as a filesystem driver is a genuine
+filesystem driver or part of a network service.</p><p>
+
+
+
+
+
+Just to add a final note of confusion, there is no need for one
+Windows NT service to be implemented as one executable. For
+performance reasons, multiple Windows NT services may be implemented
+in the same executable (for instance, the simple TCP/IP services,
+DHCP, and Berkeley LPD print service are all in the same executable).
+What the executable does will be controlled by the registry entries
+for the relevant services. It's also possible for one service
+to be made up of more than one file, with one running as a kernel
+driver for maximum speed and the other running as a normal service to
+avoid burdening the kernel too far. And, in fact, it's not at
+all uncommon for both these things to happen at once, so that a
+service is split into a kernel driver and a standard service, and the
+standard service shares an executable with several others.</p><p>
+
+
+
+
+
+Note that the kernel drivers by themselves do not provide services.
+They are simply an efficient way of providing data to the actual
+servers. Unix people who are attempting to disable services on
+Windows NT often disable the actual service, note that the port is
+not listed as open in <em class="emphasis">netstat</em>, and then become
+severely distressed when port scans show that something is listening
+to the port. This is a symptom of split service that's using a
+kernel driver, not of some horrible secret way that the operating
+system is preventing you from turning off the server and then lying
+about it. The server is off; the port is not bound; but the kernel
+driver is picking up the data and throwing it away. No significant
+security problem is involved, and if you wish to get rid of the
+apparent problem, you can use the Devices control panel to disable
+the relevant device.</p><p>
+
+
+
+
+
+The Resource Kit provides a command named <em class="emphasis">sc</em>
+that presents information about the running services and drivers;
+this gives you a much more usable interface than the registry and
+removes the large amounts of information about services and drivers
+that aren't in use. <a name="INDEX-1071" /></p><p>
+
+
+
+
+
+There is no standard way of giving options to individual services
+under Windows NT, aside from a few parameters dealing with startup
+order and dependencies, which are in well-defined places in the
+registry. You will have to research each server separately. In
+general, service parameters are stored somewhere in the
+registry -- the Microsoft-approved locations are in:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\<em class="replaceable">ServiceName</em>\Parameters</pre></blockquote>
+
+
+
+
+
+or</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\Software\<em class="replaceable">CompanyName</em>\<em class="replaceable">ServiceName</em></pre></blockquote>
+
+
+
+
+
+but servers are free to put them anywhere they can write to, in or
+out of the registry. Normally, service authors should provide a
+management interface in the form of a control panel or a plug-in for
+the Microsoft Management Console, which will modify some or all of
+the parameters.</p><p>
+
+
+
+
+
+<a name="ch12-4-fm2xml" /><div class="sect3">
+<h3 class="sect3">12.4.1.1. Registry keys</h3>
+
+
+
+
+<a name="INDEX-1072" />
+<a name="INDEX-1073" />
+
+Here is an overview of the registry keys for services and their use
+in determining what services do in order to secure a bastion host:</p><p>
+
+
+
+
+
+<dl>
+<dt><i>DependOnGroup</i></dt>
+<dd><a name="INDEX-1074" />A
+list of service groups that this service depends on. This is
+relatively rarely set. The main group of interest for networking
+purposes is "TDI", which is the group that contains base
+network interface drivers.</p><p></dd>
+
+
+
+
+
+<dt><i>DependOnService</i></dt>
+<dd><a name="INDEX-1075" />A list of services that this service depends
+on. A service that depends on LanmanServer is almost certainly a
+network server. Services that depend on LanmanWorkstation are
+probably not network servers but are clients. Services that depend on
+one of the other networking groups (NetDDE, TCPIP, NetBT, or
+AppleTalk, for instance) may be either servers or clients, but your
+suspicions should be aroused.</p><p></dd>
+
+
+
+
+
+<dt><i>DisplayName</i></dt>
+<dd><a name="INDEX-1076" />This is the name shown in the Services or
+Devices control panel.</p><p></dd>
+
+
+
+
+
+<dt><i><a name="INDEX-1077" />ErrorControl </i></dt>
+<dd>This shows what to do if this service won't run. Check here
+before you disable the service! If this is set to 0x02 or 0x03, and
+you disable the service, the machine will reenable it by restoring
+the previous configuration. If that doesn't work, at 0x03, it
+will refuse to boot. Possible values are shown here.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch12-5-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p><p></th>
+<th>
+eaning</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+0x00</p><p></td>
+<td>
+Ignore failure; continue without doing anything.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x01</p><p></td>
+<td>
+Produce a warning dialog box.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x02</p><p></td>
+<td>
+Switch to the last known good configuration if one is available;
+otherwise, boot anyway.</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x03</p><p></td>
+<td>
+Count this boot as a failure, switch to the last known good
+configuration if one is available, and fail to boot if not.</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<dl>
+<dt><i>Group </i></dt>
+<dd><a name="INDEX-1078" />This is
+the group name that is used in DependOnGroup. Anything in TDI or
+Network is networking related.</p><p></dd>
+
+
+
+
+
+<dt><i>ImagePath</i></dt>
+<dd><a name="INDEX-1079" />This
+is the location of the executable, which tells you what to remove or
+rename if you want to be sure that the service cannot be easily
+reenabled.</p><p></dd>
+
+
+
+
+
+<dt><i>ObjectName</i></dt>
+<dd><a name="INDEX-1080" />This
+is actually the name of the account that the service runs under, if
+it runs as an independent process. Almost all services run as
+LocalSystem (which is the most privileged account on the system). In
+order to run as any other user, the service needs to provide a
+password for the user, which is stored separately, in the Secrets
+section of the registry. If the service is a kernel driver, this
+specifies which kernel object will load it.</p><p></dd>
+
+
+
+
+
+<dt><i>PlugPlayServiceType</i></dt>
+<dd><a name="INDEX-1081" />This indicates whether or not it is a Plug
+and Play service, and if so, what kind. Normally, network services
+are not Plug and Play.</p><p></dd>
+
+
+
+
+
+<dt><i>Start</i></dt>
+<dd><a name="INDEX-1082" />This key
+indicates when the service should be started. Possible variables are
+as follows.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch12-6-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p><p></th>
+<th>
+eaning</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+0x00</p><p></td>
+<td>
+Boot</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x01</p><p></td>
+<td>
+System</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x02</p><p></td>
+<td>
+Autoload</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x03</p><p></td>
+<td>
+On demand</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x04</p><p></td>
+<td>
+Disabled (filesystem drivers will load anyway)</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<dl>
+<dt><i>Tag</i></dt>
+<dd><a name="INDEX-1083" />This
+specifies what order services in the same group start in; lowest
+value goes first.</p><p></dd>
+
+
+
+
+
+<dt><i>Type</i></dt>
+<dd><a name="INDEX-1084" />The type
+of service. 0x100 will be added if the service is capable of
+interacting directly with the user. Possible values are as follows.</p><p></dd>
+
+</dl>
+
+
+
+
+
+<a name="ch12-7-fm2xml" /><table border="1">
+
+
+
+<tr>
+<th>
+Value</p><p></th>
+<th>
+eaning</p><p></th>
+</tr>
+
+
+
+
+
+
+
+
+
+
+<tr>
+<td>
+0x01</p><p></td>
+<td>
+Kernel-mode device driver</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x02</p><p></td>
+<td>
+Filesystem driver</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x04</p><p></td>
+<td>
+Arguments to network adapter</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x10</p><p></td>
+<td>
+Server, standalone process</p><p></td>
+</tr>
+
+
+
+
+<tr>
+<td>
+0x20</p><p></td>
+<td>
+Server, can share address space</p><p></td>
+</tr>
+
+
+
+
+
+</table><p>
+
+<dl>
+<dt><i>Subkeys</i></dt>
+<dd><a name="INDEX-1085" />The
+only useful subkey is the Parameters subkey, which may contain
+parameters to the service. Many services have parameters controllable
+here that are not documented elsewhere.<a name="INDEX-1086" /> <a name="INDEX-1087" /></p><p></dd>
+
+</dl>
+</div>
+
+
+
+
+
+
+
+
+
+<a name="ch12-8-fm2xml" /><div class="sect3">
+<h3 class="sect3">12.4.1.2. Other ways to start programs under Windows NT</h3>
+
+
+
+
+
+All the descriptions in the previous section are about official
+Windows NT services. There are several other ways to automatically
+start programs under Windows NT, and you may run into
+"services" that use one of these other methods. In
+general, this is an extremely bad sign. These are not genuine Windows
+NT services; they are almost certainly originally written to run
+under other operating systems, and there is very little chance that
+they will be either secure or reliable. If at all possible, you
+should avoid running such programs on bastion hosts, or for that
+matter, other security-critical hosts.</p><p>
+
+
+
+
+
+The following registry key:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SessionManager\BootExecute</pre></blockquote>
+
+
+
+
+
+contains a command line that is executed at boot time. This is
+normally used to run autocheck to do filesystem checking and, as far
+as we know, is never used by legitimate services. Because it runs
+early in the boot process, it would be a tempting place to hide a
+virus.<a name="INDEX-1088" />
+<a name="INDEX-1089" />
+<a name="INDEX-1090" /></p><p>
+
+
+
+
+
+The following registry key:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion</pre></blockquote>
+
+
+
+
+
+contains three keys that are used to start programs at user login:
+Run, RunOnce, and RunServices. These are normal ways to start
+persistent programs under Windows 95/98 and may be used by legitimate
+programs that are designed for that environment. Some programs may
+also still use a model where they configure a persistent program to
+autostart when a particular user logs in, under the expectation that
+the machine will be set up to log that user in automatically at
+bootup.</p><p>
+
+
+
+
+
+Programs started in these ways may behave like services from the
+user's point of view, but they are not services from the
+operating system's point of view and are not managed by the
+Service Control Manager. This gives them very different security
+models. In particular, unless otherwise configured, the SCM runs
+services using the System account, which has the odd property that it
+is all-powerful on the local machine but is incapable of using the
+network. Programs started at user login will run as the user who just
+logged in, which will make significant changes to the permissions
+they have. A regular user will have more access to the network and to
+user files than the System account, but less access to operating
+system files and capabilities (meaning that a program that is
+auto-started at login instead of being a service will have more
+opportunities to be hostile and fewer to be useful).</p><p>
+
+
+
+
+
+Run models that require a user to be logged in are a significant
+security problem under Windows NT, because having a user logged in
+adds vulnerabilities. If you can't avoid servers like these,
+try to convert them to services using the Resource Kit's
+<em class="filename">srvany.exe</em>. <a name="INDEX-1091" /> <a name="INDEX-1092" /> <a name="INDEX-1093" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch12-9-fm2xml" /><div class="sect2">
+<h3 class="sect2">12.4.2. How to Disable Services Under Windows NT</h3>
+
+
+
+
+
+<a name="INDEX-1094" /> <a name="INDEX-1095" /> <a name="INDEX-1096" />As we
+discussed in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, there are four general
+precautions to take when disabling services:</p><p>
+
+
+
+
+
+<ul><li>Make sure that you have a way to boot the machine if you disable a
+critical service (for instance, a secondary hard disk with a full
+operating system image or a bootable CD-ROM).</p><p></li><li>Save a clean copy of everything you modify so that you know how to
+put it back the way it was if you do something wrong. Since
+it's hard to identify modified files precisely on Windows NT,
+you should have a full backup of the system, including a dump of the
+registry.</p><p></li><li>When you disable a service, disable everything that depends on it.</p></li><li>Don't connect the machine you are trying to protect to a
+hostile network before you have completed the process of disabling
+services. It is possible for the machine to be compromised while you
+are preparing it.</p><p></li></ul>
+Once you've set up your alternate boot process, start by going
+into the Networking control panel's Services tab and removing
+the things you don't need, which will probably be most, if not
+all, of them. <a href="ch12_04.html#ch12-17023">Section 12.4.5, "Specific Windows NT Services to Disable"</a>, later
+in this chapter, provides more information about which services you
+should remove. The advantage of disabling services by removing them
+from the Services tab is that if possible, it removes the services
+altogether, and the only way to turn them on will be to reinstall
+them.</p><p>
+
+
+
+
+
+You can also disable services by setting them to the startup status
+"Disabled" from the Services control panel. This is very
+easy to undo later, which may not be desirable. On the other hand,
+doing anything more permanent involves untraditional and relatively
+risky moves. For instance, you can remove the registry keys for
+services you have disabled. Without the registry keys, the Service
+Control Manager can't start them, and you have to know what the
+keys should be in order to put them back. Removing the relevant
+executables is another solution, but as noted earlier, it's
+common for multiple Windows NT services to run as part of the same
+executable. If you want any of the services provided by a given
+executable, you will have to leave it.</p><p>
+
+
+
+
+
+Some Microsoft documentation claims that some services can be
+disabled by stopping them (from the Services control panel or the
+"net stop" command). This is not true; a stopped service
+will be restarted at boot time unless it is also disabled. <a name="INDEX-1097" /> <a name="INDEX-1098" /> <a name="INDEX-1099" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch12-10-fm2xml" /><div class="sect2">
+<h3 class="sect2">12.4.3. Next Steps After Disabling Services</h3>
+
+
+
+
+
+You will need to reboot the machine after you change the service
+configuration. When it has been rebooted, you should check to make
+certain that the services are actually off and that the machine is
+still functional. One way to check that a service is turned off is to
+use the <em class="emphasis">netstat</em> utility to list the network
+ports the machine is listening on.<a name="INDEX-1100" /></p><p>
+
+
+
+
+
+After you have rebooted and tested the machine, and you are
+comfortable that the machine works without the disabled services, you
+may want to remove the executables for those services (as long as
+they are not used by other services). If the executables are lying
+around, they may be started by somebody  --  if not you, some
+other system administrator or an intruder. <a name="INDEX-1101" /></p><p>
+
+
+
+
+
+<a name="INDEX-1102" /><a name="INDEX-1103" /> <a name="INDEX-1104" />If you feel uncertain about removing
+executables, consider encrypting them instead. Use an encryption
+program that has a stable implementation of a standard algorithm,
+like Network Associates' version of PGP (see <a href="appb_01.html">Appendix B, "Tools"</a>, for information about how to get this
+package).</p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch12-3128" /><div class="sect2">
+<h3 class="sect2">12.4.4. Which Services Should You Leave Enabled?</h3>
+
+
+
+
+
+<a name="INDEX-1105" /> <a name="INDEX-1106" /> <a name="INDEX-1107" />Certain services are
+essential to the operation of the machine, and you'll probably
+need to leave these enabled, no matter what else the machine is
+configured to do. On a Windows NT system, nothing in the Services tab
+of the Networking control panel is actually required for basic
+functionality. In the Services control panel, the critical services
+include:</p><p>
+
+
+
+<a name="INDEX-1108" />
+
+<dl>
+<dt><i>EventLog</i></dt>
+<dd>This is what puts things in the event log, even for local programs.</p><p></dd>
+
+
+
+
+
+<dt><i>NT LM Security Support Provider</i></dt>
+<dd><a name="INDEX-1109" />This is required if the machine will be
+running services that need to authenticate users (for instance, FTP
+or HTTP servers).</p><p></dd>
+
+
+
+
+<a name="INDEX-1110" />
+<dt><i>Protected Storage</i></dt>
+<dd>This is part of the encrypted filesystem support and should be left enabled.</p><p></dd>
+
+
+
+
+<a name="INDEX-1111" />
+<dt><i>Remote Procedure Call (RPC) </i></dt>
+<dd>Many servers use loopback RPC calls and will not work if RPC is not available.</p><p></dd>
+
+</dl>
+
+
+
+
+
+In some circumstances you will also need these services:</p><p>
+
+
+<a name="INDEX-1112" />
+
+
+<dl>
+<dt><i>IPSEC Policy Agent (Windows 2000) </i></dt>
+<dd>This is required if you're using IPsec to secure network
+connections.</p><p></dd>
+
+
+
+<a name="INDEX-1113" />
+
+<dt><i>Net Logon</i></dt>
+<dd>This is required if the machine will be authenticating accounts for other machines or from other machines (for instance, if it's a
+member server in a domain or a primary domain server for a domain
+that contains other servers). A bastion host should use only local
+accounts, in which case this service is not required.</p><p></dd>
+
+
+
+<a name="INDEX-1114" />
+
+<dt><i>Plug and Play</i></dt>
+<dd>This is either pointless or critical, depending on your hardware configuration. It is not network-accessible in either case. Note that
+it is even required for correct functioning of peripherals on some
+server configurations that have no hot-swappable components.</p><p></dd>
+
+
+
+<a name="INDEX-1115" />
+
+<dt><i>Smart Card (Windows 2000) </i></dt>
+<dd>This is required if you have a smart card reader and want to use it for authentication; it depends on Plug and Play.</p><p></dd>
+
+
+
+<a name="INDEX-1116" />
+
+<dt><i>Spooler</i></dt>
+<dd>This is needed for printing (even local printing) to work. You can remove it if you are not going to print.</p><p></dd>
+
+</dl>
+
+
+
+
+
+In addition, you'll obviously need server processes for the
+services that you've decided to provide on your bastion host
+(e.g., real or proxy Telnet, FTP, SMTP, and DNS servers).<a name="INDEX-1117" /> <a name="INDEX-1118" /> <a name="INDEX-1119" /></p><p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch12-17023" /><div class="sect2">
+<h3 class="sect2">12.4.5. Specific Windows NT Services to Disable</h3>
+
+
+
+
+
+<a name="INDEX-1120" /> <a name="INDEX-1121" /> <a name="INDEX-1122" />As discussed
+earlier, there are three separate places where you can disable
+services for Windows NT:</p><p>
+
+
+
+
+
+<ul><li>The Services tab of the Networking control panel</p><p></li><li>The Services control panel</p></li><li><p>The registry</p></li></ul>
+You need to disable services from the registry only in very
+exceptional cases; you should be able to do everything you need from
+the Networking and Services control panels.</p><p>
+
+
+
+
+
+<dl>
+<dt><i>The Networking control panel</i></dt>
+<dd>In general, nothing in the Services tab of the Networking control
+panel is actually required, and you should disable all of the
+services if possible. Here we list services with special
+considerations:</p><p></dd>
+
+
+
+
+
+<dt><i>Microsoft DNS server (Server)</i></dt>
+<dd><a name="INDEX-1123" /> <a name="INDEX-1124" />You do not normally want to run a DNS
+server on a bastion host unless that bastion host is dedicated to
+name service. You will therefore turn this off on most bastion hosts.</p><p>
+
+
+
+
+
+If you are building a bastion host to be a name server, the Microsoft
+DNS server is a reasonable choice for a DNS server to run, but in a
+bastion host configuration, you will need to keep two things in mind.
+First, you do not want a bastion host to rely on data from a WINS
+server on another machine, so the DNS server should not be configured
+to fall back to WINS unless the WINS server is on the same bastion
+host. Second, the DNS Manager (which is often used to configure the
+DNS server) relies on NetBT, which may not be available on a bastion
+host, so you may not be able to use it except at the console.</p><p></dd>
+
+
+
+
+
+<dt><i>Microsoft TCP/IP printing (Server and Workstation) </i></dt>
+<dd><a name="INDEX-1125" />
+<a name="INDEX-1126" />Microsoft's implementation of
+<em class="emphasis">lpr</em>. Although <em class="emphasis">lpr</em> is not a
+secure protocol, it is often safer than using SMB printing, which
+cannot be enabled without enabling more dangerous services at the
+same time. Therefore, if you want to be able to print from a Windows
+NT bastion host, but do not have the resources to dedicate a printer,
+your best choice may be to install the Microsoft TCP/IP Printing
+subsystem on the bastion host and the print server and then disable
+the <em class="emphasis">lpd</em> server on the bastion host. (Do not use
+a bastion host as a print server, via any protocol; if you directly
+attach a printer to the bastion host, resign yourself to having it be
+a dedicated printer for that single host.)</p><p></dd>
+
+
+
+<a name="INDEX-1127" />
+
+<dt><i>NetBIOS interface (Default Server and Workstation) </i></dt>
+<dd>The base for many of the Microsoft-native services. You will need it if you intend to use normal Microsoft networking. Ideally, you should
+avoid this service on bastion hosts.</p><p></dd>
+
+
+<a name="INDEX-1128" />
+
+
+<dt><i>Remote Access Service (Server and Workstation) </i></dt>
+<dd>This provides networking either over phone lines or via PPTP (which is discussed further in <a href="ch14_01.html">Chapter 14, "Intermediary Protocols"</a>). It should not
+be installed unless the machine will provide or use dial-up
+networking or virtual private networking services.</p><p></dd>
+
+
+
+<a name="INDEX-1129" />
+
+<dt><i>Server (Default Server and Workstation) </i></dt>
+<dd>This is the server for inbound NetBIOS connections, including SMB connections. This includes file sharing, printer sharing, and remote
+execution of the Registry Editor, Event Viewer, and User Manager. You
+should probably remove it, although the machine will then be
+inaccessible via all normal Windows NT networking. If you need to use
+normal Windows NT networking (this is practically everything but FTP,
+HTTP, and SMTP), you should be sure that NetBT access is blocked at
+some other point and/or that the Server is unbound from high-risk
+network interfaces (see the discussion of configuring services to run
+on specific network interfaces).</p><p>
+
+
+
+
+
+Because of the way that NetBT name service works, a machine that has
+no Server service running will register its name correctly at boot
+time but won't be able to defend itself if another machine
+tries to claim the name. This may seem unimportant (who cares what
+happens to the NetBT name if the machine doesn't speak NetBT
+anyway?), but in fact, most Microsoft machines will look for a NetBT
+name before a DNS name, and attempts to reach the machine via HTTP or
+FTP from local clients will use NetBT resolution. If it's
+important to reach the machine from internal Microsoft machines, you
+need to protect it from masquerades. There are two ways to do this.
+If you have a reliable WINS configuration with a limited number of
+WINS servers, you can configure a static mapping for the name in each
+WINS server. If that is impractical, give the machine a name at least
+16 characters long, and NetBT name resolution will be impossible,
+forcing clients to fall back to DNS, which is not vulnerable to the
+same sorts of trivial and/or accidental masquerading.</p><p></dd>
+
+
+
+
+
+<dt><i>Simple TCP/IP services (Server and Workstation)</i></dt>
+<dd><a name="INDEX-1130" />
+<a name="INDEX-1131" />This package consists of
+<em class="filename">echo</em>, <em class="filename">chargen</em>,
+<em class="filename">discard</em>, <em class="filename">daytime</em>, and
+<em class="filename">quotd</em>, which are discussed further in <a href="ch22_01.html">Chapter 22, "Administrative Services"</a>. The standard advice is to avoid it unless you
+need one of the services; it is hard to imagine how you could
+possibly need any of them. Do not install it.</p><p></dd>
+
+
+
+
+
+<dt><i>SNMP service (Server and Workstation) </i></dt>
+<dd><a name="INDEX-1132" />SNMP is a dangerous service that
+provides a great deal of information and control with very little
+security, and you should normally avoid it. Many references will
+advise you to install SNMP in order to get TCP/IP performance
+statistics in the Performance Monitor. If you install SNMP for this
+reason, you will also have installed the SNMP agent service, which
+you do not need to run and which should be disabled from the Services
+control panel.</p><p>
+
+
+
+
+
+If you do wish to run the SNMP agent, you must run a version of
+Windows NT later than 4.0 Service Pack 4; versions before that do not
+correctly handle settings and will provide read and write access to
+the "public" community. You should also be sure to
+configure the SNMP Security Properties (available from the Network
+control panel in Services <img align="absmiddle" src="figs/U2192.gif" /> SNMP Service <img align="absmiddle" src="figs/U2192.gif" /> Security):</p><p>
+
+<ol>
+<li>If you have an SNMP monitoring station, leave Send Authentication Trap on, and configure the correct address for the station into the Traps panel. This will cause the machine to send a warning message if
+it receives a request with an invalid community name in it. (This is
+all this option does; it does not actually enable any authentication
+beyond SNMP's default method, which uses the community name as
+a form of cleartext password.)</p><p></li>
+
+<li>Edit the Accepted Community Names so that "public" is no longer accepted, and the only accepted value is an unguessable name
+unique to your site. <em class="emphasis">Do not leave this field
+blank!</em> If this field is
+blank, any community name will be accepted, and all SNMP requests
+will be valid.</p><p></li>
+
+<li>Set Only Accept SNMP Packets from These Hosts. You must include a host here; put in your SNMP monitoring station's address if you
+intend to use one, or use 127.0.0.1 (the loopback address). Note that
+this relies on authenticating by source address. If attackers can
+forge an accepted address on an incoming packet, they can reset
+important networking parameters. This is especially dangerous because
+it is an attack that does not require reply packets to be useful. Do
+not use an SNMP monitoring station unless you can prevent forged
+packets with its address from reaching the machine. </p><p></li>
+<a name="INDEX-1133" />
+</ol>
+</dd>
+
+</dl>
+
+
+<a name="ch12-11-fm2xml" /><div class="sect3">
+<h3 class="sect3">12.4.5.1. The Services control panel</h3>
+
+
+
+
+
+Once you have removed the services you don't want, there should
+be relatively little left in the Services control panel. You will
+probably want to disable all but the necessary services previously
+discussed and the services you intend to provide. You should be
+particularly careful to disable the UPS service and the Schedule
+service unless you are absolutely certain that they are required and
+you have taken steps to protect them from misuse. Both of these
+services have known vulnerabilities.<a name="INDEX-1134" /> <a name="INDEX-1135" /> <a name="INDEX-1136" /></p><p>
+</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="ch12-12-fm2xml" /><div class="sect2">
+<h3 class="sect2">12.4.6. Turning Off Routing</h3>
+
+
+
+
+
+<a name="INDEX-1137" />As we discussed
+in <a href="ch10_01.html">Chapter 10, "Bastion Hosts"</a>, most machines with more than one
+network interface will automatically attempt to route traffic between
+interfaces. You do not normally want a bastion host to do this. If
+you are not trying to configure a bastion host that is also a router,
+you should turn off routing, which is a three-part process:</p><p>
+
+
+
+
+
+<ol><li>Turn off services that advertise the system as a router.</p><p></li><li>Turn off IP forwarding, which actually does the routing.</p></li><li><p>If necessary, turn off source routing separately.</p></li></ol>
+Under Windows NT, turning off IP forwarding can be done either from
+the Networking control panel (under Protocols <img align="absmiddle" src="figs/U2192.gif" /> TCP/IP <img align="absmiddle" src="figs/U2192.gif" />
+Routing), by unchecking Enable IP Forwarding or from the registry by
+setting the following key to 0:</p><p>
+
+
+
+
+
+<blockquote><pre class="code">HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\IPEnableRouter</pre></blockquote>
+
+
+
+
+
+<a name="INDEX-1138" />It
+will automatically be off if there is only one network interface. If
+you later add a second network interface, Windows NT may helpfully
+turn it on for you. Be sure to turn it off after you install all the
+interfaces you intend to have on the machine. In addition, the TCP/IP
+Properties dialog will not inform you if the registry change it is
+trying to make fails; you should verify by exiting and returning to
+the dialog to make certain that your change is still shown, or better
+yet by simply checking the value in the registry.</p><p>
+
+
+
+
+
+As Microsoft points out, the ease with which this can be changed is
+not particularly comforting from a security point of view:</p><p>
+
+
+
+
+
+
+A major concern with [using a dual-interface Windows NT machine with
+routing turned off as a firewall] is that the separation between the
+Internet and your intranet depends on a single option in the TCP/IP
+configuration (or in the associated Registry entry)... An individual
+familiar with Windows NT configuration tools and administrative
+permissions can find and change the Router check box in a matter of
+minutes.</p><p>
+
+
+
+
+
+<em class="citetitle"> -- Microsoft Windows NT Resource Kit Internet
+Guide</em>, Chapter 3</p><p>
+
+
+
+
+
+
+This is a major understatement on their part; an individual who
+actually remembers where to find it ought to be able to change it in
+well under a minute. In order to slow down an attacker, and also
+decrease your chances of accidentally reenabling IP forwarding
+yourself, set the permissions on the Parameters key so that
+Administrator has the same Special Access rights that Everyone has
+(Query Value, Create Subkey, Enumerate Subkeys, Notify, and Read
+Control) and additionally has Write DAC (so that if you want to
+change things later you can).<a href="#FOOTNOTE-25">[25]</a> Note that this will create one situation in which
+TCP/IP Properties appears to work, but your changes silently
+disappear; in this situation, this is not necessarily a bad
+thing.<a name="INDEX-1139" /></p><p><blockquote class="footnote">
+
+
+
+
+<a name="FOOTNOTE-25" />[25]If Everyone has Full
+Access permissions, you have failed to install current service packs
+on the machine. You are likely to have severe security problems.</p><p>
+
+
+
+
+</blockquote>
+</div>
+
+
+<hr width="684" align="left" />
+<div class="navbar"><table width="684" border="0"><tr><td align="left" valign="top" width="228"><a href="ch12_03.html"><img alt="Previous" border="0" src="../gifs/txtpreva.gif" /></a></td><td align="center" valign="top" width="228"><a href="index-2.html"><img alt="Home" border="0" src="../gifs/txthome.gif" /></a></td><td align="right" valign="top" width="228"><a href="ch12_05.html"><img alt="Next" border="0" src="../gifs/txtnexta.gif" /></a></td></tr><tr><td align="left" valign="top" width="228">12.3. Securing Windows NT</td><td align="center" valign="top" width="228"><a href="index/index.html"><img alt="Book Index" border="0" src="../gifs/index.gif" /></a></td><td align="right" valign="top" width="228">12.5. Installing and Modifying Services</td></tr></table><div>
+<hr width="684" align="left" />
+
+<img alt="Library Navigation Links" border="0" src="../gifs/navbar.gif" usemap="#library-map" />
+<p><font size="-1"><a href="copyrght.html">Copyright &copy; 2002</a> O'Reilly &amp; Associates. All rights reserved.</font></p><p>
+
+<map name="library-map"><area shape="rect" coords="1,0,84,90" href="../index.html" /><area shape="rect" coords="86,-7,176,90" href="../ssh/index.html" /><area shape="rect" coords="178,0,265,101" href="../tcp/index.html" /><area shape="rect" coords="266,0,333,90" href="../nfs/index.html" /><area shape="rect" coords="334,-1,429,93" href="../snmp/index.html" /><area shape="rect" coords="431,0,529,116" href="../tshoot/index.html" /><area shape="rect" coords="534,0,594,104" href="../dns/index.html" /><area shape="rect" coords="595,1,704,108" href="index-2.html" /></map>
+
+</body>
+<!-- Mirrored from nnc3.com/mags/Networking2/fire/ch12_04.htm by HTTrack Website Copier/3.x [XR&CO'2014], Fri, 28 Jul 2017 17:51:34 GMT -->
+</html>
